@@ -1,0 +1,21 @@
+# 临时与系统文件
+Thumbs.db
+Desktop.ini
+.DS_Store
+~$*
+
+# Office 临时文件
+*.tmp
+*.bak
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
+
+# 原始小程序包与解包产物（体积大且含第三方代码，不入库）
+*.wxapkg
+unpacked/
+analysis/
