@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="docx-page-size" content="A4">
+  <title>品牌小程序商城 功能清单 PRD</title>
+  <style>
+  /* --- CSS @page 页面模型：封面无页脚，正文居中页码 --- */
+  @page {
+    @bottom-center { content: counter(page); }
+  }
+  @page cover {
+    @bottom-center { content: none; }
+  }
+  section[role="cover"] { page: cover; }
+
+  :root {
+    --typography-fontFamily-heading: "微软雅黑", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --typography-fontFamily-body: "微软雅黑", "Microsoft YaHei", "PingFang SC", sans-serif;
+    --typography-fontSize-title: 28pt;
+    --typography-fontSize-h1: 20pt;
+    --typography-fontSize-coverTitle: 22pt;
+    --typography-fontSize-coverCategory: 14pt;
+    --typography-fontSize-h2: 11pt;
+    --typography-fontSize-h3: 10pt;
+    --typography-fontSize-body: 9pt;
+    --typography-fontSize-small: 8pt;
+    --typography-fontSize-tiny: 7pt;
+    --typography-lineHeight-body: 1.6;
+    --typography-fontWeight-heading: 600;
+    --typography-fontWeight-body: 400;
+    --typography-fontWeight-emphasis: 500;
+    --color-primary: #1565C0;
+    --color-secondary: #0288D1;
+    --color-accent: #00897B;
+    --color-text: #212121;
+    --color-textSecondary: #616161;
+    --color-heading: #1A237E;
+    --color-divider: #E0E0E0;
+    --color-background: #FFFFFF;
+    --color-surface: #F5F7FA;
+    --spacing-paragraph: 0.75em;
+    --spacing-paragraphAfter: 0.75em;
+    --spacing-indent: 0em;
+    --spacing-sectionGap: 2.5em;
+    --spacing-cardPadding: 1.5em;
+    --layout-marginTop: 2.5cm;
+    --layout-marginBottom: 2.0cm;
+    --layout-marginLeft: 2.5cm;
+    --layout-marginRight: 2.5cm;
+    --layout-maxContentWidth: 15.6cm;
+    --sp-08: 0.8em;
+    --sp-06: 0.6em;
+    --sp-05: 0.5em;
+    --sp-04: 0.4em;
+    --sp-03: 0.3em;
+    --sp-15: 1.5em;
+    --ff-mono: "Consolas", "Source Code Pro", monospace;
+
+    --fs-h1: var(--typography-fontSize-h1, 20pt);
+    --fs-h2: var(--typography-fontSize-h2, 11pt);
+    --fs-h3: var(--typography-fontSize-h3, 10pt);
+    --fs-body: var(--typography-fontSize-body, 9pt);
+    --fs-small: var(--typography-fontSize-small, 8pt);
+    --ff-heading: var(--typography-fontFamily-heading, "黑体", SimHei, sans-serif);
+    --ff-body: var(--typography-fontFamily-body, "宋体", SimSun, serif);
+    --lh-body: var(--typography-lineHeight-body, 1.6);
+    --fw-bold: 700;
+    --fw-heading: var(--typography-fontWeight-heading, 600);
+    --color-summary-bg: var(--color-surface, #f5f7fa);
+    --color-summary-border: var(--color-primary, #1565C0);
+    --summary-border-width: 4px;
+    --radius-card: 8px;
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.08);
+    --spacing-paragraph: var(--spacing-paragraph, 0.75em);
+    --spacing-section: var(--spacing-sectionGap, 2.5em);
+    --spacing-block: var(--spacing-cardPadding, 1.5em);
+    --margin-page: 2.5cm;
+    --color-emphasis: #c62828;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--ff-body); font-size: var(--fs-body); line-height: var(--lh-body); color: var(--color-text); background: var(--color-background); max-width: var(--layout-maxContentWidth); margin-left: auto; margin-right: auto; }
+
+  /* Cover */
+  .report-cover {
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    min-height: 60vh; padding: var(--margin-page);
+    background: var(--color-surface);
+  }
+  .cover-category { font-size: var(--typography-fontSize-coverCategory, 14pt); font-family: var(--ff-heading); font-weight: var(--fw-bold); color: var(--color-primary); letter-spacing: 0.08em; margin-bottom: var(--sp-08); text-align: left; }
+  .cover-title { font-size: var(--typography-fontSize-coverTitle, 22pt); font-family: var(--ff-heading); font-weight: var(--fw-bold); color: var(--color-primary); margin-bottom: var(--sp-05); text-align: left; }
+  .cover-subtitle { font-size: var(--fs-h2); color: var(--color-textSecondary); margin-bottom: var(--spacing-section); text-align: left; }
+  .cover-meta { font-size: var(--fs-small); color: var(--color-textSecondary); text-align: left; }
+  .cover-meta p { text-align: left; }
+
+  /* TOC */
+  .doc-toc { padding: var(--spacing-block) var(--margin-page); background: var(--color-background); border-bottom: 1px solid var(--color-divider); }
+  .toc-title { font-weight: var(--fw-bold); margin-bottom: var(--sp-05); font-size: var(--fs-h3); }
+  .toc-list, .toc-list ol, .toc-list ul { list-style: none; list-style-type: none; padding-left: var(--sp-15); }
+  .toc-list li { margin-bottom: var(--sp-03); text-indent: 0; }
+  .toc-list a { color: var(--color-primary); text-decoration: none; }
+
+  /* Executive summary */
+  .executive-summary {
+    margin: var(--spacing-section) var(--margin-page);
+    padding: var(--spacing-section);
+    border-left: var(--summary-border-width) solid var(--color-summary-border);
+    background: var(--color-summary-bg);
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
+  }
+  .summary-header h2 { font-size: var(--fs-h2); font-family: var(--ff-heading); font-weight: var(--fw-heading); border-left: none; padding-left: 0; margin-top: 0; }
+  .summary-badge { font-size: var(--fs-small); color: var(--color-textSecondary); font-style: italic; }
+  .summary-highlights { margin-bottom: var(--spacing-block); }
+  .summary-highlights table { width: 100%; border-collapse: collapse; }
+  .summary-highlights td { padding: var(--spacing-paragraph); text-align: center; border: 1px solid var(--color-divider); background: var(--color-background); }
+  .card-value { font-weight: var(--fw-bold); color: var(--color-primary); }
+  .card-unit { font-size: var(--fs-small); color: var(--color-textSecondary); }
+  .summary-body p { margin-bottom: var(--spacing-paragraph); }
+
+  /* Main body */
+  .report-body { padding: var(--spacing-section) var(--margin-page); }
+  .report-body h2 { font-size: var(--fs-h2); font-family: var(--ff-heading); font-weight: var(--fw-heading); color: var(--color-heading); margin-top: var(--spacing-section); margin-bottom: var(--spacing-paragraph); border-left: 4px solid var(--color-primary); padding-left: var(--sp-06); text-align: left; }
+  .report-body h3 { font-size: var(--fs-h3); font-family: var(--ff-heading); font-weight: var(--fw-heading); color: var(--color-heading); margin-top: var(--spacing-block); margin-bottom: var(--spacing-paragraph); text-align: left; }
+  .report-body p { margin-bottom: var(--spacing-paragraph); text-align: justify; }
+
+  /* Tables */
+  .report-body table { width: 100%; border-collapse: collapse; margin-bottom: var(--spacing-paragraph); font-size: var(--fs-small); }
+  .report-body th { background: var(--color-surface); color: var(--color-heading); font-weight: var(--fw-heading); padding: var(--sp-05) var(--sp-08); border: 1px solid var(--color-divider); text-align: left; }
+  .report-body td { padding: var(--sp-05) var(--sp-08); border: 1px solid var(--color-divider); text-align: left; vertical-align: top; }
+  table caption { caption-side: top; text-align: left; font-weight: var(--fw-heading); padding-bottom: var(--sp-04); }
+
+  /* Callout */
+  .callout-info { border-left: 3px solid var(--color-primary); background: var(--color-surface); padding: var(--sp-06) var(--sp-08); margin-bottom: var(--spacing-paragraph); text-align: left; }
+  .callout-warning { border-left: 3px solid var(--color-emphasis); background: var(--color-surface); padding: var(--sp-06) var(--sp-08); margin-bottom: var(--spacing-paragraph); text-align: left; }
+
+  /* Data emphasis */
+  .data-emphasis { color: var(--color-emphasis); font-weight: var(--fw-bold); }
+  .prio-p0 { color: var(--color-emphasis); font-weight: var(--fw-bold); }
+  </style>
+</head>
+<body>
+  <section role="cover" class="report-cover">
+    <p class="cover-category">产品需求文档 · PRD（精简版）</p>
+    <h1 class="cover-title">品牌小程序商城<br>功能清单 产品需求文档</h1>
+    <p class="cover-subtitle">品牌自营商城 + 会员营销｜33 项功能 / 7 大模块</p>
+    <div class="cover-meta">
+      <p>莱克电气 品牌部 | 2026-10-07 | 版本 V1.0</p>
+    </div>
+  </section>
+
+  <section role="body" class="report-body" data-page-restart="1">
+    <nav class="doc-toc" aria-label="文档目录">
+      <p class="toc-title">目录</p>
+      <ol class="toc-list">
+        <li><a href="#sec-docinfo">文档信息</a></li>
+        <li><a href="#sec-1">一、文档说明</a></li>
+        <li><a href="#sec-2">二、产品定位与目标</a></li>
+        <li><a href="#sec-3">三、功能模块总览</a></li>
+        <li><a href="#sec-4">四、功能清单详表</a></li>
+        <li><a href="#sec-5">五、非功能需求</a></li>
+        <li><a href="#sec-6">六、分期建设建议</a></li>
+        <li><a href="#sec-7">七、待确认事项</a></li>
+      </ol>
+    </nav>
+
+    <div class="executive-summary">
+      <div class="summary-header">
+        <h2>执行摘要</h2>
+        <span class="summary-badge">Executive Summary</span>
+      </div>
+      <div class="summary-highlights">
+        <table>
+          <thead><tr><th>功能总数</th><th>P0 一期必做</th><th>P1 二期建议</th><th>P2 三期可选</th><th>页面规模预估</th></tr></thead>
+          <tbody><tr>
+            <td><span class="card-value">33</span> <span class="card-unit">项</span></td>
+            <td><span class="card-value">14</span> <span class="card-unit">项</span></td>
+            <td><span class="card-value">13</span> <span class="card-unit">项</span></td>
+            <td><span class="card-value">6</span> <span class="card-unit">项</span></td>
+            <td><span class="card-value">90–120</span> <span class="card-unit">页</span></td>
+          </tr></tbody>
+        </table>
+      </div>
+      <div class="summary-body">
+        <p>本清单用于<span class="data-emphasis">新建品牌小程序商城</span>的需求评审与开发报价，是可直接交付研发与外部供应商的功能边界文档。清单按「品牌自营商城 + 会员营销」定位，在原始拆解版（43 条需求、10 大业务域、452 个页面）基础上大幅删减，最终收敛为 <span class="data-emphasis">33 条功能、7 个模块</span>，其中一期必做的 P0 功能 <span class="data-emphasis">14 条</span>，可先跑通「选品 → 下单 → 支付 → 售后」的完整交易闭环。</p>
+        <p>本期明确不做线下 O2O（连锁门店、门店货架、门店自提、扫码购）、分销导购体系（分销员、导购工作台、社区团购）与直播挂载（小程序直播、视频号带货）；抽奖、盲盒等低频玩法降为 P2 可选。原拆解版中的有赞 SaaS 底座、分包体积、加密解密等技术细节属拆解过程数据，非需求内容，本版一并删除。</p>
+      </div>
+    </div>
+
+    <h2 id="sec-docinfo">文档信息</h2>
+    <table>
+      <thead><tr><th>项目</th><th>内容</th></tr></thead>
+      <tbody>
+        <tr><td>文档名称</td><td>品牌小程序商城 功能清单 PRD（精简版）</td></tr>
+        <tr><td>产品定位</td><td>品牌自营商城 + 会员营销</td></tr>
+        <tr><td>编制依据</td><td>LEXY莱克官方旗舰店小程序逆向拆解（V2.1 全量版）删减提炼</td></tr>
+        <tr><td>功能规模</td><td>33 条功能 / 7 个模块（P0 14 条、P1 13 条、P2 6 条）</td></tr>
+        <tr><td>页面规模预估</td><td>精简后约 90 至 120 个页面（原拆解版 452 页）</td></tr>
+        <tr><td>适用对象</td><td>研发团队、外部供应商、品牌部内部评审</td></tr>
+        <tr><td>文档版本</td><td>V1.0</td></tr>
+        <tr><td>编写日期</td><td>2026-10-07</td></tr>
+        <tr><td>编制部门</td><td>莱克电气 品牌部</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-1">一、文档说明</h2>
+    <p>本章说明本清单的编制目的、优先级判定标准，以及相对原始拆解版的删减范围。</p>
+    <h3>（一）编制目的</h3>
+    <p>本清单用于新建品牌小程序商城的需求评审与开发报价，是可直接交付研发与外部供应商的功能边界文档。本版在原始拆解版（43 条需求、10 大业务域、452 个页面）基础上，按「品牌自营商城 + 会员营销」的实际经营需要做了大幅删减，最终收敛为 33 条功能、7 个模块。</p>
+    <h3>（二）优先级定义</h3>
+    <table>
+      <thead><tr><th>优先级</th><th>含义</th><th>判定标准</th></tr></thead>
+      <tbody>
+        <tr><td><span class="prio-p0">P0</span></td><td>一期必做</td><td>缺失即交易链路中断，商城无法开张</td></tr>
+        <tr><td>P1</td><td>二期建议</td><td>影响转化与复购，是会员营销的核心抓手</td></tr>
+        <tr><td>P2</td><td>三期可选</td><td>体验增强或低频玩法，可按预算后置</td></tr>
+      </tbody>
+    </table>
+    <h3>（三）本版删减范围</h3>
+    <p>相对 V2.1 全量拆解版，本版的取舍如下。</p>
+    <table>
+      <thead><tr><th>原模块</th><th>处理</th><th>原因</th></tr></thead>
+      <tbody>
+        <tr><td>首页装修、商品、购物车、交易支付、订单售后</td><td>保留（精简条目）</td><td>商城交易主干</td></tr>
+        <tr><td>会员卡、等级权益、权益卡礼品卡</td><td>保留</td><td>会员营销核心</td></tr>
+        <tr><td>优惠券、积分商城、签到任务</td><td>保留</td><td>会员营销核心</td></tr>
+        <tr><td>拼团、砍价助力</td><td>保留（定为 P1）</td><td>拉新裂变需要</td></tr>
+        <tr><td>连锁门店、门店货架、门店自提、扫码购</td><td>删除</td><td>本期不做线下 O2O</td></tr>
+        <tr><td>分销员、导购工作台、社区团购</td><td>删除</td><td>无分销体系</td></tr>
+        <tr><td>小程序直播、视频号带货</td><td>删除</td><td>直播走独立直播间，商城不做挂载</td></tr>
+        <tr><td>抽奖、盲盒、摇一摇、集卡、预约报名</td><td>降为 P2 可选</td><td>低频玩法，按需保留</td></tr>
+        <tr><td>有赞 SaaS 底座、分包体积、加密解密等技术细节</td><td>删除</td><td>属拆解过程数据，非需求</td></tr>
+        <tr><td>模板自带但未启用模块（教育、酒店、品酒会等）</td><td>删除</td><td>与自身业务无关</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-2">二、产品定位与目标</h2>
+    <p>本章界定商城的定位、经营目标与核心用户场景，作为后续功能取舍的依据。</p>
+    <h3>（一）产品定位</h3>
+    <p><strong>一句话定位</strong>：品牌官方自营小程序商城，覆盖「整机销售 + 耗材复购 + 会员运营」的完整闭环。</p>
+    <h3>（二）产品目标</h3>
+    <table>
+      <thead><tr><th>目标层级</th><th>目标描述</th><th>衡量指标</th></tr></thead>
+      <tbody>
+        <tr><td>业务目标</td><td>承接投放、内容与私域流量的直接成交</td><td>GMV、支付转化率、客单价</td></tr>
+        <tr><td>用户目标</td><td>一站完成选购、复购、会员权益领取</td><td>复购率、会员数、7 日留存</td></tr>
+        <tr><td>品牌目标</td><td>沉淀品牌私域阵地与会员资产</td><td>会员开卡数、私域留存</td></tr>
+      </tbody>
+    </table>
+    <h3>（三）核心用户与场景</h3>
+    <table>
+      <thead><tr><th>用户群</th><th>核心诉求</th><th>对应场景</th></tr></thead>
+      <tbody>
+        <tr><td>品牌会员 / 老客</td><td>耗材复购、会员价、积分兑换</td><td>从「我的」进订单与积分商城复购</td></tr>
+        <tr><td>广告与内容引流用户</td><td>快速了解并下单主推款</td><td>落地页 → 商品详情 → 下单</td></tr>
+        <tr><td>新客 / 泛人群</td><td>领券试买、拼团低价</td><td>领券中心 → 拼团下单</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-3">三、功能模块总览</h2>
+    <p>全清单共 7 个模块、33 条功能，优先级分布如下。</p>
+    <table>
+      <thead><tr><th>序号</th><th>模块</th><th>功能数</th><th>P0</th><th>P1</th><th>P2</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>首页与装修</td><td>5</td><td>3</td><td>2</td><td>0</td></tr>
+        <tr><td>2</td><td>商品与购物车</td><td>6</td><td>3</td><td>2</td><td>1</td></tr>
+        <tr><td>3</td><td>交易与支付</td><td>4</td><td>2</td><td>0</td><td>2</td></tr>
+        <tr><td>4</td><td>订单与售后</td><td>5</td><td>3</td><td>2</td><td>0</td></tr>
+        <tr><td>5</td><td>会员与权益</td><td>5</td><td>2</td><td>2</td><td>1</td></tr>
+        <tr><td>6</td><td>积分与任务</td><td>4</td><td>0</td><td>3</td><td>1</td></tr>
+        <tr><td>7</td><td>营销玩法</td><td>4</td><td>1</td><td>2</td><td>1</td></tr>
+        <tr><td>—</td><td>合计</td><td><strong>33</strong></td><td><strong>14</strong></td><td><strong>13</strong></td><td><strong>6</strong></td></tr>
+      </tbody>
+    </table>
+    <p class="callout-info">&nbsp;&nbsp;页面规模预估：精简后约 90 至 120 个页面（对比原拆解版 452 页）。</p>
+
+    <h2 id="sec-4">四、功能清单详表</h2>
+    <p>下表按 7 个功能模块逐条列示，共 33 条功能，含需求编号、功能名称、功能说明与优先级，可直接用于研发拆分与供应商报价。</p>
+    <h3>（一）首页与装修</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>HM-01</td><td>首页装修引擎</td><td>拖拽式模块组合与排序（搜索、轮播、商品、优惠券、图文等模块），支持定时上下线；后台配置实时生效，无需发版</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>HM-02</td><td>搜索入口</td><td>搜索框、热门搜索词推荐、历史记录；支持商品名与关键词搜索，结果页可排序筛选</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>HM-03</td><td>商品分组货架</td><td>自定义商品分组（主推款、耗材专区、配件等）与组内排序，Tab 切换浏览</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>HM-04</td><td>公告与内容位</td><td>公告条滚动、图片广告位、图文与富文本内容位，用于活动与品牌信息发布</td><td>P1</td></tr>
+        <tr><td>HM-05</td><td>首页领券组件</td><td>首页直接领券，领取后引导进券包或跳转商品页</td><td>P1</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（二）商品与购物车</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>GD-01</td><td>商品详情</td><td>主图与视频、图文详情、规格 SKU 选择、库存与价格联动、评价展示、关联推荐</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>GD-02</td><td>商品列表与搜索</td><td>按分类与标签浏览，关键词搜索，排序筛选（销量、价格、上新），分页加载</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>GD-03</td><td>购物车</td><td>作为独立 Tab；数量增减、勾选结算、全选、失效商品处理、凑单推荐</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>GD-04</td><td>商品评价</td><td>订单评价、图文晒单上传、评价列表与统计展示</td><td>P1</td></tr>
+        <tr><td>GD-05</td><td>快速购买</td><td>商品列表与详情页一键直达下单页，减少跳转步骤</td><td>P1</td></tr>
+        <tr><td>GD-06</td><td>秒杀与限时抢购</td><td>秒杀会场、倒计时、开抢提醒、秒杀专享价</td><td>P2</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（三）交易与支付</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>TD-01</td><td>下单结算</td><td>收货地址管理（含地图选点）、优惠券选择、订单备注、发票信息、支付方式选择</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>TD-02</td><td>微信支付</td><td>调起微信支付完成付款；支付结果页、支付失败兜底与订单状态回查</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>TD-03</td><td>储值卡与礼品卡</td><td>卡充值、余额支付、充值赠送、卡余额与消费记录</td><td>P2</td></tr>
+        <tr><td>TD-04</td><td>订单分享</td><td>下单后分享给好友或群，支持代付场景</td><td>P2</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（四）订单与售后</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>OD-01</td><td>订单列表与详情</td><td>按状态分栏（待付款、待发货、待收货、已完成、已取消），支持订单搜索</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>OD-02</td><td>物流跟踪</td><td>快递轨迹查询、发货提醒、物流信息展示</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>OD-03</td><td>退款与退货</td><td>退款申请、退货寄回、进度查询、退款状态通知</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>OD-04</td><td>发票与凭证</td><td>发票申请、电子发票查看与下载</td><td>P1</td></tr>
+        <tr><td>OD-05</td><td>售后客服</td><td>微信客服会话接入、满意度评价</td><td>P1</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（五）会员与权益</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>MB-01</td><td>会员卡开卡</td><td>领卡入会、会员信息填写、开卡礼发放</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>MB-02</td><td>个人中心</td><td>订单入口、优惠券、积分、收藏、地址、会员卡聚合页</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>MB-03</td><td>会员等级与成长</td><td>等级规则配置、成长值与消费升级、各等级权益展示</td><td>P1</td></tr>
+        <tr><td>MB-04</td><td>权益卡与礼品卡</td><td>权益领取与核销、礼品卡购买与赠送、领取记录</td><td>P1</td></tr>
+        <tr><td>MB-05</td><td>会员码</td><td>会员二维码，用于门店与活动核销识别</td><td>P2</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（六）积分与任务</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>PT-01</td><td>积分商城</td><td>积分兑换商品与优惠券，含兑换结果与物流信息</td><td>P1</td></tr>
+        <tr><td>PT-02</td><td>积分中心</td><td>积分余额、明细流水、积分规则说明</td><td>P1</td></tr>
+        <tr><td>PT-03</td><td>每日签到</td><td>每日签到得积分，连续签到额外奖励</td><td>P1</td></tr>
+        <tr><td>PT-04</td><td>任务中心与打卡</td><td>任务列表、完成领奖、打卡记录</td><td>P2</td></tr>
+      </tbody>
+    </table>
+
+    <h3>（七）营销玩法</h3>
+    <table>
+      <thead><tr><th>编号</th><th>功能名称</th><th>功能说明</th><th>优先级</th></tr></thead>
+      <tbody>
+        <tr><td>MK-01</td><td>优惠券体系</td><td>领券中心、我的券包、券详情、分享券；支持满减、折扣、无门槛券类型</td><td><span class="prio-p0">P0</span></td></tr>
+        <tr><td>MK-02</td><td>拼团</td><td>拼团详情、开团与参团、成团提醒、拼团专享价</td><td>P1</td></tr>
+        <tr><td>MK-03</td><td>砍价与助力</td><td>好友助力砍价、分享有礼、助力进度展示</td><td>P1</td></tr>
+        <tr><td>MK-04</td><td>抽奖与互动（可选）</td><td>抽奖、盲盒等互动玩法，按运营需要启用</td><td>P2</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-5">五、非功能需求</h2>
+    <table>
+      <thead><tr><th>类别</th><th>要求</th></tr></thead>
+      <tbody>
+        <tr><td>性能</td><td>高频链路做分包预加载（购物车、下单、支付结果、个人中心）；首页依赖远程装修数据，需骨架屏与加载失败兜底</td></tr>
+        <tr><td>包体管理</td><td>主包与单个分包均需控制在微信平台上限内；新增功能优先落入既有分包，避免主包膨胀</td></tr>
+        <tr><td>隐私合规</td><td>若使用定位能力须在隐私协议中明示并前置授权；按《个人信息保护法》与微信隐私接口规范留存授权记录</td></tr>
+        <tr><td>安全风控</td><td>支付走微信支付官方通道；会员、积分、券等资产类数据须服务端校验；签到、领券、抽奖接口需限频防刷</td></tr>
+        <tr><td>可运营性</td><td>首页装修、活动、优惠券、会员权益均需后台可配置，配置变更不触发小程序重新发版</td></tr>
+        <tr><td>稳定性</td><td>下单、支付、退款关键链路需具备异常兜底与订单状态补偿机制</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-6">六、分期建设建议</h2>
+    <table>
+      <thead><tr><th>阶段</th><th>建设内容</th><th>目标</th></tr></thead>
+      <tbody>
+        <tr><td>一期（MVP）</td><td>全部 14 条 P0 功能</td><td>商城可开张交易，完成「选品 → 下单 → 支付 → 售后」闭环</td></tr>
+        <tr><td>二期</td><td>全部 13 条 P1 功能</td><td>会员营销体系上线，拉动复购与裂变</td></tr>
+        <tr><td>三期</td><td>6 条 P2 功能按需选做</td><td>体验增强与补充玩法</td></tr>
+      </tbody>
+    </table>
+
+    <h2 id="sec-7">七、待确认事项</h2>
+    <p>以下事项需在开发启动前确认，直接影响技术方案与工作量评估。</p>
+    <table>
+      <thead><tr><th>序号</th><th>待确认事项</th><th>影响范围</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>商城技术方案：自研、第三方 SaaS（如有赞、微盟）或混合模式</td><td>决定后台可配置能力的边界</td></tr>
+        <tr><td>2</td><td>会员体系与现有 CRM、企业微信是否打通</td><td>会员资产的归属与同步方式</td></tr>
+        <tr><td>3</td><td>积分与订单数据是否需与线下门店或其他渠道打通</td><td>本期虽不做门店 O2O，但数据口径需预留</td></tr>
+        <tr><td>4</td><td>商品数据源（ERP 或中台）与库存同步方式</td><td>商品与库存数据的准确性</td></tr>
+      </tbody>
+    </table>
+  </section>
+</body>
+</html>
