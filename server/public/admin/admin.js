@@ -429,27 +429,47 @@
     } else {
       var src = lib[S.libTab] || [];
       desc.textContent = (meta.desc || '') + '（共 ' + src.length + ' 个，高亮为本后台已接入、可直接添加）';
-      src.forEach(function (x) {
+      var useGroups = S.libTab === 'basic' && (lib.groups || []).length;
+      var pushOne = function (x) {
         var kind = x.kind ? (lib.kinds || []).filter(function (y) { return y.kind === x.kind; })[0] : null;
+        // 只有「声明了 ok 且 schema 里真有这个 kind」才算已接入，二者缺一不可
+        var on = !!x.ok && !!kind;
         items.push({
           kind: x.kind,
           label: x.n,
           icon: kind ? kind.icon : lib.icons.image_ad,
           desc: kind ? kind.desc : '需在小程序端开发对应组件后接入',
-          on: !!x.ok && !!kind
+          why: on ? '' : (x.why || '需在小程序端开发对应组件后接入'),
+          on: on
         });
-      });
+      };
+      if (useGroups) {
+        // 有赞左侧「基础组件」实测分 10 组，这里按真实分组渲染，方便逐个对账
+        (lib.groups || []).forEach(function (g) {
+          items.push({ __group: g.name, __count: (g.items || []).length });
+          (g.items || []).forEach(pushOne);
+        });
+      } else {
+        src.forEach(pushOne);
+      }
     }
 
     var grid = $('libGrid');
     grid.innerHTML = '';
     items.forEach(function (it) {
+      if (it.__group) {
+        // 分组标题（整行占满），不是可点击项
+        var h = el('div', 'lib-group');
+        h.innerHTML = '<span>' + esc(it.__group) + '</span><i>' + it.__count + '</i>';
+        grid.appendChild(h);
+        return;
+      }
       var b = el('button', 'lib-item' + (it.on ? '' : ' off'));
       b.innerHTML = (it.icon || '') + '<span class="lib-name">' + esc(it.label) + '</span>' +
         (it.on ? '' : '<span class="lib-flag">未接入</span>');
-      b.title = (it.on ? '点击添加到「页面区块」末尾' : '未接入：') + (it.desc || '');
+      b.title = (it.on ? '点击添加到「页面区块」末尾' : '未接入：') + (it.why || it.desc || '');
       if (it.on) b.onclick = function () { addComponent(it.kind); };
-      else b.onclick = function () { toast(it.label + '：' + (it.desc || '暂未接入'), 'err'); };
+      else b.onclick = function () { toast(it.label + '：' + (it.why || it.desc || '暂未接入'), 'err'); };
       grid.appendChild(b);
     });
   }
@@ -1523,6 +1543,21 @@
       .filter(function (x) { return x.image; });
   }
 
+  /**
+   * 富文本预览：与小程序端 utils/blocks.js 的 sanitizeRich() 保持同一套过滤规则。
+   *
+   * 后台预览会把内容 innerHTML 进 DOM，所以这里的过滤不是为了「好看」，
+   * 而是防止运营粘贴进来的 HTML 里带 <script> / onerror= 之类把后台页面打挂。
+   * 小程序端用的是同一份规则（那边过滤后交给 rich-text，本身不执行脚本）。
+   */
+  function pvRich(html) {
+    return String(html || '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/javascript:/gi, '');
+  }
+
   /** 跳转角标：预览里给「已设置跳转」的元素一个一眼能认出来的标记 */
   function linkBadge(link) {
     if (!link) return '';
@@ -1654,9 +1689,132 @@
       box += '<div class="pv-goods">' + (b.title ? '<div class="gt">' + esc(b.title) + '</div>' : '') +
         '<div class="gg">' + cells + '</div>' +
         '<div class="empty">商品数据由后端 /api/goods/list 实时提供，小程序端渲染真实商品</div></div>';
+    } else if (kind === 'rich_text') {
+      // full='0'（隐藏全屏）= 保留页面边距；full='1' = 内容占满整宽（与小程序端 normalize 同规则）
+      var richPad = b.full === '0' ? (b.pageMargin || 12) : 0;
+      var richHtml = pvRich(b.html);
+      box += '<div class="pv-rich" style="padding:8px ' + richPad + 'px;background:' + (b.bg || 'transparent') + '">' +
+        (richHtml ? richHtml : '<div style="color:#b8bec8;font-size:12px;padding:12px 0">（未填内容）支持 HTML，如 &lt;p&gt;文字&lt;/p&gt;</div>') +
+        '</div>';
+    } else if (kind === 'search') {
+      var sH = b.boxHeight || 36;
+      var sMargin = b.pageMargin || 12;
+      var sRound = (b.shape || 'square') === 'round' ? 999 : 4;
+      var sCenter = (b.textAlign || 'left') === 'center';
+      var sSticky = (b.sticky || 'normal') === 'sticky';
+      box += '<div style="padding:6px ' + sMargin + 'px;background:' + (b.bg || '#FFFFFF') + '">' +
+        (sSticky ? '<div style="font-size:10px;color:#8a919e;margin-bottom:2px">吸顶</div>' : '') +
+        '<div style="height:' + sH + 'px;background:' + (b.boxBg || '#F5F6F8') + ';border-radius:' + sRound + 'px;' +
+        'display:flex;align-items:center;gap:6px;padding:0 10px;' +
+        'justify-content:' + (sCenter ? 'center' : 'flex-start') + '">' +
+        '<span style="font-size:12px">🔍</span>' +
+        '<span style="flex:1;font-size:12px;color:' + (b.color || '#999999') + ';text-align:' + (sCenter ? 'center' : 'left') + ';' +
+        'overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(b.placeholder || '搜索店内商品') + '</span>' +
+        (b.scan ? '<span style="font-size:12px">⌗</span>' : '') +
+        '</div>' +
+        ((b.mode || 'input') === 'link' ? (b.link ? linkBadge(b.link) : '<div style="font-size:10px;color:#d46b08;margin-top:2px">整块跳转：未设置跳转链接</div>') : '') +
+        '</div>';
+    } else if (kind === 'elevator') {
+      var eItems = (b.items || []).filter(function (x) { return x && x.text; });
+      var eStyle = b.tagStyle || 'bg';
+      var eAct = Number(b.activeIndex) || 0;
+      var ePad = b.pageMargin || 0;
+      var eTag = function (it, k) {
+        var on = k === eAct;
+        var st = 'color:' + (on ? (b.activeColor || '#C8102E') : (b.color || '#323233')) + ';';
+        if (eStyle === 'bg') st += 'background:' + (on ? (b.activeColor || '#C8102E') : '#F5F6F8') + ';color:' + (on ? '#fff' : (b.color || '#323233')) + ';border-radius:4px;padding:4px 8px;';
+        else if (eStyle === 'round') st += 'border:1px solid ' + (on ? (b.activeColor || '#C8102E') : '#e5e6eb') + ';border-radius:999px;padding:3px 8px;';
+        else if (eStyle === 'square') st += 'border:1px solid ' + (on ? (b.activeColor || '#C8102E') : '#e5e6eb') + ';padding:3px 8px;';
+        else st += 'border-bottom:2px solid ' + (on ? (b.activeColor || '#C8102E') : 'transparent') + ';padding:4px 2px;';
+        return '<span style="' + st + 'font-size:12px;white-space:nowrap" title="定位到区块 ' + (Number(it.target) || 0) + '">' + esc(it.text) + '</span>';
+      };
+      box += '<div style="background:' + (b.bg || '#FFFFFF') + ';padding:6px ' + ePad + 'px">' +
+        (eItems.length
+          ? '<div style="display:flex;gap:6px;overflow:hidden;' + (b.mode === 'dropdown' ? 'flex-direction:column' : 'align-items:center') + '">' +
+            eItems.slice(0, 12).map(eTag).join('') + '</div>'
+          : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加标签）</div>') +
+        (b.mode === 'dropdown' ? '<div style="font-size:10px;color:#8a919e;margin-top:2px">下拉展示</div>' : '') +
+        '</div>';
+    } else if (kind === 'enter_shop' || kind === 'service') {
+      var isSvc = kind === 'service';
+      var bJustify = b.align === 'right' ? 'flex-end' : (b.align === 'left' ? 'flex-start' : 'center');
+      var bRound = (b.radius || 'round') !== 'square' ? 999 : 4;
+      var bTxt = b.text || (isSvc ? '在线咨询' : '进入店铺');
+      var bBg = b.bg || (isSvc ? '#07C160' : '#FFFFFF');
+      var bFg = b.color || (isSvc ? '#FFFFFF' : '#323233');
+      box += '<div style="padding:10px ' + (b.pageMargin || 12) + 'px;background:' + (b.bgOut || 'transparent') + ';display:flex;justify-content:' + bJustify + '">' +
+        '<span style="display:inline-block;padding:7px 18px;font-size:13px;border-radius:' + bRound + 'px;' +
+        'background:' + bBg + ';color:' + bFg + ';border:1px solid ' + (isSvc ? 'transparent' : '#e5e6eb') + '">' +
+        esc(bTxt) + (isSvc ? ' 💬' : '') + '</span>' +
+        (b.link ? linkBadge(b.link) : '') +
+        (isSvc ? '<span style="font-size:10px;color:#8a919e;margin-left:6px;align-self:center">唤起微信客服</span>' : '') +
+        '</div>';
+    } else if (kind === 'audio') {
+      var aDur = Number(b.duration) || 6;
+      // 与小程序端一致：宽度随时长增长，220~520rpx 之间
+      var aW = Math.max(220, Math.min(520, 160 + aDur * 24)) / 2;
+      var aRight = b.side === 'right';
+      var aAv = b.avatar;
+      box += '<div class="pv-audio' + (aRight ? ' right' : '') + '" style="padding:8px ' + (b.pageMargin || 16) + 'px">' +
+        (aAv ? '<img src="' + attr(aAv) + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover;flex:0 0 auto">'
+             : '<div style="width:32px;height:32px;border-radius:50%;background:#f0f2f5;flex:0 0 auto"></div>') +
+        '<div style="width:' + aW + 'px;min-height:32px;display:flex;align-items:center;gap:6px;padding:0 10px;border-radius:6px;' +
+        'background:' + (aRight ? '#95EC69' : '#fff') + ';border:1px solid #eceef1;' +
+        (aRight ? 'order:-1;' : '') + '">' +
+        (b.text ? '<span style="font-size:12px;flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(b.text) + '</span>' : '') +
+        '<span style="font-size:11px;color:#8a919e">' + aDur + '″</span>' +
+        '<span style="font-size:11px">▶</span></div>' +
+        (b.src ? '' : '<span style="font-size:10px;color:#d46b08;align-self:center">未设置音频地址</span>') +
+        '</div>';
+    } else if (kind === 'content_card') {
+      var cCols = Number(b.cols) || 2;
+      var cCellW = 100 / cCols;
+      var cRatio = Number(b.ratio) || 0.75;
+      // 与小程序的 padTopPct 同一算法：4:3 → 133.33（不是 1.33），否则预览里卡片会被压成一条线
+      var cPad = Math.round(10000 / cRatio) / 100;
+      var cClass = b.style === 'white' ? 'white' : (b.style === 'plain' ? 'plain' : 'shadow');
+      var cRound = (b.radius || 'round') !== 'square';
+      var cItems = (b.items || []).filter(function (x) { return x && (x.image || x.title); });
+      var cCells = cItems.slice(0, cCols === 1 ? 4 : 6).map(function (it) {
+        return '<div style="width:' + cCellW + '%;box-sizing:border-box;padding:0 ' + (cCols === 1 ? 0 : 3) + 'px;margin-bottom:6px">' +
+          '<div class="pv-ccard ' + cClass + (cRound ? ' round' : '') + '">' +
+          '<div style="position:relative;padding-top:' + cPad + '%;background:#f5f6f8">' +
+          (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">' : '') +
+          '</div><div style="padding:6px">' +
+          (it.title ? '<div style="font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
+          (it.desc ? '<div style="font-size:11px;color:#8a919e;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.desc) + '</div>' : '') +
+          ((b.showTag || b.showRead || b.showLike)
+            ? '<div style="margin-top:4px;display:flex;gap:6px;font-size:10px;color:#8a919e">' +
+              (b.showTag ? '<span style="background:#f2f3f5;border-radius:3px;padding:0 4px">笔记</span>' : '') +
+              (b.showRead ? '<span>👁 0</span>' : '') + (b.showLike ? '<span>♡ 0</span>' : '') + '</div>'
+            : '') +
+          '</div>' + (it.link ? linkBadge(it.link) : '') + '</div></div>';
+      }).join('');
+      box += '<div style="padding:6px ' + (b.pageMargin || 12) + 'px">' +
+        (b.title ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">' + esc(b.title) + '</div>' : '') +
+        (cItems.length ? '<div style="display:flex;flex-wrap:wrap;margin:0 -3px">' + cCells + '</div>'
+                       : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加卡片）</div>') +
+        (b.more ? '<div style="text-align:center;font-size:12px;color:#8a919e;padding-top:6px">' +
+          esc(b.moreText || '查看更多') + ' ›</div>' : '') +
+        '</div>';
+    } else if (kind === 'buy_bar') {
+      var bbOn = b.bgOn !== false;
+      var bbBg = b.theme === 'custom' ? (b.btnBg || '#C8102E') : '#C8102E';
+      var bbH = (b.bgH || 76) / 2;
+      box += '<div style="position:sticky;bottom:0;z-index:5;height:' + bbH + 'px;background:' + (bbOn ? (b.bg || '#FFFFFF') : 'transparent') + ';' +
+        'display:flex;align-items:center;justify-content:' + (b.align === 'right' ? 'flex-end' : 'center') + ';' +
+        'padding:0 ' + ((b.padX || 16) / 2) + 'px ' + ((b.padB || 14) / 2) + 'px;box-sizing:border-box">' +
+        '<span style="display:inline-flex;align-items:center;justify-content:center;' +
+        'min-width:120px;height:' + ((b.btnH || 48) / 2) + 'px;border-radius:' + ((b.btnR || 4) / 2) + 'px;' +
+        'font-size:' + ((b.fontSize || 16) / 2) + 'px;background:' + bbBg + ';color:#fff;padding:0 16px">' +
+        esc(b.text || '立即下单') + '</span>' +
+        (b.goodsId ? '<span style="font-size:10px;color:#8a919e;margin-left:6px">→ ' + esc(b.goodsId) + '</span>'
+                   : '<span style="font-size:10px;color:#d46b08;margin-left:6px">未填商品 ID</span>') +
+        '<span style="font-size:10px;color:#8a919e;margin-left:6px">固定吸底</span>' +
+        '</div>';
     }
 
-    box += '<span class="pv-tag">' + esc(({ swiper: '图片广告', image: '图片', video: '视频', title: '标题文本', line: '辅助分割', notice: '公告', nav: '图文导航', cube: '魔方', hotspot: '热区切图', shop: '店铺信息', goods: '商品' }[kind] || kind)) + ' ' + (i + 1) + '</span>';
+    box += '<span class="pv-tag">' + esc(({ swiper: '图片广告', image: '图片', video: '视频', title: '标题文本', line: '辅助分割', notice: '公告', nav: '图文导航', cube: '魔方', hotspot: '热区切图', shop: '店铺信息', goods: '商品', rich_text: '富文本', search: '商品搜索', elevator: '电梯导航', enter_shop: '进入店铺', audio: '语音', service: '在线客服', content_card: '内容卡片', buy_bar: '购买按钮' }[kind] || kind)) + ' ' + (i + 1) + '</span>';
     box += opsBar(p, listPath, i);
     box += '</div>';
     return box;

@@ -55,7 +55,14 @@ const ICONS = {
   cube: I('<rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/>'),
   hotspot: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 10h5v5" stroke-dasharray="2 2"/>'),
   shop: I('<path d="M4 9l1.5-4h13L20 9"/><path d="M4 9v10h16V9"/><path d="M9 19v-5h6v5"/>'),
-  anchor: I('<path d="M5 6h14M5 12h14M5 18h9"/>')
+  anchor: I('<path d="M5 6h14M5 12h14M5 18h9"/>'),
+  rich_text: I('<path d="M4 6h16"/><path d="M4 11h10M4 15h13M4 19h7"/><path d="M16 9l4 4-4 4" stroke-opacity=".4"/>'),
+  search: I('<circle cx="11" cy="11" r="6"/><path d="M15.5 15.5L20 20"/>'),
+  elevator: I('<rect x="4" y="3" width="12" height="18" rx="2"/><path d="M6 7h8M6 11h8M6 15h5"/><path d="M19 7v10M17 9l2-2 2 2M17 15l2 2 2-2" stroke-opacity=".5"/>'),
+  audio: I('<path d="M9 15V6l7-2v9"/><circle cx="6.5" cy="16" r="2.5"/><circle cx="16" cy="14" r="2.5"/>'),
+  service: I('<path d="M5 12a7 7 0 0114 0"/><rect x="3" y="12" width="4" height="7" rx="1.6"/><rect x="17" y="12" width="4" height="7" rx="1.6"/><path d="M17 19c0 1.3-1.4 2-3.2 2" stroke-opacity=".6"/>'),
+  content_card: I('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M6 19h12M8 8h6M8 11h4"/>'),
+  buy_bar: I('<rect x="3" y="16" width="18" height="5" rx="2.5"/><path d="M7 8.5h10M7 12h6" stroke-opacity=".5"/>')
 };
 
 /* ============================ 跳转链接（对标有赞「选择链接」） ============================ */
@@ -403,94 +410,384 @@ const HOME_BLOCK_KINDS = {
         fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }]
       }
     ]
+  },
+
+  /* ---------- 富文本（对标有赞「富文本」） ---------- */
+  rich_text: {
+    label: '富文本',
+    lib: 'rich_text',
+    group: 'basic',
+    desc: 'HTML 图文混排内容，小程序端用 rich-text 渲染',
+    tip: '字号 / 颜色以真机实际效果为准，左侧预览仅供参考（与有赞同款提示）。',
+    fields: [
+      {
+        k: 'html', label: '内容', type: 'textarea', rows: 8, required: true,
+        hint: '支持 HTML 片段：<p>文字</p> / <b>加粗</b> / <img src="…" /> / <br/>；<script> 会被过滤'
+      },
+      { k: 'bg', label: '背景颜色', type: 'color', def: '' },
+      { k: 'full', label: '全屏显示', type: 'radiobutton', def: '1', options: [{ value: '1', label: '显示' }, { value: '0', label: '隐藏' }], hint: '「显示」= 内容占满整宽（忽略页面边距）' },
+      {
+        type: 'group', label: '更多设置',
+        fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }]
+      }
+    ]
+  },
+
+  /* ---------- 商品搜索（对标有赞「商品搜索」） ---------- */
+  search: {
+    label: '商品搜索',
+    lib: 'search',
+    group: 'basic',
+    desc: '搜索框 + 可选扫一扫，点击进入商品列表搜索页',
+    tip: '点击后跳到商品列表页并带上关键词；「扫一扫」仅支持扫含条码的商品。',
+    fields: [
+      { k: 'placeholder', label: '占位文字', type: 'text', def: '搜索店内商品' },
+      { k: 'mode', label: '搜索方式', type: 'radiobutton', def: 'input', options: [{ value: 'input', label: '输入搜索' }, { value: 'link', label: '整块跳转' }], hint: '「整块跳转」时点击搜索框直接跳「跳转链接」，不再进搜索页' },
+      { k: 'sticky', label: '显示位置', type: 'radiobutton', def: 'normal', options: [{ value: 'normal', label: '正常模式' }, { value: 'sticky', label: '吸顶' }] },
+      { k: 'shape', label: '框体样式', type: 'radiobutton', def: 'square', options: [{ value: 'square', label: '方形' }, { value: 'round', label: '圆角' }] },
+      { k: 'textAlign', label: '文本位置', type: 'radiobutton', def: 'left', options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }] },
+      { k: 'boxHeight', label: '框体高度', type: 'slider', min: 24, max: 60, step: 2, unit: 'px', def: 36 },
+      { k: 'scan', label: '扫一扫', type: 'switch', def: false, hint: '开启后框内右侧出现扫码入口' },
+      { k: 'bg', label: '背景颜色', type: 'color', def: '#FFFFFF' },
+      { k: 'boxBg', label: '框体颜色', type: 'color', def: '#F5F6F8' },
+      { k: 'color', label: '文本颜色', type: 'color', def: '#999999' },
+      {
+        type: 'group', label: '更多设置',
+        fields: [linkField('整块跳转'), { k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }]
+      }
+    ]
+  },
+
+  /* ---------- 电梯导航（对标有赞「电梯导航」） ---------- */
+  elevator: {
+    label: '电梯导航',
+    lib: 'elevator',
+    group: 'basic',
+    desc: '标签导航条，点击滚动定位到页面下方指定区块',
+    tip: '与有赞一致：只能定位到「本组件下方」的区块，所以「定位到区块」填的是区块序号（从 1 开始，含本组件自身）。',
+    fields: [
+      { k: 'mode', label: '展示方式', type: 'radiobutton', def: 'scroll', options: [{ value: 'scroll', label: '横向滚动' }, { value: 'dropdown', label: '下拉展示' }] },
+      { k: 'styleType', label: '标签样式', type: 'radiobutton', def: 'theme', options: [{ value: 'theme', label: '全店风格' }, { value: 'custom', label: '自定义' }] },
+      { k: 'tagStyle', label: '标签风格', type: 'radiobutton', def: 'bg', options: [{ value: 'bg', label: '背景模式' }, { value: 'round', label: '圆框' }, { value: 'square', label: '方框' }, { value: 'underline', label: '下划线' }] },
+      {
+        k: 'items', label: '标签', type: 'list', max: 20, sortable: true, addable: true,
+        item: {
+          type: 'object', title: (v, i) => v.text || ('标签 ' + (i + 1)),
+          fields: [
+            { k: 'text', label: '标签文字', type: 'text' },
+            { k: 'target', label: '定位到区块', type: 'number', hint: '填下方区块的序号（1 开始，含本组件自身）' }
+          ]
+        },
+        hint: '最多 20 个标签；小程序端点击标签会滚动到对应区块'
+      },
+      { k: 'color', label: '文字颜色', type: 'color', def: '#323233' },
+      { k: 'activeColor', label: '选中颜色', type: 'color', def: '#C8102E' },
+      { k: 'bg', label: '背景颜色', type: 'color', def: '#FFFFFF' },
+      {
+        type: 'group', label: '更多设置',
+        fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 0 }]
+      }
+    ]
+  },
+
+  /* ---------- 进入店铺（对标有赞「进入店铺」） ---------- */
+  enter_shop: {
+    label: '进入店铺',
+    lib: 'shop',
+    group: 'basic',
+    desc: '一个「进入店铺」按钮，点击可跳转到店铺主页',
+    fields: [
+      { k: 'text', label: '文案', type: 'text', def: '进入店铺' },
+      { k: 'align', label: '对齐', type: 'radiobutton', def: 'center', options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }, { value: 'right', label: '右对齐' }] },
+      { k: 'color', label: '文字颜色', type: 'color', def: '#323233' },
+      { k: 'bg', label: '按钮背景', type: 'color', def: '#FFFFFF' },
+      { k: 'radius', label: '边角样式', type: 'radiobutton', def: 'round', options: [{ value: 'square', label: '方角' }, { value: 'round', label: '圆角' }] },
+      linkField('点击跳转'),
+      {
+        type: 'group', label: '更多设置',
+        fields: [
+          { k: 'bgOut', label: '区块背景', type: 'color', def: '' },
+          { k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }
+        ]
+      }
+    ]
+  },
+
+  /* ---------- 语音（对标有赞「语音」） ---------- */
+  audio: {
+    label: '语音',
+    lib: 'audio',
+    group: 'basic',
+    desc: '微信对话框样式的一条语音，点击播放',
+    tip: '小程序端用 InnerAudioContext 播放；音频受小程序 downloadFile 域名白名单约束，建议用自有 CDN。',
+    fields: [
+      { k: 'src', label: '音频地址', type: 'text', required: true },
+      { k: 'duration', label: '时长（秒）', type: 'slider', min: 1, max: 60, step: 1, unit: '秒', def: 6, hint: '仅影响气泡宽度与角标显示，不会截断音频' },
+      { k: 'text', label: '气泡内文字', type: 'text', def: '' },
+      { k: 'avatar', label: '头像', type: 'image', hint: '建议 80×80 像素' },
+      { k: 'useShopLogo', label: '使用店铺 logo', type: 'switch', def: true, hint: '开启且未设置头像时，使用店铺头像' },
+      { k: 'side', label: '气泡位置', type: 'radiobutton', def: 'left', options: [{ value: 'left', label: '居左' }, { value: 'right', label: '居右' }] },
+      { k: 'resume', label: '播放方式', type: 'radiobutton', def: 'restart', options: [{ value: 'restart', label: '暂停后从头开始' }, { value: 'resume', label: '暂停后从暂停位置开始' }] },
+      {
+        type: 'group', label: '更多设置',
+        fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 16 }]
+      }
+    ]
+  },
+
+  /* ---------- 在线客服（对标有赞「在线客服」） ---------- */
+  service: {
+    label: '在线客服',
+    lib: 'service',
+    group: 'basic',
+    desc: '唤起微信客服会话的按钮（open-type=contact）',
+    tip: '小程序端用 <button open-type="contact">，需要店铺已开通微信客服；未开通时点击无反应。',
+    fields: [
+      { k: 'text', label: '文案', type: 'text', def: '在线咨询', hint: '建议 4 个字' },
+      { k: 'align', label: '对齐', type: 'radiobutton', def: 'center', options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }, { value: 'right', label: '右对齐' }] },
+      { k: 'color', label: '文字颜色', type: 'color', def: '#FFFFFF' },
+      { k: 'bg', label: '按钮背景', type: 'color', def: '#07C160' },
+      { k: 'radius', label: '边角样式', type: 'radiobutton', def: 'round', options: [{ value: 'square', label: '方角' }, { value: 'round', label: '圆角' }] },
+      {
+        type: 'group', label: '更多设置',
+        fields: [
+          { k: 'bgOut', label: '区块背景', type: 'color', def: '' },
+          { k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }
+        ]
+      }
+    ]
+  },
+
+  /* ---------- 内容卡片（对标有赞「内容卡片」） ---------- */
+  content_card: {
+    label: '内容卡片',
+    lib: 'content_card',
+    group: 'basic',
+    desc: '专题图文卡片列表（一行一个 / 两列）',
+    fields: [
+      { k: 'title', label: '专题名称', type: 'text', hint: '建议不超过 8 个字' },
+      { k: 'cols', label: '列表样式', type: 'radiobutton', def: '2', options: [{ value: '1', label: '一行一个' }, { value: '2', label: '两列' }] },
+      { k: 'ratio', label: '图片比例', type: 'radiobutton', def: '0.75', options: [{ value: '1', label: '1:1' }, { value: '0.75', label: '4:3' }, { value: '0.5625', label: '16:9' }] },
+      {
+        k: 'items', label: '卡片', type: 'list', max: 50, sortable: true, addable: true,
+        item: {
+          type: 'object', title: (v, i) => v.title || ('卡片 ' + (i + 1)),
+          fields: [
+            { k: 'image', label: '封面图', type: 'image' },
+            { k: 'title', label: '标题', type: 'text' },
+            { k: 'desc', label: '描述', type: 'text' },
+            linkField()
+          ]
+        }
+      },
+      {
+        type: 'group', label: '显示设置',
+        fields: [
+          { k: 'style', label: '卡片样式', type: 'radiobutton', def: 'shadow', options: [{ value: 'shadow', label: '卡片投影' }, { value: 'white', label: '无边白底' }, { value: 'plain', label: '无边透明底' }] },
+          { k: 'radius', label: '卡片倒角', type: 'radiobutton', def: 'round', options: [{ value: 'square', label: '直角' }, { value: 'round', label: '圆角' }] },
+          { k: 'showTag', label: '笔记标签', type: 'switch', def: true },
+          { k: 'showRead', label: '阅读数', type: 'switch', def: false },
+          { k: 'showLike', label: '点赞数', type: 'switch', def: false },
+          { k: 'more', label: '查看更多', type: 'switch', def: false },
+          { k: 'moreText', label: '查看更多文案', type: 'text', def: '查看更多' },
+          linkField('查看更多跳转')
+        ]
+      },
+      {
+        type: 'group', label: '更多设置',
+        fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }]
+      }
+    ]
+  },
+
+  /* ---------- 购买按钮（对标有赞「购买按钮」，吸底） ---------- */
+  buy_bar: {
+    label: '购买按钮',
+    lib: 'buy_bar',
+    group: 'basic',
+    desc: '固定吸底的下单按钮，一个页面建议只加一个',
+    tip: '与有赞一致：固定吸底，一个页面只支持一个。文案建议不超过 10 个字。',
+    fields: [
+      { k: 'goodsId', label: '商品', type: 'text', required: true, hint: '填商品 ID（如 g1001），点击后进入该商品详情页下单' },
+      { k: 'text', label: '按钮文案', type: 'text', def: '立即下单' },
+      { k: 'fontSize', label: '文案字号', type: 'slider', min: 12, max: 24, step: 1, unit: 'px', def: 16 },
+      { k: 'align', label: '对齐', type: 'radiobutton', def: 'center', options: [{ value: 'center', label: '居中对齐' }, { value: 'right', label: '右对齐' }] },
+      { k: 'theme', label: '按钮配色', type: 'radiobutton', def: 'theme', options: [{ value: 'theme', label: '跟随店铺风格' }, { value: 'custom', label: '自定义' }] },
+      { k: 'btnBg', label: '按钮颜色', type: 'color', def: '#C8102E', hint: '仅「自定义」配色时生效' },
+      {
+        type: 'group', label: '尺寸设置',
+        fields: [
+          { k: 'padX', label: '左右边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 16 },
+          { k: 'padB', label: '底边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 14 },
+          { k: 'btnH', label: '按钮高度', type: 'slider', min: 36, max: 72, step: 2, unit: 'px', def: 48 },
+          { k: 'btnR', label: '按钮角度', type: 'slider', min: 0, max: 36, step: 2, unit: 'px', def: 4 }
+        ]
+      },
+      {
+        type: 'group', label: '背景设置',
+        fields: [
+          { k: 'bgOn', label: '背景', type: 'switch', def: true },
+          { k: 'bg', label: '背景颜色', type: 'color', def: '#FFFFFF' },
+          { k: 'bgH', label: '背景高度', type: 'slider', min: 60, max: 140, step: 2, unit: 'px', def: 76 }
+        ]
+      }
+    ]
   }
 };
 
 /* ============================ 组件库（对标有赞左侧组件库） ============================ */
 
 /**
- * 有赞基础组件全量清单（53 个）。
- *   ok: 1 → 本后台已接入（可添加到页面，小程序端有对应渲染）
- *   kind   → 对应的区块类型
+ * 有赞「基础组件」全量清单。
+ *
+ * 数据来源：2026-10-08 用真实浏览器打开店铺装修编辑器
+ * （store.youzan.com/v4/deco/decorate#/edit/142448593）逐个点击组件后抓取，
+ * 见 `.tooling/yz-extract.mjs` 与 `.tooling/_yz-panels.json`：
+ *   - 基础组件 tab 实测 54 个，分 10 组（本常量即该分组）
+ *   - 每项 `type` 是有赞侧真实的组件类型标识（data-type），用于跨平台对账
+ *   - 每项 `ok` 表示本后台是否已接入；未接入的必须带 `why` 说明原因，不能假装可用
+ *   - 每项 `kind` 指向 HOME_BLOCK_KINDS 里的区块类型
  */
-const YZ_BASIC = [
-  { n: '标题文本', ok: 1, kind: 'title' },
-  { n: '富文本', ok: 0 },
-  { n: '辅助分割', ok: 1, kind: 'line' },
-  { n: '图片广告', ok: 1, kind: 'swiper' },
-  { n: '热区切图', ok: 1, kind: 'hotspot' },
-  { n: '魔方', ok: 1, kind: 'cube' },
-  { n: '商品搜索', ok: 0 },
-  { n: '图文导航', ok: 1, kind: 'nav' },
-  { n: '电梯导航', ok: 0 },
-  { n: '视频', ok: 1, kind: 'video' },
-  { n: '店铺信息', ok: 1, kind: 'shop' },
-  { n: '进入店铺', ok: 1, kind: 'shop' },
-  { n: '公告', ok: 1, kind: 'notice' },
-  { n: '语音', ok: 0 },
-  { n: '自定义模块', ok: 0 },
-  { n: '涨粉', ok: 0 },
-  { n: '内容卡片', ok: 1, kind: 'goods' },
-  { n: '在线客服', ok: 0 },
-  { n: '商品', ok: 1, kind: 'goods' },
-  { n: '商品分组', ok: 0 },
-  { n: '购买按钮', ok: 0 },
-  { n: '点单卡片', ok: 0 },
-  { n: '客户资产', ok: 0 },
-  { n: '附近门店', ok: 0 },
-  { n: '好友拼单', ok: 0 },
-  { n: '在途订单', ok: 0 },
-  { n: '优惠券', ok: 0 },
-  { n: '限时折扣', ok: 0 },
-  { n: '秒杀', ok: 0 },
-  { n: '砍价', ok: 0 },
-  { n: '新人专区', ok: 0 },
-  { n: '拼团', ok: 0 },
-  { n: '集点卡', ok: 0 },
-  { n: '会员专享价', ok: 0 },
-  { n: '会员储值', ok: 0 },
-  { n: '办会员', ok: 0 },
-  { n: '积分资产', ok: 0 },
-  { n: '小程序直播', ok: 0 },
-  { n: '视频号直播', ok: 0 },
-  { n: '个性化推荐', ok: 1, kind: 'goods' },
-  { n: '人群运营', ok: 0 },
-  { n: '人群图片', ok: 0 },
-  { n: '店铺热搜', ok: 0 },
-  { n: '店铺榜单', ok: 0 },
-  { n: '课程', ok: 0 },
-  { n: '知识专栏', ok: 0 },
-  { n: '知识内容', ok: 0 },
-  { n: '知识直播', ok: 0 },
-  { n: '知识付费会员', ok: 0 },
-  { n: '群打卡', ok: 0 },
-  { n: '积分兑换商品', ok: 0 },
-  { n: '会员卡片', ok: 0 },
-  { n: '店招信息', ok: 0 }
+const YZ_BASIC_GROUPS = [
+  {
+    name: '页面装修',
+    items: [
+      { n: '标题文本', type: 'title_text,title,text', ok: 1, kind: 'title' },
+      { n: '富文本', type: 'rich_text_weapp,rich_text', ok: 1, kind: 'rich_text' },
+      { n: '辅助分割', type: 'white,line,white_line', ok: 1, kind: 'line' },
+      { n: '图片广告', type: 'new_image_ad', ok: 1, kind: 'swiper' },
+      { n: '热区切图', type: 'image_ad_hot_area', ok: 1, kind: 'hotspot' },
+      { n: '魔方', type: 'cube_v3', ok: 1, kind: 'cube' },
+      { n: '商品搜索', type: 'search', ok: 1, kind: 'search' },
+      { n: '图文导航', type: 'image_text_nav', ok: 1, kind: 'nav' },
+      { n: '电梯导航', type: 'elevator_navigation', ok: 1, kind: 'elevator' },
+      { n: '视频', type: 'video', ok: 1, kind: 'video' },
+      { n: '店铺信息', type: 'shop_banner_weapp,offline_shop_info', ok: 1, kind: 'shop' },
+      { n: '进入店铺', type: 'store', ok: 1, kind: 'enter_shop' },
+      { n: '公告', type: 'notice_weapp,notice', ok: 1, kind: 'notice' },
+      { n: '语音', type: 'audio', ok: 1, kind: 'audio' },
+      { n: '自定义模块', type: 'component', ok: 0, why: '有赞侧是「跨页复用的自定义模块」；本后台用「新建自定义页 + 区块流」实现同一目的，不再单列组件' },
+      { n: '涨粉', type: 'social_fans,official_account', ok: 0, why: '依赖公众号 / 微信客服等平台能力，自建小程序无对应数据源' },
+      { n: '内容卡片', type: 'note_card', ok: 1, kind: 'content_card' },
+      { n: '在线客服', type: 'contact_us', ok: 1, kind: 'service' }
+    ]
+  },
+  {
+    name: '商品',
+    items: [
+      { n: '商品', type: 'goods_weapp,goods,goods_new', ok: 1, kind: 'goods' },
+      { n: '商品分组', type: 'tag_list_top,tag_list_left,goods_group,goods_group_new', ok: 0, why: '需要「商品分组」这一数据维度，本后台商品库暂无分组字段' },
+      { n: '购买按钮', type: 'buy_button', ok: 1, kind: 'buy_bar' }
+    ]
+  },
+  {
+    name: '新零售',
+    items: [
+      { n: '点单卡片', type: 'shelf_order', ok: 0, why: '有赞零售「货架」体系组件，自建商城无货架 / 点单业务' },
+      { n: '客户资产', type: 'shelf_asset', ok: 0, why: '依赖有赞会员资产（积分 / 余额 / 集点卡）数据' },
+      { n: '附近门店', type: 'shelf_nearby_store', ok: 0, why: '依赖门店档案与地理位置服务' },
+      { n: '好友拼单', type: 'shelf_order_pool', ok: 0, why: '依赖有赞拼单业务链路' },
+      { n: '在途订单', type: 'on_way_order', ok: 0, why: '依赖有赞订单中台实时状态' }
+    ]
+  },
+  {
+    name: '营销活动',
+    items: [
+      { n: '优惠券', type: 'coupon_weapp,coupon', ok: 0, why: '本后台已有券模板（catalog.json），但小程序端领券链路未开发，故暂不接入' },
+      { n: '限时折扣', type: 'ump_limitdiscount', ok: 0, why: '依赖有赞营销中台的折扣活动数据' },
+      { n: '秒杀', type: 'ump_seckill', ok: 0, why: '依赖有赞营销中台的秒杀场次与库存' },
+      { n: '砍价', type: 'bargain', ok: 0, why: '依赖有赞砍价活动的社交链路' },
+      { n: '新人专区', type: 'new_zone', ok: 0, why: '依赖有赞新客标签与新人券池' },
+      { n: '拼团', type: 'groupon_weapp,groupon', ok: 0, why: '依赖有赞拼团活动的成团逻辑' },
+      { n: '集点卡', type: 'reward_points', ok: 0, why: '依赖有赞集点卡会员权益体系' }
+    ]
+  },
+  {
+    name: '会员',
+    items: [
+      { n: '会员专享价', type: 'member_goods', ok: 0, why: '依赖有赞会员等级与专享价体系' },
+      { n: '会员储值', type: 'member_value', ok: 0, why: '依赖有赞储值 / 礼品卡资金账户' },
+      { n: '办会员', type: 'registration_guide', ok: 0, why: '依赖有赞会员卡开卡链路' },
+      { n: '积分资产', type: 'point_asset', ok: 0, why: '依赖有赞积分账户' }
+    ]
+  },
+  {
+    name: '直播',
+    items: [
+      { n: '小程序直播', type: 'weapp_live', ok: 0, why: '依赖微信小程序直播组件与直播间 ID' },
+      { n: '视频号直播', type: 'wxvideo_live', ok: 0, why: '依赖视频号预约 / 直播间绑定' },
+      { n: '爱逛直播', type: 'guang_live', ok: 0, why: '依赖爱逛（第三方直播平台）账号' }
+    ]
+  },
+  {
+    name: '智能运营',
+    items: [
+      { n: '个性化推荐', type: 'goods_recommend', ok: 1, kind: 'goods' },
+      { n: '人群运营', type: 'oriented_poster', ok: 0, why: '依赖有赞人群包定向能力' },
+      { n: '人群图片', type: 'crowds_image_ad', ok: 0, why: '依赖有赞人群包定向能力' },
+      { n: '店铺热搜', type: 'hot_words_reference', ok: 0, why: '依赖有赞搜索中台的热词数据' },
+      { n: '店铺榜单', type: 'shop_ranking_list', ok: 0, why: '依赖有赞榜单计算结果' }
+    ]
+  },
+  {
+    name: '教育',
+    items: [
+      { n: '课程', type: 'knowledge-goods,edu-goods-group', ok: 0, why: '教育行业专属，莱克商城无此业务' },
+      { n: '知识专栏', type: 'paid_column', ok: 0, why: '教育行业专属' },
+      { n: '知识内容', type: 'paid_content', ok: 0, why: '教育行业专属' },
+      { n: '知识直播', type: 'paid_live', ok: 0, why: '教育行业专属' },
+      { n: '知识付费会员', type: 'paid_member', ok: 0, why: '教育行业专属' },
+      { n: '群打卡', type: 'punch', ok: 0, why: '教育行业专属' }
+    ]
+  },
+  {
+    name: '积分',
+    items: [{ n: '积分兑换商品', type: 'points_goods', ok: 0, why: '依赖有赞积分账户与兑换链路' }]
+  },
+  {
+    name: '其他',
+    items: [
+      { n: '会员卡片', type: 'shelf_member', ok: 0, why: '依赖有赞会员体系' },
+      { n: '店招信息', type: 'shelf_banner', ok: 0, why: '与「店铺信息」重复，本后台用店铺信息组件承载（含背景图与 Logo 背景色）' }
+    ]
+  }
 ];
 
-/** 有赞高级组件（行业 / 营销模板，19 个） */
+/** 基础组件扁平清单（供 componentLib().basic 下发，兼容按数组遍历的前端） */
+const YZ_BASIC = [].concat(...YZ_BASIC_GROUPS.map((g) => g.items.map((it) => Object.assign({ group: g.name }, it))));
+
+/**
+ * 有赞「高级组件」tab。
+ *
+ * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些），本店铺只有 2 个：
+ * 「个性导航」「品牌分类E」。这类组件由有赞开放平台的三方模板提供，
+ * 自建小程序没有对应运行时，因此一律标为未接入。
+ */
 const YZ_ADV = [
-  { n: '视频图片A', ok: 0 }, { n: '分类推荐C', ok: 0 }, { n: '单图广告A', ok: 1, kind: 'image' },
-  { n: '分类推荐A', ok: 0 }, { n: '通用标题A', ok: 1, kind: 'title' }, { n: '商品轮播B', ok: 0 },
-  { n: '商品轮播A', ok: 1, kind: 'goods' }, { n: '新品发售A1', ok: 0 }, { n: '换一换A', ok: 0 },
-  { n: '商品分组G', ok: 0 }, { n: '热点商品A', ok: 0 }, { n: '分类推荐B', ok: 0 },
-  { n: '商品分组A', ok: 0 }, { n: '图文轮播A', ok: 1, kind: 'swiper' }, { n: '混合排列A', ok: 0 },
-  { n: '叠卡轮播A', ok: 0 }, { n: '跑马灯A', ok: 1, kind: 'notice' }, { n: '品牌故事A', ok: 0 },
-  { n: '尾部模块D', ok: 0 }
+  { n: '个性导航', type: 'extension-cnzoom-person-nav', ok: 0, why: '有赞开放平台三方扩展组件' },
+  { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 0, why: '有赞开放平台三方扩展组件（店铺「产品」页当前在用）' }
 ];
 
 /** 默认常用组件（对标有赞「常用组件」tab，用户可自行增删，存 localStorage） */
 const YZ_COMMON = ['title', 'line', 'swiper', 'video', 'notice', 'nav', 'cube', 'hotspot', 'goods', 'shop'];
+
+/** 有赞该店铺「常用组件」实测清单（14 个），仅作对照说明，不参与前端渲染 */
+const YZ_COMMON_ACTUAL = ['标题文本', '辅助分割', '图片广告', '视频', '涨粉', '商品', '优惠券', '限时折扣', '拼团', '个性化推荐', '商品搜索', '积分兑换商品', '办会员', '在线客服'];
 
 /** 组件库全景（随 /api/decorate/pages 一起下发给前端） */
 function componentLib() {
   return {
     tabs: [
       { key: 'common', name: '常用组件', count: YZ_COMMON.length, desc: '默认展示的组件，可点「添加常用组件」自行增减' },
-      { key: 'basic', name: '基础组件', count: YZ_BASIC.length, desc: '对标有赞基础组件清单（53 个）' },
-      { key: 'adv', name: '高级组件', count: YZ_ADV.length, desc: '行业 / 营销模板组件（19 个）' }
+      { key: 'basic', name: '基础组件', count: YZ_BASIC.length, desc: '对标有赞基础组件全量清单（10 组 / ' + YZ_BASIC.length + ' 个）' },
+      { key: 'adv', name: '高级组件', count: YZ_ADV.length, desc: '店铺侧扩展组件（有赞里装了什么就有什么），本后台不接入' }
     ],
+    /** 基础组件的真实分组（装修台左侧按分组显示，与有赞一致） */
+    groups: YZ_BASIC_GROUPS.map((g) => ({
+      name: g.name,
+      count: g.items.length,
+      items: g.items
+    })),
     /** 已接入、真正可用的组件（点一下就能加到页面） */
     kinds: Object.keys(HOME_BLOCK_KINDS).map((k) => ({
       kind: k,
@@ -502,6 +799,7 @@ function componentLib() {
     })),
     icons: ICONS,
     common: YZ_COMMON,
+    commonActual: YZ_COMMON_ACTUAL,
     basic: YZ_BASIC,
     adv: YZ_ADV
   };

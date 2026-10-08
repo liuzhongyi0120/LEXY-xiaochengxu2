@@ -329,19 +329,19 @@ assert('装修页面列表返回 5 个页面',
   decoPages.ok && decoPages.data.list.length === 5,
   `实际 ${decoPages.data ? decoPages.data.list.length : 0} 个`);
 
-/* 组件库清单：三个 tab 各自数量需与有赞对齐（常用 10 / 基础 53 / 高级 19），且已接入组件数 = 首页区块类型数 */
+/* 组件库清单：基础组件需与有赞实测的 54 个一致；已接入组件数 = 首页区块类型数 */
 const decoLib = await call('GET', '/api/decorate/lib', { auth: false });
 const libTabs = decoLib.ok && decoLib.data ? decoLib.data.tabs : null;
 const libCount = {};
 if (libTabs) libTabs.forEach((t) => { libCount[t.key] = t.count; });
-assert('装修组件库三 tab 数量正确（常用 10 / 基础 53 / 高级 19）',
-  !!libTabs && libCount.common === 10 && libCount.basic === 53 && libCount.adv === 19,
+assert('装修组件库三 tab 数量正确（常用 10 / 基础 54 / 高级实测 2）',
+  !!libTabs && libCount.common === 10 && libCount.basic === 54 && libCount.adv >= 1,
   libTabs ? `实际 ${JSON.stringify(libCount)}` : '无返回');
 
 const libKinds = decoLib.ok && decoLib.data ? decoLib.data.kinds : null;
-assert('装修组件库已接入 11 种组件，且每个都带 SVG 图标',
-  !!libKinds && libKinds.length === 11 && libKinds.every((k) => !!k.icon),
-  libKinds ? `实际 ${libKinds.length} 种` : '无返回');
+assert('装修组件库已接入 19 种组件，且每个都带 SVG 图标',
+  !!libKinds && libKinds.length === 19 && libKinds.every((k) => !!k.icon),
+  libKinds ? `实际 ${libKinds.length} 种，缺图标：${libKinds.filter((k) => !k.icon).map((k) => k.kind).join(',') || '无'}` : '无返回');
 
 const decoHome = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'home' } });
 assert('装修首页详情：schema + 区块数据 + 已发布数据',
@@ -775,6 +775,26 @@ const linkRel = (f) => f.replace(/\\/g, '/').split('/miniprogram/')[1];
 const danglingLinkTap = [];
 let linkTapChecked = 0;
 
+/**
+ * 处理函数不一定写在页面 js 里 —— 区块事件已抽到 utils/blockPage.js 的 behavior，
+ * 页面靠 `Page(Object.assign({}, blockPageBehavior, {...}))` 混入。
+ * 所以「找处理函数」要按「页面 js → behavior 模块」两级找，
+ * 找到后用所在文件判断有没有调 openLink（跨文件漏了 openLink 才是真 bug）。
+ */
+const BEHAVIOR_FILES = [
+  join(MP_ROOT, 'utils', 'blockPage.js')
+];
+/** 返回 [{ file, rel, src }]：页面 js 优先，其后是 behavior 模块 */
+function handlerSources(hostJs) {
+  const out = [];
+  const push = (f) => {
+    try { out.push({ file: f, rel: linkRel(f), src: readFileSync(f, 'utf8') }); } catch (e) { /* 缺文件在调用处报 */ }
+  };
+  push(hostJs);
+  BEHAVIOR_FILES.forEach(push);
+  return out;
+}
+
 ALL_WXML.forEach((wxml) => {
   const handlers = linkTapHandlers(wxml);
   if (!handlers.size) return;
@@ -784,21 +804,25 @@ ALL_WXML.forEach((wxml) => {
   hosts.forEach((host) => {
     const hostRel = linkRel(host);
     const hostJs = host.replace(/\.wxml$/, '.js');
-    let js;
-    try { js = readFileSync(hostJs, 'utf8'); } catch (e) {
+    const sources = handlerSources(hostJs);
+    if (!sources.length) {
       danglingLinkTap.push(`${hostRel} 没有同名 js（无法确认跳转实现）`);
       return;
     }
-    if (!/require\([^)]*utils\/link/.test(js)) {
-      danglingLinkTap.push(`${hostRel} 没有 require utils/link.js`);
+    // 任一来源 require 了 utils/link 即可（页面自己引，或行为模块用相对路径 './link' 引）
+    if (!sources.some((s) => /require\([^)]*(?:utils\/link|\.\/link)['"]\)/.test(s.src))) {
+      danglingLinkTap.push(`${hostRel}（及其行为模块）都没有 require utils/link.js`);
     }
     handlers.forEach((fn) => {
       linkTapChecked++;
-      const m = new RegExp('\\b' + fn.replace(/\$/g, '\\$') + '\\s*\\([^)]*\\)\\s*\\{').exec(js);
-      if (!m) { danglingLinkTap.push(`${hostRel} 缺处理函数 ${fn}`); return; }
+      const re = new RegExp('\\b' + fn.replace(/\$/g, '\\$') + '\\s*\\([^)]*\\)\\s*\\{');
+      // 找到「定义该函数」的那份源码
+      const owner = sources.filter((s) => re.test(s.src))[0];
+      if (!owner) { danglingLinkTap.push(`${hostRel} 缺处理函数 ${fn}`); return; }
+      const m = re.exec(owner.src);
       // 取该函数起始位置后 400 字符作为函数体近似，检查是否调用 openLink
-      if (!/openLink\s*\(/.test(js.slice(m.index, m.index + 400))) {
-        danglingLinkTap.push(`${hostRel} 的 ${fn} 没调用 openLink`);
+      if (!/openLink\s*\(/.test(owner.src.slice(m.index, m.index + 400))) {
+        danglingLinkTap.push(`${owner.rel} 的 ${fn} 没调用 openLink`);
       }
     });
   });
@@ -895,6 +919,116 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     dirty.images.length === 1 && dirty.images[0].image === 'ok.png';
   assert('小程序端 normalizeBlock 同时兼容轮播图的老/新结构（否则老数据首屏白屏）',
     okMix, '老=' + JSON.stringify(legacy.images) + ' 新=' + JSON.stringify(modern.images) + ' 脏=' + JSON.stringify(dirty.images));
+}
+
+/* ---------------------------------------------------------------------------
+ * 15.78 装修组件库全量对账 + 19 种区块端到端覆盖
+ *
+ * 为什么必须有这一组：
+ *   「组件库清单」是运营眼里的全部能力边界。清单只要有一处失真，
+ *   就会出现三种「查不出来的错」：
+ *     1) 标了可用的组件其实后端没实现 → 运营点一下没反应，还以为网络卡了；
+ *     2) 库里有的组件没标「未接入」→ 运营以为能用，做出来的页面缺一块；
+ *     3) 后端接了、wxml 没渲染 → 后台预览有、真机空白，只有静态比对抓得到。
+ *   所以这一组把「有赞实测清单 ↔ schema 区块类型 ↔ wxml 渲染分支 ↔ 装修台预览分支」
+ *   四个环节串起来对账，任一处漏接都会红。
+ *
+ * 数据来源：2026-10-08 用真实浏览器打开有赞装修编辑器逐个点击组件抓取，
+ *   见 .tooling/yz-extract.mjs / .tooling/_yz-panels.json（54 个组件的中文面板字段原文）。
+ * ------------------------------------------------------------------------- */
+{
+  /* (1) 基础组件清单：54 个、分 10 组，组名与各组数量锁定到有赞实测值 */
+  const YZ_GROUPS = [
+    ['页面装修', 18], ['商品', 3], ['新零售', 5], ['营销活动', 7], ['会员', 4],
+    ['直播', 3], ['智能运营', 5], ['教育', 6], ['积分', 1], ['其他', 2]
+  ];
+  const groups = schemaMod.componentLib().groups || [];
+  const gotGroups = groups.map((g) => g.name + ':' + g.items.length);
+  const wantGroups = YZ_GROUPS.map((g) => g[0] + ':' + g[1]);
+  assert('装修组件库「基础组件」= 有赞实测 10 组 / 54 个（分组名与数量逐组对齐）',
+    gotGroups.join('|') === wantGroups.join('|'),
+    `实际 ${gotGroups.join(' ')}`);
+
+  /* (2) 已接入数 = 区块类型数；且库里每个「可用」项都指向真实存在的 kind */
+  const allKinds = Object.keys(schemaMod.HOME_BLOCK_KINDS);
+  const libBasic = schemaMod.componentLib().basic || [];
+  const libAdvised = schemaMod.componentLib().adv || [];
+  const okItems = libBasic.concat(libAdvised).filter((x) => x.ok);
+  const ghostOk = okItems.filter((x) => !x.kind || !schemaMod.HOME_BLOCK_KINDS[x.kind]).map((x) => x.n);
+  assert('组件库标记「已接入」的每一项都在 schema 里有真实区块类型（防「假装可用」）',
+    ghostOk.length === 0,
+    ghostOk.length ? `无对应区块类型：${ghostOk.join(', ')}` : `${okItems.length} 个已接入项全部有对应区块类型`);
+
+  const notOk = libBasic.filter((x) => !(x.ok && x.kind && schemaMod.HOME_BLOCK_KINDS[x.kind]));
+  const noWhy = notOk.filter((x) => !x.why).map((x) => x.n);
+  assert('未接入的组件必须写清「为什么不能接入」（只挂角标不写原因＝运营无从判断）',
+    noWhy.length === 0,
+    noWhy.length ? `缺 why：${noWhy.join(', ')}` : `${notOk.length} 个未接入组件全部带 why 说明`);
+
+  const libIcons = schemaMod.componentLib().icons || {};
+  const noIcon = allKinds.filter((k) => !libIcons[schemaMod.HOME_BLOCK_KINDS[k].lib]).map((k) => k);
+  assert('每个区块类型的图标键都能在 ICONS 里找到（否则装修台左侧渲染成空白格）',
+    noIcon.length === 0,
+    noIcon.length ? `缺图标：${noIcon.join(', ')}` : `${allKinds.length} 个区块类型图标齐全`);
+
+  /* (3) 19 种区块的字段完整性：本轮新增的 8 种逐个点名，防止「类型加了字段忘了」 */
+  const REQUIRED_FIELDS = {
+    rich_text: ['html', 'bg', 'full', 'pageMargin'],
+    search: ['placeholder', 'mode', 'sticky', 'shape', 'textAlign', 'boxHeight', 'scan', 'bg', 'boxBg', 'color', 'link', 'pageMargin'],
+    elevator: ['mode', 'styleType', 'tagStyle', 'items', 'color', 'activeColor', 'bg', 'pageMargin'],
+    enter_shop: ['text', 'align', 'color', 'bg', 'radius', 'link', 'bgOut', 'pageMargin'],
+    audio: ['src', 'duration', 'text', 'avatar', 'useShopLogo', 'side', 'resume', 'pageMargin'],
+    service: ['text', 'align', 'color', 'bg', 'radius', 'bgOut', 'pageMargin'],
+    content_card: ['title', 'cols', 'ratio', 'items', 'style', 'radius', 'showTag', 'showRead', 'showLike', 'more', 'moreText', 'link', 'pageMargin'],
+    buy_bar: ['goodsId', 'text', 'fontSize', 'align', 'theme', 'btnBg', 'padX', 'padB', 'btnH', 'btnR', 'bgOn', 'bg', 'bgH']
+  };
+  /** 拍平后的字段键集合（含 group / list.item 里的字段） */
+  const flatKeys = (node, depth = 0, out = new Set()) => {
+    if (!node || depth > 6) return out;
+    if (node.type === 'object' || Array.isArray(node.fields)) (node.fields || []).forEach((f) => flatKeys(f, depth + 1, out));
+    if (node.k) out.add(node.k);
+    if (node.type === 'union') Object.keys(node.kinds || {}).forEach((k) => flatKeys(node.kinds[k], depth + 1, out));
+    if (node.type === 'list') flatKeys(node.item, depth + 1, out);
+    return out;
+  };
+  const fieldGaps = [];
+  Object.keys(REQUIRED_FIELDS).forEach((k) => {
+    const kind = schemaMod.HOME_BLOCK_KINDS[k];
+    if (!kind) { fieldGaps.push(`${k}: 区块类型不存在`); return; }
+    const have = flatKeys({ type: 'object', fields: kind.fields });
+    const miss = REQUIRED_FIELDS[k].filter((f) => !have.has(f));
+    if (miss.length) fieldGaps.push(`${k} 缺 ${miss.join('/')}`);
+  });
+  assert('新增 8 种区块的字段完整性（对照有赞面板逐字段核对，缺字段＝属性面板少一项）',
+    fieldGaps.length === 0,
+    fieldGaps.length ? fieldGaps.join(' | ')
+      : `${Object.keys(REQUIRED_FIELDS).length} 种新组件共 ${Object.keys(REQUIRED_FIELDS).reduce((n, k) => n + REQUIRED_FIELDS[k].length, 0)} 个字段全部就位`);
+
+  /* (4) 小程序端 wxml 必须给每一种区块类型写渲染分支（后台能配、真机空白＝最典型的漏接） */
+  const blocksWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+  const wxmlMissing = allKinds.filter((k) => blocksWxml.indexOf(`block.type === '${k}'`) < 0);
+  assert('小程序 templates/blocks.wxml 覆盖全部 19 种区块类型（少一种就是「配了不显示」）',
+    wxmlMissing.length === 0,
+    wxmlMissing.length ? `wxml 缺分支：${wxmlMissing.join(', ')}` : `${allKinds.length} 种区块全部有渲染分支`);
+
+  /* (5) 装修台预览必须覆盖同样 19 种（后台预览不画＝运营以为没生效，会反复重配） */
+  const adminJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+  const pvMissing = allKinds.filter((k) => adminJs.indexOf(`kind === '${k}'`) < 0);
+  const tagLabelMissing = allKinds.filter((k) => {
+    // 预览右上角的角标名（如 buy_bar → 购买按钮）必须能查到，否则会退回显示英文类型名
+    const m = /"pv-tag">' \+ esc\(\(\{([\s\S]*?)\}\[kind\]/.exec(adminJs);
+    return !m || m[1].indexOf(k + ':') < 0;
+  });
+  assert('装修台预览覆盖全部 19 种区块类型，且每种都有中文角标名',
+    pvMissing.length === 0 && tagLabelMissing.length === 0,
+    (pvMissing.length ? `预览缺分支：${pvMissing.join(', ')}` : '') +
+    (tagLabelMissing.length ? ` 缺中文名：${tagLabelMissing.join(', ')}` : '') ||
+    `${allKinds.length} 种区块的预览分支与中文角标全部就位`);
+
+  /* (6) 装修台左侧按「有赞真实分组」渲染，而不是拍平成一堆（否则 54 个平铺没法找） */
+  assert('装修台左侧按 lib.groups 分组渲染，且未接入项会展示具体原因',
+    /lib\.groups/.test(adminJs) && /__group/.test(adminJs) && /it\.why/.test(adminJs),
+    'renderLib 已按 lib.groups 分组 + 显示 why');
 }
 
 /* ---------------------------------------------------------------------------

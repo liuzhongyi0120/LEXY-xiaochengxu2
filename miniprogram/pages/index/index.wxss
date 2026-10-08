@@ -299,3 +299,288 @@
   font-size: 24rpx;
   color: var(--color-text-secondary);
 }
+
+/* ==================== 区块锚点（电梯导航定位用） ==================== */
+.blk {
+  display: block;
+}
+
+/* ==================== 富文本 ==================== */
+.c-rich {
+  display: block;
+}
+.cr-body {
+  display: block;
+  font-size: var(--font-base);
+  color: var(--color-text);
+  line-height: 1.7;
+  word-break: break-all;
+}
+
+/* ==================== 商品搜索 ==================== */
+.c-search {
+  display: block;
+}
+.cs-box {
+  display: flex;
+  align-items: center;
+  padding: 0 20rpx;
+  border-radius: 6rpx;
+  overflow: hidden;
+}
+.cs-box.round {
+  border-radius: 999rpx;
+}
+.cs-ico {
+  font-size: 26rpx;
+  margin-right: 10rpx;
+}
+.cs-ph {
+  flex: 1;
+  font-size: var(--font-sm);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cs-scan {
+  flex: 0 0 auto;
+  margin-left: 10rpx;
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+}
+
+/* ==================== 电梯导航 ==================== */
+.c-elev {
+  display: block;
+}
+.ce-scroll {
+  white-space: nowrap;
+  width: 100%;
+}
+.ce-tag {
+  display: inline-flex;
+  align-items: center;
+  height: 64rpx;
+  padding: 0 24rpx;
+  font-size: var(--font-sm);
+  margin-right: 8rpx;
+}
+/* 标签风格：背景模式 / 圆框 / 方框 / 下划线（与有赞四选一一致） */
+.ce-tag.bg.on {
+  background: var(--color-primary-light);
+  border-radius: var(--radius-sm);
+}
+.ce-tag.round {
+  border: 1rpx solid var(--color-border);
+  border-radius: 999rpx;
+}
+.ce-tag.round.on {
+  border-color: var(--color-primary);
+}
+.ce-tag.square {
+  border: 1rpx solid var(--color-border);
+  border-radius: 6rpx;
+}
+.ce-tag.square.on {
+  border-color: var(--color-primary);
+}
+.ce-tag.underline {
+  border-bottom: 4rpx solid transparent;
+}
+.ce-tag.underline.on {
+  border-bottom-color: var(--color-primary);
+}
+.ce-drop {
+  display: flex;
+  flex-wrap: wrap;
+  padding: 12rpx 0;
+}
+.ce-dropitem {
+  font-size: var(--font-sm);
+  padding: 8rpx 20rpx;
+}
+
+/* ==================== 进入店铺 / 在线客服（按钮行） ==================== */
+.c-btnrow {
+  display: flex;
+  align-items: center;
+}
+.cbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 240rpx;
+  height: 72rpx;
+  padding: 0 40rpx;
+  font-size: var(--font-base);
+  border-radius: 6rpx;
+  line-height: 1;
+  margin: 0;
+}
+.cbtn::after {
+  border: none;
+}
+.cbtn.round {
+  border-radius: 999rpx;
+}
+
+/* ==================== 语音 ==================== */
+.c-audio {
+  display: flex;
+  align-items: center;
+}
+.c-audio.right {
+  flex-direction: row-reverse;
+}
+.ca-av {
+  width: 80rpx;
+  height: 80rpx;
+  border-radius: 50%;
+  background: var(--color-bg-muted);
+  flex: none;
+}
+.ca-bubble {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0 20rpx;
+  padding: 18rpx 24rpx;
+  background: var(--color-bg-card);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-base);
+}
+.ca-text {
+  font-size: var(--font-sm);
+  color: var(--color-text);
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ca-dur {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  margin-left: 12rpx;
+}
+.ca-ico {
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  margin-left: 12rpx;
+}
+
+/* ==================== 内容卡片 ==================== */
+.c-ccard {
+  display: block;
+}
+.cc-title {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  padding: 8rpx 4rpx 16rpx;
+}
+.cc-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+.cc-cell {
+  box-sizing: border-box;
+  padding: 8rpx;
+}
+.cc-card {
+  overflow: hidden;
+  background: var(--color-bg-card);
+}
+.cc-card.shadow {
+  border-radius: var(--radius-base);
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .06);
+}
+.cc-card.white {
+  border-radius: 0;
+}
+.cc-card.plain {
+  background: transparent;
+}
+.cc-pic {
+  position: relative;
+  width: 100%;
+  height: 0;
+  background: var(--color-bg-muted);
+  overflow: hidden;
+}
+.cc-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.cc-body {
+  padding: 16rpx;
+}
+.cc-t {
+  font-size: var(--font-base);
+  color: var(--color-text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+.cc-d {
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.cc-meta {
+  margin-top: 12rpx;
+  display: flex;
+  align-items: center;
+}
+.cc-tag {
+  font-size: var(--font-xs);
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: 4rpx;
+  padding: 2rpx 10rpx;
+  margin-right: 12rpx;
+}
+.cc-m {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  margin-right: 16rpx;
+}
+.cc-more {
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  padding: 20rpx 0 4rpx;
+}
+
+/* ==================== 购买按钮（固定吸底） ==================== */
+.cb-spacer {
+  width: 100%;
+}
+.c-buybar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+}
+.cb-row {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  box-sizing: border-box;
+}
+.cb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 300rpx;
+  padding: 0 60rpx;
+  color: var(--color-text-inverse);
+  font-weight: 600;
+}

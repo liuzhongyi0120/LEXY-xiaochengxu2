@@ -17,6 +17,22 @@ const goodsSvc = require('../services/goods');
 
 const SIZE_CLASS = { sm: 's-sm', md: 's-md', lg: 's-lg' };
 
+/** 店铺主题色（按钮「跟随店铺风格」时使用；与 tabBar selectedColor 保持一致） */
+const BRAND = '#C8102E';
+
+/**
+ * 富文本净化：小程序 rich-text 本身不执行脚本，但历史脏数据里可能带 <script>/on* 属性，
+ * 这里统一剥掉，避免「编辑器里粘了网页源码」把脏东西带上线。
+ */
+function sanitizeRich(html) {
+  return String(html || '')
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/javascript:/gi, '');
+}
+
+
 /**
  * 把装修数据转成渲染需要的派生值，让 wxml 保持干净（不在模板里做算术）。
  *
@@ -85,6 +101,62 @@ function normalizeBlock(b, index) {
     o.cellW = Math.floor(100 / cols * 100) / 100;
     o.limit = Number(o.limit) || 4;
     o.goods = [];
+  } else if (kind === 'rich_text') {
+    // 「全屏显示」= 内容占满整宽，此时忽略页面边距（与有赞一致）
+    o.marginRpx = o.full === '0' ? px2rpx(o.pageMargin) : 0;
+    o.nodes = sanitizeRich(o.html);
+  } else if (kind === 'search') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.hRpx = px2rpx(o.boxHeight || 36);
+    o.round = o.shape === 'round';
+    o.align = o.textAlign === 'center' ? 'center' : 'flex-start';
+    o.placeholder = o.placeholder || '搜索店内商品';
+  } else if (kind === 'elevator') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.dropdown = o.mode === 'dropdown';
+    o.tagStyle = o.tagStyle || 'bg';
+    o.activeIndex = o.activeIndex || 0;
+    o.items = (o.items || [])
+      .map((x) => ({ text: (x && x.text) || '', target: Number((x && x.target) || 0) || 0 }))
+      .filter((x) => x.text);
+  } else if (kind === 'enter_shop') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.justify = o.align === 'right' ? 'flex-end' : (o.align === 'left' ? 'flex-start' : 'center');
+    o.round = o.radius !== 'square';
+    o.text = o.text || '进入店铺';
+  } else if (kind === 'audio') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.right = o.side === 'right';
+    o.duration = Number(o.duration) || 6;
+    // 气泡宽度随时长增长（与微信语音气泡一致的手感），上下限兜住极端值
+    o.widthRpx = Math.max(220, Math.min(520, 160 + o.duration * 24));
+  } else if (kind === 'service') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.justify = o.align === 'right' ? 'flex-end' : (o.align === 'left' ? 'flex-start' : 'center');
+    o.round = o.radius !== 'square';
+    o.text = o.text || '在线咨询';
+  } else if (kind === 'content_card') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    const ccols = Number(o.cols) || 2;
+    o.cellW = Math.floor(100 / ccols * 100) / 100;
+    o.cardClass = o.style === 'white' ? 'white' : (o.style === 'plain' ? 'plain' : 'shadow');
+    o.round = o.radius !== 'square';
+    // 图片容器用 padding-top 撑出固定比例：padding-top 的百分比按「宽度」算，
+    // 所以 4:3 要写 133.33%（= 100 ÷ 0.75），不是 1.33%。保留两位小数。
+    const ratio = Number(o.ratio) || 0.75;
+    o.padTopPct = Math.round(10000 / ratio) / 100;
+    o.items = (o.items || []).filter((x) => x && (x.image || x.title));
+  } else if (kind === 'buy_bar') {
+    o.padXRpx = px2rpx(o.padX);
+    o.padBRpx = px2rpx(o.padB);
+    o.btnHRpx = px2rpx(o.btnH);
+    o.btnRRpx = px2rpx(o.btnR);
+    o.fontRpx = px2rpx(o.fontSize || 16);
+    o.bgHRpx = px2rpx(o.bgH || 76);
+    o.alignRight = o.align === 'right';
+    o.bgOn = o.bgOn !== false;
+    o.btnBgFinal = o.theme === 'custom' ? (o.btnBg || BRAND) : BRAND;
+    o.text = o.text || '立即下单';
   }
 
   o.__index = index;
@@ -94,6 +166,22 @@ function normalizeBlock(b, index) {
 /** 批量转换（首页与自定义页共用） */
 function normalizeBlocks(list) {
   return (list || []).map(normalizeBlock);
+}
+
+/**
+ * 「语音」区块未单独设头像且开了「使用店铺 logo」时，回落到店铺头像。
+ *
+ * 店铺信息不在区块数据里（它是页面级字段），所以只能由页面 JS 在装配 data 时补，
+ * 这里做成一个纯函数，首页与自定义页共用同一份规则。
+ *
+ * @param {Array} blocks 已 normalize 的区块数组
+ * @param {string} shopAvatar 店铺头像地址（已过 resolveAssets）
+ */
+function applyShopAvatar(blocks, shopAvatar) {
+  (blocks || []).forEach((b) => {
+    if (b && b.type === 'audio' && !b.avatar && b.useShopLogo !== false) b.avatar = shopAvatar || '';
+  });
+  return blocks;
 }
 
 /**
@@ -134,4 +222,4 @@ function loadGoodsData(blocks) {
   });
 }
 
-module.exports = { normalizeBlock, normalizeBlocks, loadGoodsData, SIZE_CLASS };
+module.exports = { normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, sanitizeRich, SIZE_CLASS };

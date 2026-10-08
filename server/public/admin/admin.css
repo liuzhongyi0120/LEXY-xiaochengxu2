@@ -344,6 +344,19 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .lib-name { font-size: 12px; color: var(--ink-2); text-align: center; line-height: 1.2; }
 .lib-item:hover .lib-name { color: var(--blue); }
 .lib-item .lib-flag { font-size: 10px; color: var(--gray-3); }
+/* 分组标题：网格里整行占满（对标有赞左侧组件库的分组分隔） */
+.lib-group {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px 4px;
+  font-size: 11px;
+  color: var(--gray-2);
+  font-weight: 600;
+}
+.lib-group span { flex: 1; }
+.lib-group i { font-style: normal; font-weight: 400; color: var(--gray-3); }
 .lib-add {
   display: block;
   width: calc(100% - 24px);
@@ -617,6 +630,21 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .pv-goods .nm { font-size: 11px; color: #333; padding: 5px 6px 0; height: 30px; overflow: hidden; }
 .pv-goods .pr { font-size: 13px; color: #C8102E; font-weight: 600; padding: 3px 6px 6px; }
 .pv-goods .empty { padding: 20px 0; text-align: center; color: #b8bec8; font-size: 11px; }
+
+/* ---------- 新增 8 种区块的预览样式（富文本 / 搜索 / 电梯 / 按钮 / 语音 / 卡片 / 吸底） ---------- */
+.pv-rich { font-size: 13px; line-height: 1.7; color: #333; word-break: break-word; }
+.pv-rich p { margin: 6px 0; }
+.pv-rich img { max-width: 100%; display: block; }
+
+.pv-audio { display: flex; align-items: center; gap: 8px; }
+.pv-audio.right { flex-direction: row-reverse; }
+
+/* 内容卡片三种样式，与小程序端 .cc-card 的 shadow / white / plain 一一对应 */
+.pv-ccard { position: relative; background: #fff; overflow: hidden; border-radius: 6px; }
+.pv-ccard.shadow { box-shadow: 0 1px 6px rgba(0, 0, 0, .08); }
+.pv-ccard.white { border: 1px solid #f0f1f3; }
+.pv-ccard.plain { background: transparent; }
+.pv-ccard img { display: block; }
 
 /* ---------- 右：属性面板 ---------- */
 .col-inspector { flex: 0 1 380px; min-width: 300px; border-left: 1px solid var(--line); }

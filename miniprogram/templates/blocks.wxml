@@ -14,6 +14,8 @@
      不要在模板里直接绑 wx.navigateTo。
 -->
 <block wx:for="{{blocks}}" wx:key="index" wx:for-item="block" wx:for-index="index">
+  <!-- 每块外面套一层带 id 的容器：电梯导航靠 #blk-N 做滚动定位（与有赞「定位到组件」同义） -->
+  <view class="blk" id="blk-{{index}}">
 
   <!-- ============ 图片广告：轮播海报 ============ -->
   <block wx:if="{{block.type === 'swiper' && block.mode === 'poster'}}">
@@ -304,4 +306,156 @@
     <view wx:if="{{!block.goods.length}}" class="cg-empty">暂无商品数据（请确认已启动后端服务）</view>
   </view>
 
+  <!-- ============ 富文本 ============ -->
+  <view
+    wx:elif="{{block.type === 'rich_text'}}"
+    class="c-rich"
+    style="padding: 0 {{block.marginRpx}}rpx; background: {{block.bg || 'transparent'}};"
+  >
+    <rich-text class="cr-body" nodes="{{block.nodes}}"></rich-text>
+  </view>
+
+  <!-- ============ 商品搜索 ============ -->
+  <view wx:elif="{{block.type === 'search'}}" class="c-search" style="padding: 12rpx {{block.marginRpx}}rpx; background: {{block.bg}};">
+    <view
+      class="cs-box {{block.round ? 'round' : ''}}"
+      style="height: {{block.hRpx}}rpx; background: {{block.boxBg}}; justify-content: {{block.align}};"
+      data-mode="{{block.mode}}"
+      data-link="{{block.link}}"
+      bindtap="onSearchTap"
+      hover-class="hover-lite"
+      hover-stay-time="80"
+    >
+      <text class="cs-ico">🔍</text>
+      <text class="cs-ph" style="color: {{block.color}};">{{block.placeholder}}</text>
+      <text wx:if="{{block.scan}}" class="cs-scan" catchtap="onScanTap">⌗</text>
+    </view>
+  </view>
+
+  <!-- ============ 电梯导航 ============ -->
+  <view wx:elif="{{block.type === 'elevator'}}" class="c-elev" style="background: {{block.bg}}; padding: 0 {{block.marginRpx}}rpx;">
+    <scroll-view wx:if="{{!block.dropdown}}" class="ce-scroll" scroll-x enable-flex>
+      <view
+        wx:for="{{block.items}}"
+        wx:key="index"
+        wx:for-item="it"
+        wx:for-index="ei"
+        class="ce-tag {{block.tagStyle}} {{block.activeIndex === ei ? 'on' : ''}}"
+        style="color: {{block.activeIndex === ei ? block.activeColor : block.color}};"
+        data-blk="{{index}}"
+        data-i="{{ei}}"
+        data-target="{{it.target}}"
+        bindtap="onElevatorTap"
+      >{{it.text}}</view>
+    </scroll-view>
+    <view wx:else class="ce-drop">
+      <view
+        wx:for="{{block.items}}"
+        wx:key="index"
+        wx:for-item="it"
+        wx:for-index="ei"
+        class="ce-dropitem {{block.activeIndex === ei ? 'on' : ''}}"
+        style="color: {{block.activeIndex === ei ? block.activeColor : block.color}};"
+        data-blk="{{index}}"
+        data-i="{{ei}}"
+        data-target="{{it.target}}"
+        bindtap="onElevatorTap"
+      >{{it.text}}</view>
+    </view>
+  </view>
+
+  <!-- ============ 进入店铺 ============ -->
+  <view wx:elif="{{block.type === 'enter_shop'}}" class="c-btnrow" style="padding: 20rpx {{block.marginRpx}}rpx; background: {{block.bgOut || 'transparent'}}; justify-content: {{block.justify}};">
+    <view
+      class="cbtn {{block.round ? 'round' : ''}}"
+      style="color: {{block.color}}; background: {{block.bg}};"
+      data-link="{{block.link}}"
+      bindtap="onTapBlock"
+      hover-class="{{block.link ? 'hover-lite' : 'none'}}"
+      hover-stay-time="80"
+    >{{block.text}}</view>
+  </view>
+
+  <!-- ============ 在线客服 ============ -->
+  <view wx:elif="{{block.type === 'service'}}" class="c-btnrow" style="padding: 20rpx {{block.marginRpx}}rpx; background: {{block.bgOut || 'transparent'}}; justify-content: {{block.justify}};">
+    <button
+      class="cbtn {{block.round ? 'round' : ''}}"
+      style="color: {{block.color}}; background: {{block.bg}};"
+      open-type="contact"
+      hover-class="hover-lite"
+      hover-stay-time="80"
+    >{{block.text}}</button>
+  </view>
+
+  <!-- ============ 语音 ============ -->
+  <view wx:elif="{{block.type === 'audio'}}" class="c-audio {{block.right ? 'right' : ''}}" style="padding: 16rpx {{block.marginRpx}}rpx;">
+    <image wx:if="{{block.avatar}}" class="ca-av" src="{{block.avatar}}" mode="aspectFill" />
+    <view class="ca-bubble" style="width: {{block.widthRpx}}rpx;" data-blk="{{index}}" bindtap="onAudioTap" hover-class="hover-lite" hover-stay-time="80">
+      <text wx:if="{{block.text}}" class="ca-text">{{block.text}}</text>
+      <text class="ca-dur">{{block.duration}}″</text>
+      <text class="ca-ico">{{block.audioPlaying ? '❚❚' : '▶'}}</text>
+    </view>
+  </view>
+
+  <!-- ============ 内容卡片 ============ -->
+  <view wx:elif="{{block.type === 'content_card'}}" class="c-ccard" style="padding: 12rpx {{block.marginRpx}}rpx;">
+    <view wx:if="{{block.title}}" class="cc-title">{{block.title}}</view>
+    <view class="cc-grid">
+      <view
+        wx:for="{{block.items}}"
+        wx:key="index"
+        wx:for-item="it"
+        wx:for-index="ci"
+        class="cc-cell"
+        style="width: {{block.cellW}}%;"
+        data-link="{{it.link}}"
+        bindtap="onTapBlock"
+        hover-class="{{it.link ? 'hover-lite' : 'none'}}"
+        hover-stay-time="80"
+      >
+        <view class="cc-card {{block.cardClass}} {{block.round ? 'round' : ''}}">
+          <view class="cc-pic" style="padding-top: {{block.padTopPct}}%;">
+            <image class="cc-img" src="{{it.image}}" mode="aspectFill" data-index="{{index}}" binderror="onImgError" />
+          </view>
+          <view class="cc-body">
+            <view wx:if="{{it.title}}" class="cc-t">{{it.title}}</view>
+            <view wx:if="{{it.desc}}" class="cc-d">{{it.desc}}</view>
+            <view wx:if="{{block.showTag || block.showRead || block.showLike}}" class="cc-meta">
+              <text wx:if="{{block.showTag}}" class="cc-tag">笔记</text>
+              <text wx:if="{{block.showRead}}" class="cc-m">👁 0</text>
+              <text wx:if="{{block.showLike}}" class="cc-m">♡ 0</text>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view
+      wx:if="{{block.more}}"
+      class="cc-more"
+      data-link="{{block.link}}"
+      bindtap="onTapBlock"
+      hover-class="hover-lite"
+      hover-stay-time="80"
+    >{{block.moreText || '查看更多'}} ›</view>
+  </view>
+
+  <!-- ============ 购买按钮（固定吸底） ============ -->
+  <block wx:elif="{{block.type === 'buy_bar'}}">
+    <!-- 占位块：吸底按钮会盖住页面内容，用它把页面底部垫高同样的高度 -->
+    <view class="cb-spacer" style="height: {{block.bgHRpx}}rpx;"></view>
+    <view class="c-buybar" style="height: {{block.bgHRpx}}rpx; background: {{block.bgOn ? block.bg : 'transparent'}};">
+      <view class="cb-row" style="padding: 0 {{block.padXRpx}}rpx {{block.padBRpx}}rpx; justify-content: {{block.alignRight ? 'flex-end' : 'center'}};">
+        <view
+          class="cb-btn"
+          style="height: {{block.btnHRpx}}rpx; border-radius: {{block.btnRRpx}}rpx; font-size: {{block.fontRpx}}rpx; background: {{block.btnBgFinal}};"
+          data-goods="{{block.goodsId}}"
+          bindtap="onBuyBarTap"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >{{block.text}}</view>
+      </view>
+    </view>
+  </block>
+
+  </view>
 </block>

@@ -10,10 +10,10 @@
  */
 
 const replica = require('../../config/replica');
-const { normalizeBlocks, loadGoodsData } = require('../../utils/blocks');
-const { openLink } = require('../../utils/link');
+const { normalizeBlocks, loadGoodsData, applyShopAvatar } = require('../../utils/blocks');
+const { blockPageBehavior } = require('../../utils/blockPage');
 
-Page({
+Page(Object.assign({}, blockPageBehavior, {
   data: {
     key: '',
     title: '',
@@ -33,7 +33,7 @@ Page({
       return;
     }
 
-    const blocks = normalizeBlocks(page.blocks || []);
+    const blocks = applyShopAvatar(normalizeBlocks(page.blocks || []), (replica.SHOP && replica.SHOP.avatar) || '');
     this.setData({
       key: key,
       title: page.name || '活动页',
@@ -49,49 +49,9 @@ Page({
     wx.setNavigationBarTitle({ title: page.name || '活动页' });
   },
 
-  /** 图片加载失败兜底，避免出现破图 */
-  onImgError(e) {
-    const { index } = e.currentTarget.dataset;
-    this.setData({ ['blocks[' + index + '].failed']: true });
-  },
-
-  /** 商品区块内单张商品图加载失败，降级为色块（与首页同一套处理） */
-  onGoodsImgError(e) {
-    const { b, g } = e.currentTarget.dataset;
-    if (b === undefined || g === undefined) return;
-    this.setData({ ['blocks[' + b + '].goods[' + g + '].failed']: true });
-  },
-
-  /**
-   * 区块点击跳转。
-   *
-   * 标题 / 公告 / 导航 / 魔方 / 热区 / 单图 / 轮播每一张 / 店铺信息 都走这里，
-   * 跳转规则统一在 utils/link.js（tab 页必须 switchTab，否则点了没反应）。
-   */
-  onTapBlock(e) {
-    openLink(e.currentTarget.dataset.link, { failText: '页面暂未开放' });
-  },
-
-  /** 商品卡片 → 商品详情 */
-  onTapGoods(e) {
-    const id = e.currentTarget.dataset.goods;
-    if (!id) return;
-    wx.navigateTo({
-      url: '/packageGoods/detail/detail?id=' + id,
-      fail: () => wx.showToast({ title: '商品详情页开发中', icon: 'none' })
-    });
-  },
-
-  /** 双层轮播：主图切换 */
-  onDoubleChange(e) {
-    const index = e.currentTarget.dataset.index;
-    this.setData({ ['blocks[' + index + '].dCur']: e.detail.current });
-  },
-
-  /** 双层轮播：点缩略图切主图 */
-  onPickThumb(e) {
-    const { block, i } = e.currentTarget.dataset;
-    this.setData({ ['blocks[' + block + '].dCur']: Number(i) });
+  /** 离开页面时释放语音播放器（区块事件见 utils/blockPage.js） */
+  onUnload() {
+    this.onUnloadBlockAudio();
   },
 
   onShareAppMessage() {
@@ -105,4 +65,4 @@ Page({
       imageUrl: img
     };
   }
-});
+}));
