@@ -1,5 +1,6 @@
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
+const { openLink } = require('../../utils/link');
 
 Page({
   data: {
@@ -8,12 +9,20 @@ Page({
     series: resolveAssets(replica.LEXY_SERIES)
   },
 
+  /** 系列头图跳转（装修台「主图跳转」） */
+  onTapBlock(e) {
+    openLink(e.currentTarget.dataset.link, { failText: '页面暂未开放' });
+  },
+
   /**
-   * 商品卡片图内含官方型号与价格（有赞源页面即如此）。
-   * 接入真实商品库后，将这里替换为 wx.navigateTo 商品详情跳转。
+   * 商品卡片点击。
+   *
+   * 装修台里给每张卡片配了「跳转链接」就按它跳（可直接挂到某个商品的详情页）；
+   * 没配的时候保持老行为：放大看图（历史上的卡片图里自带官方型号与价格）。
    */
   onTapProduct(e) {
-    const { src } = e.currentTarget.dataset;
+    const { src, link } = e.currentTarget.dataset;
+    if (openLink(link)) return;
     if (!src) return;
     wx.previewImage({ urls: [src] });
   },

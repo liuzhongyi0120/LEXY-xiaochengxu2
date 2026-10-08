@@ -26,7 +26,14 @@
     show-scrollbar="{{false}}"
   >
     <view class="group" wx:for="{{groups}}" wx:key="index" wx:for-item="group" wx:for-index="gindex">
-      <view class="group-head" wx:if="{{group.header && !group.headerFailed}}">
+      <view
+        class="group-head"
+        wx:if="{{group.header && !group.headerFailed}}"
+        data-link="{{group.link}}"
+        bindtap="onTapBlock"
+        hover-class="{{group.link ? 'hover-lite' : 'none'}}"
+        hover-stay-time="80"
+      >
         <image
           class="group-head-img"
           src="{{group.header}}"
@@ -45,6 +52,7 @@
           wx:for-item="prod"
           wx:for-index="pindex"
           data-src="{{prod.image}}"
+          data-link="{{prod.link}}"
           bindtap="onTapProduct"
           hover-class="prod-hover"
         >

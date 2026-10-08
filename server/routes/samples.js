@@ -307,6 +307,9 @@ module.exports = {
   'GET /api/decorate/stats': {
     note: '装修数据统计（草稿数、版本数、数据文件体积、目标文件路径）'
   },
+  'GET /api/decorate/link-options': {
+    note: '装修台「选择链接」弹层的候选清单：小程序页面（内置 5 个 tab 页 + 分类/购物车/全部商品 + 自定义页）、商品（后端商品库）、资讯栏目（replica.NEWS）'
+  },
   'GET /api/decorate/templates': {
     note: '新建页面可选的模板（空白页 / 复制首页）+ 自定义页配额（已用 / 上限 20）'
   },

@@ -13,10 +13,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const util = require('./util');
+const atomic = require('./atomicFile');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');
-const TMP_FILE = DB_FILE + '.tmp';
 
 /** 用户产生的数据（商品等只读数据不放这里，见 seed.js） */
 function emptyDb() {
@@ -79,7 +79,7 @@ function load() {
       // ⚠️ 只有「文件损坏」才算：备份原文件后重建。
       //    其它异常（代码 bug、IO 错误）一律向上抛，绝不清空用户数据。
       const broken = DB_FILE + '.broken.' + Date.now();
-      fs.renameSync(DB_FILE, broken);
+      atomic.renameSync(DB_FILE, broken);
       console.error(`[store] db.json 无法使用，已备份为 ${broken}：${parseErr.message}`);
       db = emptyDb();
     }
@@ -101,12 +101,11 @@ function load() {
   return db;
 }
 
-/** 原子落盘 */
+/** 原子落盘（走 atomicFile：Windows 上 rename 偶发 EPERM 时自动重试） */
 function flush(sync = false) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   const payload = JSON.stringify(db, null, 2);
-  fs.writeFileSync(TMP_FILE, payload, 'utf8');
-  fs.renameSync(TMP_FILE, DB_FILE); // rename 在多数文件系统上是原子操作
+  atomic.writeFileAtomic(DB_FILE, payload);
   if (sync) return;
 }
 

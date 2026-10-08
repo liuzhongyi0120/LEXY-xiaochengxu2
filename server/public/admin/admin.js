@@ -184,6 +184,9 @@
    * ========================================================================= */
 
   function loadPages() {
+    // 每次回到列表页都重新拉一次「可跳转目标」：新建 / 删除自定义页后立刻反映到链接选择器
+    LINK_OPTS = null;
+    loadLinkOptions();
     return api('GET', '/api/decorate/pages').then(function (d) {
       S.pages = d.list || [];
       S.stats = d.stats || {};
@@ -1021,6 +1024,46 @@
       if (f.hint) wrap.appendChild(el('div', 'hint', esc(f.hint)));
       return wrap;
 
+    } else if (f.type === 'link') {
+      input = el('div', 'lkf');
+      var shown = val == null ? '' : String(val);
+      input.innerHTML =
+        '<div class="lk-row">' +
+        '<span class="lk-ico">🔗</span>' +
+        (shown
+          ? '<span class="lk-name">' + esc(linkLabel(shown)) + '</span><code class="lk-path">' + esc(shown) + '</code>'
+          : '<span class="lk-none">未设置跳转</span>') +
+        '</div>' +
+        '<input type="text" value="' + attr(shown) + '" placeholder="留空不跳转，也可直接粘路径">' +
+        '<div class="lk-acts">' +
+        '<button class="btn sm primary">选择链接</button>' +
+        '<button class="btn sm ghost">清空</button>' +
+        '</div>';
+      var lkInp = input.querySelector('input[type=text]');
+      lkInp.oninput = function () { write(fullPath, lkInp.value, true); };
+      lkInp.onchange = function () { renderInspector(); };
+      input.querySelector('.lk-acts .primary').onclick = function () {
+        linkPicker({
+          value: shown,
+          title: (!f.label || f.label === '跳转链接') ? '选择链接' : ('选择链接 · ' + f.label),
+          hint: '选好后真机上点这个元素就会跳到对应页面。选「商品」可直接挂到某个商品的详情页。',
+          onPick: function (p) {
+            write(fullPath, p);
+            renderInspector();
+            renderPreview();
+            toast('跳转已设为：' + linkLabel(p));
+          }
+        });
+      };
+      input.querySelector('.lk-acts .ghost').onclick = function () {
+        write(fullPath, '');
+        renderInspector();
+        renderPreview();
+      };
+      wrap.appendChild(input);
+      if (f.hint) wrap.appendChild(el('div', 'hint', esc(f.hint)));
+      return wrap;
+
     } else if (f.type === 'image') {
       var box = el('div', 'imgf');
       var thumb = el('div', 'thumb');
@@ -1106,19 +1149,23 @@
 
     var bar = el('div', 'ins-list-head');
     bar.innerHTML = '<span class="cnt">' + arr.length + ' 项' + (f.max ? '（上限 ' + f.max + '）' : '') + '</span>';
+    // 图片型列表有两代结构：老的是「地址字符串数组」，新的是 [{ image, link }]
+    var strImg = f.item.type === 'image';
+    var objImg = f.item.type === 'object' && f.imageList === true;
     var addBtn = el('button', 'btn sm', '+ 新增');
     addBtn.onclick = function () {
       if (f.max && arr.length >= f.max) { toast('最多 ' + f.max + ' 项', 'err'); return; }
-      if (f.item.type === 'image') {
+      if (strImg || objImg) {
         // 图片列表：走统一的选择器，可一次从本地上传 / 素材库里挑多张
         pickImage({
           multiple: true,
           max: f.max ? f.max - arr.length : 0,
           title: '添加图片 · ' + (f.label || f.k),
-          hint: '可多选。' + (f.max ? '本列表上限 ' + f.max + ' 张，还能加 ' + (f.max - arr.length) + ' 张。' : ''),
+          hint: '可多选。' + (f.max ? '本列表上限 ' + f.max + ' 张，还能加 ' + (f.max - arr.length) + ' 张。' : '') +
+            (objImg ? '每张添加后都能单独设置跳转目标。' : ''),
           onPick: function (urls) {
             var cur = getPath(S.cur.data, fullPath);
-            urls.forEach(function (u) { cur.push(u); });
+            urls.forEach(function (u) { cur.push(objImg ? { image: u, link: '' } : u); });
             afterListChange(fullPath, cur.length - 1);
             toast('已添加 ' + urls.length + ' 张，记得保存草稿');
           }
@@ -1130,7 +1177,64 @@
     bar.appendChild(addBtn);
     body.appendChild(bar);
 
-    if (f.item.type === 'image') {
+    /* 图片 + 跳转：每项既是图片又能单独设跳转（图片广告的轮播图就是这种） */
+    if (objImg) {
+      arr.forEach(function (v, i) {
+        var u = v && v.image ? v.image : '';
+        var lk = (v && v.link) || '';
+        var item = el('div', 'ins-item ins-img' + (S.sel === fullPath + '.' + i ? ' active' : ''));
+        item.innerHTML = (u ? '<img src="' + attr(u) + '" alt="">' : '<span class="lk-ph">无图</span>') +
+          '<div class="t">第 ' + (i + 1) + ' 张<small>' +
+          (lk ? '🔗 ' + esc(linkLabel(lk)) : '未设置跳转') + '</small></div>' +
+          '<div class="ops">' +
+          '<button class="iconbtn ' + (lk ? 'has-link' : '') + '" data-lk="1" title="' +
+          (lk ? '跳转：' + attr(linkLabel(lk)) : '设置跳转目标') + '">🔗</button>' +
+          '<button class="iconbtn" data-rp="1" title="替换图片">⟳</button>' +
+          '<button class="iconbtn" data-mv="-1" title="上移">↑</button>' +
+          '<button class="iconbtn" data-mv="1" title="下移">↓</button>' +
+          '<button class="iconbtn danger" data-rm="1" title="删除">✕</button></div>';
+        item.querySelector('[data-lk]').onclick = function (e) {
+          e.stopPropagation();
+          linkPicker({
+            value: lk,
+            title: '第 ' + (i + 1) + ' 张图的跳转',
+            onPick: function (p) {
+              setPath(S.cur.data, fullPath + '.' + i + '.link', p);
+              markDirty();
+              renderInspector();
+              renderPreview();
+              toast('第 ' + (i + 1) + ' 张 跳转已设为：' + linkLabel(p));
+            }
+          });
+        };
+        item.querySelector('[data-rp]').onclick = function (e) {
+          e.stopPropagation();
+          pickImage({
+            value: u,
+            title: '替换第 ' + (i + 1) + ' 张图片',
+            onPick: function (urls) {
+              setPath(S.cur.data, fullPath + '.' + i + '.image', urls[0]);
+              markDirty();
+              renderInspector();
+              renderPreview();
+              toast('已替换，记得保存草稿');
+            }
+          });
+        };
+        item.querySelector('[data-mv="-1"]').onclick = function (e) { e.stopPropagation(); moveItem(fullPath, i, -1); };
+        item.querySelector('[data-mv="1"]').onclick = function (e) { e.stopPropagation(); moveItem(fullPath, i, 1); };
+        item.querySelector('[data-rm]').onclick = function (e) { e.stopPropagation(); removeItem(fullPath, i); };
+        if (u) item.querySelector('img').onclick = function () { previewImage(u); };
+        item.onclick = function () { select(fullPath + '.' + i); };
+        body.appendChild(item);
+      });
+      if (!arr.length) body.appendChild(el('div', 'ins-empty', '还没有图片，点「+ 新增」从本地上传或素材库里选'));
+      box.appendChild(head);
+      box.appendChild(body);
+      return box;
+    }
+
+    if (strImg) {
       arr.forEach(function (u, i) {
         var item = el('div', 'ins-item' + (S.sel === fullPath + '.' + i ? ' active' : ''));
         item.innerHTML = '<img src="' + attr(u) + '" alt="">' +
@@ -1242,7 +1346,7 @@
   function blankOf(node) {
     if (!node) return null;
     switch (node.type) {
-      case 'text': case 'textarea': case 'readonly': return '';
+      case 'text': case 'textarea': case 'readonly': case 'link': return '';
       case 'number': return node.min != null ? node.min : 0;
       case 'image': return '';
       case 'switch': return !!node.def;
@@ -1406,6 +1510,27 @@
     return '<img src="' + attr(u) + '" style="' + (style || '') + '" ' + (extra || '') + '>';
   }
 
+  /**
+   * 轮播图的两种历史结构：老数据是地址字符串，新数据是 { image, link }。
+   * 预览统一按新结构处理，老数据也不会画错。
+   */
+  function normImgs(list) {
+    return (list || [])
+      .map(function (x) {
+        if (typeof x === 'string') return { image: x, link: '' };
+        return { image: (x && x.image) || '', link: (x && x.link) || '' };
+      })
+      .filter(function (x) { return x.image; });
+  }
+
+  /** 跳转角标：预览里给「已设置跳转」的元素一个一眼能认出来的标记 */
+  function linkBadge(link) {
+    if (!link) return '';
+    var s = String(link);
+    var ico = s.indexOf('tel:') === 0 ? '📞' : (/^https?:\/\//.test(s) ? '🌐' : '🔗');
+    return '<span class="pv-link" title="点击后跳转：' + attr(s) + '">' + ico + ' ' + esc(linkLabel(s)) + '</span>';
+  }
+
   /** 悬浮操作条（对标有赞预览区右侧的圆形按钮） */
   function opsBar(path, listPath, index) {
     if (listPath == null) return '';
@@ -1435,43 +1560,46 @@
     if (kind === 'swiper') {
       var mode = b.mode || 'poster';
       var hh = Math.round((b.height || 1322) / 2);
-      var imgs = b.images || [];
-      var first = imgs[0];
+      var imgs = normImgs(b.images);
       // 预览里的当前页：点指示点/缩略图可翻页，方便确认新加的图在第几张
       var cur = Math.min(Math.max(0, S.pvSlide[p] || 0), Math.max(0, imgs.length - 1));
+      var curImg = imgs[cur] || {};
       if (mode === 'single') {
-        box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px">' + img(first, 'width:100%;display:block;font-size:0') + '</div>';
+        box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px;position:relative">' +
+          img(curImg.image, 'width:100%;display:block;font-size:0') + linkBadge(curImg.link) + '</div>';
       } else if (mode === 'scroll') {
         box += '<div style="display:flex;overflow:hidden;height:' + hh + 'px;padding:0 ' + (b.pageMargin || 0) + 'px">' +
-          imgs.slice(0, 3).map(function (u) {
-            return '<div style="flex:0 0 62%;margin-right:' + (b.imageGap || 0) + 'px">' + img(u, 'width:100%;height:' + hh + 'px;object-fit:cover') + '</div>';
+          imgs.slice(0, 3).map(function (x) {
+            return '<div style="flex:0 0 62%;margin-right:' + (b.imageGap || 0) + 'px;position:relative">' +
+              img(x.image, 'width:100%;height:' + hh + 'px;object-fit:cover') + linkBadge(x.link) + '</div>';
           }).join('') + '</div>';
       } else if (mode === 'double') {
         box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px">' +
-          img(imgs[cur], 'width:100%;height:' + hh + 'px;object-fit:cover') +
+          '<div style="position:relative">' + img(curImg.image, 'width:100%;height:' + hh + 'px;object-fit:cover') + linkBadge(curImg.link) + '</div>' +
           '<div style="display:flex;gap:4px;margin-top:4px">' +
-          imgs.slice(0, 5).map(function (u, k) {
-            return '<div data-slide="' + k + '" data-path="' + p + '" title="看第 ' + (k + 1) + ' 张" style="flex:1;cursor:pointer;border:' + (k === cur ? '1px solid #155bd4' : '1px solid #eee') + ';border-radius:2px;overflow:hidden">' +
-              img(u, 'width:100%;height:34px;object-fit:cover') + '</div>';
+          imgs.slice(0, 5).map(function (x, k) {
+            return '<div data-slide="' + k + '" data-path="' + p + '" title="看第 ' + (k + 1) + ' 张" style="flex:1;cursor:pointer;border:' + (k === cur ? '1px solid #155bd4' : '1px solid #eee') + ';border-radius:2px;overflow:hidden;position:relative">' +
+              img(x.image, 'width:100%;height:34px;object-fit:cover') + (x.link ? '<span class="pv-link dot" title="已设跳转">🔗</span>' : '') + '</div>';
           }).join('') + '</div></div>';
       } else {
-        box += '<div style="height:' + hh + 'px;padding:0 ' + (b.pageMargin || 0) + 'px">' +
-          img(imgs[cur], 'width:100%;height:100%;object-fit:cover;border-radius:' + (b.radius === 'round' ? '8px' : '0')) +
-          '<div class="pv-dots">' + imgs.map(function (_, k) {
+        box += '<div style="height:' + hh + 'px;padding:0 ' + (b.pageMargin || 0) + 'px;position:relative">' +
+          img(curImg.image, 'width:100%;height:100%;object-fit:cover;border-radius:' + (b.radius === 'round' ? '8px' : '0')) +
+          linkBadge(curImg.link) +
+          '<div class="pv-dots">' + imgs.map(function (x, k) {
             return '<i data-slide="' + k + '" data-path="' + p + '" title="看第 ' + (k + 1) + ' 张"' + (k === cur ? ' class="on"' : '') + '></i>';
           }).join('') + '</div></div>';
       }
     } else if (kind === 'image') {
-      box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px">' +
-        img(b.src, 'width:100%;display:block;border-radius:' + (b.radius === 'round' ? '8px' : '0')) + '</div>';
+      box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px;position:relative">' +
+        img(b.src, 'width:100%;display:block;border-radius:' + (b.radius === 'round' ? '8px' : '0')) + linkBadge(b.link) + '</div>';
     } else if (kind === 'video') {
       box += '<div style="height:' + Math.round((b.height || 420) / 2) + 'px;padding:0 ' + (b.pageMargin || 0) + 'px;position:relative">' +
         img(b.poster, 'width:100%;height:100%;object-fit:cover') + '<div class="pv-play">▶</div></div>';
     } else if (kind === 'title') {
       var sizeCls = { sm: 'sm', md: '', lg: 'lg' }[b.size || 'md'];
-      box += '<div class="pv-title" style="padding:' + (b.paddingY || 16) + 'px ' + (b.pageMargin || 12) + 'px;text-align:' + (b.align || 'left') + ';background:' + (b.bg || 'transparent') + '">' +
+      box += '<div class="pv-title" style="padding:' + (b.paddingY || 16) + 'px ' + (b.pageMargin || 12) + 'px;text-align:' + (b.align || 'left') + ';background:' + (b.bg || 'transparent') + ';position:relative">' +
         '<div class="t1 ' + sizeCls + '" style="color:' + (b.color || '#222') + ';font-weight:' + (b.bold ? 600 : 400) + '">' + esc(b.text || '（未填标题）') + '</div>' +
-        (b.sub ? '<div class="t2">' + esc(b.sub) + '</div>' : '') + '</div>';
+        (b.sub ? '<div class="t2">' + esc(b.sub) + '</div>' : '') + linkBadge(b.link) + '</div>';
     } else if (kind === 'line') {
       var lh = Math.round((b.height || 20) / 2);
       if ((b.style || 'blank') === 'blank') {
@@ -1482,31 +1610,36 @@
       }
     } else if (kind === 'notice') {
       box += '<div class="pv-notice" style="margin:6px ' + (b.pageMargin || 12) + 'px;color:' + (b.color || '#8A5A2B') + ';background:' + (b.bg || '#FFF7E6') + '">' +
-        (b.icon ? '<span>📢</span>' : '') + '<span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(b.text || '（未填公告）') + '</span></div>';
+        (b.icon ? '<span>📢</span>' : '') + '<span style="flex:1;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(b.text || '（未填公告）') + '</span>' +
+        (b.link ? '<span class="pv-link dot" title="整块跳转：' + attr(b.link) + '">🔗</span>' : '') + '</div>';
     } else if (kind === 'nav') {
       var cols = Number(b.cols) || 4;
       box += '<div class="pv-navrow" style="background:' + (b.bg || '#fff') + ';padding:6px 0">' +
         (b.items || []).map(function (it) {
-          return '<div class="it" style="width:' + (100 / cols) + '%">' +
+          return '<div class="it" style="width:' + (100 / cols) + '%;position:relative">' +
             (it.image ? '<img src="' + attr(it.image) + '" alt="">' : '<div style="width:34px;height:34px;background:#f0f2f5;border-radius:6px"></div>') +
-            '<span>' + esc(it.text || '') + '</span></div>';
+            '<span>' + esc(it.text || '') + '</span>' +
+            (it.link ? '<span class="pv-link dot" title="跳转：' + attr(it.link) + '">🔗</span>' : '') + '</div>';
         }).join('') + '</div>';
     } else if (kind === 'cube') {
       var c = Number(b.cols) || 2;
       box += '<div class="pv-cube">' + (b.items || []).map(function (it) {
-        return '<div class="cc" style="width:' + (100 / c) + '%">' + img(it.image, '') + '</div>';
+        return '<div class="cc" style="width:' + (100 / c) + '%;position:relative">' + img(it.image, '') +
+          (it.link ? '<span class="pv-link dot" title="跳转：' + attr(it.link) + '">🔗</span>' : '') + '</div>';
       }).join('') + '</div>';
     } else if (kind === 'hotspot') {
       box += '<div class="pv-hot" style="height:' + Math.round((b.height || 500) / 2) + 'px;margin:0 ' + (b.pageMargin || 0) + 'px">' +
         img(b.src, 'width:100%;height:100%;object-fit:cover') +
         (b.areas || []).map(function (a) {
-          return '<div class="area" style="left:' + (a.x || 0) + '%;top:' + (a.y || 0) + '%;width:' + (a.w || 20) + '%;height:' + (a.h || 20) + '%"></div>';
+          return '<div class="area" style="left:' + (a.x || 0) + '%;top:' + (a.y || 0) + '%;width:' + (a.w || 20) + '%;height:' + (a.h || 20) + '%">' +
+            (a.link ? '<span class="pv-link dot" title="跳转：' + attr(a.link) + '">🔗</span>' : '') + '</div>';
         }).join('') + '</div>';
     } else if (kind === 'shop') {
-      box += '<div style="display:flex;align-items:center;gap:10px;padding:14px;margin:0 ' + (b.pageMargin || 12) + 'px;background:' + (b.bg || '#fff') + ';justify-content:' + (b.align === 'left' ? 'flex-start' : 'center') + '">' +
+      box += '<div style="display:flex;align-items:center;gap:10px;padding:14px;margin:0 ' + (b.pageMargin || 12) + 'px;background:' + (b.bg || '#fff') + ';justify-content:' + (b.align === 'left' ? 'flex-start' : 'center') + ';position:relative">' +
         (b.style !== 'text' && b.avatar ? '<img src="' + attr(b.avatar) + '" style="width:36px;height:36px;border-radius:50%;object-fit:cover">' : '') +
         '<div><div style="font-size:14px;font-weight:600">' + esc(b.name || '') + '</div>' +
-        '<div style="font-size:11px;color:#8a919e">' + esc(b.slogan || '') + '</div></div></div>';
+        '<div style="font-size:11px;color:#8a919e">' + esc(b.slogan || '') + '</div></div>' +
+        linkBadge(b.link) + '</div>';
     } else if (kind === 'goods') {
       var gc = Number(b.cols) || 2;
       var n = Math.min(Number(b.limit) || 4, 6);
@@ -1555,11 +1688,13 @@
     (d.series || []).forEach(function (s, i) {
       var p = 'series.' + i;
       h += '<div class="pv-series pv-block' + cls(p) + '" data-path="' + p + '" style="margin-bottom:10px;position:relative">' +
-        img(s.hero, 'width:100%;display:block') +
+        '<div style="position:relative">' + img(s.hero, 'width:100%;display:block') + linkBadge(s.link) + '</div>' +
         '<div class="pv-grid g3">' +
         (s.products || []).map(function (g, j) {
           var pp = p + '.products.' + j;
-          return '<div class="pv-cell' + cls(pp) + '" data-path="' + pp + '">' + img(g.image, 'width:100%;border:1px solid #eef1f5;border-radius:6px') + '</div>';
+          return '<div class="pv-cell' + cls(pp) + '" data-path="' + pp + '" style="position:relative">' +
+            img(g.image, 'width:100%;border:1px solid #eef1f5;border-radius:6px') +
+            (g.link ? '<span class="pv-link dot" title="跳转：' + attr(g.link) + '">🔗</span>' : '') + '</div>';
         }).join('') + '</div>' +
         '<span class="pv-tag">' + esc(s.name || '') + ' · ' + esc(s.title || '') + '</span></div>';
     });
@@ -1592,10 +1727,13 @@
     (brand.groups || []).forEach(function (g, gi) {
       var gp = 'brands.' + bi + '.groups.' + gi;
       h += '<div class="pv-block' + cls(gp) + '" data-path="' + gp + '" style="margin-bottom:10px;position:relative">' +
-        '<div class="pv-grouphd">' + img(g.header) + '</div>' +
+        '<div class="pv-grouphd" style="position:relative">' + img(g.header) +
+        (g.link ? '<span class="pv-link dot" title="头图跳转：' + attr(g.link) + '">🔗</span>' : '') + '</div>' +
         '<div class="pv-grid g3">' + (g.products || []).map(function (m, mi) {
           var mp = gp + '.products.' + mi;
-          return '<div class="pv-cell pv-model' + cls(mp) + '" data-path="' + mp + '">' + img(m.image) + '<b>' + esc(m.model || '') + '</b></div>';
+          return '<div class="pv-cell pv-model' + cls(mp) + '" data-path="' + mp + '" style="position:relative">' +
+            img(m.image) + '<b>' + esc(m.model || '') + '</b>' +
+            (m.link ? '<span class="pv-link dot" title="跳转：' + attr(m.link) + '">🔗</span>' : '') + '</div>';
         }).join('') + '</div>' +
         '<span class="pv-tag">' + esc(brand.name) + ' · 分组 ' + (gi + 1) + '</span></div>';
     });
@@ -2007,6 +2145,186 @@
     modal(o.title || '选择图片', body, multi ? [confirmBtn, cancelBtn] : [cancelBtn]);
   }
 
+  /* =========================================================================
+   * 跳转链接 · 选择器
+   *
+   * 对标有赞属性面板的「选择链接」：不让运营手写 /pages/xxx 这种路径
+   * （写错了真机上就是「页面暂未开放」，而且没人记得住），
+   * 而是从一个真实来源聚合出来的清单里点选：
+   *   页面   → 内置 5 页 + 分类 / 购物车 / 全部商品 + 装修台新建的自定义页
+   *   商品   → 后端商品库（与后台控制台同一个库，/api/decorate/link-options）
+   *   资讯   → replica.NEWS 的大 / 小栏目（key 即内容页标识）
+   *   自定义 → 手填页面路径 / 网页链接 / 电话号码
+   *
+   * 存下来的仍然是普通字符串路径，所以小程序端只按普通路径跳转即可。
+   * ========================================================================= */
+
+  var LINK_OPTS = null;
+
+  function loadLinkOptions() {
+    if (LINK_OPTS) return Promise.resolve(LINK_OPTS);
+    return api('GET', '/api/decorate/link-options').then(function (d) {
+      LINK_OPTS = d || { pages: [], goods: [], news: [] };
+      return LINK_OPTS;
+    }).catch(function () {
+      LINK_OPTS = { pages: [], goods: [], news: [] };
+      return LINK_OPTS;
+    });
+  }
+
+  /** 把存下来的跳转路径翻译成人看得懂的名字（属性面板与预览角标共用） */
+  function linkLabel(link) {
+    var s = String(link === undefined || link === null ? '' : link).trim();
+    if (!s) return '';
+    if (s.indexOf('tel:') === 0) return '拨打电话 ' + s.slice(4);
+    if (/^https?:\/\//.test(s)) return '网页链接';
+    var all = [];
+    if (LINK_OPTS) all = (LINK_OPTS.pages || []).concat(LINK_OPTS.goods || [], LINK_OPTS.news || []);
+    for (var i = 0; i < all.length; i++) { if (all[i].path === s) return all[i].name; }
+    if (s.indexOf('/packageGoods/detail') === 0) return '商品详情';
+    if (s.indexOf('/packageNews/detail') === 0) return '资讯内容页';
+    if (s.indexOf('/pages/custom/index') === 0) return '自定义页';
+    return '页面';
+  }
+
+  /** 打开链接选择器：o.value 当前值，o.onPick(路径) 回调 */
+  function linkPicker(o) {
+    o = o || {};
+    var st = { tab: 'page', q: '' };
+    var opts = { pages: [], goods: [], news: [] };
+
+    var body = el('div', 'pick');
+    if (o.hint) body.appendChild(el('div', 'pick-hint', esc(o.hint)));
+    var tabBar = el('div', 'pick-tabs');
+    var pane = el('div', 'pick-pane');
+    body.appendChild(tabBar);
+    body.appendChild(pane);
+
+    var cancelBtn = el('button', 'btn', '取消');
+    cancelBtn.onclick = closeModal;
+
+    function done(p) {
+      closeModal();
+      if (o.onPick) o.onPick(p);
+    }
+
+    /** 带搜索的候选列表 */
+    function listPanel(items, emptyText) {
+      var box = el('div', 'lk-panel');
+      var kw = st.q.trim().toLowerCase();
+      var hit = items.filter(function (x) {
+        if (!kw) return true;
+        return (x.name || '').toLowerCase().indexOf(kw) >= 0 || (x.path || '').toLowerCase().indexOf(kw) >= 0;
+      });
+      if (!hit.length) {
+        box.appendChild(el('div', 'ins-empty', kw ? '没有匹配「' + esc(st.q) + '」的目标' : emptyText));
+        return box;
+      }
+      var list = el('div', 'lk-list');
+      hit.forEach(function (x) {
+        var it = el('div', 'lk-item' + (o.value === x.path ? ' on' : ''));
+        var ph = x.kind === 'goods' ? '商' : (x.kind === 'news' ? '讯' : '页');
+        it.innerHTML =
+          (x.image ? '<img src="' + attr(x.image) + '" alt="">' : '<span class="lk-ph">' + ph + '</span>') +
+          '<div class="lk-meta"><b>' + esc(x.name) + '</b><small>' + esc(x.path) + '</small></div>' +
+          (x.tab ? '<span class="lk-tag">底部导航</span>' : '') +
+          (o.value === x.path ? '<span class="lk-cur">当前</span>' : '');
+        it.onclick = function () { done(x.path); };
+        list.appendChild(it);
+      });
+      box.appendChild(list);
+      return box;
+    }
+
+    /** 自定义：手填页面路径 / 网页链接 / 电话号码 */
+    function customPanel() {
+      var box = el('div', 'lk-custom');
+      box.appendChild(el('div', 'hint',
+        '页面路径要以 / 开头（如 /pages/lexy/lexy）；网页链接小程序内打不开，点击会复制；' +
+        '电话号码会调起系统拨号。'));
+      var inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = o.value || '';
+      inp.placeholder = '/pages/xxx 或 https://… 或 tel:400-828-2233';
+      box.appendChild(inp);
+
+      var row = el('div', 'lk-quick');
+      [['/pages/index/index', '回首页'], ['/pages/product/product', '产品页'],
+       ['/packageGoods/list/list', '全部商品'], ['/pages/cart/cart', '购物车']].forEach(function (q) {
+        var b = el('button', 'btn sm ghost', q[1]);
+        b.onclick = function () { inp.value = q[0]; inp.focus(); };
+        row.appendChild(b);
+      });
+      box.appendChild(row);
+
+      var b = el('button', 'btn primary', '使用这个地址');
+      b.onclick = function () {
+        var v = inp.value.trim();
+        if (!v) { toast('请先填写跳转地址', 'err'); return; }
+        if (v.charAt(0) !== '/' && !/^https?:\/\//.test(v) && v.indexOf('tel:') !== 0) {
+          toast('地址需以 / 开头，或 http(s):// / tel: 前缀', 'err');
+          return;
+        }
+        done(v);
+      };
+      inp.onkeydown = function (e) { if (e.key === 'Enter') b.onclick(); };
+      box.appendChild(b);
+      return box;
+    }
+
+    function render() {
+      tabBar.innerHTML = '';
+      [['page', '页面', opts.pages.length], ['goods', '商品', opts.goods.length],
+       ['news', '资讯', opts.news.length], ['custom', '自定义', 0]].forEach(function (t) {
+        var b = el('button', 'pick-tab' + (st.tab === t[0] ? ' on' : ''),
+          t[1] + (t[2] ? ' <i>' + t[2] + '</i>' : ''));
+        b.onclick = function () { st.tab = t[0]; render(); };
+        tabBar.appendChild(b);
+      });
+
+      pane.innerHTML = '';
+      if (!o.__loaded && st.tab !== 'custom') {
+        pane.innerHTML = '<div class="ins-empty"><span class="spin"></span> 正在读取可跳转的目标…</div>';
+        return;
+      }
+      if (st.tab === 'custom') { pane.appendChild(customPanel()); return; }
+
+      var search = el('div', 'lk-search');
+      search.innerHTML = '<input type="text" placeholder="搜索名称或路径" value="' + attr(st.q) + '">';
+      var inp = search.querySelector('input');
+      inp.oninput = function () {
+        var pos = inp.selectionStart;
+        st.q = inp.value;
+        var next = pane.querySelector('.lk-panel');
+        if (next) pane.replaceChild(listPanel(currentItems(), emptyOf()), next);
+        else pane.appendChild(listPanel(currentItems(), emptyOf()));
+        var again = pane.querySelector('.lk-search input');
+        if (again && again !== inp) { again.value = st.q; again.focus(); }
+        else { inp.focus(); try { inp.setSelectionRange(pos, pos); } catch (e) { /* 忽略 */ } }
+      };
+      pane.appendChild(search);
+      pane.appendChild(listPanel(currentItems(), emptyOf()));
+    }
+
+    function currentItems() {
+      return st.tab === 'goods' ? opts.goods : (st.tab === 'news' ? opts.news : opts.pages);
+    }
+    function emptyOf() {
+      if (st.tab === 'goods') return '商品库里还没有商品，可先到后台控制台「商品」里新建';
+      if (st.tab === 'news') return 'replica.NEWS 里还没有栏目';
+      return '没有可跳转的页面';
+    }
+
+    render();
+    modal(o.title || '选择链接', body, [cancelBtn]);
+
+    loadLinkOptions().then(function (d) {
+      opts = { pages: d.pages || [], goods: d.goods || [], news: d.news || [] };
+      o.__loaded = true;
+      render();
+    });
+  }
+
   /* ----------------------------- 保存 / 发布 / 版本 ----------------------------- */
 
   function saveDraft() {
@@ -2399,6 +2717,9 @@
   window.__admin = {
     S: S, openPage: openPage, saveDraft: saveDraft, publish: publish, loadPages: loadPages,
     addComponent: addComponent, renderPreview: renderPreview, select: select,
-    createPageDialog: createPageDialog, renamePageDialog: renamePageDialog, deletePage: deletePage
+    createPageDialog: createPageDialog, renamePageDialog: renamePageDialog, deletePage: deletePage,
+    linkPicker: linkPicker, linkLabel: linkLabel, loadLinkOptions: loadLinkOptions,
+    linkOptions: function () { return LINK_OPTS; },
+    renderInspector: renderInspector, write: write
   };
 })();

@@ -35,7 +35,11 @@ function normalizeBlock(b, index) {
     o.round = o.radius === 'round';
     o.interval = o.interval || 4500;
     o.indicator = o.indicator || 'dots';
-    o.images = (o.images || []).filter(Boolean);
+    // 每张图带自己的跳转，所以统一成 { image, link }；
+    // 兼容老数据：images 曾是「地址字符串数组」，发布一次后会被升级成新结构。
+    o.images = (o.images || [])
+      .map((x) => (typeof x === 'string' ? { image: x, link: '' } : { image: (x && x.image) || '', link: (x && x.link) || '' }))
+      .filter((x) => x.image);
     o.dCur = 0;
   } else if (kind === 'image') {
     o.marginRpx = px2rpx(o.pageMargin);

@@ -1,5 +1,6 @@
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
+const { openLink } = require('../../utils/link');
 
 /** 深拷贝，避免运行时错误标记污染配置数据 */
 function clone(data) {
@@ -39,12 +40,20 @@ Page({
     });
   },
 
+  /** 分组头图跳转（装修台「头图跳转」） */
+  onTapBlock(e) {
+    openLink(e.currentTarget.dataset.link, { failText: '页面暂未开放' });
+  },
+
   /**
-   * 型号卡片图内含官方产品图；接入真实商品库后
-   * 将这里替换为 wx.navigateTo 商品详情跳转。
+   * 型号卡片点击。
+   *
+   * 装修台里给每个型号配了「跳转链接」就按它跳 —— 挂上商品库里的商品后，
+   * 真机上点这个型号就直接进商品详情页；没配则保持老行为：放大看图。
    */
   onTapProduct(e) {
-    const { src } = e.currentTarget.dataset;
+    const { src, link } = e.currentTarget.dataset;
+    if (openLink(link)) return;
     if (!src) return;
     wx.previewImage({ urls: [src] });
   },

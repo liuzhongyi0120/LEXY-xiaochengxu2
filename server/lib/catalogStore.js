@@ -15,10 +15,10 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const util = require('./util');
+const atomic = require('./atomicFile');
 
 const DATA_DIR = path.join(__dirname, '..', 'data');
 const FILE = path.join(DATA_DIR, 'catalog.json');
-const TMP = FILE + '.tmp';
 
 /** 店铺默认设置（后台「店铺设置」读写） */
 const DEFAULT_SETTINGS = {
@@ -93,7 +93,7 @@ function load() {
     } catch (parseErr) {
       // 只有「文件损坏」才视为可重建，其它异常向上抛，绝不清空商品库
       const broken = FILE + '.broken.' + Date.now();
-      fs.renameSync(FILE, broken);
+      atomic.renameSync(FILE, broken);
       console.error(`[catalog] catalog.json 无法使用，已备份为 ${broken}：${parseErr.message}`);
       cache = emptyCatalog();
     }
@@ -110,8 +110,7 @@ function load() {
 function flush(sync = false) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
   if (cache) cache.meta.updatedAt = Date.now();
-  fs.writeFileSync(TMP, JSON.stringify(cache, null, 2), 'utf8');
-  fs.renameSync(TMP, FILE);
+  atomic.writeFileAtomic(FILE, JSON.stringify(cache, null, 2));
   if (sync) return;
 }
 

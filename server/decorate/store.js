@@ -15,6 +15,7 @@ const vm = require('node:vm');
 const schema = require('./schema');
 const emit = require('./emit');
 const customPages = require('./customPages');
+const atomic = require('../lib/atomicFile');
 
 const ROOT = nodePath.join(__dirname, '..', '..');
 const REPLICA_FILE = nodePath.join(ROOT, 'miniprogram', 'config', 'replica.js');
@@ -44,7 +45,7 @@ function loadState() {
     } catch (parseErr) {
       // ⚠️ 只有「JSON 解析失败」才算文件损坏：备份后重建，避免后台打不开。
       //    其它异常（代码 bug / IO 错误）一律向上抛，绝不静默丢掉草稿与版本记录。
-      try { fs.renameSync(STATE_FILE, STATE_FILE + '.broken.' + Date.now()); } catch (_) { /* ignore */ }
+      try { atomic.renameSync(STATE_FILE, STATE_FILE + '.broken.' + Date.now()); } catch (_) { /* ignore */ }
       console.error(`[decorate] state.json 解析失败，已备份重建：${parseErr.message}`);
       return emptyState();
     }
@@ -57,9 +58,7 @@ function loadState() {
 
 function saveState(state) {
   ensureDirs();
-  const tmp = STATE_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(state, null, 2), 'utf8');
-  fs.renameSync(tmp, STATE_FILE);
+  atomic.writeFileAtomic(STATE_FILE, JSON.stringify(state, null, 2));
 }
 
 function now() { return Date.now(); }
@@ -100,7 +99,8 @@ function customPublished(key) {
   const def = customPages.get(key);
   if (!def) return { blocks: [], meta: schema.clone(schema.CUSTOM_META_DEFAULT) };
   return schema.clone({
-    blocks: (def.published && def.published.blocks) || [],
+    // 注册表里的历史数据可能是老结构（轮播 images 为字符串数组），读出来先升级
+    blocks: ((def.published && def.published.blocks) || []).map(schema.upgradeBlock),
     meta: Object.assign({}, schema.CUSTOM_META_DEFAULT, (def.published && def.published.meta) || {})
   });
 }
@@ -244,6 +244,8 @@ function getPage(key) {
   const published = publishedOf(key);
   const draft = state.drafts[key];
   const data = draft && draft.data ? schema.clone(draft.data) : schema.clone(published);
+  // 盘上可能存着结构升级前的老草稿（轮播 images 还是字符串数组），打开时先升级
+  schema.upgradePageData(data);
 
   // 列表项标题由服务端算好（连带 path 一起给出，前端不必实现 title 函数）
   const titles = {};
@@ -361,13 +363,11 @@ function writeReplica(pageData, validateKey) {
   const ts = now();
   const backupName = `replica.${ts}.js`;
   ensureDirs();
-  if (original) fs.writeFileSync(nodePath.join(BACKUP_DIR, backupName), original, 'utf8');
+  if (original) atomic.writeFileAtomic(nodePath.join(BACKUP_DIR, backupName), original);
   trimBackups();
 
-  /* 3) 原子写入 */
-  const tmp = REPLICA_FILE + '.tmp';
-  fs.writeFileSync(tmp, code, 'utf8');
-  fs.renameSync(tmp, REPLICA_FILE);
+  /* 3) 原子写入（Windows 上 rename 偶发 EPERM 时自动重试，避免「报发布成功但文件没换」） */
+  atomic.writeFileAtomic(REPLICA_FILE, code);
 
   /* 4) 回读校验：文件真能 require 且关键字段形状正确 */
   let reread;
@@ -375,13 +375,13 @@ function writeReplica(pageData, validateKey) {
     reread = readReplica();
   } catch (e) {
     // 回滚到备份，避免把工程搞坏
-    if (original) fs.writeFileSync(REPLICA_FILE, original, 'utf8');
+    if (original) atomic.writeFileAtomic(REPLICA_FILE, original);
     throw new Error('写回后无法加载 replica.js，已自动回滚：' + e.message);
   }
   const page = validateKey ? schema.get(validateKey) : null;
   const check = page ? validate(validateKey, page.from(reread)) : '';
   if (check) {
-    if (original) fs.writeFileSync(REPLICA_FILE, original, 'utf8');
+    if (original) atomic.writeFileAtomic(REPLICA_FILE, original);
     readReplica();
     throw new Error('回读校验失败，已自动回滚：' + check);
   }
@@ -453,7 +453,7 @@ function trimBackups() {
     const files = fs.readdirSync(BACKUP_DIR).filter((f) => /^replica\.\d+\.js$/.test(f)).sort();
     while (files.length > 20) {
       const f = files.shift();
-      try { fs.unlinkSync(nodePath.join(BACKUP_DIR, f)); } catch (_) { /* ignore */ }
+      try { atomic.unlinkSync(nodePath.join(BACKUP_DIR, f)); } catch (_) { /* ignore */ }
     }
   } catch (_) { /* ignore */ }
 }

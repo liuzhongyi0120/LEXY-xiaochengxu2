@@ -15,7 +15,7 @@
 
 import { writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const BASE = process.argv[2] || 'http://127.0.0.1:3000';
@@ -645,20 +645,45 @@ function wxssClasses(file, depth = 0, seen = new Set()) {
   return out;
 }
 
+/** 找出所有 <include src="…"/> 了某个 wxml 片段的页面（片段的 class 在「包含它的页面」作用域里解析） */
+function includersOf(fragment, allWxml) {
+  const out = [];
+  for (const f of allWxml) {
+    if (f === fragment) continue;
+    const src = readFileSync(f, 'utf8');
+    for (const m of src.matchAll(/<include\s+src\s*=\s*"([^"]+)"\s*\/?>/g)) {
+      if (resolve(dirname(f), m[1]) === fragment) { out.push(f); break; }
+    }
+  }
+  return out;
+}
+
 const appWxssClasses = wxssClasses(join(MP_ROOT, 'app.wxss'));
 const scopeIssues = [];
 const scopeHoverIssues = [];
 let scopeChecked = 0;
 let scopeHoverChecked = 0;
 
-WALK(MP_ROOT).filter((f) => f.endsWith('.wxml')).forEach((f) => {
+const ALL_WXML = WALK(MP_ROOT).filter((f) => f.endsWith('.wxml'));
+
+ALL_WXML.forEach((f) => {
   const rel = f.replace(/\\/g, '/').split('/miniprogram/')[1];
   const isComponent = rel.startsWith('components/');
+  const isFragment = rel.startsWith('templates/');
   const ownWxss = f.replace(/\.wxml$/, '.wxss');
-  // 组件：只吃自己那份 wxss；页面：app.wxss + 本页 wxss
-  const allowed = isComponent
-    ? wxssClasses(ownWxss)
-    : new Set([...appWxssClasses, ...wxssClasses(ownWxss)]);
+  // 组件：只吃自己那份 wxss；页面：app.wxss + 本页 wxss；
+  // 片段（<include> 复用）：app.wxss + 所有包含它的页面的 wxss
+  let allowed;
+  if (isComponent) {
+    allowed = wxssClasses(ownWxss);
+  } else if (isFragment) {
+    allowed = new Set(appWxssClasses);
+    includersOf(f, ALL_WXML).forEach((host) => {
+      for (const c of wxssClasses(host.replace(/\.wxml$/, '.wxss'))) allowed.add(c);
+    });
+  } else {
+    allowed = new Set([...appWxssClasses, ...wxssClasses(ownWxss)]);
+  }
 
   const src = readFileSync(f, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
   for (const m of src.matchAll(/\b(class|hover-class)\s*=\s*"([^"]*)"/g)) {
@@ -708,6 +733,254 @@ assert('小程序 var(--token) 引用的令牌全部有定义（漏定义＝该�
   missingTokens.length === 0,
   missingTokens.length ? missingTokens.join(' | ')
     : `${tokenRefs} 处引用 / ${definedTokens.size} 个令牌定义，全部命中`);
+
+/* ---------------------------------------------------------------------------
+ * 15.76 装修「跳转链接」链路静态校验
+ *
+ * 为什么必须有这一条：
+ *   装修里每个图片/元素都能配跳转，但「配得上」不等于「跳得动」。三个高发断裂点：
+ *     a) 模板里绑了 data-link，处理函数却没用 utils/link.js —— tab 页用 navigateTo
+ *        会直接失败，真机上表现为「点了没反应」，开发者工具不报错；
+ *     b) utils/link.js 的 tabBar 白名单与 app.json 漂移 —— 新增一个 tab 页后
+ *        忘了同步，点那个入口就失效；
+ *     c) schema 里某个跳转字段被写回成 text 类型 —— 运营又要手敲
+ *        /packageGoods/detail/detail?id=… 这种路径。
+ * ------------------------------------------------------------------------- */
+
+const requireFromHere = (await import('node:module')).createRequire(import.meta.url);
+const schemaMod = requireFromHere(join(__dirname, '..', 'decorate', 'schema.js'));
+
+const LINK_UTIL = join(MP_ROOT, 'utils', 'link.js');
+const linkUtilSrc = readFileSync(LINK_UTIL, 'utf8');
+const mpTabBar = JSON.parse(readFileSync(join(MP_ROOT, 'app.json'), 'utf8'));
+
+/**
+ * 收集 wxml 里「带 data-link 且绑了 bindtap」的处理函数名。
+ * 这些函数是整个跳转链路的最后一公里 —— 它们里面没调 openLink，
+ * 真机上就是「点了没反应」，而开发者工具不报任何错。
+ */
+function linkTapHandlers(wxmlFile) {
+  const src = readFileSync(wxmlFile, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  const out = new Set();
+  for (const tag of src.matchAll(/<[a-zA-Z-]+[^>]*>/g)) {
+    const t = tag[0];
+    if (!/data-link\s*=/.test(t)) continue;
+    const h = /\bbindtap\s*=\s*"([^"]+)"/.exec(t);
+    if (h) out.add(h[1]);
+  }
+  return out;
+}
+
+const linkRel = (f) => f.replace(/\\/g, '/').split('/miniprogram/')[1];
+const danglingLinkTap = [];
+let linkTapChecked = 0;
+
+ALL_WXML.forEach((wxml) => {
+  const handlers = linkTapHandlers(wxml);
+  if (!handlers.size) return;
+  const rel = linkRel(wxml);
+  // 片段被多个页面 <include>：每个宿主页面都得自己实现一遍处理函数
+  const hosts = rel.startsWith('templates/') ? includersOf(wxml, ALL_WXML) : [wxml];
+  hosts.forEach((host) => {
+    const hostRel = linkRel(host);
+    const hostJs = host.replace(/\.wxml$/, '.js');
+    let js;
+    try { js = readFileSync(hostJs, 'utf8'); } catch (e) {
+      danglingLinkTap.push(`${hostRel} 没有同名 js（无法确认跳转实现）`);
+      return;
+    }
+    if (!/require\([^)]*utils\/link/.test(js)) {
+      danglingLinkTap.push(`${hostRel} 没有 require utils/link.js`);
+    }
+    handlers.forEach((fn) => {
+      linkTapChecked++;
+      const m = new RegExp('\\b' + fn.replace(/\$/g, '\\$') + '\\s*\\([^)]*\\)\\s*\\{').exec(js);
+      if (!m) { danglingLinkTap.push(`${hostRel} 缺处理函数 ${fn}`); return; }
+      // 取该函数起始位置后 400 字符作为函数体近似，检查是否调用 openLink
+      if (!/openLink\s*\(/.test(js.slice(m.index, m.index + 400))) {
+        danglingLinkTap.push(`${hostRel} 的 ${fn} 没调用 openLink`);
+      }
+    });
+  });
+});
+assert('装修里每个带跳转的元素，其点击处理都真的走了 openLink（否则真机点了没反应）',
+  linkTapChecked > 0 && danglingLinkTap.length === 0,
+  danglingLinkTap.length ? danglingLinkTap.join(' | ')
+    : `${linkTapChecked} 处「元素 → 处理函数」全部落到 utils/link.js 的 openLink`);
+
+// 反向兜底：link.js 的 tabBar 白名单必须与 app.json 的 tabBar.list 完全一致
+const tabFromApp = ((mpTabBar.tabBar && mpTabBar.tabBar.list) || []).map((x) => '/' + x.pagePath).sort();
+const tabBlock = /TAB_PAGES\s*=\s*\[([\s\S]*?)\]/.exec(linkUtilSrc);
+const tabFromUtil = (tabBlock ? [...tabBlock[1].matchAll(/'([^']+)'/g)].map((m) => m[1]) : []).sort();
+assert('小程序 utils/link.js 的 tabBar 白名单与 app.json 完全一致（漂移＝点 tab 入口失效）',
+  tabFromApp.length > 0 && tabFromApp.join('|') === tabFromUtil.join('|'),
+  `app.json: ${tabFromApp.join(', ')} ／ link.js: ${tabFromUtil.join(', ')}`);
+
+// c) 所有区块类型里，凡是「图 / 可点元素」都应该有跳转字段；且字段类型必须是 link
+//
+// 注意：跳转字段可能藏在列表项里（图文导航的 items[].link、魔方的 items[].link、
+// 热区的 areas[].link、轮播的 images[].link），所以必须递归进 list.item 才算数 ——
+// 只看顶层字段会把这三类区块误判成「没有跳转能力」。
+const LINKABLE = ['swiper', 'image', 'title', 'notice', 'nav', 'cube', 'hotspot', 'shop'];
+function hasLinkField(node, depth = 0) {
+  if (!node || depth > 5) return false;
+  if (node.k === 'link') return node.type === 'link';
+  if (Array.isArray(node.fields)) return node.fields.some((f) => hasLinkField(f, depth + 1));
+  if (node.type === 'list' || node.item) return hasLinkField(node.item, depth + 1);
+  if (node.type === 'union') return Object.keys(node.kinds || {}).some((k) => hasLinkField(node.kinds[k], depth + 1));
+  return false;
+}
+const kindsNoLink = LINKABLE.filter((k) => {
+  const kind = schemaMod.HOME_BLOCK_KINDS[k];
+  return !kind || !hasLinkField({ type: 'object', fields: kind.fields });
+});
+assert('装修区块的图片/可点元素都能配跳转（缺哪个区块就是「这张图点了没反应」）',
+  kindsNoLink.length === 0,
+  kindsNoLink.length ? `缺跳转字段：${kindsNoLink.join(', ')}`
+    : `${LINKABLE.length} 类区块全部带跳转字段（含藏在列表项里的）`);
+
+const badLinkType = [];
+const scanLinkTypes = (pageKey, node) => {
+  if (!node) return;
+  if (node.type === 'object') { (node.fields || []).forEach((f) => scanLinkTypes(pageKey, f)); return; }
+  if (node.type === 'union') { Object.keys(node.kinds || {}).forEach((k) => scanLinkTypes(pageKey, node.kinds[k])); return; }
+  if (node.type === 'list') {
+    scanLinkTypes(pageKey, node.item);
+    return;
+  }
+  if (node.k === 'link' && node.type !== 'link') badLinkType.push(pageKey + '.' + node.k);
+};
+schemaMod.allPages().forEach((p) => scanLinkTypes(p.key, p.root));
+assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text 就等于让运营手敲路径）',
+  badLinkType.length === 0,
+  badLinkType.length ? badLinkType.join(' | ') : '全部跳转字段均为 link 类型');
+
+// d) 跳转目标清单点位必须真的能返回三组可用数据（页面 / 商品 / 资讯）
+{
+  const r = await call('GET', '/api/decorate/link-options', { auth: false });
+  const d = (r.data) || {};
+  const paths = (d.pages || []).map((x) => x.path);
+  const tabOk = ['/pages/index/index', '/pages/lexy/lexy', '/pages/news/news', '/pages/product/product', '/pages/mine/mine']
+    .every((p) => paths.indexOf(p) >= 0);
+  assert('GET /api/decorate/link-options 返回可用的跳转目标清单（内置 5 个 tab 页齐全）',
+    r.ok && tabOk,
+    `页面 ${(d.pages || []).length} 个 / 商品 ${(d.goods || []).length} 个 / 资讯 ${(d.news || []).length} 个`);
+}
+
+// e) 图片广告 images 的结构升级必须无损且幂等
+//    （老数据是地址字符串数组，新数据是 { image, link }；发布时会把老数据升级，跑两遍结果必须一样）
+{
+  const legacy = { type: 'swiper', images: ['/uploads/a.png', 'https://x/b.jpg'] };
+  const up1 = schemaMod.upgradeBlock(JSON.parse(JSON.stringify(legacy)));
+  const up2 = schemaMod.upgradeBlock(JSON.parse(JSON.stringify(up1)));
+  const okUp = up1.images.length === 2 &&
+    up1.images[0].image === '/uploads/a.png' && up1.images[0].link === '' &&
+    up1.images[1].image === 'https://x/b.jpg' && up1.images[1].link === '' &&
+    JSON.stringify(up1) === JSON.stringify(up2);
+  assert('图片广告 images 的结构升级无损且幂等（字符串数组 → { image, link }）',
+    okUp, JSON.stringify(up1));
+}
+
+// f) 小程序端区块归一化必须同时吃「老结构」与「新结构」
+//    真机上 replica.js 可能还是升级前的老数据（运营还没点过发布），
+//    这时 normalizeBlock 若不兼容，首屏轮播会直接白屏。
+{
+  const blocksMod = requireFromHere(join(MP_ROOT, 'utils', 'blocks.js'));
+  const legacy = blocksMod.normalizeBlock({ type: 'swiper', mode: 'poster', height: 1322, images: ['/uploads/a.png'] }, 0);
+  const modern = blocksMod.normalizeBlock({ type: 'swiper', images: [{ image: '/uploads/c.png', link: '/pages/lexy/lexy' }] }, 1);
+  const dirty = blocksMod.normalizeBlock({ type: 'swiper', images: ['', null, { link: 'x' }, { image: 'ok.png' }] }, 2);
+  const okMix = legacy.images.length === 1 && legacy.images[0].link === '' &&
+    legacy.images[0].image.indexOf('/uploads/a.png') >= 0 &&
+    modern.images.length === 1 && modern.images[0].link === '/pages/lexy/lexy' &&
+    dirty.images.length === 1 && dirty.images[0].image === 'ok.png';
+  assert('小程序端 normalizeBlock 同时兼容轮播图的老/新结构（否则老数据首屏白屏）',
+    okMix, '老=' + JSON.stringify(legacy.images) + ' 新=' + JSON.stringify(modern.images) + ' 脏=' + JSON.stringify(dirty.images));
+}
+
+/* ---------------------------------------------------------------------------
+ * 15.77 数据落盘「原子写 + 瞬态重试」校验
+ *
+ * 为什么必须有这一条：
+ *   Windows 上 rename / unlink 会**偶发**抛 EPERM —— 目标文件恰好被实时杀毒扫描、
+ *   或被上一轮的读句柄瞬时占用都会触发。实测连续 15 轮「上传素材 → 立刻删除」
+ *   必现一次 `EPERM: rename 'index.json.tmp' -> 'index.json'`。
+ *   这类失败**重试几十毫秒就成功**；但若像从前那样把异常吞掉继续往下走，
+ *   后果是「接口报成功、数据其实没落盘」—— media.remove 曾经正是如此：
+ *   索引删了、磁盘文件还在、/uploads/… 仍返回 200，运营以为图已下架。
+ *   所以数据文件的写与删一律走 lib/atomicFile，且**只对瞬态错误**重试
+ *   （对 ENOENT / 参数错误也重试的话，只会把真 bug 掩盖成偶发失败）。
+ * ------------------------------------------------------------------------- */
+{
+  const atomicMod = requireFromHere(join(__dirname, '..', 'lib', 'atomicFile.js'));
+
+  /* (1) 静态：持久化模块里不得再出现裸的 fs.renameSync / fs.unlinkSync */
+  const guarded = [
+    join(__dirname, '..', 'lib', 'store.js'),
+    join(__dirname, '..', 'lib', 'catalogStore.js'),
+    join(__dirname, '..', 'lib', 'media.js'),
+    join(__dirname, '..', 'decorate', 'store.js'),
+    join(__dirname, '..', 'decorate', 'customPages.js')
+  ];
+  const rawCalls = [];
+  guarded.forEach((f) => {
+    const rel = f.replace(/\\/g, '/').split('/server/')[1];
+    readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+      if (/fs\.(renameSync|unlinkSync)\s*\(/.test(line)) rawCalls.push(`${rel}:${i + 1}`);
+    });
+  });
+  assert('数据文件的重命名/删除统一走 lib/atomicFile（裸 fs 调用会在 Windows 上偶发 EPERM）',
+    rawCalls.length === 0,
+    rawCalls.length ? rawCalls.join(' | ') : `${guarded.length} 个持久化模块全部走统一封装`);
+
+  /* (2) 行为：瞬态错误必须重试，且恢复后能成功 */
+  let t1 = 0;
+  let retried = false;
+  try {
+    const v = atomicMod.retrySync(() => {
+      t1 += 1;
+      if (t1 < 4) { const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM'; throw e; }
+      return 'recovered';
+    }, '自检用重试', { attempts: 6, waitMs: 1 });
+    retried = v === 'recovered' && t1 === 4;
+  } catch (e) { retried = false; }
+  assert('瞬态错误（EPERM/EBUSY/EACCES）会自动重试，恢复后成功（不能一次失败就放弃）',
+    retried, '实际尝试次数=' + t1);
+
+  /* (3) 行为：非瞬态错误立即抛出，不做无谓重试（否则真 bug 会被伪装成偶发） */
+  let t2 = 0;
+  let fastThrow = false;
+  try {
+    atomicMod.retrySync(() => {
+      t2 += 1;
+      const e = new Error('ENOENT: no such file or directory');
+      e.code = 'ENOENT';
+      throw e;
+    }, '自检用重试', { attempts: 6, waitMs: 1 });
+  } catch (e) { fastThrow = e.code === 'ENOENT'; }
+  assert('非瞬态错误（ENOENT 等）立即抛出、只尝试 1 次',
+    fastThrow && t2 === 1, '实际尝试次数=' + t2);
+
+  /* (4) 行为：瞬态错误重试耗尽后必须把真实错误码带出来（不能吞） */
+  let t3 = 0;
+  let exhausted = '';
+  try {
+    atomicMod.retrySync(() => {
+      t3 += 1;
+      const e = new Error('EBUSY: resource busy or locked');
+      e.code = 'EBUSY';
+      throw e;
+    }, '自检用重试', { attempts: 3, waitMs: 1 });
+  } catch (e) { exhausted = e.code || ''; }
+  assert('瞬态错误重试耗尽后仍抛出（不静默当作成功），且带上真实错误码',
+    exhausted === 'EBUSY' && t3 === 3, `code=${exhausted} 尝试=${t3}`);
+
+  /* (5) 形态：writeFileAtomic 必须是「写 .tmp → rename 替换」，否则断电会写坏数据文件 */
+  const atomicSrc = readFileSync(join(__dirname, '..', 'lib', 'atomicFile.js'), 'utf8');
+  const writeBody = (/function writeFileAtomic[\s\S]*?\n}/.exec(atomicSrc) || [''])[0];
+  assert('writeFileAtomic 采用「写 .tmp → rename 替换」的原子写（防断电写坏数据文件）',
+    /\.tmp/.test(writeBody) && /renameSync/.test(writeBody),
+    writeBody ? writeBody.replace(/\s+/g, ' ').slice(0, 120) : '找不到 writeFileAtomic');
+}
 
 /* ---------------------------------------------------------------------------
  * 15.8 后台控制台接口（/api/admin/*）

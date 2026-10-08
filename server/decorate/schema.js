@@ -58,6 +58,62 @@ const ICONS = {
   anchor: I('<path d="M5 6h14M5 12h14M5 18h9"/>')
 };
 
+/* ============================ 跳转链接（对标有赞「选择链接」） ============================ */
+
+/**
+ * 跳转目标类型。
+ *
+ * 数据上「跳转」只存一个字符串（小程序页面路径 / 商品详情路径 / 外链 / 电话），
+ * 这样 replica.js 的结构不变、小程序端只按普通路径跳转；
+ * 后台负责把这个字符串「翻译」成人看得懂的名字（见 admin.js 的 linkLabel）。
+ *
+ *   page   小程序页面（内置 5 页 + 自定义页），如 /pages/lexy/lexy
+ *   goods  商品详情，如 /packageGoods/detail/detail?id=g1001
+ *   news   资讯内容页，如 /packageNews/detail/detail?key=about
+ *   web    网页链接（小程序内打不开，点击复制）
+ *   tel    电话号码（点击拨号）
+ */
+const LINK_KINDS = ['page', 'goods', 'news', 'web', 'tel'];
+
+const LINK_HINT = '留空则不跳转。点「选择链接」从页面 / 商品 / 资讯里挑，也可以手填路径或外链';
+
+/** 生成一个跳转字段（各处复用，保证 label / hint / type 完全一致） */
+function linkField(label) {
+  return { k: 'link', label: label || '跳转链接', type: 'link', hint: LINK_HINT };
+}
+
+/**
+ * 区块数据的结构升级（幂等：新老数据跑一遍结果一致）。
+ *
+ * 历史沿革：图片广告的 images 原本是「图片地址字符串数组」，
+ * 加入「每张图单独设跳转」后升级为 [{ image, link }]。
+ * 升级只改结构、不动图片地址，且必须让新老数据得到同一结果 ——
+ * 否则「发布前后逐字段哈希一致」的无损校验会失败。
+ */
+function upgradeBlock(b) {
+  if (!b || typeof b !== 'object') return b;
+  if (b.type === 'swiper' && Array.isArray(b.images)) {
+    b.images = b.images
+      .map((x) => {
+        if (typeof x === 'string') return x ? { image: x, link: '' } : null;
+        if (x && typeof x === 'object') return { image: x.image || '', link: x.link || '' };
+        return null;
+      })
+      .filter(Boolean);
+  }
+  return b;
+}
+
+/**
+ * 页面数据升级。目前只有「首页 / 自定义页」是区块流（根上有 blocks），
+ * 其余页面的跳转字段都是新增的可选字段，缺省即空，不需要迁移。
+ */
+function upgradePageData(data) {
+  if (!data || typeof data !== 'object') return data;
+  if (Array.isArray(data.blocks)) data.blocks = data.blocks.map(upgradeBlock);
+  return data;
+}
+
 /* ============================ 首页区块类型（可添加到页面的组件） ============================ */
 
 const HOME_BLOCK_KINDS = {
@@ -81,9 +137,13 @@ const HOME_BLOCK_KINDS = {
       { k: 'height', label: '高度', type: 'slider', min: 200, max: 3000, step: 2, unit: 'rpx', def: 1322, hint: 'rpx（750 宽基准），建议与该图在 750 宽下的实际高度一致，否则会被裁切。首屏海报实测 1322' },
       { k: 'radius', label: '边角样式', type: 'radiobutton', def: 'square', options: [{ value: 'square', label: '方角' }, { value: 'round', label: '圆角' }] },
       {
-        k: 'images', label: '图片', type: 'list', item: { type: 'image' }, max: 10,
-        title: (v, i) => '第 ' + (i + 1) + ' 张',
-        hint: '建议图片尺寸宽度 750，高度不限制；最多 10 张'
+        k: 'images', label: '图片', type: 'list', max: 10, imageList: true,
+        item: {
+          type: 'object',
+          title: (v, i) => '第 ' + (i + 1) + ' 张',
+          fields: [{ k: 'image', label: '图片', type: 'image' }, linkField()]
+        },
+        hint: '建议图片尺寸宽度 750，高度不限制；最多 10 张。每张图可单独设置跳转目标'
       },
       {
         type: 'group', label: '更多设置',
@@ -102,10 +162,11 @@ const HOME_BLOCK_KINDS = {
     label: '单张图片',
     lib: 'image_ad',
     group: 'basic',
-    desc: '整宽图片，按宽度自适应高度',
+    desc: '整宽图片，按宽度自适应高度，可设置跳转',
     fields: [
       { k: 'height', label: '占位高度', type: 'slider', min: 40, max: 6000, step: 2, unit: 'px', def: 400, hint: '仅供后台预览占位；真机按 widthFix 以图片原比例自适应，此值不生效' },
       { k: 'src', label: '图片', type: 'image' },
+      linkField(),
       { k: 'radius', label: '边角样式', type: 'radiobutton', def: 'square', options: [{ value: 'square', label: '方角' }, { value: 'round', label: '圆角' }] },
       {
         type: 'group', label: '更多设置',
@@ -158,7 +219,7 @@ const HOME_BLOCK_KINDS = {
       { k: 'bold', label: '加粗', type: 'switch', def: true },
       { k: 'color', label: '文字颜色', type: 'color', def: '#222222' },
       { k: 'bg', label: '背景颜色', type: 'color', def: '' },
-      { k: 'link', label: '跳转路径', type: 'text', hint: '小程序页面路径，如 /pages/lexy/lexy；留空则不跳转' },
+      linkField('整块跳转'),
       {
         type: 'group', label: '更多设置',
         fields: [
@@ -202,7 +263,7 @@ const HOME_BLOCK_KINDS = {
       {
         type: 'group', label: '更多设置',
         fields: [
-          { k: 'link', label: '跳转路径', type: 'text' },
+          linkField('整块跳转'),
           { k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }
         ]
       }
@@ -225,7 +286,7 @@ const HOME_BLOCK_KINDS = {
           fields: [
             { k: 'image', label: '图标', type: 'image' },
             { k: 'text', label: '文字', type: 'text' },
-            { k: 'link', label: '跳转路径', type: 'text' }
+            linkField()
           ]
         }
       },
@@ -249,7 +310,7 @@ const HOME_BLOCK_KINDS = {
       { k: 'gap', label: '格子间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 6 },
       {
         k: 'items', label: '格子', type: 'list', max: 12, sortable: true,
-        item: { type: 'object', title: (v, i) => '格子 ' + (i + 1), fields: [{ k: 'image', label: '图片', type: 'image' }, { k: 'link', label: '跳转路径', type: 'text' }] }
+        item: { type: 'object', title: (v, i) => '格子 ' + (i + 1), fields: [{ k: 'image', label: '图片', type: 'image' }, linkField()] }
       },
       {
         type: 'group', label: '更多设置',
@@ -281,7 +342,7 @@ const HOME_BLOCK_KINDS = {
             { k: 'y', label: '上边距 %', type: 'slider', min: 0, max: 100, step: 1, unit: '%', def: 10 },
             { k: 'w', label: '宽度 %', type: 'slider', min: 1, max: 100, step: 1, unit: '%', def: 40 },
             { k: 'h', label: '高度 %', type: 'slider', min: 1, max: 100, step: 1, unit: '%', def: 20 },
-            { k: 'link', label: '跳转路径', type: 'text' }
+            linkField()
           ]
         }
       },
@@ -307,6 +368,7 @@ const HOME_BLOCK_KINDS = {
       {
         type: 'group', label: '更多设置',
         fields: [
+          linkField('整块跳转'),
           { k: 'align', label: '对齐', type: 'radiobutton', def: 'center', options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }] },
           { k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 12 }
         ]
@@ -538,7 +600,7 @@ const PAGES = [
     from(R) {
       return {
         shop: R.SHOP,
-        blocks: R.HOME_BLOCKS,
+        blocks: (R.HOME_BLOCKS || []).map(upgradeBlock),
         meta: (R.PAGE_META && R.PAGE_META.home) || pageMetaDefault('home')
       };
     },
@@ -589,10 +651,15 @@ const PAGES = [
               { k: 'title', label: '主标题', type: 'text' },
               { k: 'subtitle', label: '副标题', type: 'text' },
               { k: 'hero', label: '系列主图', type: 'image' },
+              linkField('主图跳转'),
               {
-                k: 'products', label: '商品卡片', type: 'list',
-                item: { type: 'object', title: (v, i) => '卡片 ' + (i + 1), fields: [{ k: 'image', label: '商品图', type: 'image' }] },
-                title: (v, i) => '商品 ' + (i + 1), sortable: true, addable: true
+                k: 'products', label: '商品卡片', type: 'list', imageList: true,
+                item: {
+                  type: 'object', title: (v, i) => '商品 ' + (i + 1),
+                  fields: [{ k: 'image', label: '商品图', type: 'image' }, linkField()]
+                },
+                title: (v, i) => '商品 ' + (i + 1), sortable: true, addable: true,
+                hint: '点每张卡片的「跳转」可以挂到具体商品，真机上点它就直接进商品详情页'
               }
             ]
           },
@@ -688,16 +755,19 @@ const PAGES = [
                   title: (v, i) => '分组 ' + (i + 1) + (v.products ? '（' + v.products.length + ' 个型号）' : ''),
                   fields: [
                     { k: 'header', label: '分组头图', type: 'image' },
+                    linkField('头图跳转'),
                     {
-                      k: 'products', label: '型号卡片', type: 'list',
+                      k: 'products', label: '型号卡片', type: 'list', imageList: true,
                       item: {
                         type: 'object', title: (v, i) => v.model || '型号 ' + (i + 1),
                         fields: [
                           { k: 'model', label: '型号名', type: 'text' },
-                          { k: 'image', label: '型号图', type: 'image' }
+                          { k: 'image', label: '型号图', type: 'image' },
+                          linkField()
                         ]
                       },
-                      sortable: true, addable: true
+                      sortable: true, addable: true,
+                      hint: '点每个型号的「跳转」挂到商品库里的商品，真机上点它就直接进商品详情页'
                     }
                   ]
                 },
@@ -769,7 +839,7 @@ function customPageDef(def) {
       const all = (R && R.CUSTOM_PAGES) || {};
       const d = all[def.key] || {};
       return {
-        blocks: Array.isArray(d.blocks) ? d.blocks : [],
+        blocks: (Array.isArray(d.blocks) ? d.blocks : []).map(upgradeBlock),
         meta: Object.assign({}, CUSTOM_META_DEFAULT, d.meta || {})
       };
     },
@@ -802,6 +872,88 @@ function findPage(key) {
   if (hit) return hit;
   const def = customPages.get(k);
   return def ? customPageDef(def) : null;
+}
+
+/* ============================ 跳转目标清单（装修台「选择链接」弹层用） ============================ */
+
+/** 小程序 tabBar 页面：只能 switchTab 打开，不能 navigateTo */
+const TAB_PAGES = ['pages/index/index', 'pages/lexy/lexy', 'pages/news/news', 'pages/product/product', 'pages/mine/mine'];
+
+/** 商品详情 / 资讯详情 / 商品列表的路径模板（与小程序端 utils/link.js 必须一致） */
+const LINK_ROUTES = {
+  goods: '/packageGoods/detail/detail?id=',
+  goodsList: '/packageGoods/list/list',
+  newsDetail: '/packageNews/detail/detail?key=',
+  category: '/pages/category/category',
+  cart: '/pages/cart/cart'
+};
+
+/**
+ * 内置页面的可跳转入口（tabBar 5 页 + 分类 + 购物车）。
+ * 自定义页面走动态列表，不在这里写死。
+ */
+const BUILTIN_LINKS = [
+  { kind: 'page', path: '/pages/index/index', name: '首页', tab: true },
+  { kind: 'page', path: '/pages/lexy/lexy', name: '莱克（产品系列）', tab: true },
+  { kind: 'page', path: '/pages/news/news', name: '资讯（了解莱克）', tab: true },
+  { kind: 'page', path: '/pages/product/product', name: '产品（全品牌产品库）', tab: true },
+  { kind: 'page', path: '/pages/mine/mine', name: '我的（个人中心）', tab: true },
+  { kind: 'page', path: LINK_ROUTES.category, name: '分类（商品分类页）', tab: false },
+  { kind: 'page', path: LINK_ROUTES.cart, name: '购物车', tab: false },
+  { kind: 'page', path: LINK_ROUTES.goodsList, name: '全部商品（商品列表页）', tab: false }
+];
+
+/**
+ * 汇总所有可选跳转目标。
+ *
+ * 数据来自三处真实来源，不编造：
+ *   - 页面：内置清单 + customPages.list()（装修台新建的自定义页）
+ *   - 商品：catalogStore（后端商品库，与后台控制台同一个库）
+ *   - 资讯：replica.NEWS 的 big / small 栏目（key 即内容页标识）
+ */
+function linkOptions(replica, catalogStore) {
+  const pages = BUILTIN_LINKS.slice();
+
+  customPages.list().forEach((c) => {
+    pages.push({
+      kind: 'page',
+      path: '/pages/custom/index?key=' + c.key,
+      name: c.name + '（自定义页）',
+      tab: false
+    });
+  });
+
+  const R = replica || {};
+  const news = [];
+  ['big', 'small'].forEach((group) => {
+    const arr = (R.NEWS && R.NEWS[group]) || [];
+    arr.forEach((x) => {
+      if (!x || !x.key) return;
+      news.push({
+        kind: 'news',
+        path: LINK_ROUTES.newsDetail + x.key,
+        name: (x.label || x.key) + (group === 'big' ? '（大栏目）' : '（小栏目）'),
+        key: x.key,
+        image: x.image || ''
+      });
+    });
+  });
+
+  let goods = [];
+  try {
+    const g = catalogStore.get();
+    goods = ((g && g.goods) || []).map((x) => ({
+      kind: 'goods',
+      path: LINK_ROUTES.goods + x.id,
+      name: x.name || x.id,
+      id: x.id,
+      image: x.cover || ''
+    }));
+  } catch (e) {
+    goods = [];
+  }
+
+  return { pages: pages, goods: goods, news: news, kinds: LINK_KINDS };
 }
 
 /* ============================ 对外接口 ============================ */
@@ -865,4 +1017,4 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault };
+module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS };

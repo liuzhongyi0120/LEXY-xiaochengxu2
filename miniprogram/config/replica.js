@@ -13,7 +13,7 @@
  *    接入真实商品库后，把 onTapGoods 的预览逻辑替换为商品详情跳转即可。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 12:49:25（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 13:42:28（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -29,8 +29,14 @@ const HOME_BLOCKS = [
     type: "swiper",
     height: 1322,
     images: [
-      "https://img.yzcdn.cn/upload_files/2026/01/04/Fo69HIsVHfOzMC08PSX7N7uFY8s1.png!large.webp",
-      "https://img.yzcdn.cn/upload_files/2026/01/04/Fl6yiLDP_qD77xcIPwrKfpbdgn3l.jpg!large.webp"
+      {
+        image: "https://img.yzcdn.cn/upload_files/2026/01/04/Fo69HIsVHfOzMC08PSX7N7uFY8s1.png!large.webp",
+        link: ""
+      },
+      {
+        image: "https://img.yzcdn.cn/upload_files/2026/01/04/Fl6yiLDP_qD77xcIPwrKfpbdgn3l.jpg!large.webp",
+        link: ""
+      }
     ]
   },
   {

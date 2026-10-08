@@ -24,6 +24,7 @@
 const fs = require('node:fs');
 const nodePath = require('node:path');
 const util = require('../lib/util');
+const atomic = require('../lib/atomicFile');
 
 const DATA_DIR = nodePath.join(__dirname, '..', 'data', 'decorate');
 const FILE = nodePath.join(DATA_DIR, 'custom-pages.json');
@@ -74,7 +75,7 @@ function load() {
       }
     } catch (parseErr) {
       const broken = FILE + '.broken.' + Date.now();
-      try { fs.renameSync(FILE, broken); } catch (_) { /* ignore */ }
+      try { atomic.renameSync(FILE, broken); } catch (_) { /* ignore */ }
       console.error(`[customPages] custom-pages.json 无法使用，已备份为 ${broken}：${parseErr.message}`);
       cache = empty();
     }
@@ -100,9 +101,7 @@ function flushNow() {
   if (!needFlush) return;
   ensureDir();
   const data = load();
-  const tmp = FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');
-  fs.renameSync(tmp, FILE);
+  atomic.writeFileAtomic(FILE, JSON.stringify(data, null, 2));
   needFlush = false;
 }
 

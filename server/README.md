@@ -90,6 +90,7 @@ PORT=8080 node server/index.js
 | `color` | 取色器 | 颜色选择 + hex 输入 + 重置 |
 | `select` / `number` / `text` / `textarea` | 原生控件 | 常规字段 |
 | `image` | 图片选择 | 点「选择图片」打开三 tab 选择器：**本地上传 / 素材库 / 外链地址**；缩略图支持「点击放大」「拖拽本地图片直接上传替换」「清空」 |
+| `link` | 链接选择器 | 跳转目标：回显「人能看懂的名字 + 真实路径」，可点「选择链接」从**页面（内置 5 + 自定义）/ 商品（商品库）/ 资讯栏目**里挑（带搜索），也可直接手填路径、`tel:` 或 `https://`。留空即不跳转 |
 | `list` | 列表管理 | 卡片式列表项，支持上移 / 下移 / 复制 / 删除，受 `max` 上限约束 |
 | `readonly` | 只读展示 | 不可编辑的键值（如内容页标识） |
 | `group` + `collapsed` | `.deco-control-group__label` | 可折叠分组（如视频的「播放设置 4 项」「更多设置 2 项」） |
@@ -100,6 +101,25 @@ PORT=8080 node server/index.js
 图片广告（4 种展示形态）/ 单张图片 / 视频 / 标题文本 / 辅助分割 / 公告 / 图文导航 / 魔方 / 热区切图 / 店铺信息 / 商品。
 
 组件库中未接入的组件（基础 40 + 高级 14）会**灰显并标注「未接入」**，点击不生效——避免运营误加后前端渲染空白。
+
+#### 元素跳转（每个图片 / 可点元素都能配跳转）
+
+装修里**凡是有图或能点的元素**都能配跳转目标，落点经四段链路：`schema` 字段 → 后台控件 / 弹层 → `replica.js` 存字符串 → 小程序 `openLink` 执行。
+
+| 位置 | 跳转粒度 |
+|---|---|
+| 图片广告（4 种形态） | **每张图各自独立**（`images: [{ image, link }]`，列表项右侧 🔗 按钮单独设置） |
+| 单张图片 / 标题文本 / 公告 / 店铺信息 | 整块一个 |
+| 图文导航 / 魔方 | **每个图标格各自独立**（`items[].link`） |
+| 热区切图 | **每个热区各自独立**（`areas[].link`） |
+| 莱克页 / 产品页 | 系列主图、分组头图各一个；系列商品图、型号卡片**每张独立**（产品页型号卡片可直跳商品详情） |
+
+跳转值只存一个字符串，支持四类：小程序页面路径（如 `/pages/news/news`）、商品详情路径（如 `/packageGoods/detail/detail?id=g1001`）、`tel:13800000000`（拨号）、`https://…`（复制链接）。后台弹层负责把它翻译成人看得懂的名字，运营不必背路径。
+
+**两个必须知道的约束**（已由自检断言锁死，改坏会 FAIL）：
+
+1. **tabBar 页面必须用 `wx.switchTab`**：用 `wx.navigateTo` 打开首页 / 莱克 / 资讯 / 产品 / 我的会**直接失败且不报错**，真机表现就是「点了没反应」。收敛在 `miniprogram/utils/link.js` 一份实现里，白名单与 `app.json` 的 `tabBar.list` 由自检比对。
+2. **`images` 结构升级是幂等的**：轮播图片从「地址字符串数组」升为 `[{ image, link }]`，`schema.upgradeBlock()` 跑两遍结果一致；小程序端 `normalizeBlock()` **同时吃老新两种结构**，因为运营没点发布时 `replica.js` 还是旧数据，不兼容就是首屏白屏。`test-emit.mjs` 的无损校验基准也已过同一个升级函数。
 
 #### 草稿 - 发布模型
 
@@ -128,11 +148,13 @@ PORT=8080 node server/index.js
 | `.tooling/test-publish-e2e.mjs` | 真实 HTTP 全链路：改草稿 → diff → 发布 → 核对 replica.js → 回滚还原（18 项） |
 | `.tooling/test-media.mjs` | 素材库全链路：上传 → 落盘核对 → 静态访问 → 列表 → 引用检查 → 删除 → 越权/穿越拦截（48 项） |
 | `.tooling/probe-custom.cjs` | 自定义页 lib 层全生命周期（40 项，篡改数据文件后自动复原） |
-| `.tooling/probe-custom-http.cjs` | 自定义页 HTTP 层（32 项） |
+| `.tooling/probe-custom-http.cjs` | 自定义页 HTTP 层（36 项） |
+| `.tooling/probe-link-publish.mjs` | 装修跳转字段发布链路：给莱克页 / 产品页配跳转 → 存草稿 → 发布 → 核对 `replica.js` 真的写入且其余字段无损 → 改回原值再发布，最后比对数据指纹与基线一致（43 项，全程走公开接口、不残留草稿） |
+| `.tooling/probe-unlink-race.mjs` | 素材「上传 → 立刻删除」瞬态错误压力测试（默认 15 轮，用于验证 `atomicFile` 的重试是否够用） |
 | `.tooling/probe-resilience.cjs` | 持久化层韧性：三份数据文件被改成 `null`/`123`/`"abc"`/`[]` 时**备份 + 重建而非崩掉**（18 项，全程备份复原并逐字节校验） |
-| `node server/tools/check-all.mjs` | 全量点位连通性自检（85 点位 / 245 断言，含装修、自定义页面全生命周期、素材库、后台控制台往返、安全开关判定矩阵、持久化兜底守卫、**WXSS 作用域与设计令牌静态校验**；含小程序配置与页面资源可达性静态校验） |
+| `node server/tools/check-all.mjs` | 全量点位连通性自检（86 点位 / 258 断言，含装修、自定义页面全生命周期、素材库、后台控制台往返、安全开关判定矩阵、持久化兜底守卫、**数据落盘原子写与瞬态重试**、**WXSS 作用域与设计令牌静态校验**、**装修跳转链路校验**；含小程序配置与页面资源可达性静态校验） |
 
-**装修相关点位（13 个，`/api/decorate/*`）**：页面列表 / 组件库清单 / 页面详情 / 保存草稿 / 丢弃草稿 / 查看变更 / 发布 / 回滚 / 统计 / 模板与配额 / 新建自定义页 / 改页面信息 / 删自定义页。这些点位未开启 JWT 鉴权（当前无管理端账号体系），**正式环境请在网关层加访问控制**；设置 `DEBUG_PAGE=off` 也能把它们连同页面一起关掉（但网关层鉴权仍是首选，因为那个开关是「全开或全关」，做不到按角色细分）。
+**装修相关点位（14 个，`/api/decorate/*`）**：页面列表 / 组件库清单 / 页面详情 / 保存草稿 / 丢弃草稿 / 查看变更 / 发布 / 回滚 / 统计 / 可选跳转目标清单 / 模板与配额 / 新建自定义页 / 改页面信息 / 删自定义页。这些点位未开启 JWT 鉴权（当前无管理端账号体系），**正式环境请在网关层加访问控制**；设置 `DEBUG_PAGE=off` 也能把它们连同页面一起关掉（但网关层鉴权仍是首选，因为那个开关是「全开或全关」，做不到按角色细分）。
 
 **后台控制台点位（28 个，`/api/admin/*`）**：数据概览 / 商品 6 / 分类 3 / 订单 6 / 客户 3 / 优惠券 5 / 评价 2 / 店铺设置 2。同样免登录，**上线必须加访问控制**（见「上线前必做」）。
 
@@ -325,7 +347,7 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 | POST | `/api/footprint/add` | 是 | 记录浏览 |
 | DELETE | `/api/footprint/clear` | 是 | 清空浏览记录 |
 
-### 店铺装修（13）
+### 店铺装修（14）
 
 | 方法 | 路径 | 鉴权 | 说明 |
 |---|---|---|---|
@@ -342,6 +364,7 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 | POST | `/api/decorate/publish` | 否 | 发布（写回 `replica.js`，双重校验 + 失败回滚） |
 | POST | `/api/decorate/rollback` | 否 | 回滚历史版本（`mode=publish` 可直接发布） |
 | GET | `/api/decorate/stats` | 否 | 装修数据统计 |
+| GET | `/api/decorate/link-options` | 否 | 可选跳转目标清单（小程序页面 / 商品 / 资讯栏目），供装修台「选择链接」弹层使用 |
 
 ### 素材库（3）
 
@@ -386,7 +409,7 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 | 设置 | GET `/api/admin/settings` | 店铺设置当前值 + 默认值 + 资产数量 |
 | | POST `/api/admin/settings/save` | 保存店铺设置 |
 
-> 装修 13 个 + 素材 3 个 + 后台 28 个免登录点位均属运营管理功能，**上线必须在网关层加访问控制**（见「上线前必做」）。设置 `DEBUG_PAGE=off` 可把它们连同三个管理页面一起关掉（返回 403），但那是「全有或全无」，替代不了按角色的登录态鉴权。
+> 装修 14 个 + 素材 3 个 + 后台 28 个免登录点位均属运营管理功能，**上线必须在网关层加访问控制**（见「上线前必做」）。设置 `DEBUG_PAGE=off` 可把它们连同三个管理页面一起关掉（返回 403），但那是「全有或全无」，替代不了按角色的登录态鉴权。
 
 ---
 
@@ -420,6 +443,26 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 - 换算函数只此一份：`miniprogram/utils/units.js`（`px2rpx` / `heightRpx`），回归测试 `.tooling/test-layout.mjs`。
 - 区块渲染也只此一份：`miniprogram/utils/blocks.js`（`normalizeBlock` / `normalizeBlocks` / `loadGoodsData`）。首页与装修台新建的自定义页共用它，避免两边各写一套后逐渐走样。
 
+### 数据落盘：一律走 `lib/atomicFile.js`
+
+所有数据文件（`db.json` / `catalog.json` / `state.json` / `custom-pages.json` / `replica.js` / 素材 `index.json`）都采用**「写 `.tmp` → `rename` 替换」的原子写**，防止进程中断留下半个文件。
+
+但在 Windows 上 `rename` / `unlink` 会**偶发**抛 `EPERM` —— 目标文件恰好被实时杀毒扫描、或被上一轮的读句柄瞬时占用都会触发。实测：连续 15 轮「上传素材 → 立刻删除」必现一次 `EPERM: rename 'index.json.tmp' -> 'index.json'`。
+
+所以落盘与删除**统一走 `server/lib/atomicFile.js`**：
+
+| 函数 | 作用 |
+|---|---|
+| `writeFileAtomic(file, text)` | 原子写（`.tmp` → `rename`） |
+| `unlinkSync(file)` | 带重试删除；文件本就不在时返回 `false` |
+| `renameSync(from, to)` | 带重试重命名（备份损坏文件也用它） |
+| `retrySync(fn, label, opt)` | 失败重试；**只对 `EPERM` / `EACCES` / `EBUSY` 这类瞬态错误重试** |
+
+两条不可动摇的原则（已由自检 15.77 段的 5 条断言锁死）：
+
+1. **瞬态错误必须重试**（重试几十毫秒即可成功）；**非瞬态错误（`ENOENT` / 参数错误）立即抛出、只尝试一次** —— 否则真 bug 会被伪装成「偶发失败」而永远查不出。
+2. **绝不把落盘失败当成功**。这里踩过一个代价不小的坑：`media.remove` 曾把 `unlink` 的异常静默吞掉后照样删索引并返回 `deleted: true`，结果**索引里没了、磁盘上还在、`/uploads/…` 仍返回 200** —— 运营以为图已下架，实际内容还在被访问。**下架失效比删除失败危险得多**，因此现在失败就整体失败，把真实错误码（`EPERM` / `EBUSY`）带回给调用方。
+
 ### 鉴权
 
 ```
@@ -440,6 +483,7 @@ JWT（HS256），默认 7 天。token 失效时返回 HTTP 401 + `code: 401`，�
 ## 五、数据存储
 
 当前为 **JSON 文件存储**（原子写 + 50ms 合并落盘），适合开发联调与单机小流量。
+原子写与删除的实现与重试策略见 `server/lib/atomicFile.js`（见上文「数据落盘」）。
 
 存储已收敛在 `server/lib/store.js`（业务数据）与 `server/lib/catalogStore.js`（运营资产）两层，
 **切换到 MySQL / Redis 只需替换这两处实现，路由代码零改动**。
@@ -515,7 +559,7 @@ node server/tools/check-all.mjs
 1. **设置 `JWT_SECRET`**：`NODE_ENV=production` 且未设置时服务会**拒绝启动**（不是只打一行警告）。开发默认密钥 `dev-only-secret-change-me` 是公开的，带它上线等于所有人可伪造任意用户登录态。生成方式：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 2. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，并补微信支付 v3 证书签名（`lib/wechat.js` 的 `unifiedOrder` 已标注接入点）
 3. 关闭模拟支付：`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`（同时会关闭三个管理页面与三类管理接口）
-4. **装修后台 + 素材库 + 后台控制台加访问控制**：`/api/decorate/*`（13 个）、`/api/media/*`（3 个）、`/api/admin/*`（28 个）均未做鉴权。风险最高的是 `/api/media/upload`（文件写入，无鉴权时任何人都能往服务器写文件占满磁盘）、`/api/admin/goods/*` 与 `/api/admin/settings/save`（可直接改商品与店铺配置）。**兜底手段**：设 `DEBUG_PAGE=off`（或 `NODE_ENV=production`），三个管理页面与这三类接口会一起返回 403 —— 已由自检的「安全开关」断言锁定，不会再出现「页面关了、接口还开着」的假关闭。**但这只是兜底**：它是全开/全关，无法按角色区分，正式环境仍应在网关层限制来源 / 加登录态。
+4. **装修后台 + 素材库 + 后台控制台加访问控制**：`/api/decorate/*`（14 个）、`/api/media/*`（3 个）、`/api/admin/*`（28 个）均未做鉴权。风险最高的是 `/api/media/upload`（文件写入，无鉴权时任何人都能往服务器写文件占满磁盘）、`/api/admin/goods/*` 与 `/api/admin/settings/save`（可直接改商品与店铺配置）。**兜底手段**：设 `DEBUG_PAGE=off`（或 `NODE_ENV=production`），三个管理页面与这三类接口会一起返回 403 —— 已由自检的「安全开关」断言锁定，不会再出现「页面关了、接口还开着」的假关闭。**但这只是兜底**：它是全开/全关，无法按角色区分，正式环境仍应在网关层限制来源 / 加登录态。
 5. **素材目录纳入备份与容量监控**：`server/data/uploads/`（与 `db.json`、`catalog.json` 同处 `server/data`，一个目录即可整体备份；建议加磁盘水位告警，并考虑后续迁移到对象存储 / CDN）
 6. 域名备案 + HTTPS 证书，小程序后台配置 `request` 合法域名（**同时要把上传图片的域名加进 `downloadFile` 合法域名**，否则小程序端显示不出素材库的图）
 7. 存储切到 MySQL / Redis（`lib/store.js` 业务数据 + `lib/catalogStore.js` 运营资产）

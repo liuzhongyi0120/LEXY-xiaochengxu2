@@ -1,7 +1,13 @@
 <view class="page" style="background: {{pageBg}};">
   <view wx:for="{{series}}" wx:key="id" wx:for-item="group" wx:for-index="sindex">
     <!-- 系列头图 + 文案（文案为源页面真实覆盖文字） -->
-    <view class="hero">
+    <view
+      class="hero"
+      data-link="{{group.link}}"
+      bindtap="onTapBlock"
+      hover-class="{{group.link ? 'hover-lite' : 'none'}}"
+      hover-stay-time="80"
+    >
       <image
         wx:if="{{!group.heroFailed}}"
         class="hero-img"
@@ -29,6 +35,7 @@
           wx:for-item="prod"
           wx:for-index="pindex"
           data-src="{{prod.image}}"
+          data-link="{{prod.link}}"
           bindtap="onTapProduct"
           hover-class="card-hover"
         >

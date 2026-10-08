@@ -9,6 +9,7 @@
  *   POST /api/decorate/publish            发布（写回 miniprogram/config/replica.js）
  *   POST /api/decorate/rollback           回滚到历史版本
  *   GET  /api/decorate/stats              装修数据统计
+ *   GET  /api/decorate/link-options       可选跳转目标清单（页面 / 商品 / 资讯栏目）
  *
  *   ── 自定义页面（对标有赞「新建页面」，数据写入 replica.CUSTOM_PAGES）──
  *   GET  /api/decorate/templates          新建模板清单 + 配额
@@ -22,6 +23,7 @@
 
 const decorate = require('../decorate/store');
 const schema = require('../decorate/schema');
+const catalogStore = require('../lib/catalogStore');
 const { diff } = require('../decorate/diff');
 const { BizError, ERR } = require('../lib/http');
 
@@ -216,6 +218,16 @@ module.exports = [
     desc: '装修数据统计（草稿数、版本数、数据文件体积、目标文件路径）',
     async handler() {
       return decorate.stats();
+    }
+  },
+
+  {
+    method: 'GET',
+    path: '/api/decorate/link-options',
+    auth: false,
+    desc: '可选跳转目标清单：小程序页面（内置 + 自定义）/ 商品（后端商品库）/ 资讯栏目（replica.NEWS）',
+    async handler() {
+      return schema.linkOptions(decorate.readReplica(), catalogStore);
     }
   }
 ];

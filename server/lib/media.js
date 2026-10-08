@@ -14,6 +14,7 @@
 
 const fs = require('node:fs');
 const nodePath = require('node:path');
+const atomic = require('./atomicFile');
 const { BizError, ERR } = require('./http');
 
 /** 素材根目录（与数据同处 server/data，运维时一个目录备份即可） */
@@ -58,9 +59,7 @@ function readIndex() {
 
 function writeIndex(idx) {
   ensureDir(ROOT);
-  const tmp = INDEX_FILE + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(idx, null, 2), 'utf8');
-  fs.renameSync(tmp, INDEX_FILE); // 原子替换，避免进程中断写坏索引
+  atomic.writeFileAtomic(INDEX_FILE, JSON.stringify(idx, null, 2));
 }
 
 /* ----------------------------- 图片探测 ----------------------------- */
@@ -407,7 +406,18 @@ function remove(name, force) {
 
   const abs = nodePath.join(ROOT, n);
   let missing = false;
-  try { fs.unlinkSync(abs); } catch (e) { missing = e.code === 'ENOENT'; }
+  try {
+    /*
+     * 走带重试的删除：Windows 上文件会被实时扫描 / 残留句柄瞬时占用（EPERM / EBUSY），
+     * 重试几十毫秒即可成功。
+     * 曾经这里把任何异常都静默吞掉、照旧返回 deleted:true 并删掉索引 ——
+     * 结果是「索引里没了、磁盘上还在」，运营以为图已下架，而 /uploads/... 仍返回 200。
+     * 内容下架失效比删除失败严重得多，所以失败必须整体失败、让调用方看到真实原因。
+     */
+    if (!atomic.unlinkSync(abs)) missing = true;
+  } catch (e) {
+    throw new BizError('删除文件失败（' + (e.code || e.message) + '）：' + n + '，文件可能正被占用，请稍后重试', ERR.BIZ);
+  }
   idx.items.splice(i, 1);
   writeIndex(idx);
 

@@ -1,6 +1,7 @@
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
 const { normalizeBlocks, loadGoodsData } = require('../../utils/blocks');
+const { openLink } = require('../../utils/link');
 
 Page({
   data: {
@@ -34,15 +35,14 @@ Page({
     this.setData({ ['blocks[' + b + '].goods[' + g + '].failed']: true });
   },
 
-  /** 区块点击跳转（标题 / 公告 / 导航 / 魔方 / 热区共用） */
+  /**
+   * 区块点击跳转。
+   *
+   * 标题 / 公告 / 导航 / 魔方 / 热区 / 单图 / 轮播每一张 / 店铺信息 都走这里，
+   * 跳转规则（tab 页 switchTab、外链复制、电话拨号）统一在 utils/link.js 一份实现里。
+   */
   onTapBlock(e) {
-    const link = e.currentTarget.dataset.link;
-    if (!link) return;
-    if (/^https?:\/\//.test(link)) {
-      wx.setClipboardData({ data: link, success: () => wx.showToast({ title: '链接已复制', icon: 'none' }) });
-      return;
-    }
-    wx.navigateTo({ url: link, fail: () => wx.showToast({ title: '页面暂未开放', icon: 'none' }) });
+    openLink(e.currentTarget.dataset.link, { failText: '页面暂未开放' });
   },
 
   /** 商品卡片 → 商品详情 */
@@ -69,11 +69,13 @@ Page({
 
   onShareAppMessage() {
     const first = (this.data.blocks || [])[0] || {};
-    const img = first.images && first.images[0] ? first.images[0] : first.src;
+    // images 的元素是 { image, link } 对象（每张图可单独设跳转），取图要 .image
+    const first0 = (first.images || [])[0];
+    const img = (first0 && first0.image) || first.src || '';
     return {
       title: (this.data.shop && this.data.shop.name) || 'LEXY莱克',
       path: '/pages/index/index',
-      imageUrl: img || ''
+      imageUrl: img
     };
   }
 });
