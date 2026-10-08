@@ -1,0 +1,138 @@
+/* =========================================================================
+ * 小程序预览页（/preview）· 布局样式
+ *
+ * 手机壳与区块样式全部复用 /admin/admin.css（.phone / .phone-screen / .tabbar / .pv-*），
+ * 这里只写这个页面自己的两栏布局与顶栏 —— 不重复定义任何区块样式。
+ * ========================================================================= */
+
+.pv-body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ------------------------------ 顶栏 ------------------------------ */
+
+.pv-top {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  background: #fff;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.pv-brand { display: flex; align-items: center; gap: 10px; }
+.pv-mark {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: #C8102E; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; letter-spacing: .5px;
+}
+.pv-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
+.pv-title small { display: block; font-size: 11px; font-weight: 400; color: var(--gray-2); margin-top: 1px; }
+.pv-spacer { flex: 1; }
+.pv-cur {
+  font-size: 12px; color: var(--ink-2);
+  background: var(--line-2); border-radius: 20px; padding: 5px 12px;
+  max-width: 320px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+}
+.pv-field {
+  display: flex; align-items: center; gap: 5px;
+  font-size: 12px; color: var(--gray);
+}
+.pv-field select { height: 28px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; background: #fff; }
+.pv-auto { cursor: pointer; user-select: none; }
+.pv-dot {
+  width: 7px; height: 7px; border-radius: 50%; background: var(--line);
+  display: inline-block; transition: .2s;
+}
+.pv-dot.on { background: var(--ok); box-shadow: 0 0 0 3px rgba(18, 183, 106, .14); }
+.pv-dot.busy { background: var(--warn); }
+.pv-links { display: flex; gap: 10px; font-size: 12px; }
+.pv-links a { color: var(--blue); text-decoration: none; }
+.pv-links a:hover { text-decoration: underline; }
+
+/* ------------------------------ 主区 ------------------------------ */
+
+.pv-main { flex: 1; display: flex; min-height: 0; }
+
+/* 左：页面列表 */
+.pv-side {
+  flex: 0 0 260px; width: 260px;
+  background: #fff; border-right: 1px solid var(--line);
+  display: flex; flex-direction: column; min-height: 0;
+}
+.pv-side-head {
+  flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px;
+  padding: 12px 14px 8px; font-size: 13px;
+}
+.pv-side-head .muted { font-size: 11px; }
+.pv-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+.pv-item {
+  display: block; width: 100%; text-align: left;
+  border: 1px solid transparent; border-radius: 8px;
+  padding: 9px 10px; margin-bottom: 3px;
+  background: transparent; cursor: pointer; transition: .12s;
+}
+.pv-item:hover { background: var(--line-2); }
+.pv-item.on { background: var(--blue-light); border-color: var(--blue-border); }
+.pv-item b { display: block; font-size: 13px; font-weight: 600; color: var(--ink); }
+.pv-item.on b { color: var(--blue); }
+.pv-item small { display: block; font-size: 11px; color: var(--gray-2); margin-top: 2px; }
+.pv-item .pv-badges { margin-top: 4px; display: flex; gap: 5px; flex-wrap: wrap; }
+.pv-badge {
+  font-size: 10px; line-height: 16px; height: 16px; padding: 0 6px; border-radius: 3px;
+  background: var(--line-2); color: var(--gray);
+}
+.pv-badge.custom { background: #e8f0fe; color: var(--blue); }
+.pv-badge.draft { background: #fff4e5; color: #d46b08; }
+.pv-side-foot {
+  flex: 0 0 auto; border-top: 1px solid var(--line);
+  padding: 9px 14px; font-size: 11px; color: var(--gray-2); line-height: 1.7;
+}
+
+/* 右：预览画布（整页滚动，手机壳居中） */
+.pv-stage {
+  flex: 1; min-width: 0; overflow: auto;
+  background: #eef0f3;
+  padding: 24px 20px 80px;
+  display: flex; justify-content: center; align-items: flex-start;
+}
+.pv-stage .phone { box-shadow: 0 6px 32px rgba(0, 0, 0, .16); }
+
+/* 「按手机屏查看」模式：手机屏固定一屏高，内部滚动（模拟真机滚动） */
+.pv-stage.screen-mode .phone-screen {
+  height: 667px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.pv-stage.screen-mode .tabbar {
+  position: sticky; bottom: 0; z-index: 9;
+}
+
+/* 页面顶部的「已发布状态」条 —— 只在此处显示，不进小程序端渲染 */
+.pv-meta {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 12px; font-size: 11px; color: var(--gray);
+  background: #f7f8fa; border-bottom: 1px solid var(--line-2);
+}
+.pv-meta b { color: var(--ink-2); font-weight: 600; }
+.pv-meta.warn { background: #fff8e6; color: #a8680a; }
+
+/* 加载与错误态 */
+.pv-loading, .pv-error {
+  padding: 60px 20px; text-align: center; font-size: 13px; color: var(--gray-2);
+}
+.pv-error { color: var(--danger); }
+.pv-error code { display: block; margin-top: 8px; font-size: 11px; color: var(--gray); }
+
+/* 悬浮提示 */
+.pv-toast {
+  position: fixed; left: 50%; top: 64px; transform: translateX(-50%);
+  background: rgba(31, 35, 41, .92); color: #fff;
+  font-size: 12px; padding: 8px 16px; border-radius: 20px; z-index: 99;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, .2);
+}

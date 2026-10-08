@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>小程序预览 · LEXY莱克官方旗舰店</title>
+<!--
+  复用装修台的样式：手机壳（.phone / .phone-screen / .tabbar）与全部 .pv-* 区块样式。
+  刻意不复制一份 —— 预览页与装修台预览必须长得一模一样，样式分家就是走样的开始。
+-->
+<link rel="stylesheet" href="/admin/admin.css">
+<link rel="stylesheet" href="/preview/preview.css">
+</head>
+<body class="pv-body">
+
+<header class="pv-top">
+  <div class="pv-brand">
+    <span class="pv-mark">LEXY</span>
+    <span class="pv-title">小程序预览
+      <small>看的是「已发布」的内容 —— 装修台点「立即发布」后，这里刷新即变</small>
+    </span>
+  </div>
+  <div class="pv-spacer"></div>
+  <div class="pv-cur" id="pvCur">—</div>
+  <label class="pv-field">机型
+    <select id="pvDevice">
+      <option value="375">iPhone 12（375）</option>
+      <option value="320">iPhone SE（320）</option>
+      <option value="414">iPhone Pro Max（414）</option>
+    </select>
+  </label>
+  <button class="btn" id="pvScreenMode" title="在「整页铺开」与「一屏高可滚动」之间切换">按手机屏查看</button>
+  <label class="pv-field pv-auto" title="装修台发布后自动更新预览">
+    <input type="checkbox" id="pvAuto" checked> 自动刷新
+    <span class="pv-dot" id="pvDot"></span>
+  </label>
+  <button class="btn primary" id="pvReload" title="重新拉取已发布内容">刷新</button>
+  <nav class="pv-links">
+    <a href="/admin" target="_blank">装修台</a>
+    <a href="/console" target="_blank">后台控制台</a>
+    <a href="/debug" target="_blank">接口调试台</a>
+  </nav>
+</header>
+
+<main class="pv-main">
+  <!-- 左：页面列表（内置 5 页 + 装修台新建的自定义页） -->
+  <aside class="pv-side">
+    <div class="pv-side-head">
+      <b>页面</b>
+      <span class="muted" id="pvCount">—</span>
+    </div>
+    <div class="pv-list" id="pvPages"></div>
+    <div class="pv-side-foot" id="pvFoot">—</div>
+  </aside>
+
+  <!-- 右：手机壳预览 -->
+  <section class="pv-stage" id="pvStage">
+    <div class="phone" id="phone">
+      <div class="phone-bar">
+        <span class="ph-time">9:41</span>
+        <span class="ph-title" id="phTitle">首页</span>
+        <span class="ph-dots">···</span>
+      </div>
+      <div class="phone-screen" id="preview"></div>
+      <div class="tabbar" id="phTabbar">
+        <span>首页</span><span>莱克</span><span>资讯</span><span>产品</span><span>我的</span>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="pv-toast" id="pvToast" hidden></div>
+
+<!-- 渲染核心与装修台共用同一份（展示态 edit:false：不带选中框、悬浮操作条、区块角标、跳转角标） -->
+<script src="/shared/pv-render.js"></script>
+<script src="/preview/preview.js"></script>
+</body>
+</html>

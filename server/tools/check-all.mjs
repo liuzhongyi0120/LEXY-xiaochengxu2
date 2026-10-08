@@ -1106,12 +1106,15 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     wxmlMissing.length === 0,
     wxmlMissing.length ? `wxml 缺分支：${wxmlMissing.join(', ')}` : `${allKinds.length} 种区块全部有渲染分支`);
 
-  /* (5) 装修台预览必须覆盖同样 19 种（后台预览不画＝运营以为没生效，会反复重配） */
+  /* (5) 装修台预览必须覆盖同样 19 种（后台预览不画＝运营以为没生效，会反复重配）
+   *     渲染实现已统一到 public/shared/pv-render.js（装修台与前端预览页共用一份），
+   *     所以这里查的是共享模块，不是 admin.js。 */
   const adminJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
-  const pvMissing = allKinds.filter((k) => adminJs.indexOf(`kind === '${k}'`) < 0);
+  const pvRendSrc = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+  const pvMissing = allKinds.filter((k) => pvRendSrc.indexOf(`kind === '${k}'`) < 0);
   const tagLabelMissing = allKinds.filter((k) => {
     // 预览右上角的角标名（如 buy_bar → 购买按钮）必须能查到，否则会退回显示英文类型名
-    const m = /"pv-tag">' \+ esc\(\(\{([\s\S]*?)\}\[kind\]/.exec(adminJs);
+    const m = /var KIND_LABEL = \{([\s\S]*?)\};/.exec(pvRendSrc);
     return !m || m[1].indexOf(k + ':') < 0;
   });
   assert('装修台预览覆盖全部 19 种区块类型，且每种都有中文角标名',
@@ -1522,7 +1525,7 @@ assert('后台 · 自检全程未改变真实用户数据规模（订单数 / �
  * 解析成 /console.core.js → 404 → 脚本整段不执行 → 页面看起来「一片空白」。
  * 这里按「无尾斜杠 URL」真实解析并请求每个引用，把这类问题拦在自检里。
  * ------------------------------------------------------------------------- */
-const PAGE_HTML = { '/': 'debug.html', '/debug': 'debug.html', '/admin': 'admin/index.html', '/console': 'console/index.html' };
+const PAGE_HTML = { '/': 'debug.html', '/debug': 'debug.html', '/admin': 'admin/index.html', '/console': 'console/index.html', '/preview': 'preview/index.html' };
 const pageBad = [];
 let pageRefTotal = 0;
 for (const [route, file] of Object.entries(PAGE_HTML)) {
@@ -1543,17 +1546,19 @@ assert('后台页面内的静态引用在「无尾斜杠 URL」下全部可达�
   pageBad.length ? pageBad.join(' | ') : `${Object.keys(PAGE_HTML).length} 个页面 · ${pageRefTotal} 个引用全部 200`);
 
 const pageProbe = [];
-for (const route of ['/console', '/admin', '/debug']) {
+for (const route of ['/console', '/admin', '/debug', '/preview']) {
   const res = await fetch(BASE + route);
   pageProbe.push({ route, status: res.status, html: (res.headers.get('content-type') || '').indexOf('text/html') === 0 });
 }
-assert('后台页面路由可访问且返回 HTML（/console · /admin · /debug）',
+assert('后台页面路由可访问且返回 HTML（/console · /admin · /debug · /preview）',
   pageProbe.every((p) => p.status === 200 && p.html),
   pageProbe.map((p) => `${p.route}=${p.status}`).join(' · '));
 
 const CONSOLE_FILES = [
   'console/index.html', 'console/console.css', 'console/console.core.js', 'console/console.modules.js',
-  'admin/index.html', 'admin/admin.js', 'admin/admin.css'
+  'admin/index.html', 'admin/admin.js', 'admin/admin.css',
+  'preview/index.html', 'preview/preview.css', 'preview/preview.js',
+  'shared/pv-render.js'
 ];
 const missAssets = [];
 CONSOLE_FILES.forEach((f) => {
@@ -1562,6 +1567,87 @@ CONSOLE_FILES.forEach((f) => {
 assert('后台控制台与装修台必需文件齐全',
   missAssets.length === 0,
   missAssets.length ? `缺失：${missAssets.join(', ')}` : `${CONSOLE_FILES.length} 个文件全部存在`);
+
+/* ---------------------------------------------------------------------------
+ * 15.10 前端预览页（/preview）与共享渲染核心
+ *
+ * 装修台的手机预览与 /preview 必须共用**同一份**渲染实现（public/shared/pv-render.js）。
+ * 各写一份的后果不是「有点不一样」，而是「后台看着好好的、真机上是另一回事」。
+ * 所以这条约束要固化成断言，谁再复制一份出来，自检立刻红。
+ *
+ * 另外这里做了**真实渲染校验**：拿线上已发布数据渲染一遍，逐字符确认展示态里
+ * 没有任何编辑装饰（.pv-tag 区块角标 / .pv-ops 悬浮操作条 / .pv-link 跳转角标 / active 选中态）。
+ * 这不是多余的 —— 抽模块时就真漏过几个地方：莱克页与产品页的「系列/分组」角标、
+ * nav / 魔方 / 热区 / 公告里的 🔗 角标是**硬编码**输出、不受 edit 开关控制，
+ * 浏览器实测才暴露出来（后台预览带这些是对的，线上露出就是脏数据）。
+ * ------------------------------------------------------------------------- */
+const pvRequire = (await import('node:module')).createRequire(import.meta.url);
+const PUB = join(__dirname, '..', 'public');
+const sharedSrc = readFileSync(join(PUB, 'shared', 'pv-render.js'), 'utf8');
+const adminSrc = readFileSync(join(PUB, 'admin', 'admin.js'), 'utf8');
+const previewSrc = readFileSync(join(PUB, 'preview', 'preview.js'), 'utf8');
+const previewHtml = readFileSync(join(PUB, 'preview', 'index.html'), 'utf8');
+
+assert('装修台与预览页共用同一份渲染核心，任一侧都没有第二份实现',
+  /PvRender\.render\(/.test(adminSrc) && /PvRender\.render\(/.test(previewSrc) &&
+  !/function pvBlock\s*\(/.test(adminSrc) && !/function pvHome\s*\(/.test(adminSrc) &&
+  !/function pvBlock\s*\(/.test(previewSrc),
+  [!/PvRender\.render\(/.test(adminSrc) ? 'admin.js 未走共享渲染核心' : '',
+   !/PvRender\.render\(/.test(previewSrc) ? 'preview.js 未走共享渲染核心' : '',
+   /function pvBlock\s*\(/.test(adminSrc) ? 'admin.js 里又出现了第二份 pvBlock' : '',
+   /function pvBlock\s*\(/.test(previewSrc) ? 'preview.js 里出现了第二份 pvBlock' : ''
+  ].filter(Boolean).join('；') || '两侧均走 pv-render.js');
+
+/* 六类编辑装饰都必须由 CTX.edit 控制，漏一处展示态就会露出真机没有的东西 */
+const editGated = ['cls', 'linkBadge', 'linkDot', 'groupTag', 'opsBar', 'kindTag'];
+const notGated = editGated.filter((fn) => {
+  const i = sharedSrc.indexOf('function ' + fn + '(');
+  return i < 0 || !/CTX\.edit/.test(sharedSrc.slice(i, i + 460));
+});
+assert('六类编辑装饰全部受 edit 开关控制（漏一处，预览页就会露出真机上没有的角标）',
+  notGated.length === 0,
+  notGated.length ? `未受控：${notGated.join(', ')}` : editGated.join(' / ') + ' 均已受控');
+
+assert('预览页复用装修台的手机壳与区块样式（样式分家 = 两处长得不一样）',
+  /href="\/admin\/admin\.css"/.test(previewHtml) && /src="\/shared\/pv-render\.js"/.test(previewHtml),
+  [/href="\/admin\/admin\.css"/.test(previewHtml) ? '' : '未复用 admin.css',
+   /src="\/shared\/pv-render\.js"/.test(previewHtml) ? '' : '未引入共享渲染核心'].filter(Boolean).join('；') || '同一份 CSS + 同一份渲染核心');
+
+assert('预览页渲染的是「已发布」数据，不是装修草稿',
+  /d\.published/.test(previewSrc) && !/CUR\.published\s*=\s*d\.data/.test(previewSrc),
+  /d\.published/.test(previewSrc) ? 'published → 预览' : '未取 published 字段');
+
+/* 真实渲染校验：已发布数据在两种形态下的差异必须「只差编辑装饰」 */
+const PvRender = pvRequire(join(PUB, 'shared', 'pv-render.js')).PvRender;
+/* 编辑装饰在 HTML 里都是 class，写成 CSS 选择器形式（.pv-tag）会一个都匹配不到 */
+const DECOR = ['class="pv-tag"', 'class="pv-ops"', 'class="pv-link', 'pv-block active"'];
+const pvBad = [];
+const pvSeen = [];
+for (const key of ['home', 'lexy', 'news', 'product', 'mine']) {
+  const r = await call('GET', '/api/decorate/page', { auth: false, query: { key } });
+  const pub = r.data && r.data.published;
+  if (!pub) continue;
+  pvSeen.push(key);
+  const showHtml = PvRender.render(key, pub, { edit: false });
+  const editHtml = PvRender.render(key, pub, { edit: true });
+
+  // 展示态：一处编辑装饰都不能有
+  DECOR.forEach((d) => { if (showHtml.indexOf(d) > -1) pvBad.push(`${key} 展示态残留 ${d}`); });
+
+  // 编辑态：有区块/分组结构的页面应当带装饰（证明开关真的在起作用，不是两边长一样）
+  const editHasDecor = DECOR.some((d) => editHtml.indexOf(d) > -1);
+  if (editHasDecor) {
+    if (showHtml.length >= editHtml.length) {
+      pvBad.push(`${key} 展示态不比编辑态短（${showHtml.length} vs ${editHtml.length}）`);
+    }
+  } else if (showHtml !== editHtml) {
+    // 资讯 / 我的这类页面没有区块级装饰，两态输出本就该完全一致
+    pvBad.push(`${key} 没有装饰却两态渲染不一致`);
+  }
+}
+assert('真实已发布数据渲染：展示态无编辑装饰、编辑态保留装饰（两态确实不同）',
+  pvSeen.length > 0 && pvBad.length === 0,
+  pvBad.length ? pvBad.join(' | ') : `${pvSeen.join('/')} 共 ${pvSeen.length} 页，两态渲染均正常`);
 
 /* 15.95 把本次自检消耗掉的库存补回（与 0.5 节呼应，保证可重复运行） */
 if (stockBefore.length) {

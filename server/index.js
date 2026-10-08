@@ -59,11 +59,16 @@ const STATIC_PAGES = {
   '/admin': 'admin/index.html',
   '/admin/': 'admin/index.html',
   '/console': 'console/index.html',
-  '/console/': 'console/index.html'
+  '/console/': 'console/index.html',
+  '/preview': 'preview/index.html',
+  '/preview/': 'preview/index.html'
 };
 
-/** 允许直接访问的静态子目录（前缀 → public 下的目录） */
-const STATIC_DIRS = { '/admin/': 'admin/', '/console/': 'console/' };
+/**
+ * 允许直接访问的静态子目录（前缀 → public 下的目录）
+ *   /shared/ —— 装修台与前端预览页共用的渲染核心（pv-render.js），两边都要加载它
+ */
+const STATIC_DIRS = { '/admin/': 'admin/', '/console/': 'console/', '/preview/': 'preview/', '/shared/': 'shared/' };
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -332,6 +337,7 @@ server.listen(PORT, HOST, () => {
   log(`监听地址   http://127.0.0.1:${PORT}`);
   log(`接口调试台 http://127.0.0.1:${PORT}/debug  ${DEBUG_PAGE ? '（已开放，线上请设 DEBUG_PAGE=off）' : '（已关闭）'}`);
   log(`店铺装修台 http://127.0.0.1:${PORT}/admin  ${DEBUG_PAGE ? '（逐个页面改前端，发布写回 replica.js）' : '（已关闭）'}`);
+  log(`前端预览   http://127.0.0.1:${PORT}/preview  ${DEBUG_PAGE ? '（发布后看线上效果，与装修台预览同一份渲染）' : '（已关闭）'}`);
   log(`后台控制台 http://127.0.0.1:${PORT}/console  ${DEBUG_PAGE ? '（商品/订单/客户/营销/设置）' : '（已关闭）'}`);
   log(`管理接口   ${DEBUG_PAGE ? '（41 个 admin/decorate/media 点位随页面一同开放）' : '（已随页面一同关闭，返回 403）'}`);
   log(`点位总数   ${routes.length + 2} 个（业务 ${routes.length} + 运维 2，需登录 ${authed} 个）`);
