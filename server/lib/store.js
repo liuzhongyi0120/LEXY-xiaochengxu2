@@ -35,6 +35,7 @@ function emptyDb() {
     footprints: {},      // userId -> [{ goodsId, at }]
     stocks: {},          // skuId -> 剩余库存（下单扣减 / 取消回滚，重启不丢）
     payLogs: [],         // 支付回调幂等日志
+    comments: [],        // [comment] 商品评价（UGC，删除商品时一并清理）
     commentReplies: {}   // commentId -> { text, at }（商家回复评价）
   };
 }

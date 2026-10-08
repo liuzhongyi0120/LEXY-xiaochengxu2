@@ -13,7 +13,7 @@
  *    接入真实商品库后，把 onTapGoods 的预览逻辑替换为商品详情跳转即可。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 15:17:07（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 15:37:10（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -31,11 +31,11 @@ const HOME_BLOCKS = [
     images: [
       {
         image: "https://img.yzcdn.cn/upload_files/2026/01/04/Fo69HIsVHfOzMC08PSX7N7uFY8s1.png!large.webp",
-        link: "/pages/product/product"
+        link: "/packageGoods/detail/detail?id=g1003972"
       },
       {
         image: "https://img.yzcdn.cn/upload_files/2026/01/04/Fl6yiLDP_qD77xcIPwrKfpbdgn3l.jpg!large.webp",
-        link: ""
+        link: "/packageGoods/detail/detail?id=g1003972"
       }
     ]
   },
@@ -329,7 +329,7 @@ const PRODUCT_BRANDS = [
             id: "lexy-1-1",
             model: "S10系列",
             image: "https://img01.yzcdn.cn/upload_files/2025/09/15/Fkd0LlSB743H6c-NfBMQho7ARVd0.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g1003972",
             yzId: "35y0chueb2pnaxa"
           },
           {

@@ -8,7 +8,7 @@
 
 const catalogStore = require('./catalogStore');
 const db$ = require('./store');
-const { BANNERS, DETAIL_BLOCKS, COMMENTS } = require('./seed');
+const { BANNERS, DETAIL_BLOCKS } = require('./seed');
 const { paginate, expandCategoryIds, toInt, clone, genId, now } = require('./util');
 const { BizError, ERR } = require('./http');
 
@@ -192,14 +192,25 @@ function home() {
 
 /* ------------------------------ 评价 ------------------------------ */
 
+/**
+ * 评价数据源：`db.comments`（用户产生的业务数据，与商品库分库、持久化）
+ *
+ * 曾经这里读的是 `seed.js` 按**小程序端 mock 商品**凭空生成的演示评价。商品库接入真实商品后，
+ * 后台评价管理里全是 `g1001`/`g1002`… 这些**商品库里早已不存在的商品**的评价（列表里商品名直接
+ * 显示成商品 id，因为查不到）。评价是 UGC，必须和订单一样是持久化数据 —— 能清、能随商品一起删。
+ */
+function commentsOf(goodsId) {
+  return (db().comments || []).filter((c) => !goodsId || c.goodsId === goodsId);
+}
+
 function commentList(goodsId, page, size) {
-  const list = (COMMENTS[goodsId] || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  const list = commentsOf(goodsId).slice().sort((a, b) => b.createdAt - a.createdAt);
   return paginate(list, page, size);
 }
 
 function comments(goodsId, page, size) {
   findGoods(goodsId); // 校验商品存在
-  const list = (COMMENTS[goodsId] || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  const list = commentsOf(goodsId).slice().sort((a, b) => b.createdAt - a.createdAt);
   const result = paginate(list, page, size);
   const scoreAvg = list.length
     ? Number((list.reduce((s, c) => s + c.score, 0) / list.length).toFixed(1))
@@ -378,7 +389,7 @@ function deleteGoods(id) {
   const list = GOODS();
   list.splice(list.indexOf(goods), 1);
   (goods.skus || []).forEach((s) => { delete db().stocks[s.skuId]; });
-  // 顺带清理购物车 / 收藏 / 浏览记录中的残留引用
+  // 顺带清理购物车 / 收藏 / 浏览记录 / 评价中的残留引用（否则会留下「幽灵评价」）
   Object.keys(db().carts).forEach((uid) => {
     db().carts[uid] = (db().carts[uid] || []).filter((it) => it.goodsId !== id);
   });
@@ -388,6 +399,11 @@ function deleteGoods(id) {
   Object.keys(db().footprints).forEach((uid) => {
     db().footprints[uid] = (db().footprints[uid] || []).filter((it) => it.goodsId !== id);
   });
+  const gone = (db().comments || []).filter((c) => c.goodsId === id).map((c) => c.commentId);
+  if (gone.length) {
+    db().comments = db().comments.filter((c) => c.goodsId !== id);
+    gone.forEach((cid) => { delete (db().commentReplies || {})[cid]; });
+  }
   db$.commit();
   catalogStore.commit();
   return { deleted: true, id };
@@ -569,6 +585,7 @@ module.exports = {
   findSku,
   listGoods,
   detail,
+  commentsOf,
   comments,
   commentList,
   home,

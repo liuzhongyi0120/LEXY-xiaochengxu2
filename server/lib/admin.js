@@ -10,7 +10,6 @@
 const catalog = require('./catalog');
 const orderLib = require('./order');
 const catalogStore = require('./catalogStore');
-const { COMMENTS } = require('./seed');
 const { paginate, toInt, clone, now } = require('./util');
 const { BizError, ERR } = require('./http');
 
@@ -421,19 +420,19 @@ function setCustomerTags(db, { userId, tags, append }) {
 
 /* ----------------------------- 评价管理 ----------------------------- */
 
+/** 全部商品的评价（跨商品聚合，按商品名 / 评分 / 关键词筛选） */
 function allComments(db, { goodsId, keyword, score, page, size }) {
   const goodsMap = {};
   catalogStore.get().goods.forEach((g) => { goodsMap[g.id] = g; });
-  let list = [];
-  Object.keys(COMMENTS).forEach((gid) => {
-    if (goodsId && gid !== goodsId) return;
-    COMMENTS[gid].forEach((c) => {
-      list.push(Object.assign({}, c, {
-        goodsName: (goodsMap[gid] && goodsMap[gid].name) || gid,
-        reply: (db.commentReplies || {})[c.commentId] || null
-      }));
-    });
-  });
+  /*
+   * 评价来源统一走 `catalog.commentsOf()`（唯一实现处），这里只做「补商品名 + 挂商家回复」。
+   * 商品已被删除时商品名兜底成「xx（商品已删除）」并显式标出 —— 曾因来源是 mock 商品，
+   * 列表里出现一堆商品库里根本不存在的商品、商品名直接显示成商品 id。
+   */
+  let list = catalog.commentsOf(goodsId).map((c) => Object.assign({}, c, {
+    goodsName: (goodsMap[c.goodsId] && goodsMap[c.goodsId].name) || (c.goodsId + '（商品已删除）'),
+    reply: (db.commentReplies || {})[c.commentId] || null
+  }));
   if (score) list = list.filter((c) => String(c.score) === String(score));
   if (keyword) list = list.filter((c) => String(c.content).indexOf(keyword) > -1 || String(c.author).indexOf(keyword) > -1);
   list.sort((a, b) => b.createdAt - a.createdAt);

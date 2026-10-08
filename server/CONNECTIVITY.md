@@ -1,6 +1,6 @@
 # 后端点位连通性报告
 
-> 生成时间：2026/10/8 15:10:52　｜　目标服务：`http://127.0.0.1:3000`
+> 生成时间：2026/10/8 15:37:11　｜　目标服务：`http://127.0.0.1:3000`
 > 生成方式：`node server/tools/check-all.mjs`（真实 HTTP 请求，非静态扫描）
 
 ## 一、总览
@@ -10,8 +10,8 @@
 | 已注册点位 | 86 |
 | 已实测点位 | 86 |
 | 未覆盖点位 | 0 |
-| 实测请求/断言 | 274 |
-| 通过 | 274 |
+| 实测请求/断言 | 284 |
+| 通过 | 284 |
 | 失败 | 0 |
 | 服务健康检查 | up |
 | 微信能力模式 | 登录 mock / 支付 mock |
@@ -42,258 +42,268 @@
 | 20 | GET | `/api/coupon/list` | 200 | 0 | ✅ | ok |
 | 21 | GET | `/api/coupon/list` | 200 | 0 | ✅ | ok |
 | 22 | GET | `/api/coupon/list` | 200 | 0 | ✅ | ok |
-| 23 | POST | `/api/address/save` | 200 | 0 | ✅ | ok |
-| 24 | GET | `/api/address/list` | 200 | 0 | ✅ | ok |
-| 25 | GET | `/api/address/detail` | 200 | 0 | ✅ | ok |
-| 26 | POST | `/api/address/setDefault` | 200 | 0 | ✅ | ok |
-| 27 | POST | `/api/cart/add` | 200 | 0 | ✅ | ok |
-| 28 | GET | `/api/cart/list` | 200 | 0 | ✅ | ok |
-| 29 | PUT | `/api/cart/update` | 200 | 0 | ✅ | ok |
-| 30 | POST | `/api/cart/selectAll` | 200 | 0 | ✅ | ok |
-| 31 | GET | `/api/coupon/available` | 200 | 0 | ✅ | ok |
-| 32 | POST | `/api/coupon/receive` | 200 | 0 | ✅ | ok |
-| 33 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：重复领券被拦截 |
-| 34 | GET | `/api/coupon/list` | 200 | 0 | ✅ | ok |
-| 35 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
-| 36 | — | `下单返回支付参数` | PASS | 0 | ✅ | 断言 |
-| 37 | GET | `/api/order/detail` | 200 | 0 | ✅ | ok |
-| 38 | GET | `/api/order/list` | 200 | 0 | ✅ | ok |
-| 39 | GET | `/api/order/count` | 200 | 0 | ✅ | ok |
-| 40 | POST | `/api/pay/query` | 200 | 0 | ✅ | ok |
-| 41 | POST | `/api/pay/mock-success` | 200 | 0 | ✅ | ok |
-| 42 | POST | `/api/pay/query` | 200 | 0 | ✅ | ok |
-| 43 | — | `支付后订单转为待发货` | PASS | 0 | ✅ | 断言 |
-| 44 | POST | `/api/order/ship` | 200 | 0 | ✅ | ok |
-| 45 | POST | `/api/order/confirm` | 200 | 0 | ✅ | ok |
-| 46 | GET | `/api/order/detail` | 200 | 0 | ✅ | ok |
-| 47 | — | `确认收货后订单完成` | PASS | 0 | ✅ | 断言 |
-| 48 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
-| 49 | — | `立即购买下单成功` | PASS | 0 | ✅ | 断言 |
-| 50 | — | `下单后实时库存扣减 1 件` | PASS | 0 | ✅ | 断言 |
-| 51 | POST | `/api/order/cancel` | 200 | 0 | ✅ | ok |
-| 52 | — | `取消订单后库存回滚` | PASS | 0 | ✅ | 断言 |
-| 53 | POST | `/api/order/cancel` | 200 | 2000 | ✅ | 预期失败：重复取消被拦截 |
-| 54 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
-| 55 | POST | `/api/pay/notify` | 200 | 0 | ✅ | ok |
-| 56 | — | `支付回调返回 SUCCESS` | PASS | 0 | ✅ | 断言 |
-| 57 | POST | `/api/pay/notify` | 200 | 0 | ✅ | ok |
-| 58 | — | `重复回调幂等（duplicated=true）` | PASS | 0 | ✅ | 断言 |
-| 59 | POST | `/api/favorite/toggle` | 200 | 0 | ✅ | ok |
-| 60 | GET | `/api/favorite/list` | 200 | 0 | ✅ | ok |
-| 61 | POST | `/api/footprint/add` | 200 | 0 | ✅ | ok |
-| 62 | GET | `/api/footprint/list` | 200 | 0 | ✅ | ok |
-| 63 | POST | `/api/cart/add` | 200 | 2000 | ✅ | 预期失败：超量加购被拦截 |
-| 64 | — | `超量加购返回业务码 2000` | PASS | 0 | ✅ | 断言 |
-| 65 | GET | `/api/goods/detail` | 404 | 404 | ✅ | 预期失败：商品不存在 |
-| 66 | — | `不存在的商品返回业务码 404` | PASS | 0 | ✅ | 断言 |
-| 67 | GET | `/api/not/exist` | 404 | 404 | ✅ | 预期失败：未注册路径 |
-| 68 | — | `未注册路径返回 HTTP 404` | PASS | 0 | ✅ | 断言 |
-| 69 | DELETE | `/api/cart/remove` | 200 | 0 | ✅ | ok |
-| 70 | DELETE | `/api/footprint/clear` | 200 | 0 | ✅ | ok |
-| 71 | POST | `/api/address/delete` | 200 | 0 | ✅ | ok |
-| 72 | POST | `/api/order/precreate` | 200 | 2000 | ✅ | 预期失败：无收货地址 |
-| 73 | — | `无收货地址时下单被拦截` | PASS | 0 | ✅ | 断言 |
-| 74 | POST | `/api/auth/logout` | 200 | 0 | ✅ | ok |
-| 75 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
-| 76 | — | `装修页面列表返回 5 个页面` | PASS | 0 | ✅ | 断言 |
-| 77 | GET | `/api/decorate/lib` | 200 | 0 | ✅ | ok |
-| 78 | — | `装修组件库三 tab 数量正确（常用 10 / 基础 54 / 高级实测 2）` | PASS | 0 | ✅ | 断言 |
-| 79 | — | `装修组件库已接入 19 种组件，且每个都带 SVG 图标` | PASS | 0 | ✅ | 断言 |
-| 80 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
-| 81 | — | `装修首页详情：schema + 区块数据 + 已发布数据` | PASS | 0 | ✅ | 断言 |
-| 82 | GET | `/api/decorate/page` | 404 | 404 | ✅ | 预期失败：未知页面 404 |
-| 83 | — | `装修未知页面返回 404` | PASS | 0 | ✅ | 断言 |
-| 84 | POST | `/api/decorate/draft` | 200 | 0 | ✅ | ok |
-| 85 | — | `装修草稿保存成功` | PASS | 0 | ✅ | 断言 |
-| 86 | GET | `/api/decorate/diff` | 200 | 0 | ✅ | ok |
-| 87 | — | `草稿与已发布一致时 diff 为 0` | PASS | 0 | ✅ | 断言 |
-| 88 | POST | `/api/decorate/discard` | 200 | 0 | ✅ | ok |
-| 89 | POST | `/api/decorate/publish` | 200 | 2000 | ✅ | 预期失败：无草稿发布被拦截 |
-| 90 | POST | `/api/decorate/rollback` | 200 | 2000 | ✅ | 预期失败：版本不存在 |
-| 91 | GET | `/api/decorate/stats` | 200 | 0 | ✅ | ok |
-| 92 | — | `装修统计返回目标文件路径` | PASS | 0 | ✅ | 断言 |
-| 93 | GET | `/api/decorate/templates` | 200 | 0 | ✅ | ok |
-| 94 | — | `装修模板点位返回 2 个模板 + 20 个配额上限` | PASS | 0 | ✅ | 断言 |
-| 95 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
+| 23 | GET | `/api/address/list` | 200 | 0 | ✅ | ok |
+| 24 | POST | `/api/address/save` | 200 | 0 | ✅ | ok |
+| 25 | GET | `/api/address/list` | 200 | 0 | ✅ | ok |
+| 26 | GET | `/api/address/detail` | 200 | 0 | ✅ | ok |
+| 27 | POST | `/api/address/setDefault` | 200 | 0 | ✅ | ok |
+| 28 | POST | `/api/cart/add` | 200 | 0 | ✅ | ok |
+| 29 | GET | `/api/cart/list` | 200 | 0 | ✅ | ok |
+| 30 | PUT | `/api/cart/update` | 200 | 0 | ✅ | ok |
+| 31 | POST | `/api/cart/selectAll` | 200 | 0 | ✅ | ok |
+| 32 | GET | `/api/coupon/available` | 200 | 0 | ✅ | ok |
+| 33 | POST | `/api/coupon/receive` | 200 | 0 | ✅ | ok |
+| 34 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：重复领券被拦截 |
+| 35 | GET | `/api/coupon/list` | 200 | 0 | ✅ | ok |
+| 36 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
+| 37 | — | `下单返回支付参数` | PASS | 0 | ✅ | 断言 |
+| 38 | GET | `/api/order/detail` | 200 | 0 | ✅ | ok |
+| 39 | GET | `/api/order/list` | 200 | 0 | ✅ | ok |
+| 40 | GET | `/api/order/count` | 200 | 0 | ✅ | ok |
+| 41 | POST | `/api/pay/query` | 200 | 0 | ✅ | ok |
+| 42 | POST | `/api/pay/mock-success` | 200 | 0 | ✅ | ok |
+| 43 | POST | `/api/pay/query` | 200 | 0 | ✅ | ok |
+| 44 | — | `支付后订单转为待发货` | PASS | 0 | ✅ | 断言 |
+| 45 | POST | `/api/order/ship` | 200 | 0 | ✅ | ok |
+| 46 | POST | `/api/order/confirm` | 200 | 0 | ✅ | ok |
+| 47 | GET | `/api/order/detail` | 200 | 0 | ✅ | ok |
+| 48 | — | `确认收货后订单完成` | PASS | 0 | ✅ | 断言 |
+| 49 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
+| 50 | — | `立即购买下单成功` | PASS | 0 | ✅ | 断言 |
+| 51 | — | `下单后实时库存扣减 1 件` | PASS | 0 | ✅ | 断言 |
+| 52 | POST | `/api/order/cancel` | 200 | 0 | ✅ | ok |
+| 53 | — | `取消订单后库存回滚` | PASS | 0 | ✅ | 断言 |
+| 54 | POST | `/api/order/cancel` | 200 | 2000 | ✅ | 预期失败：重复取消被拦截 |
+| 55 | POST | `/api/order/precreate` | 200 | 0 | ✅ | ok |
+| 56 | POST | `/api/pay/notify` | 200 | 0 | ✅ | ok |
+| 57 | — | `支付回调返回 SUCCESS` | PASS | 0 | ✅ | 断言 |
+| 58 | POST | `/api/pay/notify` | 200 | 0 | ✅ | ok |
+| 59 | — | `重复回调幂等（duplicated=true）` | PASS | 0 | ✅ | 断言 |
+| 60 | POST | `/api/favorite/toggle` | 200 | 0 | ✅ | ok |
+| 61 | GET | `/api/favorite/list` | 200 | 0 | ✅ | ok |
+| 62 | POST | `/api/footprint/add` | 200 | 0 | ✅ | ok |
+| 63 | GET | `/api/footprint/list` | 200 | 0 | ✅ | ok |
+| 64 | POST | `/api/cart/add` | 200 | 2000 | ✅ | 预期失败：超量加购被拦截 |
+| 65 | — | `超量加购返回业务码 2000` | PASS | 0 | ✅ | 断言 |
+| 66 | GET | `/api/goods/detail` | 404 | 404 | ✅ | 预期失败：商品不存在 |
+| 67 | — | `不存在的商品返回业务码 404` | PASS | 0 | ✅ | 断言 |
+| 68 | GET | `/api/not/exist` | 404 | 404 | ✅ | 预期失败：未注册路径 |
+| 69 | — | `未注册路径返回 HTTP 404` | PASS | 0 | ✅ | 断言 |
+| 70 | DELETE | `/api/cart/remove` | 200 | 0 | ✅ | ok |
+| 71 | DELETE | `/api/footprint/clear` | 200 | 0 | ✅ | ok |
+| 72 | POST | `/api/address/delete` | 200 | 0 | ✅ | ok |
+| 73 | POST | `/api/order/precreate` | 200 | 2000 | ✅ | 预期失败：无收货地址 |
+| 74 | — | `无收货地址时下单被拦截` | PASS | 0 | ✅ | 断言 |
+| 75 | POST | `/api/auth/logout` | 200 | 0 | ✅ | ok |
+| 76 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
+| 77 | — | `装修页面列表返回 5 个页面` | PASS | 0 | ✅ | 断言 |
+| 78 | GET | `/api/decorate/lib` | 200 | 0 | ✅ | ok |
+| 79 | — | `装修组件库三 tab 数量正确（常用 10 / 基础 54 / 高级实测 2）` | PASS | 0 | ✅ | 断言 |
+| 80 | — | `装修组件库已接入 19 种组件，且每个都带 SVG 图标` | PASS | 0 | ✅ | 断言 |
+| 81 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
+| 82 | — | `装修首页详情：schema + 区块数据 + 已发布数据` | PASS | 0 | ✅ | 断言 |
+| 83 | GET | `/api/decorate/page` | 404 | 404 | ✅ | 预期失败：未知页面 404 |
+| 84 | — | `装修未知页面返回 404` | PASS | 0 | ✅ | 断言 |
+| 85 | POST | `/api/decorate/draft` | 200 | 0 | ✅ | ok |
+| 86 | — | `装修草稿保存成功` | PASS | 0 | ✅ | 断言 |
+| 87 | GET | `/api/decorate/diff` | 200 | 0 | ✅ | ok |
+| 88 | — | `草稿与已发布一致时 diff 为 0` | PASS | 0 | ✅ | 断言 |
+| 89 | POST | `/api/decorate/discard` | 200 | 0 | ✅ | ok |
+| 90 | POST | `/api/decorate/publish` | 200 | 2000 | ✅ | 预期失败：无草稿发布被拦截 |
+| 91 | POST | `/api/decorate/rollback` | 200 | 2000 | ✅ | 预期失败：版本不存在 |
+| 92 | GET | `/api/decorate/stats` | 200 | 0 | ✅ | ok |
+| 93 | — | `装修统计返回目标文件路径` | PASS | 0 | ✅ | 断言 |
+| 94 | GET | `/api/decorate/templates` | 200 | 0 | ✅ | ok |
+| 95 | — | `装修模板点位返回 2 个模板 + 20 个配额上限` | PASS | 0 | ✅ | 断言 |
 | 96 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
-| 97 | POST | `/api/decorate/page/create` | 200 | 0 | ✅ | ok |
-| 98 | — | `新建自定义页面成功并返回小程序路径` | PASS | 0 | ✅ | 断言 |
-| 99 | — | `新建后未发布，replica.js 里还没有 CUSTOM_PAGES` | PASS | 0 | ✅ | 断言 |
-| 100 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
-| 101 | — | `自定义页在列表里被标记（类型 / 归属 / 数据来源）` | PASS | 0 | ✅ | 断言 |
-| 102 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
-| 103 | — | `自定义页的字段结构 = 页面区块 + 页面设置（与首页同构）` | PASS | 0 | ✅ | 断言 |
-| 104 | POST | `/api/decorate/draft` | 200 | 1001 | ✅ | 预期失败：自定义页沿用首页的区块校验 |
-| 105 | — | `自定义页沿用首页的区块校验规则` | PASS | 0 | ✅ | 断言 |
-| 106 | POST | `/api/decorate/draft` | 200 | 0 | ✅ | ok |
-| 107 | POST | `/api/decorate/publish` | 200 | 0 | ✅ | ok |
-| 108 | — | `自定义页发布成功` | PASS | 0 | ✅ | 断言 |
-| 109 | — | `发布后 replica.js 写入 CUSTOM_PAGES 与页面数据` | PASS | 0 | ✅ | 断言 |
-| 110 | — | `replica.js 的导出清单包含 CUSTOM_PAGES` | PASS | 0 | ✅ | 断言 |
-| 111 | GET | `/api/decorate/diff` | 200 | 0 | ✅ | ok |
-| 112 | — | `发布后该页草稿已清空` | PASS | 0 | ✅ | 断言 |
-| 113 | POST | `/api/decorate/page/rename` | 200 | 0 | ✅ | ok |
-| 114 | — | `自定义页改名（页面标识迁移）成功` | PASS | 0 | ✅ | 断言 |
-| 115 | — | `改名后 replica.js 的键名同步、旧键消失` | PASS | 0 | ✅ | 断言 |
-| 116 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
-| 117 | — | `改名后已发布内容不丢` | PASS | 0 | ✅ | 断言 |
-| 118 | POST | `/api/decorate/page/delete` | 200 | 2000 | ✅ | 预期失败：内置页不可删除 |
-| 119 | — | `内置页面不可删除` | PASS | 0 | ✅ | 断言 |
-| 120 | POST | `/api/decorate/page/rename` | 200 | 1001 | ✅ | 预期失败：内置页不可改名 |
-| 121 | — | `内置页面不可改名` | PASS | 0 | ✅ | 断言 |
-| 122 | POST | `/api/decorate/page/create` | 200 | 1001 | ✅ | 预期失败：保留标识 |
-| 123 | — | `与内置页重名的标识被拒绝` | PASS | 0 | ✅ | 断言 |
-| 124 | POST | `/api/decorate/page/create` | 200 | 1001 | ✅ | 预期失败：页面名称重复 |
-| 125 | — | `页面名称重复被拒绝` | PASS | 0 | ✅ | 断言 |
-| 126 | POST | `/api/decorate/page/delete` | 200 | 0 | ✅ | ok |
-| 127 | — | `删除自定义页面成功` | PASS | 0 | ✅ | 断言 |
-| 128 | — | `删除后 replica.js 里 CUSTOM_PAGES 整段消失、无残留数据` | PASS | 0 | ✅ | 断言 |
-| 129 | — | `删除后仍保留 6 个内置装修字段` | PASS | 0 | ✅ | 断言 |
-| 130 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
-| 131 | — | `自检未改变自定义页数量（可重复运行）` | PASS | 0 | ✅ | 断言 |
-| 132 | — | `装修台含「新建页面」入口与自定义页改名 / 删除操作` | PASS | 0 | ✅ | 断言 |
-| 133 | — | `装修台列表区分内置页 / 自定义页` | PASS | 0 | ✅ | 断言 |
-| 134 | — | `小程序端通用自定义页存在，且复用 utils/blocks 的区块渲染` | PASS | 0 | ✅ | 断言 |
-| 135 | — | `小程序端自定义页的区块渲染与首页同源（首页也已改用 utils/blocks）` | PASS | 0 | ✅ | 断言 |
-| 136 | — | `素材引用检查同时覆盖 商品库 / 已发布页面 / 装修草稿（漏一处就会误删在用图）` | PASS | 0 | ✅ | 断言 |
-| 137 | — | `商品图文详情按商品自身数据生成，占位内容仅作最后回落` | PASS | 0 | ✅ | 断言 |
-| 138 | POST | `/api/media/upload` | 200 | 0 | ✅ | ok |
-| 139 | — | `素材上传返回相对路径与真实尺寸（2×2）` | PASS | 0 | ✅ | 断言 |
-| 140 | — | `上传的素材可通过 /uploads/ 直接访问（小程序端读的就是它）` | PASS | 0 | ✅ | 断言 |
-| 141 | GET | `/api/media/list` | 200 | 0 | ✅ | ok |
-| 142 | — | `素材库列表返回统计（张数 / 占用 / 单张上限）` | PASS | 0 | ✅ | 断言 |
-| 143 | POST | `/api/media/upload` | 200 | 1001 | ✅ | 预期失败：伪装图片被拒 |
-| 144 | — | `伪装成 png 的文本被拒（按文件头校验）` | PASS | 0 | ✅ | 断言 |
-| 145 | POST | `/api/media/delete` | 200 | 1001 | ✅ | 预期失败：路径穿越被拦 |
-| 146 | — | `素材删除接口拦住 ../ 穿越` | PASS | 0 | ✅ | 断言 |
-| 147 | POST | `/api/media/delete` | 200 | 0 | ✅ | ok |
-| 148 | — | `素材删除成功（自检产生的文件已回收）` | PASS | 0 | ✅ | 断言 |
-| 149 | POST | `/api/media/delete` | 200 | 2000 | ✅ | 预期失败：商品图删除被拒 |
-| 150 | — | `商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用` | PASS | 0 | ✅ | 断言 |
-| 151 | — | `商品图文详情：配了 detailImages 就按商品自身数据渲染（不再回落开发期占位文案）` | PASS | 0 | ✅ | 断言 |
-| 152 | — | `自检结束后素材库数量与初始一致（无残留）` | PASS | 0 | ✅ | 断言 |
-| 153 | — | `小程序全部 json 可解析` | PASS | 0 | ✅ | 断言 |
-| 154 | — | `usingComponents 字段类型合法（须为对象，写 true 会让模拟器启动失败）` | PASS | 0 | ✅ | 断言 |
-| 155 | — | `app.json 无开发者工具不识别的顶层字段` | PASS | 0 | ✅ | 断言 |
-| 156 | — | `app.json 声明的页面文件齐全（.js + .wxml）` | PASS | 0 | ✅ | 断言 |
-| 157 | — | `tabBar 每个 pagePath 都在 pages 声明里` | PASS | 0 | ✅ | 断言 |
-| 158 | — | `sitemapLocation 指向的文件存在` | PASS | 0 | ✅ | 断言 |
-| 159 | — | `project.config.json 已填真实 AppID（非占位符）` | PASS | 0 | ✅ | 断言 |
-| 160 | — | `小程序 wxml 的 class 引用都在正确作用域内有定义（组件不吃 app.wxss 的 class）` | PASS | 0 | ✅ | 断言 |
-| 161 | — | `小程序 hover-class 全部有对应样式（否则是「点了没反应」的哑点击态）` | PASS | 0 | ✅ | 断言 |
-| 162 | — | `小程序 var(--token) 引用的令牌全部有定义（漏定义＝该处颜色静默失效）` | PASS | 0 | ✅ | 断言 |
-| 163 | — | `装修里每个带跳转的元素，其点击处理都真的走了 openLink（否则真机点了没反应）` | PASS | 0 | ✅ | 断言 |
-| 164 | — | `小程序 utils/link.js 的 tabBar 白名单与 app.json 完全一致（漂移＝点 tab 入口失效）` | PASS | 0 | ✅ | 断言 |
-| 165 | — | `装修区块的图片/可点元素都能配跳转（缺哪个区块就是「这张图点了没反应」）` | PASS | 0 | ✅ | 断言 |
-| 166 | — | `装修 schema 里所有跳转字段都是 link 类型（回退成 text 就等于让运营手敲路径）` | PASS | 0 | ✅ | 断言 |
-| 167 | GET | `/api/decorate/link-options` | 200 | 0 | ✅ | ok |
-| 168 | — | `GET /api/decorate/link-options 返回可用的跳转目标清单（内置 5 个 tab 页齐全）` | PASS | 0 | ✅ | 断言 |
-| 169 | — | `图片广告 images 的结构升级无损且幂等（字符串数组 → { image, link }）` | PASS | 0 | ✅ | 断言 |
-| 170 | — | `小程序端 normalizeBlock 同时兼容轮播图的老/新结构（否则老数据首屏白屏）` | PASS | 0 | ✅ | 断言 |
-| 171 | — | `装修组件库「基础组件」= 有赞实测 10 组 / 54 个（分组名与数量逐组对齐）` | PASS | 0 | ✅ | 断言 |
-| 172 | — | `组件库标记「已接入」的每一项都在 schema 里有真实区块类型（防「假装可用」）` | PASS | 0 | ✅ | 断言 |
-| 173 | — | `未接入的组件必须写清「为什么不能接入」（只挂角标不写原因＝运营无从判断）` | PASS | 0 | ✅ | 断言 |
-| 174 | — | `每个区块类型的图标键都能在 ICONS 里找到（否则装修台左侧渲染成空白格）` | PASS | 0 | ✅ | 断言 |
-| 175 | — | `新增 8 种区块的字段完整性（对照有赞面板逐字段核对，缺字段＝属性面板少一项）` | PASS | 0 | ✅ | 断言 |
-| 176 | — | `小程序 templates/blocks.wxml 覆盖全部 19 种区块类型（少一种就是「配了不显示」）` | PASS | 0 | ✅ | 断言 |
-| 177 | — | `装修台预览覆盖全部 19 种区块类型，且每种都有中文角标名` | PASS | 0 | ✅ | 断言 |
-| 178 | — | `装修台左侧按 lib.groups 分组渲染，且未接入项会展示具体原因` | PASS | 0 | ✅ | 断言 |
-| 179 | — | `数据文件的重命名/删除统一走 lib/atomicFile（裸 fs 调用会在 Windows 上偶发 EPERM）` | PASS | 0 | ✅ | 断言 |
-| 180 | — | `瞬态错误（EPERM/EBUSY/EACCES）会自动重试，恢复后成功（不能一次失败就放弃）` | PASS | 0 | ✅ | 断言 |
-| 181 | — | `非瞬态错误（ENOENT 等）立即抛出、只尝试 1 次` | PASS | 0 | ✅ | 断言 |
-| 182 | — | `瞬态错误重试耗尽后仍抛出（不静默当作成功），且带上真实错误码` | PASS | 0 | ✅ | 断言 |
-| 183 | — | `writeFileAtomic 采用「写 .tmp → rename 替换」的原子写（防断电写坏数据文件）` | PASS | 0 | ✅ | 断言 |
-| 184 | GET | `/api/admin/dashboard` | 200 | 0 | ✅ | ok |
-| 185 | — | `后台 · 数据概览返回今日/累计 KPI、待办、趋势、Top 商品` | PASS | 0 | ✅ | 断言 |
-| 186 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 187 | — | `后台 · 商品列表返回全量商品（含下架）+ 分类 + 预警线` | PASS | 0 | ✅ | 断言 |
-| 188 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
-| 189 | — | `后台 · 商品详情返回编辑态商品 + 分类选项` | PASS | 0 | ✅ | 断言 |
-| 190 | GET | `/api/admin/category/list` | 200 | 0 | ✅ | ok |
-| 191 | — | `后台 · 分类树带每个分类的商品数` | PASS | 0 | ✅ | 断言 |
-| 192 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
-| 193 | — | `后台 · 订单列表返回各状态计数与客户信息` | PASS | 0 | ✅ | 断言 |
-| 194 | GET | `/api/admin/order/detail` | 200 | 0 | ✅ | ok |
-| 195 | — | `后台 · 订单详情返回商品明细、收货地址、金额与物流位` | PASS | 0 | ✅ | 断言 |
-| 196 | GET | `/api/admin/order/export` | 200 | 0 | ✅ | ok |
-| 197 | — | `后台 · 订单导出 CSV（带 BOM，Excel 打开不乱码）` | PASS | 0 | ✅ | 断言 |
-| 198 | POST | `/api/admin/order/ship` | 200 | 0 | ✅ | ok |
-| 199 | — | `后台 · 发货接口对不存在的订单给出失败明细（不会误标为已发货）` | PASS | 0 | ✅ | 断言 |
-| 200 | POST | `/api/admin/order/remark` | 200 | 0 | ✅ | ok |
-| 201 | — | `后台 · 商家备注可写可读，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
-| 202 | POST | `/api/admin/order/close` | 200 | 2000 | ✅ | 预期失败：已支付订单不可关闭 |
-| 203 | — | `后台 · 关闭订单只允许未付款（已支付订单被拦下）` | PASS | 0 | ✅ | 断言 |
-| 204 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
-| 205 | — | `后台 · 客户列表返回消费汇总、分层与标签池` | PASS | 0 | ✅ | 断言 |
-| 206 | GET | `/api/admin/customer/detail` | 200 | 0 | ✅ | ok |
-| 207 | — | `后台 · 客户详情返回消费统计、订单、地址、券与资产` | PASS | 0 | ✅ | 断言 |
-| 208 | GET | `/api/admin/comment/list` | 200 | 0 | ✅ | ok |
-| 209 | — | `后台 · 评价列表带商品名与商家回复字段` | PASS | 0 | ✅ | 断言 |
-| 210 | GET | `/api/admin/coupon/list` | 200 | 0 | ✅ | ok |
-| 211 | — | `后台 · 优惠券模板列表带领取/核销统计` | PASS | 0 | ✅ | 断言 |
-| 212 | GET | `/api/admin/coupon/detail` | 200 | 0 | ✅ | ok |
-| 213 | — | `后台 · 单个优惠券模板详情可读` | PASS | 0 | ✅ | 断言 |
-| 214 | GET | `/api/admin/coupon/detail` | 404 | 404 | ✅ | 预期失败：优惠券不存在 |
-| 215 | — | `后台 · 读取不存在的优惠券模板返回 404` | PASS | 0 | ✅ | 断言 |
-| 216 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 217 | — | `后台 · 店铺设置返回当前值与默认值` | PASS | 0 | ✅ | 断言 |
-| 218 | POST | `/api/admin/category/save` | 200 | 0 | ✅ | ok |
-| 219 | — | `后台 · 新建一级分类成功` | PASS | 0 | ✅ | 断言 |
-| 220 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
-| 221 | — | `后台 · 新建商品成功（含 2 个 SKU）` | PASS | 0 | ✅ | 断言 |
-| 222 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
-| 223 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
-| 224 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
-| 225 | — | `后台 · 商品详情长图落库后，小程序端详情按商品自身数据出图（不再回落占位内容）` | PASS | 0 | ✅ | 断言 |
-| 226 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 227 | — | `后台 · 新建商品可按关键词搜回，SKU 数为 2` | PASS | 0 | ✅ | 断言 |
-| 228 | POST | `/api/admin/goods/stock` | 200 | 0 | ✅ | ok |
-| 229 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
-| 230 | — | `后台 · 改库存后小程序端读取同一值（库存真源唯一，无二次真源）` | PASS | 0 | ✅ | 断言 |
-| 231 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
-| 232 | GET | `/api/goods/list` | 200 | 0 | ✅ | ok |
-| 233 | — | `后台 · 下架后小程序端列表立即不再返回该商品` | PASS | 0 | ✅ | 断言 |
-| 234 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
-| 235 | — | `后台 · 重新上架成功` | PASS | 0 | ✅ | 断言 |
-| 236 | POST | `/api/admin/coupon/save` | 200 | 0 | ✅ | ok |
-| 237 | — | `后台 · 新建优惠券模板成功` | PASS | 0 | ✅ | 断言 |
-| 238 | POST | `/api/admin/coupon/status` | 200 | 0 | ✅ | ok |
-| 239 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：券已停止发放 |
-| 240 | — | `后台 · 暂停券后小程序端不可再领取（状态穿透到 C 端）` | PASS | 0 | ✅ | 断言 |
-| 241 | POST | `/api/admin/coupon/delete` | 200 | 0 | ✅ | ok |
-| 242 | — | `后台 · 删除未被领取的券模板成功（已领取则拒绝）` | PASS | 0 | ✅ | 断言 |
-| 243 | POST | `/api/admin/goods/delete` | 200 | 0 | ✅ | ok |
-| 244 | — | `后台 · 删除自检商品成功` | PASS | 0 | ✅ | 断言 |
-| 245 | POST | `/api/admin/category/delete` | 200 | 0 | ✅ | ok |
-| 246 | — | `后台 · 删除自检分类成功（分类下有商品时会被拒绝）` | PASS | 0 | ✅ | 断言 |
-| 247 | POST | `/api/admin/goods/delete` | 404 | 404 | ✅ | 预期失败：商品不存在 |
-| 248 | — | `后台 · 删除不存在的商品返回 404` | PASS | 0 | ✅ | 断言 |
-| 249 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 250 | — | `后台 · 自建自删后商品库数量回到初始（自检零残留）` | PASS | 0 | ✅ | 断言 |
-| 251 | POST | `/api/admin/settings/save` | 200 | 0 | ✅ | ok |
-| 252 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 253 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 254 | — | `后台 · 店铺设置可写可读，且自检结束时已还原原值` | PASS | 0 | ✅ | 断言 |
-| 255 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
-| 256 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
-| 257 | — | `后台 · 客户打标签可用，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
-| 258 | POST | `/api/admin/comment/reply` | 200 | 0 | ✅ | ok |
-| 259 | — | `后台 · 回复评价可用（仅挑无回复的评价，测完立即清空）` | PASS | 0 | ✅ | 断言 |
-| 260 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
-| 261 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
-| 262 | — | `后台 · 自检全程未改变真实用户数据规模（订单数 / 客户数一致）` | PASS | 0 | ✅ | 断言 |
-| 263 | — | `后台页面内的静态引用在「无尾斜杠 URL」下全部可达（防相对路径 404 白屏）` | PASS | 0 | ✅ | 断言 |
-| 264 | — | `后台页面路由可访问且返回 HTML（/console · /admin · /debug）` | PASS | 0 | ✅ | 断言 |
-| 265 | — | `后台控制台与装修台必需文件齐全` | PASS | 0 | ✅ | 断言 |
-| 266 | — | `联调示例里每个 key 都命中已注册点位（无写错路径的静默失效）` | PASS | 0 | ✅ | 断言 |
-| 267 | — | `每个点位都带联调示例（调试台可一键填参）` | PASS | 0 | ✅ | 断言 |
-| 268 | — | `前端 services 引用的点位后端均已实现（无断链）` | PASS | 0 | ✅ | 断言 |
-| 269 | — | `安全开关 · DEBUG_PAGE 判定矩阵全部符合预期（含 off / 拼错值 / 大小写）` | PASS | 0 | ✅ | 断言 |
-| 270 | — | `安全开关 · 识别「未知取值」以便启动时告警（避免静默按关闭处理）` | PASS | 0 | ✅ | 断言 |
-| 271 | — | `安全开关 · 管理接口（admin/decorate/media）与页面同受一个开关约束` | PASS | 0 | ✅ | 断言 |
-| 272 | — | `安全开关 · 生产环境缺 JWT_SECRET 时拒绝启动（不靠人看日志）` | PASS | 0 | ✅ | 断言 |
-| 273 | — | `持久化兜底 · 三处存储层都有「解析成功后再验是否为对象」的守卫` | PASS | 0 | ✅ | 断言 |
-| 274 | — | `持久化兜底 · isPlainObject 对 null / 数组 / 数字 均判为「非对象」` | PASS | 0 | ✅ | 断言 |
+| 97 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
+| 98 | POST | `/api/decorate/page/create` | 200 | 0 | ✅ | ok |
+| 99 | — | `新建自定义页面成功并返回小程序路径` | PASS | 0 | ✅ | 断言 |
+| 100 | — | `新建后未发布，replica.js 里还没有 CUSTOM_PAGES` | PASS | 0 | ✅ | 断言 |
+| 101 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
+| 102 | — | `自定义页在列表里被标记（类型 / 归属 / 数据来源）` | PASS | 0 | ✅ | 断言 |
+| 103 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
+| 104 | — | `自定义页的字段结构 = 页面区块 + 页面设置（与首页同构）` | PASS | 0 | ✅ | 断言 |
+| 105 | POST | `/api/decorate/draft` | 200 | 1001 | ✅ | 预期失败：自定义页沿用首页的区块校验 |
+| 106 | — | `自定义页沿用首页的区块校验规则` | PASS | 0 | ✅ | 断言 |
+| 107 | POST | `/api/decorate/draft` | 200 | 0 | ✅ | ok |
+| 108 | POST | `/api/decorate/publish` | 200 | 0 | ✅ | ok |
+| 109 | — | `自定义页发布成功` | PASS | 0 | ✅ | 断言 |
+| 110 | — | `发布后 replica.js 写入 CUSTOM_PAGES 与页面数据` | PASS | 0 | ✅ | 断言 |
+| 111 | — | `replica.js 的导出清单包含 CUSTOM_PAGES` | PASS | 0 | ✅ | 断言 |
+| 112 | GET | `/api/decorate/diff` | 200 | 0 | ✅ | ok |
+| 113 | — | `发布后该页草稿已清空` | PASS | 0 | ✅ | 断言 |
+| 114 | POST | `/api/decorate/page/rename` | 200 | 0 | ✅ | ok |
+| 115 | — | `自定义页改名（页面标识迁移）成功` | PASS | 0 | ✅ | 断言 |
+| 116 | — | `改名后 replica.js 的键名同步、旧键消失` | PASS | 0 | ✅ | 断言 |
+| 117 | GET | `/api/decorate/page` | 200 | 0 | ✅ | ok |
+| 118 | — | `改名后已发布内容不丢` | PASS | 0 | ✅ | 断言 |
+| 119 | POST | `/api/decorate/page/delete` | 200 | 2000 | ✅ | 预期失败：内置页不可删除 |
+| 120 | — | `内置页面不可删除` | PASS | 0 | ✅ | 断言 |
+| 121 | POST | `/api/decorate/page/rename` | 200 | 1001 | ✅ | 预期失败：内置页不可改名 |
+| 122 | — | `内置页面不可改名` | PASS | 0 | ✅ | 断言 |
+| 123 | POST | `/api/decorate/page/create` | 200 | 1001 | ✅ | 预期失败：保留标识 |
+| 124 | — | `与内置页重名的标识被拒绝` | PASS | 0 | ✅ | 断言 |
+| 125 | POST | `/api/decorate/page/create` | 200 | 1001 | ✅ | 预期失败：页面名称重复 |
+| 126 | — | `页面名称重复被拒绝` | PASS | 0 | ✅ | 断言 |
+| 127 | POST | `/api/decorate/page/delete` | 200 | 0 | ✅ | ok |
+| 128 | — | `删除自定义页面成功` | PASS | 0 | ✅ | 断言 |
+| 129 | — | `删除后 replica.js 里 CUSTOM_PAGES 整段消失、无残留数据` | PASS | 0 | ✅ | 断言 |
+| 130 | — | `删除后仍保留 6 个内置装修字段` | PASS | 0 | ✅ | 断言 |
+| 131 | GET | `/api/decorate/pages` | 200 | 0 | ✅ | ok |
+| 132 | — | `自检未改变自定义页数量（可重复运行）` | PASS | 0 | ✅ | 断言 |
+| 133 | — | `装修台含「新建页面」入口与自定义页改名 / 删除操作` | PASS | 0 | ✅ | 断言 |
+| 134 | — | `装修台列表区分内置页 / 自定义页` | PASS | 0 | ✅ | 断言 |
+| 135 | — | `小程序端通用自定义页存在，且复用 utils/blocks 的区块渲染` | PASS | 0 | ✅ | 断言 |
+| 136 | — | `小程序端自定义页的区块渲染与首页同源（首页也已改用 utils/blocks）` | PASS | 0 | ✅ | 断言 |
+| 137 | — | `素材引用检查同时覆盖 商品库 / 已发布页面 / 装修草稿（漏一处就会误删在用图）` | PASS | 0 | ✅ | 断言 |
+| 138 | — | `商品图文详情按商品自身数据生成，占位内容仅作最后回落` | PASS | 0 | ✅ | 断言 |
+| 139 | — | `评价数据源是持久化的 db.comments，不再由 seed 按 mock 商品生成` | PASS | 0 | ✅ | 断言 |
+| 140 | — | `后台评价列表复用 catalog.commentsOf()（评价来源只此一处实现）` | PASS | 0 | ✅ | 断言 |
+| 141 | — | `删除商品时连带清理其评价与商家回复（否则留下幽灵评价）` | PASS | 0 | ✅ | 断言 |
+| 142 | — | `store 的空库结构包含 comments（老数据文件缺字段时按此自愈）` | PASS | 0 | ✅ | 断言 |
+| 143 | — | `自检用固定 code 登录（不再每轮新建客户，客户数稳定）` | PASS | 0 | ✅ | 断言 |
+| 144 | — | `自检的库存探针商品取自商品库在售首件（写死 id 会在商品被删后静默失效）` | PASS | 0 | ✅ | 断言 |
+| 145 | POST | `/api/media/upload` | 200 | 0 | ✅ | ok |
+| 146 | — | `素材上传返回相对路径与真实尺寸（2×2）` | PASS | 0 | ✅ | 断言 |
+| 147 | — | `上传的素材可通过 /uploads/ 直接访问（小程序端读的就是它）` | PASS | 0 | ✅ | 断言 |
+| 148 | GET | `/api/media/list` | 200 | 0 | ✅ | ok |
+| 149 | — | `素材库列表返回统计（张数 / 占用 / 单张上限）` | PASS | 0 | ✅ | 断言 |
+| 150 | POST | `/api/media/upload` | 200 | 1001 | ✅ | 预期失败：伪装图片被拒 |
+| 151 | — | `伪装成 png 的文本被拒（按文件头校验）` | PASS | 0 | ✅ | 断言 |
+| 152 | POST | `/api/media/delete` | 200 | 1001 | ✅ | 预期失败：路径穿越被拦 |
+| 153 | — | `素材删除接口拦住 ../ 穿越` | PASS | 0 | ✅ | 断言 |
+| 154 | POST | `/api/media/delete` | 200 | 0 | ✅ | ok |
+| 155 | — | `素材删除成功（自检产生的文件已回收）` | PASS | 0 | ✅ | 断言 |
+| 156 | POST | `/api/media/delete` | 200 | 2000 | ✅ | 预期失败：商品图删除被拒 |
+| 157 | — | `商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用` | PASS | 0 | ✅ | 断言 |
+| 158 | — | `商品图文详情：配了 detailImages 就按商品自身数据渲染（不再回落开发期占位文案）` | PASS | 0 | ✅ | 断言 |
+| 159 | — | `自检结束后素材库数量与初始一致（无残留）` | PASS | 0 | ✅ | 断言 |
+| 160 | — | `小程序全部 json 可解析` | PASS | 0 | ✅ | 断言 |
+| 161 | — | `usingComponents 字段类型合法（须为对象，写 true 会让模拟器启动失败）` | PASS | 0 | ✅ | 断言 |
+| 162 | — | `app.json 无开发者工具不识别的顶层字段` | PASS | 0 | ✅ | 断言 |
+| 163 | — | `app.json 声明的页面文件齐全（.js + .wxml）` | PASS | 0 | ✅ | 断言 |
+| 164 | — | `tabBar 每个 pagePath 都在 pages 声明里` | PASS | 0 | ✅ | 断言 |
+| 165 | — | `sitemapLocation 指向的文件存在` | PASS | 0 | ✅ | 断言 |
+| 166 | — | `project.config.json 已填真实 AppID（非占位符）` | PASS | 0 | ✅ | 断言 |
+| 167 | — | `小程序 wxml 的 class 引用都在正确作用域内有定义（组件不吃 app.wxss 的 class）` | PASS | 0 | ✅ | 断言 |
+| 168 | — | `小程序 hover-class 全部有对应样式（否则是「点了没反应」的哑点击态）` | PASS | 0 | ✅ | 断言 |
+| 169 | — | `小程序 var(--token) 引用的令牌全部有定义（漏定义＝该处颜色静默失效）` | PASS | 0 | ✅ | 断言 |
+| 170 | — | `装修里每个带跳转的元素，其点击处理都真的走了 openLink（否则真机点了没反应）` | PASS | 0 | ✅ | 断言 |
+| 171 | — | `小程序 utils/link.js 的 tabBar 白名单与 app.json 完全一致（漂移＝点 tab 入口失效）` | PASS | 0 | ✅ | 断言 |
+| 172 | — | `装修区块的图片/可点元素都能配跳转（缺哪个区块就是「这张图点了没反应」）` | PASS | 0 | ✅ | 断言 |
+| 173 | — | `装修 schema 里所有跳转字段都是 link 类型（回退成 text 就等于让运营手敲路径）` | PASS | 0 | ✅ | 断言 |
+| 174 | GET | `/api/decorate/link-options` | 200 | 0 | ✅ | ok |
+| 175 | — | `GET /api/decorate/link-options 返回可用的跳转目标清单（内置 5 个 tab 页齐全）` | PASS | 0 | ✅ | 断言 |
+| 176 | — | `图片广告 images 的结构升级无损且幂等（字符串数组 → { image, link }）` | PASS | 0 | ✅ | 断言 |
+| 177 | — | `小程序端 normalizeBlock 同时兼容轮播图的老/新结构（否则老数据首屏白屏）` | PASS | 0 | ✅ | 断言 |
+| 178 | — | `装修组件库「基础组件」= 有赞实测 10 组 / 54 个（分组名与数量逐组对齐）` | PASS | 0 | ✅ | 断言 |
+| 179 | — | `组件库标记「已接入」的每一项都在 schema 里有真实区块类型（防「假装可用」）` | PASS | 0 | ✅ | 断言 |
+| 180 | — | `未接入的组件必须写清「为什么不能接入」（只挂角标不写原因＝运营无从判断）` | PASS | 0 | ✅ | 断言 |
+| 181 | — | `每个区块类型的图标键都能在 ICONS 里找到（否则装修台左侧渲染成空白格）` | PASS | 0 | ✅ | 断言 |
+| 182 | — | `新增 8 种区块的字段完整性（对照有赞面板逐字段核对，缺字段＝属性面板少一项）` | PASS | 0 | ✅ | 断言 |
+| 183 | — | `小程序 templates/blocks.wxml 覆盖全部 19 种区块类型（少一种就是「配了不显示」）` | PASS | 0 | ✅ | 断言 |
+| 184 | — | `装修台预览覆盖全部 19 种区块类型，且每种都有中文角标名` | PASS | 0 | ✅ | 断言 |
+| 185 | — | `装修台左侧按 lib.groups 分组渲染，且未接入项会展示具体原因` | PASS | 0 | ✅ | 断言 |
+| 186 | — | `数据文件的重命名/删除统一走 lib/atomicFile（裸 fs 调用会在 Windows 上偶发 EPERM）` | PASS | 0 | ✅ | 断言 |
+| 187 | — | `瞬态错误（EPERM/EBUSY/EACCES）会自动重试，恢复后成功（不能一次失败就放弃）` | PASS | 0 | ✅ | 断言 |
+| 188 | — | `非瞬态错误（ENOENT 等）立即抛出、只尝试 1 次` | PASS | 0 | ✅ | 断言 |
+| 189 | — | `瞬态错误重试耗尽后仍抛出（不静默当作成功），且带上真实错误码` | PASS | 0 | ✅ | 断言 |
+| 190 | — | `writeFileAtomic 采用「写 .tmp → rename 替换」的原子写（防断电写坏数据文件）` | PASS | 0 | ✅ | 断言 |
+| 191 | GET | `/api/admin/dashboard` | 200 | 0 | ✅ | ok |
+| 192 | — | `后台 · 数据概览返回今日/累计 KPI、待办、趋势、Top 商品` | PASS | 0 | ✅ | 断言 |
+| 193 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 194 | — | `后台 · 商品列表返回全量商品（含下架）+ 分类 + 预警线` | PASS | 0 | ✅ | 断言 |
+| 195 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
+| 196 | — | `后台 · 商品详情返回编辑态商品 + 分类选项` | PASS | 0 | ✅ | 断言 |
+| 197 | GET | `/api/admin/category/list` | 200 | 0 | ✅ | ok |
+| 198 | — | `后台 · 分类树带每个分类的商品数` | PASS | 0 | ✅ | 断言 |
+| 199 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
+| 200 | — | `后台 · 订单列表返回各状态计数与客户信息` | PASS | 0 | ✅ | 断言 |
+| 201 | GET | `/api/admin/order/detail` | 200 | 0 | ✅ | ok |
+| 202 | — | `后台 · 订单详情返回商品明细、收货地址、金额与物流位` | PASS | 0 | ✅ | 断言 |
+| 203 | GET | `/api/admin/order/export` | 200 | 0 | ✅ | ok |
+| 204 | — | `后台 · 订单导出 CSV（带 BOM，Excel 打开不乱码）` | PASS | 0 | ✅ | 断言 |
+| 205 | POST | `/api/admin/order/ship` | 200 | 0 | ✅ | ok |
+| 206 | — | `后台 · 发货接口对不存在的订单给出失败明细（不会误标为已发货）` | PASS | 0 | ✅ | 断言 |
+| 207 | POST | `/api/admin/order/remark` | 200 | 0 | ✅ | ok |
+| 208 | — | `后台 · 商家备注可写可读，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
+| 209 | POST | `/api/admin/order/close` | 200 | 2000 | ✅ | 预期失败：已支付订单不可关闭 |
+| 210 | — | `后台 · 关闭订单只允许未付款（已支付订单被拦下）` | PASS | 0 | ✅ | 断言 |
+| 211 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
+| 212 | — | `后台 · 客户列表返回消费汇总、分层与标签池` | PASS | 0 | ✅ | 断言 |
+| 213 | GET | `/api/admin/customer/detail` | 200 | 0 | ✅ | ok |
+| 214 | — | `后台 · 客户详情返回消费统计、订单、地址、券与资产` | PASS | 0 | ✅ | 断言 |
+| 215 | GET | `/api/admin/comment/list` | 200 | 0 | ✅ | ok |
+| 216 | — | `后台 · 评价列表带商品名与商家回复字段` | PASS | 0 | ✅ | 断言 |
+| 217 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 218 | — | `后台 · 评价只挂在商品库真实存在的商品上（无「幽灵评价」）` | PASS | 0 | ✅ | 断言 |
+| 219 | GET | `/api/admin/coupon/list` | 200 | 0 | ✅ | ok |
+| 220 | — | `后台 · 优惠券模板列表带领取/核销统计` | PASS | 0 | ✅ | 断言 |
+| 221 | GET | `/api/admin/coupon/detail` | 200 | 0 | ✅ | ok |
+| 222 | — | `后台 · 单个优惠券模板详情可读` | PASS | 0 | ✅ | 断言 |
+| 223 | GET | `/api/admin/coupon/detail` | 404 | 404 | ✅ | 预期失败：优惠券不存在 |
+| 224 | — | `后台 · 读取不存在的优惠券模板返回 404` | PASS | 0 | ✅ | 断言 |
+| 225 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 226 | — | `后台 · 店铺设置返回当前值与默认值` | PASS | 0 | ✅ | 断言 |
+| 227 | POST | `/api/admin/category/save` | 200 | 0 | ✅ | ok |
+| 228 | — | `后台 · 新建一级分类成功` | PASS | 0 | ✅ | 断言 |
+| 229 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
+| 230 | — | `后台 · 新建商品成功（含 2 个 SKU）` | PASS | 0 | ✅ | 断言 |
+| 231 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
+| 232 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
+| 233 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
+| 234 | — | `后台 · 商品详情长图落库后，小程序端详情按商品自身数据出图（不再回落占位内容）` | PASS | 0 | ✅ | 断言 |
+| 235 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 236 | — | `后台 · 新建商品可按关键词搜回，SKU 数为 2` | PASS | 0 | ✅ | 断言 |
+| 237 | POST | `/api/admin/goods/stock` | 200 | 0 | ✅ | ok |
+| 238 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
+| 239 | — | `后台 · 改库存后小程序端读取同一值（库存真源唯一，无二次真源）` | PASS | 0 | ✅ | 断言 |
+| 240 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
+| 241 | GET | `/api/goods/list` | 200 | 0 | ✅ | ok |
+| 242 | — | `后台 · 下架后小程序端列表立即不再返回该商品` | PASS | 0 | ✅ | 断言 |
+| 243 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
+| 244 | — | `后台 · 重新上架成功` | PASS | 0 | ✅ | 断言 |
+| 245 | POST | `/api/admin/coupon/save` | 200 | 0 | ✅ | ok |
+| 246 | — | `后台 · 新建优惠券模板成功` | PASS | 0 | ✅ | 断言 |
+| 247 | POST | `/api/admin/coupon/status` | 200 | 0 | ✅ | ok |
+| 248 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：券已停止发放 |
+| 249 | — | `后台 · 暂停券后小程序端不可再领取（状态穿透到 C 端）` | PASS | 0 | ✅ | 断言 |
+| 250 | POST | `/api/admin/coupon/delete` | 200 | 0 | ✅ | ok |
+| 251 | — | `后台 · 删除未被领取的券模板成功（已领取则拒绝）` | PASS | 0 | ✅ | 断言 |
+| 252 | POST | `/api/admin/goods/delete` | 200 | 0 | ✅ | ok |
+| 253 | — | `后台 · 删除自检商品成功` | PASS | 0 | ✅ | 断言 |
+| 254 | POST | `/api/admin/category/delete` | 200 | 0 | ✅ | ok |
+| 255 | — | `后台 · 删除自检分类成功（分类下有商品时会被拒绝）` | PASS | 0 | ✅ | 断言 |
+| 256 | POST | `/api/admin/goods/delete` | 404 | 404 | ✅ | 预期失败：商品不存在 |
+| 257 | — | `后台 · 删除不存在的商品返回 404` | PASS | 0 | ✅ | 断言 |
+| 258 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 259 | — | `后台 · 自建自删后商品库数量回到初始（自检零残留）` | PASS | 0 | ✅ | 断言 |
+| 260 | POST | `/api/admin/settings/save` | 200 | 0 | ✅ | ok |
+| 261 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 262 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 263 | — | `后台 · 店铺设置可写可读，且自检结束时已还原原值` | PASS | 0 | ✅ | 断言 |
+| 264 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
+| 265 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
+| 266 | — | `后台 · 客户打标签可用，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
+| 267 | POST | `/api/admin/comment/reply` | 200 | 0 | ✅ | ok |
+| 268 | — | `后台 · 回复评价可用（仅挑无回复的评价，测完立即清空）` | PASS | 0 | ✅ | 断言 |
+| 269 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
+| 270 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
+| 271 | — | `后台 · 自检全程未改变真实用户数据规模（订单数 / 客户数一致）` | PASS | 0 | ✅ | 断言 |
+| 272 | — | `后台页面内的静态引用在「无尾斜杠 URL」下全部可达（防相对路径 404 白屏）` | PASS | 0 | ✅ | 断言 |
+| 273 | — | `后台页面路由可访问且返回 HTML（/console · /admin · /debug）` | PASS | 0 | ✅ | 断言 |
+| 274 | — | `后台控制台与装修台必需文件齐全` | PASS | 0 | ✅ | 断言 |
+| 275 | — | `库存净影响归零：自检消耗的 SKU 库存已补回（可重复运行）` | PASS | 0 | ✅ | 断言 |
+| 276 | — | `联调示例里每个 key 都命中已注册点位（无写错路径的静默失效）` | PASS | 0 | ✅ | 断言 |
+| 277 | — | `每个点位都带联调示例（调试台可一键填参）` | PASS | 0 | ✅ | 断言 |
+| 278 | — | `前端 services 引用的点位后端均已实现（无断链）` | PASS | 0 | ✅ | 断言 |
+| 279 | — | `安全开关 · DEBUG_PAGE 判定矩阵全部符合预期（含 off / 拼错值 / 大小写）` | PASS | 0 | ✅ | 断言 |
+| 280 | — | `安全开关 · 识别「未知取值」以便启动时告警（避免静默按关闭处理）` | PASS | 0 | ✅ | 断言 |
+| 281 | — | `安全开关 · 管理接口（admin/decorate/media）与页面同受一个开关约束` | PASS | 0 | ✅ | 断言 |
+| 282 | — | `安全开关 · 生产环境缺 JWT_SECRET 时拒绝启动（不靠人看日志）` | PASS | 0 | ✅ | 断言 |
+| 283 | — | `持久化兜底 · 三处存储层都有「解析成功后再验是否为对象」的守卫` | PASS | 0 | ✅ | 断言 |
+| 284 | — | `持久化兜底 · isPlainObject 对 null / 数组 / 数字 均判为「非对象」` | PASS | 0 | ✅ | 断言 |
 
 ## 三、覆盖结论
 

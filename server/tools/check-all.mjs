@@ -17,7 +17,8 @@ import { writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+const SELF_FILE = fileURLToPath(import.meta.url);
+const __dirname = dirname(SELF_FILE);
 const BASE = process.argv[2] || 'http://127.0.0.1:3000';
 
 /* ----------------------------- 结果收集 ----------------------------- */
@@ -134,8 +135,17 @@ console.log(` 服务状态   ${health.data.status}   点位 ${health.data.routes
  * 因此每次运行都会永久扣减库存。反复运行会把 SKU 跑空（实际已发生：g1001-01 只剩 1 件，
  * 导致 quantity:2 的加购直接被库存校验拦下）。
  * 处理：开跑前把自检用的 SKU 补到安全水位（顺带把历史自检跑空的库存补回），
- *       跑完后把「本次净消耗」补回，做到可重复运行、且对运营数据净影响为零。 */
-const STOCK_GOODS = 'g1001';
+ *       跑完后把「本次净消耗」补回，做到可重复运行、且对运营数据净影响为零。
+ *
+ * ⚠️ 探针商品必须**动态取商品库在售首件**，绝不能写死商品 id ——
+ *    曾经写死 'g1001'，该商品被删掉后 readGoodsStock() 一直返回 null，
+ *    「水位兜底」与收尾的「净影响归零」断言被整体静默跳过，
+ *    于是每跑一轮自检就永久扣掉一笔库存（实测累计把 S10Pro 从 99 扣到 93 都没人发现）。
+ */
+const stockProbe = await call('GET', '/api/goods/list', { auth: false, query: { page: 1, size: 1 }, silent: true });
+const STOCK_GOODS = ((stockProbe.data && stockProbe.data.list) || [])[0]
+  ? stockProbe.data.list[0].id
+  : '';
 const STOCK_FLOOR = 50;
 const readGoodsStock = async () => {
   const r = await call('GET', '/api/admin/goods/detail', {
@@ -171,10 +181,17 @@ assert('未登录访问受保护点位返回 401',
   `实际 HTTP ${unauth.httpStatus} / code ${unauth.json && unauth.json.code}`);
 assert('401 时响应体不含业务数据', !unauth.json.data, `data=${JSON.stringify(unauth.json.data)}`);
 
-/* 3. 登录链路（用随机 code → 每次都创建全新账号，保证自检状态干净） */
+/*
+ * 3. 登录链路
+ *
+ * 用**固定 code**：微信 code 换 openid 是「一码一用户」，随机 code 等于每跑一轮就新建一个账号 ——
+ * 实测跑了几十轮之后，后台「客户管理」里堆了 69 个同名「联调账号」，只能手工清库。
+ * 固定 code 让自检始终用同一个「联调账号」，后台客户数稳定为 1。
+ * 自检对账号状态的假设（地址 / 购物车）在下面各步自行复位，不依赖「这个账号是全新的」。
+ */
 const login = await call('POST', '/api/auth/login', {
   auth: false,
-  body: { code: 'check_code_' + Date.now() }
+  body: { code: 'check_code_selfcheck' }
 });
 if (!login.ok) {
   console.error(' ✗ 登录失败，无法继续：', login.json && login.json.msg);
@@ -207,7 +224,15 @@ await call('GET', '/api/coupon/list', { query: { status: 'available' } });
 const coupons = await call('GET', '/api/coupon/list', { query: { status: 'available' } });
 console.log(` 新用户赠券 ${coupons.data.total} 张：${coupons.data.list.map((c) => c.name).join(' / ')}`);
 
-/* 6. 地址链路 */
+/* 6. 地址链路
+ * 先清掉历史残留：登录已改成固定账号，若上一轮自检中途失败（本轮之前就发生过），
+ * 未删掉的地址会挂在这个账号上越积越多。自检正常跑完会在收尾删掉自己那条。 */
+const addrOld = await call('GET', '/api/address/list');
+let addrCleared = 0;
+for (const a of ((addrOld.data && addrOld.data.list) || [])) {
+  const rm = await call('POST', '/api/address/delete', { body: { addressId: a.addressId }, silent: true });
+  if (rm.ok) addrCleared += 1;
+}
 const addr = await call('POST', '/api/address/save', {
   body: { name: '张三', phone: '13800138000', province: '江苏省', city: '苏州市', district: '姑苏区', detail: '示例路 1 号 101 室', isDefault: true }
 });
@@ -498,6 +523,45 @@ const catalogSrc = readFileSync(join(__dirname, '..', 'lib', 'catalog.js'), 'utf
 assert('商品图文详情按商品自身数据生成，占位内容仅作最后回落',
   /function buildDetailBlocks/.test(catalogSrc) && /detailBlocks:\s*buildDetailBlocks\(goods\)/.test(catalogSrc),
   'buildDetailBlocks 未接入 detail()');
+
+/*
+ * 评价必须是「持久化的用户业务数据」，不能是「按 mock 商品当场生成的演示数据」。
+ * 后者在商品库换成真实商品之后会产出大量幽灵评价（商品库里根本没这些商品），
+ * 且只有改代码才能清 —— 详见 lib/seed.js 的说明。
+ */
+const seedSrc = readFileSync(join(__dirname, '..', 'lib', 'seed.js'), 'utf8');
+// 注释里提到 COMMENTS 只是文档说明，不算「还在用它」——剥掉注释再查标识符
+const seedCode = seedSrc.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+assert('评价数据源是持久化的 db.comments，不再由 seed 按 mock 商品生成',
+  !/COMMENTS/.test(seedCode) &&
+  /db\(\)\.comments/.test(catalogSrc) &&
+  /commentsOf/.test(catalogSrc),
+  [/COMMENTS/.test(seedCode) ? 'seed.js 仍在使用 COMMENTS' : '',
+   !/db\(\)\.comments/.test(catalogSrc) ? 'catalog.js 未读 db.comments' : ''].filter(Boolean).join('；') || 'ok');
+assert('后台评价列表复用 catalog.commentsOf()（评价来源只此一处实现）',
+  /catalog\.commentsOf\(/.test(readFileSync(join(__dirname, '..', 'lib', 'admin.js'), 'utf8')),
+  'admin.js 未走 commentsOf');
+assert('删除商品时连带清理其评价与商家回复（否则留下幽灵评价）',
+  /db\(\)\.comments\s*=\s*db\(\)\.comments\.filter\(\(c\)\s*=>\s*c\.goodsId\s*!==\s*id\)/.test(catalogSrc) &&
+  /delete \(db\(\)\.commentReplies \|\| \{\}\)\[cid\]/.test(catalogSrc),
+  'deleteGoods 未清理评价');
+assert('store 的空库结构包含 comments（老数据文件缺字段时按此自愈）',
+  /comments:\s*\[\]/.test(readFileSync(join(__dirname, '..', 'lib', 'store.js'), 'utf8')),
+  'emptyDb() 缺 comments');
+
+/* 自检自身的两条「开发期卫生」约定（写错会让自检悄悄污染真实数据） */
+const selfSrc = readFileSync(SELF_FILE, 'utf8');
+assert('自检用固定 code 登录（不再每轮新建客户，客户数稳定）',
+  /code:\s*'check_code_selfcheck'/.test(selfSrc),
+  '自检登录 code 仍是随机的');
+/*
+ * 只断言「必须是从商品库动态取」这一件事，别再叠一条「源码里不得出现写死写法」——
+ * 那条模式串会**匹配到断言自己的源码**（自指），从而永远为假，属假红灯。
+ * 写死的写法 `const STOCK_GOODS = 'g1001';` 本来就不会命中下面这个模式。
+ */
+assert('自检的库存探针商品取自商品库在售首件（写死 id 会在商品被删后静默失效）',
+  /const STOCK_GOODS = \(\(stockProbe/.test(selfSrc),
+  'STOCK_GOODS 未从商品库动态取（商品一旦被删，库存兜底会静默失效）');
 
 /* 15.7 素材库（图片本地上传）：上传 → 静态访问 → 列表 → 拒绝非法文件 → 删除，全程自清理 */
 const PNG_2X2 = Buffer.from(
@@ -1264,9 +1328,22 @@ assert('后台 · 客户详情返回消费统计、订单、地址、券与资�
 
 const adComment0 = await call('GET', '/api/admin/comment/list', { auth: false, query: { page: 1, size: 10 } });
 assert('后台 · 评价列表带商品名与商家回复字段',
-  adComment0.ok && adComment0.data.list.length > 0 &&
-  adComment0.data.list.every((c) => 'reply' in c && !!c.goodsName),
+  adComment0.ok && adComment0.data.list.every((c) => 'reply' in c && !!c.goodsName),
   `${adComment0.data && adComment0.data.total} 条评价`);
+
+/*
+ * 评价数据源一度是「按小程序端 mock 商品凭空生成」：商品库换成真实商品之后，
+ * 后台评价管理里全是 g1001/g1002… 这些商品库里已不存在的商品的评价（商品名直接显示成商品 id），
+ * 且只能靠改代码才能清。评价现已持久化到 db.comments，这条断言拦住「幽灵评价」再回来。
+ */
+const adGoodsAll = await call('GET', '/api/admin/goods/list', { auth: false, query: { page: 1, size: 200 } });
+const adGoodsIdSet = new Set(((adGoodsAll.data && adGoodsAll.data.list) || []).map((g) => g.id));
+const adGhost = ((adComment0.data && adComment0.data.list) || []).filter((c) => !adGoodsIdSet.has(c.goodsId));
+assert('后台 · 评价只挂在商品库真实存在的商品上（无「幽灵评价」）',
+  adComment0.ok && adGhost.length === 0,
+  adGhost.length
+    ? `幽灵评价 ${adGhost.length} 条：${adGhost.map((c) => c.commentId + ' → ' + c.goodsId).join('、')}`
+    : `${((adComment0.data && adComment0.data.list) || []).length} 条评价全部命中商品库（${adGoodsIdSet.size} 个商品）`);
 
 const adCoupon0 = await call('GET', '/api/admin/coupon/list', { auth: false });
 assert('后台 · 优惠券模板列表带领取/核销统计',
