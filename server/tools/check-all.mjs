@@ -484,6 +484,21 @@ assert('小程序端自定义页的区块渲染与首页同源（首页也已改
   readFileSync(join(ROOT_DIR, 'miniprogram', 'pages', 'index', 'index.js'), 'utf8').indexOf('utils/blocks') >= 0 &&
   existsSync(join(ROOT_DIR, 'miniprogram', 'utils', 'blocks.js')));
 
+/*
+ * 素材「是否被引用」的三个来源必须齐全：
+ * 商品库（商品主图 / 图集 / 详情长图）+ 已发布 replica.js + 装修草稿。
+ * 曾经只扫后两处 —— 于是商品图在素材管理里显示「未引用」，运营一点删除就把在用的商品图删没了。
+ */
+const mediaSrc = readFileSync(join(__dirname, '..', 'lib', 'media.js'), 'utf8');
+assert('素材引用检查同时覆盖 商品库 / 已发布页面 / 装修草稿（漏一处就会误删在用图）',
+  /'data',\s*'catalog\.json'/.test(mediaSrc) && /'config',\s*'replica\.js'/.test(mediaSrc) && /'decorate',\s*'state\.json'/.test(mediaSrc),
+  '缺失来源：' + [/catalog\.json/, /replica\.js/, /state\.json/].filter((r) => !r.test(mediaSrc)).map(String).join(', '));
+
+const catalogSrc = readFileSync(join(__dirname, '..', 'lib', 'catalog.js'), 'utf8');
+assert('商品图文详情按商品自身数据生成，占位内容仅作最后回落',
+  /function buildDetailBlocks/.test(catalogSrc) && /detailBlocks:\s*buildDetailBlocks\(goods\)/.test(catalogSrc),
+  'buildDetailBlocks 未接入 detail()');
+
 /* 15.7 素材库（图片本地上传）：上传 → 静态访问 → 列表 → 拒绝非法文件 → 删除，全程自清理 */
 const PNG_2X2 = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGM4IaDHAMUAFEYDE2QuiKkAAAAASUVORK5CYII=',
@@ -532,6 +547,22 @@ const mediaDel = upOne
   : null;
 assert('素材删除成功（自检产生的文件已回收）', !!mediaDel && mediaDel.ok && mediaDel.data.deleted === true,
   mediaDel && mediaDel.data ? `剩余 ${mediaDel.data.total} 张` : '-');
+
+/* —— 商品库图片的删除保护：素材管理不能把商品主图 / 详情长图删没 —— */
+const goodsUploads = (detail.data.images || []).filter((u) => /^\/uploads\//.test(u));
+if (goodsUploads.length) {
+  const gname = goodsUploads[0].replace(/^\/uploads\//, '');
+  const guard = await call('POST', '/api/media/delete', { body: { name: gname }, auth: false, expectFail: '商品图删除被拒' });
+  assert('商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用',
+    !!guard.json && guard.json.code === 2000 && /商品库/.test(guard.json.msg || ''),
+    guard.json && guard.json.msg);
+}
+const goodsDetailImgs = detail.data.detailImages || [];
+assert('商品图文详情：配了 detailImages 就按商品自身数据渲染（不再回落开发期占位文案）',
+  goodsDetailImgs.length
+    ? (detail.data.detailBlocks || []).filter((b) => b.type === 'image').length === goodsDetailImgs.length
+    : (detail.data.detailBlocks || []).length > 0,
+  `detailImages ${goodsDetailImgs.length} 张 → detailBlocks ${(detail.data.detailBlocks || []).length} 块`);
 
 const mediaCount1 = await call('GET', '/api/media/list', { auth: false, silent: true });
 assert('自检结束后素材库数量与初始一致（无残留）',
@@ -1280,6 +1311,18 @@ const adNewGoods = await call('POST', '/api/admin/goods/save', {
 });
 const adGid = (adNewGoods.ok && adNewGoods.data && adNewGoods.data.id) || '';
 assert('后台 · 新建商品成功（含 2 个 SKU）', adNewGoods.ok && !!adGid, `商品 id=${adGid}`);
+
+/* 详情长图：编辑态写入 → 小程序端详情接口应把它转成 image 块（而不是继续吐开发期占位文案） */
+const adDetailImg = (detail.data.images || [])[0] || '';
+const adGoodsSnap = (await call('GET', '/api/admin/goods/detail', { auth: false, query: { id: adGid } })).data.goods;
+const adSaveDetail = await call('POST', '/api/admin/goods/save', {
+  auth: false, body: Object.assign({}, adGoodsSnap, { detailImages: adDetailImg ? [adDetailImg] : [] })
+});
+const adDetailMp = await call('GET', '/api/goods/detail', { auth: false, query: { id: adGid } });
+const adDBlocks = (adDetailMp.data && adDetailMp.data.detailBlocks) || [];
+assert('后台 · 商品详情长图落库后，小程序端详情按商品自身数据出图（不再回落占位内容）',
+  adSaveDetail.ok && !!adDetailImg && adDBlocks.length >= 1 && adDBlocks.every((b) => b.type === 'image'),
+  `detailImages ${((adDetailMp.data && adDetailMp.data.detailImages) || []).length} 张 · detailBlocks ${adDBlocks.map((b) => b.type).join('+') || '(空)'}`);
 
 const adSearch = await call('GET', '/api/admin/goods/list', { auth: false, query: { keyword: adTag, page: 1, size: 50 } });
 const adFound = ((adSearch.data && adSearch.data.list) || []).filter((g) => g.id === adGid);

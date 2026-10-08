@@ -171,12 +171,13 @@ App.views.goods = {
   async openEditor(id) {
     const d = await API.get('/api/admin/goods/detail', id ? { id } : {});
     const g = Object.assign({
-      id: '', name: '', subtitle: '', categoryId: '', tags: [], cover: '', images: [],
+      id: '', name: '', subtitle: '', categoryId: '', tags: [], cover: '', images: [], detailImages: [],
       description: '', status: 'on_sale', skus: [{ specs: [], price: 0, originalPrice: 0, stock: 0, image: '' }]
     }, d.goods || {});
     const cats = d.categories;
     let skus = JSON.parse(JSON.stringify(g.skus || []));
     let images = (g.images || []).slice();
+    let detailImages = (g.detailImages || []).slice();
     let cover = g.cover || '';
 
     const m = openModal({
@@ -195,6 +196,9 @@ App.views.goods = {
           '<span class="tip">列表与详情页的第一张图，建议 1:1 或 4:3</span></div></div>' +
         '<div class="form-row"><div class="lbl">商品图集</div><div class="ctl"><div class="img-list" data-images></div>' +
           '<span class="tip">最多 12 张，第一张默认作为主图；支持拖拽/粘贴上传</span></div></div>' +
+
+        '<div class="form-row"><div class="lbl">详情长图</div><div class="ctl"><div class="img-list" data-detailimgs></div>' +
+          '<span class="tip">最多 20 张，按顺序拼在详情页「商品详情」区（建议 750 宽长图）；留空则显示默认占位内容</span></div></div>' +
 
         '<div class="form-row"><div class="lbl">图文描述</div><div class="ctl"><textarea rows="3" style="flex:1" data-f="description" placeholder="商品卖点描述">' + esc(g.description || '') + '</textarea></div></div>' +
 
@@ -236,6 +240,20 @@ App.views.goods = {
         renderImages();
       }));
     };
+    /* 详情长图：与图集同一套交互，但顺序即展示顺序（长条形，槽位内完整显示） */
+    const renderDetailImages = () => {
+      root.querySelector('[data-detailimgs]').innerHTML =
+        detailImages.map((u, i) => '<div class="img-slot filled tall" style="background-image:url(' + esc(u) + ')"><button class="del" data-rmd="' + i + '">×</button><span class="lv">' + (i + 1) + '</span></div>').join('') +
+        '<div class="img-slot add" data-pickdetail title="添加详情长图">+</div>';
+      root.querySelector('[data-pickdetail]').addEventListener('click', async () => {
+        const r = await pickImage({ multi: true, max: 20, value: detailImages });
+        if (r) { detailImages = r.slice(0, 20); renderDetailImages(); }
+      });
+      root.querySelectorAll('[data-rmd]').forEach((b) => b.addEventListener('click', () => {
+        detailImages.splice(Number(b.getAttribute('data-rmd')), 1);
+        renderDetailImages();
+      }));
+    };
 
     /* SKU 行 */
     const renderSkus = () => {
@@ -266,7 +284,7 @@ App.views.goods = {
       renderSkus();
     });
 
-    renderCover(); renderImages(); renderSkus();
+    renderCover(); renderImages(); renderDetailImages(); renderSkus();
 
     root.querySelector('[data-save]').addEventListener('click', async () => {
       const f = (k) => { const el = root.querySelector('[data-f="' + k + '"]'); return el ? el.value : ''; };
@@ -280,6 +298,7 @@ App.views.goods = {
         description: f('description'),
         cover: cover || images[0] || '',
         images: images.length ? images : (cover ? [cover] : []),
+        detailImages: detailImages,
         skus: skus.map((s) => ({ skuId: s.skuId, specs: s.specs, price: s.price, originalPrice: s.originalPrice, stock: s.stock, image: s.image || '' }))
       };
       if (!payload.name) return toast('请填写商品名称', true);

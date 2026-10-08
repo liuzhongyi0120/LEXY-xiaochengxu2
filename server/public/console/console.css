@@ -318,6 +318,8 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 .img-slot.add { display: flex; align-items: center; justify-content: center; color: var(--sub); font-size: 20px; }
 .img-slot.add:hover { border-color: var(--primary); color: var(--primary); }
 .img-slot .lv { position: absolute; left: 3px; bottom: 3px; background: rgba(0,0,0,.55); color: #fff; font-size: 10px; padding: 0 4px; border-radius: 3px; }
+/* 详情长图：长条形，槽位内完整显示（cover 会把长图裁成一小块，认不出是哪张） */
+.img-slot.tall { width: 104px; background-color: #fff; background-size: contain; }
 
 /* ---------------------------- 素材库 ---------------------------- */
 

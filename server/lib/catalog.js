@@ -146,6 +146,23 @@ function listGoods(params) {
   });
 }
 
+/**
+ * 商品的图文详情块
+ *
+ * 优先用**商品自己的**数据（description 文字 + detailImages 图片），
+ * 只有两者都没有时才回落到开发期占位内容 —— 否则运营从有赞搬来的真实商品，
+ * 详情区会一直显示「本页为开发阶段演示内容」。
+ */
+function buildDetailBlocks(goods) {
+  const blocks = [];
+  const desc = String(goods.description || '').trim();
+  if (desc) blocks.push({ type: 'text', content: desc });
+  (goods.detailImages || []).forEach((url) => {
+    if (url) blocks.push({ type: 'image', content: url });
+  });
+  return blocks.length ? blocks : DETAIL_BLOCKS;
+}
+
 /** 详情：商品 + SKU 矩阵 + 图文详情 + 同分类推荐 */
 function detail(id) {
   const goods = withLiveStock(findGoods(id));
@@ -157,7 +174,7 @@ function detail(id) {
     (g) => g.id !== goods.id && g.categoryId !== goods.categoryId && g.status === 'on_sale'
   );
   return Object.assign({}, goods, {
-    detailBlocks: DETAIL_BLOCKS,
+    detailBlocks: buildDetailBlocks(goods),
     recommends: sameCat.concat(others).slice(0, 4).map((g) => toListItem(withLiveStock(g)))
   });
 }
@@ -280,6 +297,7 @@ function saveGoods(payload) {
       commentCount: toInt(p.commentCount),
       cover: p.cover || (p.images || [])[0] || '',
       images: (p.images || []).slice(0, 12),
+      detailImages: (p.detailImages || []).slice(0, 20),
       description: String(p.description || ''),
       specs: (p.specs || []).slice(0, 4),
       skus,
@@ -297,6 +315,7 @@ function saveGoods(payload) {
       tags: (p.tags || []).map((t) => String(t)).filter(Boolean).slice(0, 6),
       cover: p.cover || goods.cover,
       images: (p.images || []).slice(0, 12),
+      detailImages: (p.detailImages || []).slice(0, 20),
       description: String(p.description || ''),
       specs: (p.specs || []).slice(0, 4),
       skus,

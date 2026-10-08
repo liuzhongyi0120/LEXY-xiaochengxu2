@@ -365,10 +365,18 @@ function list(opt) {
   };
 }
 
-/** 素材被哪些页面的数据引用（扫已发布的 replica.js 与草稿 state.json） */
+/**
+ * 素材被哪些数据引用
+ *
+ * 三个引用源缺一不可：
+ *   - 已发布 replica.js / 草稿 state.json → 装修页面的图片
+ *   - **商品库 catalog.json** → 商品主图、图集、详情长图
+ * 曾漏掉商品库：商品图在素材管理里显示「未引用」，运营一点删除就把商品图删没了。
+ */
 function refs(name) {
   const url = URL_PREFIX + '/' + name;
   const files = [
+    { label: '商品库', file: nodePath.join(__dirname, '..', 'data', 'catalog.json') },
     { label: '已发布', file: nodePath.join(__dirname, '..', '..', 'miniprogram', 'config', 'replica.js') },
     { label: '草稿', file: nodePath.join(__dirname, '..', 'data', 'decorate', 'state.json') }
   ];
