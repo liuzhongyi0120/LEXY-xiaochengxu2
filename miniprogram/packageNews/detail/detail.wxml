@@ -169,6 +169,7 @@
   </view>
 </view>
 
-<view class="empty" wx:else>
+<view class="loading-tip" wx:else>
+  <view class="spinner"></view>
   <text>内容加载中…</text>
 </view>

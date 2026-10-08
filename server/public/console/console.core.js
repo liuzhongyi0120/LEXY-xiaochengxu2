@@ -286,21 +286,53 @@ function pickImage(opt) {
 
 /* ============================== 导航与路由 ============================== */
 
+/*
+ * 侧栏图标：原来用的是 ▤ ▦ ☺ ▣ ☰ ✦ ◈ ▨ ✎ ⚙ 这些字符，
+ * 依赖系统字体里有没有对应字形 —— 实测「店铺装修」的 ✎ 在 Windows 上被字体回退成了「↘」，
+ * 同一排里还有实心/空心/线框三种风格，看着像拼凑的。
+ * 这里改成内联 SVG（16×16，stroke=currentColor），统一线性风格且不依赖字体。
+ */
+const ICONS = {
+  dashboard: '<rect x="2.4" y="2.4" width="4.9" height="4.9" rx="1.1"/><rect x="8.7" y="2.4" width="4.9" height="4.9" rx="1.1"/>' +
+    '<rect x="2.4" y="8.7" width="4.9" height="4.9" rx="1.1"/><rect x="8.7" y="8.7" width="4.9" height="4.9" rx="1.1"/>',
+  orders: '<path d="M3.2 2.4h9.6v11.2l-1.7-1.2-1.6 1.2-1.5-1.2-1.6 1.2-1.6-1.2-1.6 1.2z"/>' +
+    '<path d="M5.6 6.2h4.8M5.6 8.8h3.1"/>',
+  customers: '<circle cx="8" cy="5.6" r="2.5"/><path d="M3.1 13.6c0-2.5 2.2-4.1 4.9-4.1s4.9 1.6 4.9 4.1"/>',
+  goods: '<path d="M8 1.9 13.7 5v6L8 14.1 2.3 11V5z"/><path d="M2.6 5.2 8 8.2l5.4-3M8 8.2v5.7"/>',
+  categories: '<path d="M2.6 4.2h10.8M2.6 8h10.8M2.6 11.8h10.8"/>',
+  comments: '<path d="M13.6 8.4c0 2.5-2.5 4.5-5.6 4.5-.7 0-1.4-.1-2-.3L2.9 14l.9-2.4C3.1 10.7 2.4 9.6 2.4 8.4 2.4 5.9 4.9 3.9 8 3.9s5.6 2 5.6 4.5z"/>',
+  marketing: '<path d="M2.4 6.4h2.3L10 3.5v9L4.7 9.6H2.4z"/><path d="M5.6 9.6v2.2a1.2 1.2 0 0 0 2.4 0v-1.3"/>' +
+    '<path d="M12 6.3a2.5 2.5 0 0 1 0 3.4"/>',
+  media: '<rect x="2.4" y="3" width="11.2" height="10" rx="1.5"/><circle cx="5.9" cy="6.4" r="1.1"/>' +
+    '<path d="M2.7 11.1 6.1 8.2l2.3 2 1.9-1.6 2.9 2.5"/>',
+  decorate: '<path d="M11.3 2.4 13.6 4.7 6.2 12.1l-2.9.7.7-2.9z"/><path d="M9.7 4 12 6.3"/>',
+  settings: '<circle cx="8" cy="8" r="2.1"/>' +
+    '<path d="M8 2.1v1.5M8 12.4v1.5M13.9 8h-1.5M3.6 8H2.1M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1M12.2 12.2l-1.1-1.1M4.9 4.9 3.8 3.8"/>'
+};
+
+/** 生成一个侧栏图标；名字不在表里就返回空串，不会画出一个方框里带问号的破图 */
+function navIcon(name) {
+  const p = ICONS[name];
+  if (!p) return '';
+  return '<svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.4" ' +
+    'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
+}
+
 const NAV = [
   { group: '经营' },
-  { key: 'dashboard', text: '数据概览', ico: '▤' },
-  { key: 'orders', text: '订单管理', ico: '▦' },
-  { key: 'customers', text: '客户管理', ico: '☺' },
+  { key: 'dashboard', text: '数据概览', ico: 'dashboard' },
+  { key: 'orders', text: '订单管理', ico: 'orders' },
+  { key: 'customers', text: '客户管理', ico: 'customers' },
   { group: '商品' },
-  { key: 'goods', text: '商品管理', ico: '▣' },
-  { key: 'categories', text: '分类管理', ico: '☰' },
-  { key: 'comments', text: '评价管理', ico: '✦' },
+  { key: 'goods', text: '商品管理', ico: 'goods' },
+  { key: 'categories', text: '分类管理', ico: 'categories' },
+  { key: 'comments', text: '评价管理', ico: 'comments' },
   { group: '营销与内容' },
-  { key: 'marketing', text: '优惠券', ico: '◈' },
-  { key: 'media', text: '素材库', ico: '▨' },
-  { key: 'decorate', text: '店铺装修', ico: '✎' },
+  { key: 'marketing', text: '优惠券', ico: 'marketing' },
+  { key: 'media', text: '素材库', ico: 'media' },
+  { key: 'decorate', text: '店铺装修', ico: 'decorate' },
   { group: '系统' },
-  { key: 'settings', text: '店铺设置', ico: '⚙' }
+  { key: 'settings', text: '店铺设置', ico: 'settings' }
 ];
 
 const App = {
@@ -329,7 +361,7 @@ const App = {
       if (n.group) return '<div class="nav-group">' + esc(n.group) + '</div>';
       const b = this.badges[n.key];
       return '<button class="nav-item' + (n.key === this.view ? ' on' : '') + '" data-view="' + n.key + '">' +
-        '<span class="ico">' + n.ico + '</span><span>' + esc(n.text) + '</span>' +
+        '<span class="ico">' + navIcon(n.ico) + '</span><span>' + esc(n.text) + '</span>' +
         (b ? '<span class="badge">' + b + '</span>' : '') + '</button>';
     }).join('');
     $('#nav').querySelectorAll('[data-view]').forEach((el) => {
@@ -343,7 +375,7 @@ const App = {
   async render() {
     const v = this.views[this.view];
     const body = $('#body');
-    body.innerHTML = '<div class="empty-state">加载中…</div>';
+    body.innerHTML = '<div class="empty-state"><span class="spinner"></span>加载中…</div>';
     try {
       await v.render(body, this.state(this.view));
     } catch (e) {
@@ -406,10 +438,26 @@ App.views.dashboard = {
     const arrow = cmp >= 0 ? '<span class="up">↑ ' : '<span class="down">↓ ';
     const cmpText = (d.yesterday.gmv ? (Math.abs(cmp / (d.yesterday.gmv || 1)) * 100).toFixed(1) + '%' : '—');
 
+    /*
+     * 柱状图：原来所有柱子都走 Math.max(3, …)，GMV=0 的那天也会画出一根 3px 的红色短线，
+     * 浮在图表底部看着像误画的横线。现在 0 值改画一根浅灰的「零值刻度」，与真柱子明确区分；
+     * 整段区间全是 0 时直接不画图，给一句空态，避免 7 根灰线让人以为页面坏了。
+     */
+    const totalGmv = d.trend.reduce((s, x) => s + x.gmv, 0);
     const max = Math.max.apply(null, d.trend.map((x) => x.gmv).concat([1]));
-    const bars = d.trend.map((x) =>
-      '<div class="b" title="' + esc(x.label) + '：GMV ' + money(x.gmv) + '，订单 ' + x.orders + ' 笔"><div class="bar" style="height:' +
-      Math.max(3, Math.round(x.gmv / max * 132)) + 'px"><span class="val">' + (x.gmv ? wan(x.gmv) : '') + '</span></div><div class="lb">' + esc(x.label) + '</div></div>').join('');
+    const bars = d.trend.map((x) => {
+      const has = x.gmv > 0;
+      const tip = esc(x.label) + '：GMV ' + money(x.gmv) + '，订单 ' + x.orders + ' 笔';
+      return '<div class="b" title="' + tip + '">' +
+        (has
+          ? '<div class="bar" style="height:' + Math.max(4, Math.round(x.gmv / max * 138)) + 'px">' +
+            '<span class="val">' + wan(x.gmv) + '</span></div>'
+          : '<div class="bar zero" title="' + esc(x.label) + '：当日无成交"></div>') +
+        '<div class="lb">' + esc(x.label) + '</div></div>';
+    }).join('');
+    const chartHtml = totalGmv === 0
+      ? '<div class="chart-empty">近 ' + days + ' 天还没有已付款订单，暂时没有趋势可画</div>'
+      : '<div class="bars">' + bars + '</div>';
 
     body.innerHTML =
       '<div class="grid c4" style="margin-bottom:14px">' +
@@ -423,8 +471,8 @@ App.views.dashboard = {
       '<div class="card"><div class="card-h"><h2>销售趋势</h2><div class="grow"></div>' +
         '<button class="btn sm' + (days === 7 ? ' primary' : '') + '" data-days="7">近 7 天</button>' +
         '<button class="btn sm' + (days === 30 ? ' primary' : '') + '" data-days="30">近 30 天</button>' +
-      '</div><div class="card-b"><div class="bars">' + bars + '</div>' +
-      '<div class="sub" style="margin-top:8px">近 ' + days + ' 天累计 GMV ' + money(d.trend.reduce((s, x) => s + x.gmv, 0)) +
+      '</div><div class="card-b">' + chartHtml +
+      '<div class="sub" style="margin-top:8px">近 ' + days + ' 天累计 GMV ' + money(totalGmv) +
         ' · 订单 ' + d.trend.reduce((s, x) => s + x.orders, 0) + ' 笔</div></div></div>' +
 
       '<div class="grid c2">' +

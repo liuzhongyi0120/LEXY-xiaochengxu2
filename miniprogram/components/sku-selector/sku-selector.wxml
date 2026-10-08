@@ -70,7 +70,7 @@
     </scroll-view>
 
     <!-- ---------- 操作按钮 ---------- -->
-    <view class="sku-footer safe-area-bottom">
+    <view class="sku-footer">
       <view
         wx:if="{{mode === 'both' || mode === 'cart'}}"
         class="sku-btn sku-btn-cart {{disabled ? 'is-disabled' : ''}}"

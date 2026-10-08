@@ -78,6 +78,8 @@
             data-block="{{index}}"
             data-i="{{ii}}"
             bindtap="onPickThumb"
+            hover-class="hover"
+            hover-stay-time="80"
           />
         </scroll-view>
       </view>
@@ -118,6 +120,8 @@
       style="padding: {{block.padYRpx}}rpx {{block.marginRpx}}rpx; background: {{block.bg || 'transparent'}}; text-align: {{block.align}};"
       data-link="{{block.link}}"
       bindtap="onTapBlock"
+      hover-class="{{block.link ? 'hover-lite' : 'none'}}"
+      hover-stay-time="80"
     >
       <view class="ct-main {{block.sizeClass}} {{block.bold ? 'bold' : ''}}" style="color: {{block.color}};">{{block.text}}</view>
       <view wx:if="{{block.sub}}" class="ct-sub">{{block.sub}}</view>
@@ -136,6 +140,8 @@
       style="margin: 0 {{block.marginRpx}}rpx; color: {{block.color}}; background: {{block.bg}};"
       data-link="{{block.link}}"
       bindtap="onTapBlock"
+      hover-class="{{block.link ? 'hover-lite' : 'none'}}"
+      hover-stay-time="80"
     >
       <text wx:if="{{block.icon}}" class="cn-icon">📢</text>
       <swiper wx:if="{{block.scroll}}" class="cn-scroll" vertical autoplay circular interval="3000">
@@ -154,6 +160,8 @@
         style="width: {{block.colW}}%;"
         data-link="{{it.link}}"
         bindtap="onTapBlock"
+        hover-class="{{it.link ? 'hover-lite' : 'none'}}"
+        hover-stay-time="80"
       >
         <image wx:if="{{it.image}}" class="cn-i" style="width: {{block.iconRpx}}rpx; height: {{block.iconRpx}}rpx;" src="{{it.image}}" mode="aspectFit" />
         <text class="cn-t">{{it.text}}</text>
@@ -171,6 +179,8 @@
           style="width: {{block.cellW}}%; padding: {{block.gapRpx}}rpx;"
           data-link="{{it.link}}"
           bindtap="onTapBlock"
+          hover-class="{{it.link ? 'hover-lite' : 'none'}}"
+          hover-stay-time="80"
         >
           <image class="cc-img" src="{{it.image}}" mode="aspectFill" />
         </view>
@@ -210,13 +220,25 @@
           wx:for="{{block.goods}}"
           wx:key="goodsId"
           wx:for-item="g"
+          wx:for-index="gIndex"
           class="cg-cell"
           style="width: {{block.cellW}}%;"
           data-goods="{{g.goodsId}}"
           bindtap="onTapGoods"
+          hover-class="hover-lite"
+          hover-stay-time="80"
         >
           <view class="cg-card" style="background: {{block.cardBg}};">
-            <image class="cg-img" src="{{g.image}}" mode="aspectFill" />
+            <image
+              wx:if="{{!g.failed}}"
+              class="cg-img"
+              src="{{g.image}}"
+              mode="aspectFill"
+              data-b="{{index}}"
+              data-g="{{gIndex}}"
+              binderror="onGoodsImgError"
+            />
+            <view wx:else class="cg-img cg-img-failed">暂无图片</view>
             <view class="cg-info">
               <view wx:if="{{block.showTitle}}" class="cg-name">{{g.name}}</view>
               <view wx:if="{{block.showPrice}}" class="cg-price">

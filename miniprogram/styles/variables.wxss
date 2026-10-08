@@ -20,6 +20,9 @@ page {
   /* ---------- 背景与描边 ---------- */
   --color-bg: #F5F5F5;
   --color-bg-card: #FFFFFF;
+  --color-bg-muted: #F2F3F5;         /* 图片占位、浅底色块 */
+  --color-bg-hover: #EBEDF0;         /* 点击态底色（按钮 / 步进器） */
+  --color-disabled: #D8D8D8;         /* 禁用态底色 */
   --color-border: #EBEDF0;
 
   /* ---------- 字号 ---------- */

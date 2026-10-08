@@ -1,4 +1,17 @@
 <view class="page">
+  <!-- 加载骨架：原先加载中是一个纯白空屏，看不出「在加载」还是「真的空」 -->
+  <view wx:if="{{loading && !items.length}}" class="list">
+    <view class="cart-item" wx:for="{{[1,2,3]}}" wx:key="*this">
+      <view class="skeleton sk-check"></view>
+      <view class="skeleton sk-thumb"></view>
+      <view class="sk-lines">
+        <view class="skeleton sk-t1"></view>
+        <view class="skeleton sk-t2"></view>
+        <view class="skeleton sk-t3"></view>
+      </view>
+    </view>
+  </view>
+
   <block wx:if="{{items.length}}">
     <view class="list">
       <view class="cart-item" wx:for="{{items}}" wx:key="cartItemId">
@@ -7,22 +20,39 @@
           class="checkbox {{item.selected ? 'is-checked' : ''}}"
           data-id="{{item.cartItemId}}"
           bindtap="onToggleSelect"
+          hover-class="hover"
+          hover-stay-time="80"
         ></view>
 
-        <!-- 商品图 -->
+        <!-- 商品图（加载失败降级为色块 + 名称首字，避免破图） -->
         <image
+          wx:if="{{!item.imgError}}"
           class="item-img"
           src="{{item.image}}"
           mode="aspectFill"
           data-id="{{item.goodsId}}"
+          data-index="{{index}}"
           bindtap="onTapGoods"
+          hover-class="hover"
+          hover-stay-time="80"
+          binderror="onImgError"
         />
+        <view
+          wx:else
+          class="item-img item-img-fallback"
+          data-id="{{item.goodsId}}"
+          bindtap="onTapGoods"
+          hover-class="hover"
+          hover-stay-time="80"
+        >
+          <text>{{item.fallbackText}}</text>
+        </view>
 
         <!-- 信息 -->
         <view class="item-info">
           <view class="item-head">
-            <text class="item-name" data-id="{{item.goodsId}}" bindtap="onTapGoods">{{item.name}}</text>
-            <text class="item-remove" data-id="{{item.cartItemId}}" bindtap="onRemove">删除</text>
+            <text class="item-name" data-id="{{item.goodsId}}" bindtap="onTapGoods" hover-class="hover">{{item.name}}</text>
+            <text class="item-remove" data-id="{{item.cartItemId}}" bindtap="onRemove" hover-class="hover">删除</text>
           </view>
 
           <text class="item-spec">{{item.specText}}</text>
@@ -35,6 +65,8 @@
                 data-id="{{item.cartItemId}}"
                 data-delta="-1"
                 bindtap="onQuantityChange"
+                hover-class="{{item.quantity <= 1 ? 'none' : 'step-hover'}}"
+                hover-stay-time="80"
               >−</view>
               <text class="stepper-num">{{item.quantity}}</text>
               <view
@@ -42,6 +74,8 @@
                 data-id="{{item.cartItemId}}"
                 data-delta="1"
                 bindtap="onQuantityChange"
+                hover-class="{{item.quantity >= item.stock ? 'none' : 'step-hover'}}"
+                hover-stay-time="80"
               >+</view>
             </view>
           </view>
@@ -54,7 +88,7 @@
     <!-- 结算栏 -->
     <view class="footer-bar">
       <view class="checkout-bar">
-        <view class="checkout-all" bindtap="onToggleAll">
+        <view class="checkout-all" bindtap="onToggleAll" hover-class="hover" hover-stay-time="80">
           <view class="checkbox {{allSelected ? 'is-checked' : ''}}"></view>
           <text class="checkout-all-text">全选</text>
         </view>
@@ -64,7 +98,12 @@
           <text class="checkout-price">¥{{totalParts.int}}{{totalParts.dec}}</text>
         </view>
 
-        <view class="checkout-btn {{selectedCount ? '' : 'is-disabled'}}" bindtap="onCheckout">
+        <view
+          class="checkout-btn {{selectedCount ? '' : 'is-disabled'}}"
+          bindtap="onCheckout"
+          hover-class="{{selectedCount ? 'checkout-hover' : 'none'}}"
+          hover-stay-time="80"
+        >
           结算{{selectedCount ? '(' + selectedCount + ')' : ''}}
         </view>
       </view>

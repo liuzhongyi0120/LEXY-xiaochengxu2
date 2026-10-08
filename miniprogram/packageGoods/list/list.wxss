@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   padding: 16rpx 24rpx;
-  background: #ffffff;
+  background: var(--color-bg-card);
 }
 
 .search-box {
@@ -17,7 +17,7 @@
   align-items: center;
   height: 68rpx;
   padding: 0 24rpx;
-  background: #F5F5F5;
+  background: var(--color-bg);
   border-radius: 34rpx;
 }
 
@@ -26,7 +26,7 @@
   width: 28rpx;
   height: 28rpx;
   margin-right: 14rpx;
-  border: 3rpx solid #969799;
+  border: 3rpx solid var(--color-text-secondary);
   border-radius: 50%;
   flex-shrink: 0;
 }
@@ -38,31 +38,31 @@
   bottom: -6rpx;
   width: 14rpx;
   height: 3rpx;
-  background: #969799;
+  background: var(--color-text-secondary);
   transform: rotate(45deg);
 }
 
 .search-input {
   flex: 1;
   font-size: 26rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .search-ph {
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .search-clear {
   width: 40rpx;
   text-align: center;
   font-size: 32rpx;
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
 }
 
 .search-cancel {
   margin-left: 20rpx;
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 /* ---------- 搜索历史 ---------- */
@@ -78,12 +78,12 @@
 
 .history-title {
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .history-clear {
   font-size: 24rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .history-tags {
@@ -99,7 +99,7 @@
   line-height: 56rpx;
   font-size: 24rpx;
   color: #444441;
-  background: #ffffff;
+  background: var(--color-bg-card);
   border-radius: 28rpx;
 }
 
@@ -108,7 +108,7 @@
   padding: 60rpx 0;
   text-align: center;
   font-size: 26rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 /* ---------- 排序栏 ---------- */
@@ -116,7 +116,7 @@
   display: flex;
   align-items: center;
   padding: 20rpx 24rpx;
-  background: #ffffff;
+  background: var(--color-bg-card);
 }
 
 .sort-item {
@@ -124,11 +124,11 @@
   align-items: center;
   margin-right: 44rpx;
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .sort-item.is-active {
-  color: #C8102E;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -140,7 +140,7 @@
 .sort-count {
   margin-left: auto;
   font-size: 22rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 /* ---------- 商品网格 ---------- */
@@ -159,12 +159,7 @@
   margin-right: 20rpx;
 }
 
-/* ---------- 骨架屏 ---------- */
-.skeleton {
-  background: #EDEEF0;
-  border-radius: 8rpx;
-}
-
+/* ---------- 骨架屏（底色/动效走 app.wxss 的 .skeleton，这里只管尺寸） ---------- */
 .sk-img {
   width: 100%;
   height: 340rpx;
@@ -189,5 +184,5 @@
 
 .load-more-text {
   font-size: 24rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }

@@ -3,8 +3,15 @@
   <view wx:else class="empty-shape"></view>
 
   <text class="empty-text">{{text}}</text>
+  <text wx:if="{{desc}}" class="empty-desc">{{desc}}</text>
 
-  <view wx:if="{{buttonText}}" class="empty-btn" hover-class="hover" bindtap="onAction">
+  <view
+    wx:if="{{buttonText}}"
+    class="empty-btn"
+    hover-class="empty-btn-hover"
+    hover-stay-time="80"
+    bindtap="onAction"
+  >
     {{buttonText}}
   </view>
 </view>

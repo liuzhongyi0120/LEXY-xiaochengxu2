@@ -1,14 +1,14 @@
 .page {
   display: flex;
   height: 100vh;
-  background: #ffffff;
+  background: var(--color-bg-card);
 }
 
 /* ---------- 左侧 ---------- */
 .sidebar {
   width: 190rpx;
   height: 100%;
-  background: #F5F5F5;
+  background: var(--color-bg);
 }
 
 .sidebar-scroll {
@@ -24,7 +24,7 @@
 }
 
 .sidebar-item.is-active {
-  background: #ffffff;
+  background: var(--color-bg-card);
 }
 
 .sidebar-bar {
@@ -34,17 +34,17 @@
   width: 6rpx;
   height: 40rpx;
   margin-top: -20rpx;
-  background: #C8102E;
+  background: var(--color-primary);
   border-radius: 0 4rpx 4rpx 0;
 }
 
 .sidebar-text {
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .sidebar-item.is-active .sidebar-text {
-  color: #C8102E;
+  color: var(--color-primary);
   font-weight: 600;
 }
 
@@ -69,12 +69,12 @@
 .content-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .content-more {
   font-size: 24rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .sub-grid {
@@ -101,7 +101,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F6F7F9;
+  background: var(--color-bg-muted);
   border-radius: 16rpx;
 }
 
@@ -113,22 +113,14 @@
 .sub-name {
   margin-top: 14rpx;
   font-size: 24rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .content-tip {
   padding: 20rpx 24rpx 60rpx;
   font-size: 22rpx;
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
   text-align: center;
 }
 
-.content-empty {
-  padding: 160rpx 0;
-  text-align: center;
-}
-
-.content-empty-text {
-  font-size: 26rpx;
-  color: #969799;
-}
+/* 空态统一走 components/empty-state */

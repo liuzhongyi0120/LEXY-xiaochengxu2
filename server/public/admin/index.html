@@ -9,23 +9,26 @@
 <body>
 
 <!-- ============================ 顶栏（对标有赞：退出编辑器 / 正在装修 / 预览 · 存至草稿 · 立即发布） ============================ -->
-<header class="topbar">
+<header class="topbar mode-list" id="topbar">
   <div class="tb-left">
-    <button class="tb-back" id="btnBack" title="返回页面列表">‹ 退出编辑器</button>
+    <span class="tb-brand">LEXY 店铺装修台</span>
+    <button class="tb-back tb-edit-only" id="btnBack" title="返回页面列表">‹ 退出编辑器</button>
   </div>
   <div class="tb-center">
-    <span class="tb-label">正在装修：</span>
-    <span class="tb-page" id="edName">—</span>
-    <span class="tb-tag" id="edPath">—</span>
-    <span class="tb-tag" id="edPageTag">内置页</span>
+    <span class="tb-list-title">店铺页面</span>
+    <span class="tb-label tb-edit-only">正在装修：</span>
+    <span class="tb-page tb-edit-only" id="edName">—</span>
+    <span class="tb-tag tb-edit-only" id="edPath">—</span>
+    <span class="tb-tag tb-edit-only" id="edPageTag">内置页</span>
   </div>
   <div class="tb-right">
-    <span class="tb-dirty" id="edDirty">无未保存改动</span>
-    <button class="tb-btn" id="btnDiff">查看变更</button>
-    <button class="tb-btn" id="btnVersions">版本</button>
-    <button class="tb-btn" id="btnDiscard">丢弃草稿</button>
-    <button class="tb-btn" id="btnSave">存至草稿</button>
-    <button class="tb-btn primary" id="btnPublish">立即发布</button>
+    <span class="tb-dirty tb-edit-only" id="edDirty">无未保存改动</span>
+    <button class="tb-btn tb-edit-only" id="btnKeys" title="键盘快捷键（Ctrl / ⌘ + K）">?</button>
+    <button class="tb-btn tb-edit-only" id="btnDiff">查看变更</button>
+    <button class="tb-btn tb-edit-only" id="btnVersions">版本</button>
+    <button class="tb-btn tb-edit-only" id="btnDiscard">丢弃草稿</button>
+    <button class="tb-btn tb-edit-only" id="btnSave">存至草稿</button>
+    <button class="tb-btn primary tb-edit-only" id="btnPublish">立即发布</button>
   </div>
 </header>
 
@@ -63,7 +66,6 @@
       <button class="btn" id="btnFilter">筛选</button>
       <button class="btn ghost" id="btnResetFilter">重置</button>
     </div>
-    <div class="spacer"></div>
     <button class="btn primary" id="btnCreatePage" title="新建一个自定义页面（发布后小程序端可访问）">+ 新建页面</button>
   </div>
 
@@ -71,15 +73,11 @@
     <table class="grid">
       <thead>
         <tr>
-          <th style="width:230px">页面名称</th>
-          <th style="width:96px">类型</th>
-          <th style="width:120px">归属</th>
-          <th style="width:140px">页面状态</th>
-          <th style="width:110px">内容量</th>
-          <th style="width:150px">最近草稿</th>
-          <th style="width:190px">数据来源</th>
-          <th>备注</th>
-          <th style="width:360px">操作</th>
+          <th>页面名称 · 路径 · 内容量</th>
+          <th style="width:178px">页面状态</th>
+          <th style="width:176px">数据来源</th>
+          <th style="width:176px">备注</th>
+          <th style="width:392px">操作</th>
         </tr>
       </thead>
       <tbody id="pageRows"></tbody>

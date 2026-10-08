@@ -1,5 +1,5 @@
 <view class="page" style="background: {{pageBg}};">
-  <view class="series" wx:for="{{series}}" wx:key="id" wx:for-item="group" wx:for-index="sindex">
+  <view wx:for="{{series}}" wx:key="id" wx:for-item="group" wx:for-index="sindex">
     <!-- 系列头图 + 文案（文案为源页面真实覆盖文字） -->
     <view class="hero">
       <image

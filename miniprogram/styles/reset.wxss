@@ -20,7 +20,7 @@ scroll-view {
 image {
   display: block;
   /* 图片加载失败时不显示破图图标，由容器底色兜底 */
-  background-color: #F2F3F5;
+  background-color: var(--color-bg-muted, #F2F3F5);
 }
 
 /* 去掉 button 默认样式，便于自定义 */

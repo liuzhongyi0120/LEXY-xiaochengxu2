@@ -8,7 +8,7 @@
   <!-- 两个大栏目 -->
   <view class="grid grid-2">
     <view
-      class="cell cell-big"
+      class="cell"
       wx:for="{{news.big}}"
       wx:key="id"
       wx:for-index="index"
@@ -38,7 +38,7 @@
   <!-- 六个小栏目 -->
   <view class="grid grid-3">
     <view
-      class="cell cell-small"
+      class="cell"
       wx:for="{{news.small}}"
       wx:key="id"
       wx:for-index="index"

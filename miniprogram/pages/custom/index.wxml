@@ -1,15 +1,17 @@
 <view class="page" style="background: {{meta.bg || '#F5F6F8'}};">
 
   <!-- 装修数据还没下发：多半是运营建了页面但没点「发布」，或 key 填错了 -->
-  <view wx:if="{{missing}}" class="empty">
-    <text class="empty-t">页面不存在或尚未发布</text>
-    <text class="empty-s">请到装修台「店铺页面」确认该页面已点「立即发布」</text>
-  </view>
+  <empty-state
+    wx:if="{{missing}}"
+    text="页面不存在或尚未发布"
+    desc="请到装修台「店铺页面」确认该页面已点「立即发布」"
+  />
 
-  <view wx:elif="{{!blocks.length}}" class="empty">
-    <text class="empty-t">页面还在装修中</text>
-    <text class="empty-s">这个页面还没有添加任何区块</text>
-  </view>
+  <empty-state
+    wx:elif="{{!blocks.length}}"
+    text="页面还在装修中"
+    desc="这个页面还没有添加任何区块"
+  />
 
   <block wx:for="{{blocks}}" wx:key="index" wx:for-item="block" wx:for-index="index">
 

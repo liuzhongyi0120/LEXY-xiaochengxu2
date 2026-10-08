@@ -10,7 +10,7 @@
   </view>
 
   <!-- ---------- 订单入口 ---------- -->
-  <view class="card order-card">
+  <view class="card">
     <view class="card-head">
       <text class="card-title">我的订单</text>
       <text class="card-more" data-status="ALL" bindtap="onTapOrder">全部订单 ›</text>

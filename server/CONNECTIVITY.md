@@ -1,6 +1,6 @@
 # 后端点位连通性报告
 
-> 生成时间：2026/10/8 11:08:54　｜　目标服务：`http://127.0.0.1:3000`
+> 生成时间：2026/10/8 12:49:20　｜　目标服务：`http://127.0.0.1:3000`
 > 生成方式：`node server/tools/check-all.mjs`（真实 HTTP 请求，非静态扫描）
 
 ## 一、总览
@@ -10,8 +10,8 @@
 | 已注册点位 | 85 |
 | 已实测点位 | 85 |
 | 未覆盖点位 | 0 |
-| 实测请求/断言 | 242 |
-| 通过 | 242 |
+| 实测请求/断言 | 245 |
+| 通过 | 245 |
 | 失败 | 0 |
 | 服务健康检查 | up |
 | 微信能力模式 | 登录 mock / 支付 mock |
@@ -174,94 +174,97 @@
 | 152 | — | `tabBar 每个 pagePath 都在 pages 声明里` | PASS | 0 | ✅ | 断言 |
 | 153 | — | `sitemapLocation 指向的文件存在` | PASS | 0 | ✅ | 断言 |
 | 154 | — | `project.config.json 已填真实 AppID（非占位符）` | PASS | 0 | ✅ | 断言 |
-| 155 | GET | `/api/admin/dashboard` | 200 | 0 | ✅ | ok |
-| 156 | — | `后台 · 数据概览返回今日/累计 KPI、待办、趋势、Top 商品` | PASS | 0 | ✅ | 断言 |
-| 157 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 158 | — | `后台 · 商品列表返回全量商品（含下架）+ 分类 + 预警线` | PASS | 0 | ✅ | 断言 |
-| 159 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
-| 160 | — | `后台 · 商品详情返回编辑态商品 + 分类选项` | PASS | 0 | ✅ | 断言 |
-| 161 | GET | `/api/admin/category/list` | 200 | 0 | ✅ | ok |
-| 162 | — | `后台 · 分类树带每个分类的商品数` | PASS | 0 | ✅ | 断言 |
-| 163 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
-| 164 | — | `后台 · 订单列表返回各状态计数与客户信息` | PASS | 0 | ✅ | 断言 |
-| 165 | GET | `/api/admin/order/detail` | 200 | 0 | ✅ | ok |
-| 166 | — | `后台 · 订单详情返回商品明细、收货地址、金额与物流位` | PASS | 0 | ✅ | 断言 |
-| 167 | GET | `/api/admin/order/export` | 200 | 0 | ✅ | ok |
-| 168 | — | `后台 · 订单导出 CSV（带 BOM，Excel 打开不乱码）` | PASS | 0 | ✅ | 断言 |
-| 169 | POST | `/api/admin/order/ship` | 200 | 0 | ✅ | ok |
-| 170 | — | `后台 · 发货接口对不存在的订单给出失败明细（不会误标为已发货）` | PASS | 0 | ✅ | 断言 |
-| 171 | POST | `/api/admin/order/remark` | 200 | 0 | ✅ | ok |
-| 172 | — | `后台 · 商家备注可写可读，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
-| 173 | POST | `/api/admin/order/close` | 200 | 2000 | ✅ | 预期失败：已支付订单不可关闭 |
-| 174 | — | `后台 · 关闭订单只允许未付款（已支付订单被拦下）` | PASS | 0 | ✅ | 断言 |
-| 175 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
-| 176 | — | `后台 · 客户列表返回消费汇总、分层与标签池` | PASS | 0 | ✅ | 断言 |
-| 177 | GET | `/api/admin/customer/detail` | 200 | 0 | ✅ | ok |
-| 178 | — | `后台 · 客户详情返回消费统计、订单、地址、券与资产` | PASS | 0 | ✅ | 断言 |
-| 179 | GET | `/api/admin/comment/list` | 200 | 0 | ✅ | ok |
-| 180 | — | `后台 · 评价列表带商品名与商家回复字段` | PASS | 0 | ✅ | 断言 |
-| 181 | GET | `/api/admin/coupon/list` | 200 | 0 | ✅ | ok |
-| 182 | — | `后台 · 优惠券模板列表带领取/核销统计` | PASS | 0 | ✅ | 断言 |
-| 183 | GET | `/api/admin/coupon/detail` | 200 | 0 | ✅ | ok |
-| 184 | — | `后台 · 单个优惠券模板详情可读` | PASS | 0 | ✅ | 断言 |
-| 185 | GET | `/api/admin/coupon/detail` | 404 | 404 | ✅ | 预期失败：优惠券不存在 |
-| 186 | — | `后台 · 读取不存在的优惠券模板返回 404` | PASS | 0 | ✅ | 断言 |
-| 187 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 188 | — | `后台 · 店铺设置返回当前值与默认值` | PASS | 0 | ✅ | 断言 |
-| 189 | POST | `/api/admin/category/save` | 200 | 0 | ✅ | ok |
-| 190 | — | `后台 · 新建一级分类成功` | PASS | 0 | ✅ | 断言 |
-| 191 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
-| 192 | — | `后台 · 新建商品成功（含 2 个 SKU）` | PASS | 0 | ✅ | 断言 |
-| 193 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 194 | — | `后台 · 新建商品可按关键词搜回，SKU 数为 2` | PASS | 0 | ✅ | 断言 |
-| 195 | POST | `/api/admin/goods/stock` | 200 | 0 | ✅ | ok |
-| 196 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
-| 197 | — | `后台 · 改库存后小程序端读取同一值（库存真源唯一，无二次真源）` | PASS | 0 | ✅ | 断言 |
-| 198 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
-| 199 | GET | `/api/goods/list` | 200 | 0 | ✅ | ok |
-| 200 | — | `后台 · 下架后小程序端列表立即不再返回该商品` | PASS | 0 | ✅ | 断言 |
+| 155 | — | `小程序 wxml 的 class 引用都在正确作用域内有定义（组件不吃 app.wxss 的 class）` | PASS | 0 | ✅ | 断言 |
+| 156 | — | `小程序 hover-class 全部有对应样式（否则是「点了没反应」的哑点击态）` | PASS | 0 | ✅ | 断言 |
+| 157 | — | `小程序 var(--token) 引用的令牌全部有定义（漏定义＝该处颜色静默失效）` | PASS | 0 | ✅ | 断言 |
+| 158 | GET | `/api/admin/dashboard` | 200 | 0 | ✅ | ok |
+| 159 | — | `后台 · 数据概览返回今日/累计 KPI、待办、趋势、Top 商品` | PASS | 0 | ✅ | 断言 |
+| 160 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 161 | — | `后台 · 商品列表返回全量商品（含下架）+ 分类 + 预警线` | PASS | 0 | ✅ | 断言 |
+| 162 | GET | `/api/admin/goods/detail` | 200 | 0 | ✅ | ok |
+| 163 | — | `后台 · 商品详情返回编辑态商品 + 分类选项` | PASS | 0 | ✅ | 断言 |
+| 164 | GET | `/api/admin/category/list` | 200 | 0 | ✅ | ok |
+| 165 | — | `后台 · 分类树带每个分类的商品数` | PASS | 0 | ✅ | 断言 |
+| 166 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
+| 167 | — | `后台 · 订单列表返回各状态计数与客户信息` | PASS | 0 | ✅ | 断言 |
+| 168 | GET | `/api/admin/order/detail` | 200 | 0 | ✅ | ok |
+| 169 | — | `后台 · 订单详情返回商品明细、收货地址、金额与物流位` | PASS | 0 | ✅ | 断言 |
+| 170 | GET | `/api/admin/order/export` | 200 | 0 | ✅ | ok |
+| 171 | — | `后台 · 订单导出 CSV（带 BOM，Excel 打开不乱码）` | PASS | 0 | ✅ | 断言 |
+| 172 | POST | `/api/admin/order/ship` | 200 | 0 | ✅ | ok |
+| 173 | — | `后台 · 发货接口对不存在的订单给出失败明细（不会误标为已发货）` | PASS | 0 | ✅ | 断言 |
+| 174 | POST | `/api/admin/order/remark` | 200 | 0 | ✅ | ok |
+| 175 | — | `后台 · 商家备注可写可读，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
+| 176 | POST | `/api/admin/order/close` | 200 | 2000 | ✅ | 预期失败：已支付订单不可关闭 |
+| 177 | — | `后台 · 关闭订单只允许未付款（已支付订单被拦下）` | PASS | 0 | ✅ | 断言 |
+| 178 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
+| 179 | — | `后台 · 客户列表返回消费汇总、分层与标签池` | PASS | 0 | ✅ | 断言 |
+| 180 | GET | `/api/admin/customer/detail` | 200 | 0 | ✅ | ok |
+| 181 | — | `后台 · 客户详情返回消费统计、订单、地址、券与资产` | PASS | 0 | ✅ | 断言 |
+| 182 | GET | `/api/admin/comment/list` | 200 | 0 | ✅ | ok |
+| 183 | — | `后台 · 评价列表带商品名与商家回复字段` | PASS | 0 | ✅ | 断言 |
+| 184 | GET | `/api/admin/coupon/list` | 200 | 0 | ✅ | ok |
+| 185 | — | `后台 · 优惠券模板列表带领取/核销统计` | PASS | 0 | ✅ | 断言 |
+| 186 | GET | `/api/admin/coupon/detail` | 200 | 0 | ✅ | ok |
+| 187 | — | `后台 · 单个优惠券模板详情可读` | PASS | 0 | ✅ | 断言 |
+| 188 | GET | `/api/admin/coupon/detail` | 404 | 404 | ✅ | 预期失败：优惠券不存在 |
+| 189 | — | `后台 · 读取不存在的优惠券模板返回 404` | PASS | 0 | ✅ | 断言 |
+| 190 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 191 | — | `后台 · 店铺设置返回当前值与默认值` | PASS | 0 | ✅ | 断言 |
+| 192 | POST | `/api/admin/category/save` | 200 | 0 | ✅ | ok |
+| 193 | — | `后台 · 新建一级分类成功` | PASS | 0 | ✅ | 断言 |
+| 194 | POST | `/api/admin/goods/save` | 200 | 0 | ✅ | ok |
+| 195 | — | `后台 · 新建商品成功（含 2 个 SKU）` | PASS | 0 | ✅ | 断言 |
+| 196 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 197 | — | `后台 · 新建商品可按关键词搜回，SKU 数为 2` | PASS | 0 | ✅ | 断言 |
+| 198 | POST | `/api/admin/goods/stock` | 200 | 0 | ✅ | ok |
+| 199 | GET | `/api/goods/detail` | 200 | 0 | ✅ | ok |
+| 200 | — | `后台 · 改库存后小程序端读取同一值（库存真源唯一，无二次真源）` | PASS | 0 | ✅ | 断言 |
 | 201 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
-| 202 | — | `后台 · 重新上架成功` | PASS | 0 | ✅ | 断言 |
-| 203 | POST | `/api/admin/coupon/save` | 200 | 0 | ✅ | ok |
-| 204 | — | `后台 · 新建优惠券模板成功` | PASS | 0 | ✅ | 断言 |
-| 205 | POST | `/api/admin/coupon/status` | 200 | 0 | ✅ | ok |
-| 206 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：券已停止发放 |
-| 207 | — | `后台 · 暂停券后小程序端不可再领取（状态穿透到 C 端）` | PASS | 0 | ✅ | 断言 |
-| 208 | POST | `/api/admin/coupon/delete` | 200 | 0 | ✅ | ok |
-| 209 | — | `后台 · 删除未被领取的券模板成功（已领取则拒绝）` | PASS | 0 | ✅ | 断言 |
-| 210 | POST | `/api/admin/goods/delete` | 200 | 0 | ✅ | ok |
-| 211 | — | `后台 · 删除自检商品成功` | PASS | 0 | ✅ | 断言 |
-| 212 | POST | `/api/admin/category/delete` | 200 | 0 | ✅ | ok |
-| 213 | — | `后台 · 删除自检分类成功（分类下有商品时会被拒绝）` | PASS | 0 | ✅ | 断言 |
-| 214 | POST | `/api/admin/goods/delete` | 404 | 404 | ✅ | 预期失败：商品不存在 |
-| 215 | — | `后台 · 删除不存在的商品返回 404` | PASS | 0 | ✅ | 断言 |
-| 216 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
-| 217 | — | `后台 · 自建自删后商品库数量回到初始（自检零残留）` | PASS | 0 | ✅ | 断言 |
-| 218 | POST | `/api/admin/settings/save` | 200 | 0 | ✅ | ok |
-| 219 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 220 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
-| 221 | — | `后台 · 店铺设置可写可读，且自检结束时已还原原值` | PASS | 0 | ✅ | 断言 |
-| 222 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
-| 223 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
-| 224 | — | `后台 · 客户打标签可用，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
-| 225 | POST | `/api/admin/comment/reply` | 200 | 0 | ✅ | ok |
-| 226 | — | `后台 · 回复评价可用（仅挑无回复的评价，测完立即清空）` | PASS | 0 | ✅ | 断言 |
-| 227 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
-| 228 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
-| 229 | — | `后台 · 自检全程未改变真实用户数据规模（订单数 / 客户数一致）` | PASS | 0 | ✅ | 断言 |
-| 230 | — | `后台页面内的静态引用在「无尾斜杠 URL」下全部可达（防相对路径 404 白屏）` | PASS | 0 | ✅ | 断言 |
-| 231 | — | `后台页面路由可访问且返回 HTML（/console · /admin · /debug）` | PASS | 0 | ✅ | 断言 |
-| 232 | — | `后台控制台与装修台必需文件齐全` | PASS | 0 | ✅ | 断言 |
-| 233 | — | `库存净影响归零：自检消耗的 SKU 库存已补回（可重复运行）` | PASS | 0 | ✅ | 断言 |
-| 234 | — | `联调示例里每个 key 都命中已注册点位（无写错路径的静默失效）` | PASS | 0 | ✅ | 断言 |
-| 235 | — | `每个点位都带联调示例（调试台可一键填参）` | PASS | 0 | ✅ | 断言 |
-| 236 | — | `前端 services 引用的点位后端均已实现（无断链）` | PASS | 0 | ✅ | 断言 |
-| 237 | — | `安全开关 · DEBUG_PAGE 判定矩阵全部符合预期（含 off / 拼错值 / 大小写）` | PASS | 0 | ✅ | 断言 |
-| 238 | — | `安全开关 · 识别「未知取值」以便启动时告警（避免静默按关闭处理）` | PASS | 0 | ✅ | 断言 |
-| 239 | — | `安全开关 · 管理接口（admin/decorate/media）与页面同受一个开关约束` | PASS | 0 | ✅ | 断言 |
-| 240 | — | `安全开关 · 生产环境缺 JWT_SECRET 时拒绝启动（不靠人看日志）` | PASS | 0 | ✅ | 断言 |
-| 241 | — | `持久化兜底 · 三处存储层都有「解析成功后再验是否为对象」的守卫` | PASS | 0 | ✅ | 断言 |
-| 242 | — | `持久化兜底 · isPlainObject 对 null / 数组 / 数字 均判为「非对象」` | PASS | 0 | ✅ | 断言 |
+| 202 | GET | `/api/goods/list` | 200 | 0 | ✅ | ok |
+| 203 | — | `后台 · 下架后小程序端列表立即不再返回该商品` | PASS | 0 | ✅ | 断言 |
+| 204 | POST | `/api/admin/goods/status` | 200 | 0 | ✅ | ok |
+| 205 | — | `后台 · 重新上架成功` | PASS | 0 | ✅ | 断言 |
+| 206 | POST | `/api/admin/coupon/save` | 200 | 0 | ✅ | ok |
+| 207 | — | `后台 · 新建优惠券模板成功` | PASS | 0 | ✅ | 断言 |
+| 208 | POST | `/api/admin/coupon/status` | 200 | 0 | ✅ | ok |
+| 209 | POST | `/api/coupon/receive` | 200 | 2000 | ✅ | 预期失败：券已停止发放 |
+| 210 | — | `后台 · 暂停券后小程序端不可再领取（状态穿透到 C 端）` | PASS | 0 | ✅ | 断言 |
+| 211 | POST | `/api/admin/coupon/delete` | 200 | 0 | ✅ | ok |
+| 212 | — | `后台 · 删除未被领取的券模板成功（已领取则拒绝）` | PASS | 0 | ✅ | 断言 |
+| 213 | POST | `/api/admin/goods/delete` | 200 | 0 | ✅ | ok |
+| 214 | — | `后台 · 删除自检商品成功` | PASS | 0 | ✅ | 断言 |
+| 215 | POST | `/api/admin/category/delete` | 200 | 0 | ✅ | ok |
+| 216 | — | `后台 · 删除自检分类成功（分类下有商品时会被拒绝）` | PASS | 0 | ✅ | 断言 |
+| 217 | POST | `/api/admin/goods/delete` | 404 | 404 | ✅ | 预期失败：商品不存在 |
+| 218 | — | `后台 · 删除不存在的商品返回 404` | PASS | 0 | ✅ | 断言 |
+| 219 | GET | `/api/admin/goods/list` | 200 | 0 | ✅ | ok |
+| 220 | — | `后台 · 自建自删后商品库数量回到初始（自检零残留）` | PASS | 0 | ✅ | 断言 |
+| 221 | POST | `/api/admin/settings/save` | 200 | 0 | ✅ | ok |
+| 222 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 223 | GET | `/api/admin/settings` | 200 | 0 | ✅ | ok |
+| 224 | — | `后台 · 店铺设置可写可读，且自检结束时已还原原值` | PASS | 0 | ✅ | 断言 |
+| 225 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
+| 226 | POST | `/api/admin/customer/tag` | 200 | 0 | ✅ | ok |
+| 227 | — | `后台 · 客户打标签可用，且自检结束时已还原` | PASS | 0 | ✅ | 断言 |
+| 228 | POST | `/api/admin/comment/reply` | 200 | 0 | ✅ | ok |
+| 229 | — | `后台 · 回复评价可用（仅挑无回复的评价，测完立即清空）` | PASS | 0 | ✅ | 断言 |
+| 230 | GET | `/api/admin/order/list` | 200 | 0 | ✅ | ok |
+| 231 | GET | `/api/admin/customer/list` | 200 | 0 | ✅ | ok |
+| 232 | — | `后台 · 自检全程未改变真实用户数据规模（订单数 / 客户数一致）` | PASS | 0 | ✅ | 断言 |
+| 233 | — | `后台页面内的静态引用在「无尾斜杠 URL」下全部可达（防相对路径 404 白屏）` | PASS | 0 | ✅ | 断言 |
+| 234 | — | `后台页面路由可访问且返回 HTML（/console · /admin · /debug）` | PASS | 0 | ✅ | 断言 |
+| 235 | — | `后台控制台与装修台必需文件齐全` | PASS | 0 | ✅ | 断言 |
+| 236 | — | `库存净影响归零：自检消耗的 SKU 库存已补回（可重复运行）` | PASS | 0 | ✅ | 断言 |
+| 237 | — | `联调示例里每个 key 都命中已注册点位（无写错路径的静默失效）` | PASS | 0 | ✅ | 断言 |
+| 238 | — | `每个点位都带联调示例（调试台可一键填参）` | PASS | 0 | ✅ | 断言 |
+| 239 | — | `前端 services 引用的点位后端均已实现（无断链）` | PASS | 0 | ✅ | 断言 |
+| 240 | — | `安全开关 · DEBUG_PAGE 判定矩阵全部符合预期（含 off / 拼错值 / 大小写）` | PASS | 0 | ✅ | 断言 |
+| 241 | — | `安全开关 · 识别「未知取值」以便启动时告警（避免静默按关闭处理）` | PASS | 0 | ✅ | 断言 |
+| 242 | — | `安全开关 · 管理接口（admin/decorate/media）与页面同受一个开关约束` | PASS | 0 | ✅ | 断言 |
+| 243 | — | `安全开关 · 生产环境缺 JWT_SECRET 时拒绝启动（不靠人看日志）` | PASS | 0 | ✅ | 断言 |
+| 244 | — | `持久化兜底 · 三处存储层都有「解析成功后再验是否为对象」的守卫` | PASS | 0 | ✅ | 断言 |
+| 245 | — | `持久化兜底 · isPlainObject 对 null / 数组 / 数字 均判为「非对象」` | PASS | 0 | ✅ | 断言 |
 
 ## 三、覆盖结论
 

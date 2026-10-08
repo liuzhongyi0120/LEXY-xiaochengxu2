@@ -55,7 +55,55 @@
     var box = $('toast');
     var t = el('div', 't' + (type ? ' ' + type : ''), esc(msg));
     box.appendChild(t);
-    setTimeout(function () { t.remove(); }, 2200);
+    // 错误信息（尤其是服务端的校验提示）需要阅读时间，2.2 秒根本来不及看
+    setTimeout(function () { t.remove(); }, type === 'err' ? 4600 : 2200);
+  }
+
+  /**
+   * 服务端的校验信息形如「第 12 个标题文本没有内容」。
+   * 只把这句话弹出来，用户还得自己在几十个区块里数到第 12 个；
+   * 这里直接解析序号、选中对应区块并滚动过去，报错即定位。
+   */
+  function locateFromMessage(msg) {
+    var m = /第\s*(\d+)\s*个/.exec(String(msg || ''));
+    if (!m) return false;
+    var idx = Number(m[1]) - 1;
+    var list = (S.cur && S.cur.data && S.cur.data.blocks) || [];
+    if (idx < 0 || idx >= list.length) return false;
+    select('blocks.' + idx);
+    scrollToSel();
+    return true;
+  }
+
+  /**
+   * 按钮防重复点击。
+   * 发布 / 保存是「点了就写文件」的动作，之前没有任何禁用态，
+   * 手快连点两下就会发两次 publish，版本库里多出一条重复版本、replica.js 被重写两遍。
+   * 用法：withBusy(btn, function () { return 请求 Promise })
+   */
+  function withBusy(btn, fn) {
+    if (!btn) return fn();
+    if (btn.disabled) return;
+    var old = btn.textContent;
+    btn.disabled = true;
+    btn.classList.add('busy');
+    btn.textContent = old + '…';
+    var done = function () {
+      btn.classList.remove('busy');
+      btn.textContent = old;
+      // 不能在结束时无条件 disabled = false：
+      // renderDirty() 会把 btnSave 按「有没有未保存改动」重设，
+      // 无条件启用会把刚设好的禁用态覆盖掉（保存成功后按钮又亮起来）。
+      // 这里交给 renderDirty 统一裁决，并对其它按钮回落到原态。
+      if (btn.id === 'btnSave') renderDirty();
+      else btn.disabled = false;
+    };
+    var r;
+    try { r = fn(); } catch (e) { done(); throw e; }
+    return Promise.resolve(r).then(
+      function (v) { done(); return v; },
+      function (e) { done(); throw e; }
+    );
   }
 
   /* ----------------------------- 状态 ----------------------------- */
@@ -104,15 +152,31 @@
   }
 
   /* ----------------------------- 视图切换 ----------------------------- */
+  /**
+   * 顶栏有两种形态（靠 .mode-list 切换，样式在 admin.css）：
+   *   list —— 只看得到「LEXY 店铺装修台 / 店铺页面」，
+   *           隐藏「正在装修：—」「内置页」与编辑专属按钮（查看变更 / 版本 / 丢弃草稿 / 存至草稿 / 立即发布）。
+   *           之前不区分视图，列表页顶栏会显示「正在装修：—」并挂着一排编辑按钮，语义错乱且容易误点发布。
+   *   edit —— 完整编辑器工具栏。
+   */
+  function setTopbar(mode) {
+    var tb = $('topbar');
+    if (!tb) return;
+    if (mode === 'edit') tb.classList.remove('mode-list');
+    else tb.classList.add('mode-list');
+  }
+
   function showList() {
     $('viewList').hidden = false;
     $('viewEdit').hidden = true;
     S.cur = null;
+    setTopbar('list');
     loadPages();
   }
   function showEdit() {
     $('viewList').hidden = true;
     $('viewEdit').hidden = false;
+    setTopbar('edit');
   }
 
   /* =========================================================================
@@ -172,39 +236,65 @@
     });
   }
 
+  /**
+   * 数据来源压缩显示。
+   * 后端给的是完整表达式，例如
+   *   replica.HOME_BLOCKS + replica.SHOP + replica.PAGE_META
+   * 直接放进 158px 的列里会被省略号截成「replica.HOME_BLOCK…」，反而看不出是哪个字段。
+   * 这里压成「HOME_BLOCKS 等 3 项」，完整值放在 title 里。
+   */
+  function shortSource(src) {
+    var parts = String(src || '').split('+').map(function (s) {
+      return s.trim().replace(/^replica\./, '');
+    }).filter(Boolean);
+    if (!parts.length) return '—';
+    if (parts.length === 1) return parts[0];
+    return parts[0] + ' +' + (parts.length - 1);
+  }
+
   function renderList() {
     var rows = $('pageRows');
     var list = filtered();
     rows.innerHTML = '';
     if (!list.length) {
-      rows.innerHTML = '<tr><td colspan="9" style="text-align:center;color:#8a919e;padding:28px">没有匹配的页面</td></tr>';
+      rows.innerHTML = '<tr><td colspan="5" class="td-empty">没有匹配的页面' +
+        (S.pages.length ? '，试试「重置」筛选条件' : '，点右上角「+ 新建页面」创建第一个自定义页') + '</td></tr>';
     }
     list.forEach(function (p) {
       var tr = el('tr');
-      var statusHtml = '<span class="tag ok">已发布</span>' +
-        (p.hasDraft ? ' <span class="tag warn">有草稿</span>' : '');
       // 内置页对应小程序里固定页面（不可删）；自定义页由「+ 新建页面」创建，可改名 / 删除
       var typeHtml = p.custom
         ? '<span class="type-tag custom">自定义页</span>'
         : '<span class="type-tag builtin">内置页</span>';
+      // 9 列压成 5 列：类型 / 归属 / 内容量并进名称单元格，
+      // 草稿时间并进状态单元格 —— 否则 1440 宽度下「操作」的 6 个按钮会换行（实测需求 354px / 实际 302px）
+      var subParts = [p.path, p.belongs, p.blockCount + ' 项', p.fields + ' 字段'];
       tr.innerHTML =
-        '<td><div class="pname" data-open="' + attr(p.key) + '">' + esc(p.name) + '</div>' +
-          '<div class="psub">' + esc(p.path) + '</div></td>' +
-        '<td>' + typeHtml + '</td>' +
-        '<td>' + esc(p.belongs) + '</td>' +
-        '<td>' + statusHtml + '</td>' +
-        '<td>' + p.blockCount + ' <span style="color:#8a919e">项</span> · ' + p.fields + ' <span style="color:#8a919e">字段</span></td>' +
-        '<td>' + (p.hasDraft ? '<span class="tag warn">' + esc(p.draftAtText) + '</span>' : '<span style="color:#8a919e">—</span>') + '</td>' +
-        '<td><code style="font-size:11px">' + esc(p.source) + '</code></td>' +
-        '<td>' + (p.note ? esc(p.note) : '<span style="color:#8a919e">—</span>') + '</td>' +
+        '<td>' +
+          '<div class="pname-row">' +
+            '<span class="pname" data-open="' + attr(p.key) + '">' + esc(p.name) + '</span>' + typeHtml +
+          '</div>' +
+          '<div class="psub" title="' + attr(subParts.join(' · ')) + '">' +
+            esc(subParts.join(' · ')) + '</div>' +
+        '</td>' +
+        '<td>' +
+          '<span class="tag ok">已发布</span>' +
+          (p.hasDraft ? '<div class="psub warn" title="草稿时间">草稿 ' + esc(p.draftAtText) + '</div>' : '') +
+        '</td>' +
+        '<td class="src-cell"><span class="src" title="' + attr(p.source) + '">' +
+          esc(shortSource(p.source)) + '</span></td>' +
+        '<td class="note-cell">' +
+          (p.note ? '<span title="' + attr(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dim">—</span>') +
+        '</td>' +
         '<td><div class="ops">' +
-          '<button class="btn sm" data-open="' + attr(p.key) + '">装修</button>' +
-          '<button class="btn sm" data-diff="' + attr(p.key) + '">查看变更</button>' +
-          '<button class="btn sm" data-vers="' + attr(p.key) + '">版本</button>' +
-          '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') + '>丢弃草稿</button>' +
+          '<button class="btn sm" data-open="' + attr(p.key) + '" title="进入可视化编辑器">装修</button>' +
+          '<button class="btn sm" data-diff="' + attr(p.key) + '" title="查看草稿与已发布内容的差异">查看变更</button>' +
+          '<button class="btn sm" data-vers="' + attr(p.key) + '" title="历史版本与回滚">版本</button>' +
+          '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +
+            ' title="' + (p.hasDraft ? '恢复到已发布内容' : '当前没有草稿') + '">丢弃草稿</button>' +
           (p.custom
-            ? '<button class="btn sm" data-rename="' + attr(p.key) + '">改名</button>' +
-              '<button class="btn sm danger" data-del="' + attr(p.key) + '">删除</button>'
+            ? '<button class="btn sm" data-rename="' + attr(p.key) + '" title="改名称 / 标识 / 备注">改名</button>' +
+              '<button class="btn sm danger" data-del="' + attr(p.key) + '" title="删除该自定义页（不可撤销）">删除</button>'
             : '') +
         '</div></td>';
       rows.appendChild(tr);
@@ -1927,7 +2017,10 @@
         toast('草稿已保存 ' + d.atText, 'ok');
         return d;
       })
-      .catch(function (e) { toast('保存失败：' + e.message, 'err'); });
+      .catch(function (e) {
+        toast('保存失败：' + e.message, 'err');
+        locateFromMessage(e.message);
+      });
   }
 
   function publish() {
@@ -1947,7 +2040,10 @@
           S.dirty = false;
           renderDirty();
         })
-        .catch(function (e) { toast('发布失败：' + e.message, 'err'); });
+        .catch(function (e) {
+          toast('发布失败：' + e.message, 'err');
+          locateFromMessage(e.message);
+        });
     };
 
     if (S.dirty) {
@@ -2209,7 +2305,25 @@
 
   /* ----------------------------- 事件绑定 ----------------------------- */
 
-  $('btnReload').onclick = function () { loadPages().then(function () { toast('已刷新'); }); };
+  /** 键盘快捷键说明（顶栏「?」或 Ctrl / ⌘ + K 打开） */
+  function keysDialog() {
+    var rows = [
+      ['Ctrl / ⌘ + S', '保存草稿'],
+      ['Ctrl / ⌘ + Enter', '立即发布（写回 replica.js）'],
+      ['Ctrl / ⌘ + K', '打开这个快捷键说明'],
+      ['Esc', '关闭弹层 / 退出图片大图预览'],
+      ['点击手机预览里的区块', '直接在预览中选中该组件'],
+      ['拖拽「页面布局」里的手柄', '调整区块顺序']
+    ];
+    var html = '<table class="keys-tb"><tbody>' + rows.map(function (r) {
+      return '<tr><td><kbd>' + esc(r[0]) + '</kbd></td><td>' + esc(r[1]) + '</td></tr>';
+    }).join('') + '</tbody></table>' +
+      '<div class="hint" style="margin-top:10px">Mac 上 ⌘ 与 Ctrl 等价；快捷键在输入框内不生效，可以放心打字。</div>';
+    modal('键盘快捷键', html, [btnClose()]);
+  }
+
+  $('btnKeys').onclick = keysDialog;
+  $('btnReload').onclick = function () { withBusy($('btnReload'), function () { return loadPages(); }).then(function () { toast('已刷新'); }); };
   $('btnFilter').onclick = function () {
     S.filters.name = $('fName').value;
     S.filters.status = $('fStatus').value;
@@ -2239,8 +2353,8 @@
     if (S.dirty && !confirm('有未保存的改动，确定退出编辑器？')) return;
     showList();
   };
-  $('btnSave').onclick = saveDraft;
-  $('btnPublish').onclick = publish;
+  $('btnSave').onclick = function () { withBusy($('btnSave'), saveDraft); };
+  $('btnPublish').onclick = function () { withBusy($('btnPublish'), publish); };
   $('btnDiff').onclick = function () { showDiff(); };
   $('btnVersions').onclick = function () { showVersions(); };
   $('btnDiscard').onclick = function () { discardDraft(); };
@@ -2255,17 +2369,31 @@
   $('imgPreview').onclick = function () { $('imgPreview').hidden = true; };
 
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { $('imgPreview').hidden = true; closeModal(); }
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+    // Esc：关掉最上层的弹层与图片大图（任何时候都生效）
+    if (e.key === 'Escape') { $('imgPreview').hidden = true; closeModal(); return; }
+    // 其余快捷键都要求 Ctrl / ⌘，且在输入框里打字时不劫持
+    if (!(e.ctrlKey || e.metaKey)) return;
+    var k = String(e.key || '').toLowerCase();
+    if (k === 's') {
       e.preventDefault();
-      if (S.cur && S.dirty) saveDraft();
+      if (!S.cur) return;
+      if (!S.dirty) { toast('没有需要保存的改动'); return; }
+      withBusy($('btnSave'), saveDraft);
+      return;
     }
+    if (k === 'enter') {
+      e.preventDefault();
+      if (S.cur) withBusy($('btnPublish'), publish);
+      return;
+    }
+    if (k === 'k') { e.preventDefault(); keysDialog(); }
   });
   window.addEventListener('beforeunload', function (e) {
     if (S.dirty) { e.preventDefault(); e.returnValue = ''; }
   });
 
   /* ----------------------------- 启动 ----------------------------- */
+  setTopbar('list');
   loadPages();
 
   window.__admin = {

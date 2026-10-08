@@ -10,18 +10,30 @@
 .cart-item {
   display: flex;
   align-items: center;
-  padding: 24rpx;
+  padding: var(--space-base);
   margin-bottom: 20rpx;
-  background: #ffffff;
-  border-radius: 16rpx;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-base);
 }
 
 .item-img {
   width: 160rpx;
   height: 160rpx;
   border-radius: 12rpx;
-  background: #F2F3F5;
+  background: var(--color-bg-muted);
   flex-shrink: 0;
+}
+
+/* 图片加载失败时的降级色块 */
+.item-img-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-sm);
+  color: var(--color-text-placeholder);
+  text-align: center;
+  padding: 8rpx;
+  box-sizing: border-box;
 }
 
 .item-info {
@@ -41,23 +53,23 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   overflow: hidden;
-  font-size: 28rpx;
+  font-size: var(--font-base);
   line-height: 38rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .item-remove {
-  margin-left: 16rpx;
-  font-size: 24rpx;
-  color: #969799;
+  margin-left: var(--space-sm);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
   flex-shrink: 0;
 }
 
 .item-spec {
   display: block;
   margin-top: 10rpx;
-  font-size: 22rpx;
-  color: #969799;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
 }
 
 .item-bottom {
@@ -68,9 +80,9 @@
 }
 
 .item-price {
-  font-size: 32rpx;
+  font-size: var(--font-lg);
   font-weight: 600;
-  color: #C8102E;
+  color: var(--color-price);
 }
 
 /* ---------- 数量步进器 ---------- */
@@ -85,20 +97,25 @@
   line-height: 48rpx;
   text-align: center;
   font-size: 30rpx;
-  color: #323233;
-  background: #F5F5F5;
-  border-radius: 8rpx;
+  color: var(--color-text);
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
 }
 
 .stepper-btn.is-disabled {
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
+}
+
+/* 步进器点击态：只在可点时生效（模板里已按 quantity/stock 切换 hover-class） */
+.step-hover {
+  background: var(--color-bg-hover);
 }
 
 .stepper-num {
   min-width: 64rpx;
   text-align: center;
-  font-size: 28rpx;
-  color: #323233;
+  font-size: var(--font-base);
+  color: var(--color-text);
 }
 
 /* ---------- 复选框 ---------- */
@@ -107,14 +124,14 @@
   width: 40rpx;
   height: 40rpx;
   margin-right: 20rpx;
-  border: 2rpx solid #C8C9CC;
+  border: 2rpx solid var(--color-text-placeholder);
   border-radius: 50%;
   flex-shrink: 0;
 }
 
 .checkbox.is-checked {
-  background: #C8102E;
-  border-color: #C8102E;
+  background: var(--color-primary);
+  border-color: var(--color-primary);
 }
 
 .checkbox.is-checked::after {
@@ -124,8 +141,8 @@
   top: 7rpx;
   width: 10rpx;
   height: 18rpx;
-  border-right: 3rpx solid #ffffff;
-  border-bottom: 3rpx solid #ffffff;
+  border-right: 3rpx solid var(--color-text-inverse);
+  border-bottom: 3rpx solid var(--color-text-inverse);
   transform: rotate(45deg);
 }
 
@@ -147,7 +164,7 @@
 
 .checkout-all-text {
   font-size: 26rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .checkout-total {
@@ -160,14 +177,14 @@
 
 .checkout-label {
   font-size: 26rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .checkout-price {
   margin-left: 8rpx;
-  font-size: 36rpx;
+  font-size: var(--font-xl);
   font-weight: 600;
-  color: #C8102E;
+  color: var(--color-price);
 }
 
 .checkout-btn {
@@ -175,11 +192,56 @@
   height: 80rpx;
   line-height: 80rpx;
   font-size: 30rpx;
-  color: #ffffff;
-  background: #C8102E;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
   border-radius: 40rpx;
 }
 
 .checkout-btn.is-disabled {
-  background: #D8D8D8;
+  background: var(--color-disabled);
+}
+
+/* 结算按钮点击态：只在有勾选时生效 */
+.checkout-hover {
+  opacity: 0.88;
+}
+
+/* ---------- 加载骨架（底色/动效走 app.wxss 的 .skeleton） ---------- */
+.sk-check {
+  width: 40rpx;
+  height: 40rpx;
+  margin-right: 20rpx;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.sk-thumb {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  flex-shrink: 0;
+}
+
+.sk-lines {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.sk-t1 {
+  height: 30rpx;
+  width: 80%;
+  margin-top: 8rpx;
+}
+
+.sk-t2 {
+  height: 22rpx;
+  width: 48%;
+  margin-top: 18rpx;
+}
+
+.sk-t3 {
+  height: 36rpx;
+  width: 34%;
+  margin-top: 26rpx;
 }

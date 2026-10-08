@@ -1,5 +1,5 @@
 .page {
-  background: #ffffff;
+  background: var(--color-bg-card);
   min-height: 100vh;
   padding-bottom: 32rpx;
 }
@@ -38,7 +38,7 @@
 .hero-title {
   margin-left: 24rpx;
   font-size: 36rpx;
-  color: #ffffff;
+  color: var(--color-text-inverse);
   letter-spacing: 2rpx;
   text-shadow: 0 2rpx 12rpx rgba(0, 0, 0, 0.25);
 }
@@ -47,7 +47,7 @@
   margin-left: 24rpx;
   margin-top: 14rpx;
   font-size: 25rpx;
-  color: #ffffff;
+  color: var(--color-text-inverse);
   letter-spacing: 1rpx;
   text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.25);
 }
@@ -56,7 +56,7 @@
   margin-left: 284rpx;
   margin-top: 18rpx;
   font-size: 28rpx;
-  color: #ffffff;
+  color: var(--color-text-inverse);
   letter-spacing: 2rpx;
   text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.3);
 }
@@ -76,7 +76,7 @@
 .card {
   width: 300rpx;
   margin-left: 10rpx;
-  background: #ffffff;
+  background: var(--color-bg-card);
   border-radius: 8rpx;
   overflow: hidden;
 }
@@ -92,11 +92,11 @@
 .card-img {
   width: 100%;
   display: block;
-  background: #f7f7f7;
+  background: var(--color-bg-muted);
 }
 
 .card-fallback {
   width: 300rpx;
   height: 488rpx;
-  background: #f2f2f2;
+  background: var(--color-bg-muted);
 }

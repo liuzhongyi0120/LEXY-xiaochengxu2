@@ -27,6 +27,13 @@ Page({
     this.setData({ ['blocks[' + index + '].failed']: true });
   },
 
+  /** 商品区块内单张商品图加载失败，降级为色块 */
+  onGoodsImgError(e) {
+    const { b, g } = e.currentTarget.dataset;
+    if (b === undefined || g === undefined) return;
+    this.setData({ ['blocks[' + b + '].goods[' + g + '].failed']: true });
+  },
+
   /** 区块点击跳转（标题 / 公告 / 导航 / 魔方 / 热区共用） */
   onTapBlock(e) {
     const link = e.currentTarget.dataset.link;

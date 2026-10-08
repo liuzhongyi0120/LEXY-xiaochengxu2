@@ -8,7 +8,7 @@
   display: flex;
   align-items: center;
   padding: 60rpx 32rpx 80rpx;
-  background: #C8102E;
+  background: var(--color-primary);
 }
 
 .avatar {
@@ -31,7 +31,7 @@
 .nickname {
   font-size: 36rpx;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--color-text-inverse);
 }
 
 .profile-tip {
@@ -45,8 +45,8 @@
   height: 58rpx;
   line-height: 58rpx;
   font-size: 26rpx;
-  color: #C8102E;
-  background: #ffffff;
+  color: var(--color-primary);
+  background: var(--color-bg-card);
   border-radius: 29rpx;
 }
 
@@ -54,7 +54,7 @@
 .card {
   margin: -40rpx 24rpx 20rpx;
   padding: 24rpx;
-  background: #ffffff;
+  background: var(--color-bg-card);
   border-radius: 16rpx;
 }
 
@@ -74,12 +74,12 @@
 .card-title {
   font-size: 30rpx;
   font-weight: 600;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .card-more {
   font-size: 24rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 /* ---------- 订单入口 ---------- */
@@ -103,14 +103,14 @@
   width: 56rpx;
   height: 56rpx;
   border-radius: 12rpx;
-  background: #FDECEE;
+  background: var(--color-primary-light);
   border: 2rpx solid #F5C4B3;
 }
 
 .order-label {
   margin-top: 14rpx;
   font-size: 24rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 /* ---------- 工具网格 ---------- */
@@ -137,19 +137,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #F5F5F5;
+  background: var(--color-bg);
   border-radius: 50%;
 }
 
 .tool-icon-text {
   font-size: 28rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .tool-label {
   margin-top: 14rpx;
   font-size: 24rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 /* ---------- 客服 ---------- */
@@ -165,12 +165,12 @@
 
 .service-text {
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .service-arrow {
   font-size: 32rpx;
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
 }
 
 /* ---------- 版本 ---------- */
@@ -178,7 +178,7 @@
   padding: 40rpx 0 0;
   text-align: center;
   font-size: 22rpx;
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
 }
 
 /* ---------- 资产 ---------- */
@@ -202,7 +202,7 @@
 .asset-num {
   font-size: 34rpx;
   font-weight: 600;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .asset-label {

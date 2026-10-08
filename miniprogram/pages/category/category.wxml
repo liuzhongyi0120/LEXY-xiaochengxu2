@@ -47,9 +47,7 @@
         <view class="content-tip">点击分类查看该品类下的全部商品</view>
       </block>
 
-      <view class="content-empty" wx:elif="{{!loading}}">
-        <text class="content-empty-text">暂无分类数据</text>
-      </view>
+      <empty-state wx:elif="{{!loading}}" text="暂无分类数据" desc="请到后台控制台「分类」里添加" />
     </scroll-view>
   </view>
 </view>

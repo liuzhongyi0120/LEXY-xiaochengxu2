@@ -17,14 +17,23 @@
   width: 160rpx;
   height: 160rpx;
   border-radius: 50%;
-  background-color: #F2F3F5;
+  background-color: var(--color-bg-muted, #F2F3F5);
   border: 2rpx solid #E6E8EB;
 }
 
 .empty-text {
   margin-top: 32rpx;
   font-size: 28rpx;
-  color: #969799;
+  color: var(--color-text-secondary, #969799);
+  text-align: center;
+}
+
+.empty-desc {
+  margin-top: 14rpx;
+  padding: 0 20rpx;
+  font-size: 24rpx;
+  line-height: 1.7;
+  color: var(--color-text-placeholder, #C8C9CC);
   text-align: center;
 }
 
@@ -34,7 +43,13 @@
   height: 72rpx;
   line-height: 72rpx;
   font-size: 28rpx;
-  color: #ffffff;
-  background-color: #C8102E;
+  color: var(--color-text-inverse, #FFFFFF);
+  background-color: var(--color-primary, #C8102E);
   border-radius: 36rpx;
+}
+
+/* 点击态必须写在本组件内：自定义组件 styleIsolation 默认 isolated，
+   app.wxss 里的 .hover 对组件内部无效（曾因此点了没反应） */
+.empty-btn-hover {
+  opacity: 0.7;
 }

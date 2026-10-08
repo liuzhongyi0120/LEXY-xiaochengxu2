@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "产品",
-  "usingComponents": {}
+  "usingComponents": {
+    "empty-state": "/components/empty-state/empty-state"
+  }
 }

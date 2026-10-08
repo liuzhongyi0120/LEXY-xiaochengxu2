@@ -65,7 +65,7 @@
       </view>
     </view>
 
-    <view class="empty" wx:if="{{!groups.length}}">该品牌暂无上架产品</view>
+    <empty-state wx:if="{{!groups.length}}" text="该品牌暂无上架产品" />
     <view class="main-bottom"></view>
   </scroll-view>
 </view>

@@ -1,4 +1,6 @@
 {
   "navigationBarTitleText": "活动页",
-  "usingComponents": {}
+  "usingComponents": {
+    "empty-state": "/components/empty-state/empty-state"
+  }
 }

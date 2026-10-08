@@ -14,12 +14,12 @@
   width: 100%;
   height: 100%;
   display: block;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 .biw {
   width: 100%;
   display: block;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 .bv {
   width: 100%;
@@ -44,7 +44,7 @@
   right: 32rpx;
   bottom: 32rpx;
   background: rgba(0, 0, 0, .38);
-  color: #fff;
+  color: var(--color-text-inverse);
   font-size: 22rpx;
   padding: 2rpx 16rpx;
   border-radius: 20rpx;
@@ -59,7 +59,7 @@
   width: 560rpx;
   display: inline-block;
   vertical-align: top;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 
 /* 双层轮播缩略图 */
@@ -75,11 +75,11 @@
   border-radius: 8rpx;
   opacity: .6;
   border: 2rpx solid transparent;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 .thumb-i.on {
   opacity: 1;
-  border-color: #C8102E;
+  border-color: var(--color-primary);
 }
 
 /* ==================== 标题文本 ==================== */
@@ -96,13 +96,13 @@
 .ct-sub {
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: #8a919e;
+  color: var(--color-text-secondary);
 }
 
 /* ==================== 辅助分割 ==================== */
 .ln {
   border-top-style: solid;
-  border-top-color: #EEEEEE;
+  border-top-color: var(--color-border);
 }
 .ln.dashed { border-top-style: dashed; }
 
@@ -143,7 +143,7 @@
 .cn-t {
   margin-top: 8rpx;
   font-size: 24rpx;
-  color: #333;
+  color: var(--color-text);
 }
 
 /* ==================== 魔方 ==================== */
@@ -159,7 +159,7 @@
   height: 220rpx;
   display: block;
   border-radius: 8rpx;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 
 /* ==================== 热区切图 ==================== */
@@ -186,7 +186,7 @@
   height: 88rpx;
   border-radius: 50%;
   margin-right: 16rpx;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 .cs-txt {
   display: flex;
@@ -195,12 +195,12 @@
 .cs-n {
   font-size: 30rpx;
   font-weight: 600;
-  color: #222;
+  color: var(--color-text);
 }
 .cs-s {
   margin-top: 4rpx;
   font-size: 24rpx;
-  color: #8a919e;
+  color: var(--color-text-secondary);
 }
 
 /* ==================== 商品 ==================== */
@@ -210,7 +210,7 @@
 .cg-title {
   font-size: 32rpx;
   font-weight: 600;
-  color: #222;
+  color: var(--color-text);
   padding: 24rpx 0 12rpx;
 }
 .cg-grid {
@@ -230,14 +230,22 @@
   width: 100%;
   height: 320rpx;
   display: block;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
+}
+/* 商品图加载失败时的降级色块 */
+.cg-img-failed {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
 }
 .cg-info {
   padding: 12rpx;
 }
 .cg-name {
   font-size: 26rpx;
-  color: #333;
+  color: var(--color-text);
   line-height: 1.35;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -246,7 +254,7 @@
 }
 .cg-price {
   margin-top: 8rpx;
-  color: #C8102E;
+  color: var(--color-price);
 }
 .cg-cur { font-size: 22rpx; }
 .cg-num { font-size: 32rpx; font-weight: 600; }
@@ -256,15 +264,15 @@
   line-height: 52rpx;
   text-align: center;
   font-size: 24rpx;
-  color: #fff;
-  background: #C8102E;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
   border-radius: 26rpx;
 }
 .cg-empty {
   padding: 40rpx 0;
   text-align: center;
-  color: #8a919e;
-  font-size: 24rpx;
+  color: var(--color-text-secondary);
+  font-size: var(--font-sm);
 }
 
 /* ==================== 页面级店铺信息（原有） ==================== */
@@ -278,16 +286,16 @@
   width: 96rpx;
   height: 96rpx;
   border-radius: 50%;
-  background: #f0f2f5;
+  background: var(--color-bg-muted);
 }
 .shop-name {
   margin-top: 12rpx;
   font-size: 30rpx;
   font-weight: 600;
-  color: #222;
+  color: var(--color-text);
 }
 .shop-slogan {
   margin-top: 6rpx;
   font-size: 24rpx;
-  color: #8a919e;
+  color: var(--color-text-secondary);
 }

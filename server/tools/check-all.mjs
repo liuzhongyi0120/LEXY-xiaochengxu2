@@ -618,6 +618,98 @@ assert('project.config.json 已填真实 AppID（非占位符）',
   `appid=${projCfg.appid}`);
 
 /* ---------------------------------------------------------------------------
+ * 15.75 小程序样式作用域静态校验（抓「写了 class 但根本没有样式」的哑样式）
+ *
+ * 为什么必须有这一条：
+ *   自定义组件默认 styleIsolation: 'isolated' —— app.wxss 与页面 wxss 里的
+ *   **class 选择器到不了组件内部**。组件 wxml 上写 hover-class="hover"
+ *   （而 .hover 只定义在 app.wxss）在真机上就是「点了没反应」，
+ *   开发者工具却**不会报任何错**。页面同理：A 页面的 wxss 不作用于 B 页面。
+ *   这类哑样式只有静态比对 class 定义域才抓得到。
+ * ------------------------------------------------------------------------- */
+
+/** 收集一个 wxss 及其 @import 链上的全部 class 选择器名 */
+function wxssClasses(file, depth = 0, seen = new Set()) {
+  const out = new Set();
+  if (depth > 3 || seen.has(file)) return out;
+  seen.add(file);
+  let src;
+  try { src = readFileSync(file, 'utf8'); } catch (e) { return out; }
+  const noComment = src.replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of noComment.matchAll(/([^{}]+)\{/g)) {
+    for (const cm of m[1].matchAll(/\.(-?[A-Za-z_][\w-]*)/g)) out.add(cm[1]);
+  }
+  for (const m of src.matchAll(/@import\s+["']([^"']+)["']\s*;/g)) {
+    for (const c of wxssClasses(join(dirname(file), m[1]), depth + 1, seen)) out.add(c);
+  }
+  return out;
+}
+
+const appWxssClasses = wxssClasses(join(MP_ROOT, 'app.wxss'));
+const scopeIssues = [];
+const scopeHoverIssues = [];
+let scopeChecked = 0;
+let scopeHoverChecked = 0;
+
+WALK(MP_ROOT).filter((f) => f.endsWith('.wxml')).forEach((f) => {
+  const rel = f.replace(/\\/g, '/').split('/miniprogram/')[1];
+  const isComponent = rel.startsWith('components/');
+  const ownWxss = f.replace(/\.wxml$/, '.wxss');
+  // 组件：只吃自己那份 wxss；页面：app.wxss + 本页 wxss
+  const allowed = isComponent
+    ? wxssClasses(ownWxss)
+    : new Set([...appWxssClasses, ...wxssClasses(ownWxss)]);
+
+  const src = readFileSync(f, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  for (const m of src.matchAll(/\b(class|hover-class)\s*=\s*"([^"]*)"/g)) {
+    const attr = m[1];
+    const value = m[2];
+    const names = [];
+    // {{ }} 之外是静态类名；{{ }} 之内只认字符串字面量（裸标识符无法静态求解）
+    names.push(...value.replace(/\{\{[\s\S]*?\}\}/g, ' ').split(/\s+/));
+    for (const blk of value.matchAll(/\{\{([\s\S]*?)\}\}/g)) {
+      for (const q of blk[1].matchAll(/['"]([^'"]*)['"]/g)) names.push(...q[1].split(/\s+/));
+    }
+    for (const cls of names) {
+      if (!cls || cls === 'none' || /\{\{/.test(cls)) continue;
+      if (attr === 'hover-class') scopeHoverChecked++; else scopeChecked++;
+      if (!allowed.has(cls)) {
+        (attr === 'hover-class' ? scopeHoverIssues : scopeIssues).push(`${rel} ${attr}="${cls}"`);
+      }
+    }
+  }
+});
+
+assert('小程序 wxml 的 class 引用都在正确作用域内有定义（组件不吃 app.wxss 的 class）',
+  scopeIssues.length === 0,
+  scopeIssues.length ? `未定义：${scopeIssues.join(' | ')}` : `${scopeChecked} 处 class 引用全部有定义`);
+
+assert('小程序 hover-class 全部有对应样式（否则是「点了没反应」的哑点击态）',
+  scopeHoverIssues.length === 0,
+  scopeHoverIssues.length ? `未定义：${scopeHoverIssues.join(' | ')}` : `${scopeHoverChecked} 处 hover-class 全部有定义`);
+
+// 设计令牌：凡是被 var(--x) 引用的令牌，必须在 styles/variables.wxss 里有定义。
+// 漏定义不会报错，只会让那一处颜色静默失效 —— 只有静态比对才抓得到。
+const VARS_FILE = join(MP_ROOT, 'styles', 'variables.wxss');
+const definedTokens = new Set(
+  [...readFileSync(VARS_FILE, 'utf8').matchAll(/(--[a-z0-9-]+)\s*:/g)].map((m) => m[1]));
+const missingTokens = [];
+let tokenRefs = 0;
+WALK(MP_ROOT).filter((f) => f.endsWith('.wxss')).forEach((f) => {
+  const rel = f.replace(/\\/g, '/').split('/miniprogram/')[1];
+  readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
+    for (const m of line.matchAll(/var\((--[a-z0-9-]+)/g)) {
+      tokenRefs++;
+      if (!definedTokens.has(m[1])) missingTokens.push(`${rel}:${i + 1} 用了 ${m[1]}`);
+    }
+  });
+});
+assert('小程序 var(--token) 引用的令牌全部有定义（漏定义＝该处颜色静默失效）',
+  missingTokens.length === 0,
+  missingTokens.length ? missingTokens.join(' | ')
+    : `${tokenRefs} 处引用 / ${definedTokens.size} 个令牌定义，全部命中`);
+
+/* ---------------------------------------------------------------------------
  * 15.8 后台控制台接口（/api/admin/*）
  *
  * 安全原则：只读巡检 + 自建自删。

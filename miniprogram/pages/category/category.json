@@ -1,5 +1,7 @@
 {
   "navigationBarTitleText": "商品分类",
   "enablePullDownRefresh": true,
-  "usingComponents": {}
+  "usingComponents": {
+    "empty-state": "/components/empty-state/empty-state"
+  }
 }

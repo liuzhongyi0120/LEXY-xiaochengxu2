@@ -8,7 +8,7 @@
   position: relative;
   width: 100%;
   height: 750rpx;
-  background: #F2F3F5;
+  background: var(--color-bg-muted);
 }
 
 .gallery-swiper {
@@ -29,7 +29,7 @@
   height: 44rpx;
   line-height: 44rpx;
   font-size: 22rpx;
-  color: #ffffff;
+  color: var(--color-text-inverse);
   background: rgba(0, 0, 0, 0.4);
   border-radius: 22rpx;
 }
@@ -38,7 +38,7 @@
 .card {
   margin: 20rpx 24rpx;
   padding: 24rpx;
-  background: #ffffff;
+  background: var(--color-bg-card);
   border-radius: 16rpx;
 }
 
@@ -55,7 +55,7 @@
 .price {
   display: flex;
   align-items: baseline;
-  color: #C8102E;
+  color: var(--color-primary);
 }
 
 .price-symbol {
@@ -73,13 +73,13 @@
 
 .price-range {
   font-size: 26rpx;
-  color: #C8102E;
+  color: var(--color-primary);
 }
 
 .sales {
   margin-left: auto;
   font-size: 24rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .name {
@@ -87,13 +87,13 @@
   font-size: 34rpx;
   font-weight: 600;
   line-height: 48rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .subtitle {
   margin-top: 10rpx;
   font-size: 26rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .tag-row {
@@ -108,8 +108,8 @@
   height: 34rpx;
   line-height: 34rpx;
   font-size: 20rpx;
-  color: #C8102E;
-  background: #FDECEE;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
   border-radius: 6rpx;
 }
 
@@ -127,18 +127,18 @@
 .cell-label {
   width: 100rpx;
   font-size: 28rpx;
-  color: #969799;
+  color: var(--color-text-secondary);
 }
 
 .cell-value {
   flex: 1;
   font-size: 28rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .cell-arrow {
   font-size: 32rpx;
-  color: #C8C9CC;
+  color: var(--color-text-placeholder);
 }
 
 /* ---------- 服务承诺 ---------- */
@@ -158,12 +158,12 @@
   height: 12rpx;
   margin-right: 10rpx;
   border-radius: 50%;
-  background: #C8102E;
+  background: var(--color-primary);
 }
 
 .service-text {
   font-size: 24rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 /* ---------- 图文详情 ---------- */
@@ -176,7 +176,7 @@
   padding: 28rpx 24rpx 20rpx;
   font-size: 30rpx;
   font-weight: 600;
-  color: #323233;
+  color: var(--color-text);
   text-align: center;
 }
 
@@ -203,14 +203,14 @@
   width: 8rpx;
   height: 30rpx;
   margin-right: 14rpx;
-  background: #C8102E;
+  background: var(--color-primary);
   border-radius: 4rpx;
 }
 
 .section-text {
   font-size: 32rpx;
   font-weight: 600;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .recommend-scroll {
@@ -244,7 +244,7 @@
 
 .footer-icon-text {
   font-size: 22rpx;
-  color: #323233;
+  color: var(--color-text);
 }
 
 .footer-badge {
@@ -256,8 +256,8 @@
   line-height: 32rpx;
   padding: 0 8rpx;
   font-size: 20rpx;
-  color: #ffffff;
-  background: #C8102E;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
   border-radius: 16rpx;
 }
 
@@ -276,25 +276,20 @@
 }
 
 .btn-cart {
-  color: #C8102E;
-  background: #FDECEE;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
   border-radius: 42rpx 0 0 42rpx;
 }
 
 .btn-buy {
-  color: #ffffff;
-  background: #C8102E;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
   border-radius: 0 42rpx 42rpx 0;
 }
 
-/* ---------- 骨架屏 ---------- */
+/* ---------- 骨架屏（底色/动效走 app.wxss 的 .skeleton，这里只管尺寸） ---------- */
 .loading-placeholder {
   padding: 24rpx;
-}
-
-.skeleton {
-  background: #EDEEF0;
-  border-radius: 8rpx;
 }
 
 .sk-main {

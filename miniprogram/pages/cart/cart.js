@@ -28,7 +28,11 @@ Page({
       .then((res) => {
         // 价格在 JS 层格式化，避免在 WXML 中做数值运算
         const items = (res.items || []).map((item) =>
-          Object.assign({}, item, { priceText: money(item.price) })
+          Object.assign({}, item, {
+            priceText: money(item.price),
+            imgError: false,
+            fallbackText: String(item.name || '').replace(/[·\s]/g, '').slice(0, 4)
+          })
         );
         this.setData({ items, loading: false });
         this.recalculate();
@@ -137,6 +141,12 @@ Page({
   onTapGoods(e) {
     const { id } = e.currentTarget.dataset;
     wx.navigateTo({ url: `${ROUTES.GOODS_DETAIL}?id=${id}` });
+  },
+
+  /** 商品图加载失败，降级为色块 + 名称首字 */
+  onImgError(e) {
+    const { index } = e.currentTarget.dataset;
+    this.setData({ ['items[' + index + '].imgError']: true });
   },
 
   onCheckout() {
