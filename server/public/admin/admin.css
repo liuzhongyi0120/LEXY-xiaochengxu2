@@ -596,12 +596,45 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 }
 .pv-shop { padding: 22px 16px; text-align: center; font-size: 12px; color: #666; }
 .pv-shop b { color: #222; font-size: 14px; }
+/*
+ * 产品页预览
+ *
+ * ⚠️ 这里的取值必须与**真机** miniprogram/pages/product/product.wxss 对齐
+ *   （真机 rpx ÷ 2 = 这里预览画的 px，预览画布就是 375 宽）：
+ *     .side            196rpx → 98px
+ *     .side-item       90rpx 高 / 30rpx 字 → 45px / 15px
+ *     .side-item-active 黑底白字（不是红字白底）
+ *     .prod            width 50% —— **两列**，曾错写成三列
+ *     .prod-pic        239rpx → 119.5px
+ *     .prod-model      28rpx 字 / 20rpx 上边距 → 14px / 10px
+ *   自检 check-all 有断言盯着这几个数，改真机 wxss 时会一起红，防止再次走样。
+ */
 .pv-prod { display: flex; min-height: 300px; }
-.pv-nav { width: 88px; background: #f7f7f7; flex: 0 0 88px; }
-.pv-nav > div { padding: 13px 6px; text-align: center; font-size: 12px; color: #666; cursor: pointer; }
-.pv-nav > div.on { background: #fff; color: #C8102E; font-weight: 600; }
-.pv-prod .right { flex: 1; padding: 8px; }
-.pv-grouphd img { width: 100%; display: block; border-radius: 4px; }
+.pv-nav { width: 98px; background: #F5F5F5; flex: 0 0 98px; }
+.pv-nav > div {
+  height: 45px; padding: 0 12px;
+  display: flex; align-items: center;
+  font-size: 15px; color: #050505; cursor: pointer; box-sizing: border-box;
+}
+.pv-nav > div.on { background: #000; color: #fff; font-weight: 600; }
+.pv-prod .right { flex: 1; padding: 0; min-width: 0; }
+.pv-grouphd img { width: 100%; display: block; border-radius: 0; }
+
+/* 型号网格：两列（真机 .prod{width:50%}），图片定高 119.5px、contain 居中 */
+.pv-prods { display: flex; flex-wrap: wrap; }
+.pv-prods .pv-cell {
+  width: 50%; box-sizing: border-box;
+  padding: 5px 0 10px;
+  display: flex; flex-direction: column; align-items: center;
+}
+.pv-prods .pv-cell img {
+  width: 100%; height: 119.5px; object-fit: contain; border-radius: 0;
+  background: #fff;
+}
+.pv-prods .pv-cell.pv-model b {
+  margin-top: 10px; font-size: 14px; color: #323233; font-weight: 400;
+  padding: 0; text-align: center;
+}
 
 /* 预览内的新增组件 */
 .pv-title { padding: 14px 12px; }

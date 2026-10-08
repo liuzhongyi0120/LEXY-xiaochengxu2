@@ -444,16 +444,17 @@
     var bi = Math.min(CTX.brand, brands.length - 1);
     var brand = brands[bi];
     var h = '<div class="pv-prod">';
-    h += '<div class="pv-nav">' + img(d.navLogo, 'width:100%;padding:6px') + brands.map(function (b, i) {
+    h += '<div class="pv-nav">' + img(d.navLogo, 'width:100%;display:block') + brands.map(function (b, i) {
       return '<div data-path="brand:' + i + '" class="' + (i === bi ? 'on' : '') + '">' + esc(b.name) + '</div>';
     }).join('') + '</div>';
     h += '<div class="right">';
     (brand.groups || []).forEach(function (g, gi) {
       var gp = 'brands.' + bi + '.groups.' + gi;
-      h += '<div class="pv-block' + cls(gp) + '" data-path="' + gp + '" style="margin-bottom:10px;position:relative">' +
+      h += '<div class="pv-block' + cls(gp) + '" data-path="' + gp + '" style="margin-bottom:4px;position:relative">' +
         '<div class="pv-grouphd" style="position:relative">' + img(g.header) +
         linkDot(g.link, '头图跳转') + '</div>' +
-        '<div class="pv-grid g3">' + (g.products || []).map(function (m, mi) {
+        /* 型号网格：真机是**两列**（.prod{width:50%}），曾经写成三列，真机一对照就露馅 */
+        '<div class="pv-prods">' + (g.products || []).map(function (m, mi) {
           var mp = gp + '.products.' + mi;
           return '<div class="pv-cell pv-model' + cls(mp) + '" data-path="' + mp + '" style="position:relative">' +
             img(m.image) + '<b>' + esc(m.model || '') + '</b>' +

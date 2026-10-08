@@ -1,16 +1,55 @@
 /* =========================================================================
- * 小程序预览页（/preview）· 布局样式
+ * 小程序预览页（/preview）· 外壳样式
  *
- * 手机壳与区块样式全部复用 /admin/admin.css（.phone / .phone-screen / .tabbar / .pv-*），
- * 这里只写这个页面自己的两栏布局与顶栏 —— 不重复定义任何区块样式。
+ * 与装修台**不共用样式表**（刻意）：
+ *   手机屏里放的是真机页面的真机样式（mp-wxss 编译 miniprogram 下的 wxss 得到），
+ *   再叠一层装修台的样式表，两套基础规则会互相打架 —— 预览就不准了。
+ *   所以这里把手机壳、工具条、列表全部自带一份。
+ *
+ * 手机屏尺寸（对应真机口径，改这里要同步 preview.js 里的 SCREEN）：
+ *   屏宽 375、可视区高 718（= 整机 832 − 导航栏 44 − tabBar 50 − 底部安全区 20）
  * ========================================================================= */
+
+:root {
+  --mp-screen-w: 375px;
+  --mp-screen-h: 718px;
+
+  --line: #e4e7ec;
+  --line-2: #f0f2f5;
+  --ink: #1f2329;
+  --ink-2: #4a5159;
+  --gray: #6b7280;
+  --gray-2: #98a0ab;
+  --blue: #155bd4;
+  --blue-light: #eef4ff;
+  --blue-border: #c9dcff;
+  --ok: #07c160;
+  --warn: #d46b08;
+  --danger: #e34d59;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; margin: 0; }
 
 .pv-body {
   height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: #eef0f3;
 }
+
+.btn {
+  height: 28px; padding: 0 12px; border-radius: 6px;
+  border: 1px solid var(--line); background: #fff; color: var(--ink-2);
+  font-size: 12px; cursor: pointer; transition: .12s;
+}
+.btn:hover { border-color: var(--blue-border); color: var(--blue); }
+.btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
 
 /* ------------------------------ 顶栏 ------------------------------ */
 
@@ -34,15 +73,7 @@
 .pv-title { font-size: 15px; font-weight: 700; line-height: 1.3; }
 .pv-title small { display: block; font-size: 11px; font-weight: 400; color: var(--gray-2); margin-top: 1px; }
 .pv-spacer { flex: 1; }
-.pv-cur {
-  font-size: 12px; color: var(--ink-2);
-  background: var(--line-2); border-radius: 20px; padding: 5px 12px;
-  max-width: 320px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
-}
-.pv-field {
-  display: flex; align-items: center; gap: 5px;
-  font-size: 12px; color: var(--gray);
-}
+.pv-field { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray); }
 .pv-field select { height: 28px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; background: #fff; }
 .pv-auto { cursor: pointer; user-select: none; }
 .pv-dot {
@@ -61,7 +92,7 @@
 
 /* 左：页面列表 */
 .pv-side {
-  flex: 0 0 260px; width: 260px;
+  flex: 0 0 240px; width: 240px;
   background: #fff; border-right: 1px solid var(--line);
   display: flex; flex-direction: column; min-height: 0;
 }
@@ -69,13 +100,14 @@
   flex: 0 0 auto; display: flex; align-items: baseline; gap: 8px;
   padding: 12px 14px 8px; font-size: 13px;
 }
-.pv-side-head .muted { font-size: 11px; }
+.pv-side-head .muted { font-size: 11px; color: var(--gray-2); }
 .pv-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
 .pv-item {
   display: block; width: 100%; text-align: left;
   border: 1px solid transparent; border-radius: 8px;
   padding: 9px 10px; margin-bottom: 3px;
   background: transparent; cursor: pointer; transition: .12s;
+  font: inherit; color: inherit;
 }
 .pv-item:hover { background: var(--line-2); }
 .pv-item.on { background: var(--blue-light); border-color: var(--blue-border); }
@@ -88,48 +120,131 @@
   background: var(--line-2); color: var(--gray);
 }
 .pv-badge.custom { background: #e8f0fe; color: var(--blue); }
-.pv-badge.draft { background: #fff4e5; color: #d46b08; }
+.pv-badge.draft { background: #fff4e5; color: var(--warn); }
 .pv-side-foot {
   flex: 0 0 auto; border-top: 1px solid var(--line);
   padding: 9px 14px; font-size: 11px; color: var(--gray-2); line-height: 1.7;
 }
+.pv-side-foot code { font-size: 10px; background: var(--line-2); padding: 0 3px; border-radius: 3px; }
 
-/* 右：预览画布（整页滚动，手机壳居中） */
+/* 右：预览画布 */
 .pv-stage {
   flex: 1; min-width: 0; overflow: auto;
   background: #eef0f3;
-  padding: 24px 20px 80px;
-  display: flex; justify-content: center; align-items: flex-start;
+  padding: 16px 20px 60px;
+  display: flex; flex-direction: column; align-items: center;
 }
-.pv-stage .phone { box-shadow: 0 6px 32px rgba(0, 0, 0, .16); }
+.pv-status {
+  flex: 0 0 auto;
+  font-size: 11px; color: var(--gray);
+  background: #fff; border: 1px solid var(--line); border-radius: 20px;
+  padding: 5px 14px; margin-bottom: 12px;
+  max-width: 100%; text-align: center;
+}
+.pv-status b { color: var(--ink-2); font-weight: 600; }
+.pv-status.warn { background: #fff8e6; border-color: #ffe0a3; color: var(--warn); }
+.pv-note {
+  margin-top: 14px; max-width: 520px;
+  font-size: 11px; color: var(--gray); line-height: 1.8; text-align: center;
+}
+.pv-note.err { color: var(--danger); }
 
-/* 「按手机屏查看」模式：手机屏固定一屏高，内部滚动（模拟真机滚动） */
-.pv-stage.screen-mode .phone-screen {
-  height: 667px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-.pv-stage.screen-mode .tabbar {
-  position: sticky; bottom: 0; z-index: 9;
+/* ------------------------------ 手机壳 ------------------------------ */
+
+.phone {
+  width: var(--mp-screen-w);
+  flex: 0 0 auto;
+  background: #fff;
+  border-radius: 14px;
+  box-shadow: 0 6px 32px rgba(0, 0, 0, .16);
+  overflow: hidden;
+  transform-origin: top center;
 }
 
-/* 页面顶部的「已发布状态」条 —— 只在此处显示，不进小程序端渲染 */
-.pv-meta {
-  display: flex; align-items: center; gap: 8px;
-  padding: 7px 12px; font-size: 11px; color: var(--gray);
-  background: #f7f8fa; border-bottom: 1px solid var(--line-2);
+/* 导航栏：真机是系统导航栏，标题居中 */
+.phone-bar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 14px;
+  background: #fff;
+  font-size: 16px;
+  color: #000;
 }
-.pv-meta b { color: var(--ink-2); font-weight: 600; }
-.pv-meta.warn { background: #fff8e6; color: #a8680a; }
+.ph-time { font-size: 12px; font-weight: 600; letter-spacing: .2px; }
+.ph-title {
+  position: absolute; left: 0; right: 0; top: 0; height: 44px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 600; color: #000;
+  pointer-events: none;
+}
+/* 右上角胶囊（真机导航栏右侧的 ··· ⊙） */
+.ph-capsule {
+  margin-left: auto;
+  display: flex; align-items: center; justify-content: center; gap: 3px;
+  width: 76px; height: 30px;
+  border: 1px solid rgba(0, 0, 0, .12); border-radius: 15px;
+  background: rgba(255, 255, 255, .7);
+  z-index: 2;
+}
+.ph-capsule i { width: 3px; height: 3px; border-radius: 50%; background: #111; }
+.ph-capsule i:last-child {
+  width: 12px; height: 12px; background: transparent;
+  border: 1.5px solid #111; border-radius: 50%; position: relative;
+}
+.ph-capsule i:last-child::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  border-radius: 50%; background: #111;
+}
 
-/* 加载与错误态 */
+/* 手机屏 = 小程序 page 根节点：真机里 100vh 就是这块区域的高度 */
+.phone-screen {
+  position: relative;
+  width: var(--mp-screen-w);
+  height: var(--mp-screen-h);
+  overflow: hidden;
+  background: #F5F5F5;
+}
+
+/* tabBar：app.json 里没配 iconPath，所以真机上是纯文字（别自作主张加图标） */
+.tabbar {
+  display: flex;
+  height: 50px;
+  border-top: 1px solid rgba(0, 0, 0, .12);
+  background: #fff;
+}
+.tabbar span {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: #999;
+}
+.tabbar span.on { color: #C8102E; }
+.tabbar[hidden] { display: none !important; }
+
+/* 手机壳下方的底部安全区（真机的 home indicator 区域） */
+.phone::after {
+  content: '';
+  display: block;
+  height: 20px;
+  background: #fff;
+}
+
+/* 「按手机屏查看」时手机壳更高一点，提示内部可滚动 */
+.pv-stage.screen-mode .phone { box-shadow: 0 10px 40px rgba(0, 0, 0, .2); }
+
+/* ------------------------------ 加载 / 错误 / 提示 ------------------------------ */
+
 .pv-loading, .pv-error {
   padding: 60px 20px; text-align: center; font-size: 13px; color: var(--gray-2);
 }
 .pv-error { color: var(--danger); }
-.pv-error code { display: block; margin-top: 8px; font-size: 11px; color: var(--gray); }
+.pv-error code { display: block; margin-top: 8px; font-size: 11px; color: var(--gray); white-space: pre-wrap; text-align: left; }
 
-/* 悬浮提示 */
 .pv-toast {
   position: fixed; left: 50%; top: 64px; transform: translateX(-50%);
   background: rgba(31, 35, 41, .92); color: #fff;

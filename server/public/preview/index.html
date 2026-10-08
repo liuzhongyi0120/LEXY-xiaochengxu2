@@ -5,11 +5,17 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>小程序预览 · LEXY莱克官方旗舰店</title>
 <!--
-  复用装修台的样式：手机壳（.phone / .phone-screen / .tabbar）与全部 .pv-* 区块样式。
-  刻意不复制一份 —— 预览页与装修台预览必须长得一模一样，样式分家就是走样的开始。
+  这个页面**不加载 admin/admin.css**。
+
+  原因：预览的手机屏里要放的是「真机页面的真机样式」（由 mp-wxss 把 miniprogram 下的
+  app.wxss / 页面 wxss / 组件 wxss 编译而成）。再叠一层装修台的样式表，
+  两边的基础规则会互相打架（box-sizing、img 默认尺寸、button 默认外观…），
+  预览就又不可信了。手机壳与页面外壳的样式都写在 preview.css 里，自成一套。
+
+  真正要展示的样式编译结果注入到下面的 <style id="mpStyle"> 里。
 -->
-<link rel="stylesheet" href="/admin/admin.css">
 <link rel="stylesheet" href="/preview/preview.css">
+<style id="mpStyle"></style>
 </head>
 <body class="pv-body">
 
@@ -17,24 +23,29 @@
   <div class="pv-brand">
     <span class="pv-mark">LEXY</span>
     <span class="pv-title">小程序预览
-      <small>看的是「已发布」的内容 —— 装修台点「立即发布」后，这里刷新即变</small>
+      <small>直接编译真机的 WXML + WXSS 渲染 —— 与微信开发者工具看到的是同一套页面源码</small>
     </span>
   </div>
   <div class="pv-spacer"></div>
-  <div class="pv-cur" id="pvCur">—</div>
   <label class="pv-field">机型
     <select id="pvDevice">
-      <option value="375">iPhone 12（375）</option>
+      <option value="375">iPhone（375）</option>
       <option value="320">iPhone SE（320）</option>
       <option value="414">iPhone Pro Max（414）</option>
     </select>
   </label>
-  <button class="btn" id="pvScreenMode" title="在「整页铺开」与「一屏高可滚动」之间切换">按手机屏查看</button>
+  <label class="pv-field">轮播
+    <select id="pvSwiper">
+      <option value="0">第 1 张</option>
+      <option value="1">第 2 张</option>
+      <option value="2">第 3 张</option>
+    </select>
+  </label>
   <label class="pv-field pv-auto" title="装修台发布后自动更新预览">
     <input type="checkbox" id="pvAuto" checked> 自动刷新
     <span class="pv-dot" id="pvDot"></span>
   </label>
-  <button class="btn primary" id="pvReload" title="重新拉取已发布内容">刷新</button>
+  <button class="btn" id="pvReload" title="重新编译页面源码">重新编译</button>
   <nav class="pv-links">
     <a href="/admin" target="_blank">装修台</a>
     <a href="/console" target="_blank">后台控制台</a>
@@ -50,29 +61,37 @@
       <span class="muted" id="pvCount">—</span>
     </div>
     <div class="pv-list" id="pvPages"></div>
-    <div class="pv-side-foot" id="pvFoot">—</div>
+    <div class="pv-side-foot">
+      渲染内核：真机 <code>WXML</code> + <code>WXSS</code><br>
+      （1rpx = 0.5px，100vh = 手机屏可视区高）
+    </div>
   </aside>
 
   <!-- 右：手机壳预览 -->
   <section class="pv-stage" id="pvStage">
+    <!-- 状态条刻意放在手机壳**外面**：真机屏上没有这条东西，放进屏里就不像真机了 -->
+    <div class="pv-status" id="pvStatus">—</div>
     <div class="phone" id="phone">
       <div class="phone-bar">
         <span class="ph-time">9:41</span>
-        <span class="ph-title" id="phTitle">首页</span>
-        <span class="ph-dots">···</span>
+        <span class="ph-title" id="phTitle">—</span>
+        <span class="ph-capsule"><i></i><i></i><i></i></span>
       </div>
-      <div class="phone-screen" id="preview"></div>
+      <!-- 手机屏 = 小程序 page 的根节点（WXSS 里的 page{} 就编译到 .mp-root 上） -->
+      <div class="phone-screen mp-root" id="preview"></div>
       <div class="tabbar" id="phTabbar">
         <span>首页</span><span>莱克</span><span>资讯</span><span>产品</span><span>我的</span>
       </div>
     </div>
+    <div class="pv-note" id="pvNote"></div>
   </section>
 </main>
 
 <div class="pv-toast" id="pvToast" hidden></div>
 
-<!-- 渲染核心与装修台共用同一份（展示态 edit:false：不带选中框、悬浮操作条、区块角标、跳转角标） -->
-<script src="/shared/pv-render.js"></script>
+<script src="/shared/mp-wxss.js"></script>
+<script src="/shared/mp-wxml.js"></script>
+<script src="/shared/mp-runtime.js"></script>
 <script src="/preview/preview.js"></script>
 </body>
 </html>

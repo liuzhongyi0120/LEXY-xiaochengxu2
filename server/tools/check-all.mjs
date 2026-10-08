@@ -1558,28 +1558,41 @@ const CONSOLE_FILES = [
   'console/index.html', 'console/console.css', 'console/console.core.js', 'console/console.modules.js',
   'admin/index.html', 'admin/admin.js', 'admin/admin.css',
   'preview/index.html', 'preview/preview.css', 'preview/preview.js',
-  'shared/pv-render.js'
+  'shared/pv-render.js',
+  /* 真机渲染三件套：/preview 的全部依靠就是这三个文件，缺一个预览直接白屏 */
+  'shared/mp-wxss.js', 'shared/mp-wxml.js', 'shared/mp-runtime.js'
 ];
 const missAssets = [];
 CONSOLE_FILES.forEach((f) => {
   try { readFileSync(join(__dirname, '..', 'public', f)); } catch (e) { missAssets.push(f); }
 });
-assert('后台控制台与装修台必需文件齐全',
+assert('后台控制台、装修台与预览渲染三件套文件齐全',
   missAssets.length === 0,
   missAssets.length ? `缺失：${missAssets.join(', ')}` : `${CONSOLE_FILES.length} 个文件全部存在`);
 
 /* ---------------------------------------------------------------------------
- * 15.10 前端预览页（/preview）与共享渲染核心
+ * 15.10 装修台预览（共享渲染核心）与 /preview（真机源码编译）
  *
- * 装修台的手机预览与 /preview 必须共用**同一份**渲染实现（public/shared/pv-render.js）。
- * 各写一份的后果不是「有点不一样」，而是「后台看着好好的、真机上是另一回事」。
- * 所以这条约束要固化成断言，谁再复制一份出来，自检立刻红。
+ * 两条链路，各有各的约束，不能混：
  *
- * 另外这里做了**真实渲染校验**：拿线上已发布数据渲染一遍，逐字符确认展示态里
- * 没有任何编辑装饰（.pv-tag 区块角标 / .pv-ops 悬浮操作条 / .pv-link 跳转角标 / active 选中态）。
- * 这不是多余的 —— 抽模块时就真漏过几个地方：莱克页与产品页的「系列/分组」角标、
- * nav / 魔方 / 热区 / 公告里的 🔗 角标是**硬编码**输出、不受 edit 开关控制，
- * 浏览器实测才暴露出来（后台预览带这些是对的，线上露出就是脏数据）。
+ *  A. 装修台（/admin）的「手机预览」—— 与真实页面**编辑器绑在一起**，
+ *     必须能画区块角标 / 悬浮操作条 / 跳转角标，所以它有自己的一份渲染核心
+ *     public/shared/pv-render.js。这份实现是**给运营看的近似**，允许带编辑装饰。
+ *
+ *  B. 前端预览页（/preview）—— 给「后端改完发布、想看真机效果」用，
+ *     **不允许有任何近似**：直接编译真机的页面 JS + WXML + WXSS。
+ *
+ *  B 曾经写成「照着小程序手抄一份 HTML」，结果必然走样（真实发生过）：
+ *  产品页抄成 3 列（真机 2 列）、左栏选中态抄成红字白底（真机黑底白字）、
+ *  左栏 88px（真机 196rpx = 98px）。用户一眼就看出来了 —— 预览一旦跟真机不一样
+ *  就完全失去意义。所以这里把「预览页只能走真机源码」固化成断言，谁再写第二份
+ *  手抄渲染，自检立刻红。
+ *
+ *  同时做了**真实渲染校验**（针对 A）：拿线上已发布数据渲染一遍，逐字符确认展示态里
+ *  没有任何编辑装饰（.pv-tag 区块角标 / .pv-ops 悬浮操作条 / .pv-link 跳转角标 / active 选中态）。
+ *  这不是多余的 —— 抽模块时就真漏过几个地方：莱克页与产品页的「系列/分组」角标、
+ *  nav / 魔方 / 热区 / 公告里的 🔗 角标是**硬编码**输出、不受 edit 开关控制，
+ *  浏览器实测才暴露出来（后台预览带这些是对的，线上露出就是脏数据）。
  * ------------------------------------------------------------------------- */
 const pvRequire = (await import('node:module')).createRequire(import.meta.url);
 const PUB = join(__dirname, '..', 'public');
@@ -1587,16 +1600,103 @@ const sharedSrc = readFileSync(join(PUB, 'shared', 'pv-render.js'), 'utf8');
 const adminSrc = readFileSync(join(PUB, 'admin', 'admin.js'), 'utf8');
 const previewSrc = readFileSync(join(PUB, 'preview', 'preview.js'), 'utf8');
 const previewHtml = readFileSync(join(PUB, 'preview', 'index.html'), 'utf8');
+/* 真机渲染三件套：WXSS 转译 / WXML 编译 / 无头运行时 */
+const MP_KERNEL = ['shared/mp-wxss.js', 'shared/mp-wxml.js', 'shared/mp-runtime.js'];
+const kernelSrc = {};
+MP_KERNEL.forEach((f) => { kernelSrc[f] = readFileSync(join(PUB, f), 'utf8'); });
 
-assert('装修台与预览页共用同一份渲染核心，任一侧都没有第二份实现',
-  /PvRender\.render\(/.test(adminSrc) && /PvRender\.render\(/.test(previewSrc) &&
-  !/function pvBlock\s*\(/.test(adminSrc) && !/function pvHome\s*\(/.test(adminSrc) &&
-  !/function pvBlock\s*\(/.test(previewSrc),
+/* ---- A. 装修台预览：必须走共享渲染核心，不许后台自己再抄一份 ---- */
+assert('装修台预览走共享渲染核心 pv-render.js，admin.js 里没有第二份实现',
+  /PvRender\.render\(/.test(adminSrc) &&
+  !/function pvBlock\s*\(/.test(adminSrc) && !/function pvHome\s*\(/.test(adminSrc),
   [!/PvRender\.render\(/.test(adminSrc) ? 'admin.js 未走共享渲染核心' : '',
-   !/PvRender\.render\(/.test(previewSrc) ? 'preview.js 未走共享渲染核心' : '',
    /function pvBlock\s*\(/.test(adminSrc) ? 'admin.js 里又出现了第二份 pvBlock' : '',
-   /function pvBlock\s*\(/.test(previewSrc) ? 'preview.js 里出现了第二份 pvBlock' : ''
-  ].filter(Boolean).join('；') || '两侧均走 pv-render.js');
+   /function pvHome\s*\(/.test(adminSrc) ? 'admin.js 里又出现了第二份 pvHome' : ''
+  ].filter(Boolean).join('；') || 'admin.js → PvRender.render()');
+
+/* ---- B. /preview：只能编译真机源码，禁止第二份手抄实现 ---- */
+const previewBad = [];
+if (!/MpRuntime\.renderPage\(/.test(previewSrc)) previewBad.push('preview.js 未走真机渲染链路（MpRuntime.renderPage）');
+if (/PvRender\.render\(/.test(previewSrc)) previewBad.push('preview.js 又回去调 PvRender（那是装修台的近似实现）');
+if (/function pvBlock\s*\(|function pvHome\s*\(|function pvProduct\s*\(/.test(previewSrc)) {
+  previewBad.push('preview.js 里出现了第二份手写渲染函数');
+}
+assert('预览页只能编译真机源码（页面 JS + WXML + WXSS），不得有第二份 HTML 近似',
+  previewBad.length === 0,
+  previewBad.length ? previewBad.join('；') : 'preview.js → MpRuntime.renderPage()');
+
+const htmlScripts = [...previewHtml.matchAll(/<script[^>]+src="([^"]+)"/g)].map((m) => m[1]);
+const kernelMissing = MP_KERNEL.filter((f) => htmlScripts.indexOf('/' + f) === -1);
+assert('预览页加载了真机渲染三件套（WXSS 转译 · WXML 编译 · 无头运行时），顺序固定',
+  kernelMissing.length === 0 &&
+  htmlScripts.indexOf('/shared/mp-wxss.js') < htmlScripts.indexOf('/shared/mp-wxml.js') &&
+  htmlScripts.indexOf('/shared/mp-wxml.js') < htmlScripts.indexOf('/shared/mp-runtime.js'),
+  kernelMissing.length ? `未引入：${kernelMissing.join(', ')}` : htmlScripts.join(' → '));
+
+/* 只认真正的 <link>，不认注释里出现的字眼（index.html 的注释正好在解释「为什么不加载它」） */
+const linksAdminCss = /<link[^>]+href="\/admin\/admin\.css"/.test(previewHtml);
+assert('预览页不叠加装修台样式表（两套基础规则打架 = 预览又不可信了）',
+  !linksAdminCss && /<link[^>]+href="\/preview\/preview\.css"/.test(previewHtml),
+  linksAdminCss
+    ? 'preview/index.html 仍在加载 /admin/admin.css（会污染真机样式的 box-sizing / img 默认尺寸）'
+    : '外壳样式自带 preview.css，手机屏内只吃真机 WXSS 编译结果');
+
+assert('预览页手机屏是 page{} 的落点（.mp-root），否则真机根节点的设计令牌无处生效',
+  /class="[^"]*mp-root[^"]*"\s+id="preview"|id="preview"[^>]*class="[^"]*mp-root/.test(previewHtml),
+  'phone-screen 元素同时带 mp-root 与 id="preview"');
+
+assert('预览页读的是线上内容（replica.js），不去读装修草稿',
+  !/api\/decorate\/draft/.test(previewSrc),
+  /api\/decorate\/draft/.test(previewSrc) ? 'preview.js 里出现了草稿接口（预览会显示未发布内容）' : '仅通过 /api/decorate/pages 取列表与发布状态');
+
+/* ---- /mp-src：预览页读取真机源码的唯一入口，必须只读 + 类型白名单 + 防穿越 ---- */
+/*
+ * 注意：穿越探测必须写成**编码形态**。`fetch('/mp-src/a/../../../server/index.js')`
+ * 会在发请求前就被 URL 解析器归一化成 `/server/index.js`，根本到不了 tryMpSrc，
+ * 那测到的是 HTTP 客户端的行为，不是服务端防线的行为。
+ */
+const srcProbe = [
+  ['/mp-src/pages/product/product.wxss', 200, '真机 WXSS'],
+  ['/mp-src/pages/index/index.wxml', 200, '真机 WXML'],
+  ['/mp-src/pages/index/index.js', 200, '页面 JS'],
+  ['/mp-src/app.json', 200, '配置文件'],
+  ['/mp-src/pages/product/product.png', 403, '非文本类型（png）'],
+  ['/mp-src/pages/product/%2e%2e%2f%2e%2e%2f%2e%2e%2fserver%2findex.js', 400, '编码后的穿越（多层 ..）'],
+  ['/mp-src/..%2Fserver%2Findex.js', 400, '编码后的穿越 %2F'],
+  ['/mp-src/%2e%2e%2fserver%2findex.js', 400, '编码后的穿越 %2e'],
+  ['/mp-src/pages%5Cproduct%5Cproduct.wxss', 400, '反斜杠路径 %5C'],
+  ['/mp-src/pages/product/nope.wxss', 404, '不存在的文件']
+];
+const srcBad = [];
+for (const [p, want, label] of srcProbe) {
+  let st = 0;
+  try { st = (await fetch(BASE + p)).status; } catch (e) { st = -1; }
+  if (st !== want) srcBad.push(`${label} ${p} → ${st}（期望 ${want}）`);
+}
+assert('/mp-src 源码路由：文本类型放行、非文本拒绝、路径穿越一律 400',
+  srcBad.length === 0,
+  srcBad.length ? srcBad.join(' | ') : `${srcProbe.length} 项探测全部符合预期`);
+
+const idxSrcForMp = readFileSync(join(__dirname, '..', 'index.js'), 'utf8');
+const mpGuardIdx = idxSrcForMp.indexOf('function tryMpSrc');
+assert('/mp-src 与装修后台同受 DEBUG_PAGE 开关约束（关掉管理页时源码也不能裸奔）',
+  mpGuardIdx > -1 && /DEBUG_PAGE/.test(idxSrcForMp.slice(mpGuardIdx, mpGuardIdx + 400)),
+  mpGuardIdx > -1 ? 'tryMpSrc 内已判定 DEBUG_PAGE，关闭时返回 403' : '未找到 tryMpSrc');
+
+/* ---- 装修台预览与真机口径对账：两处一起改，防止再次各写一套后走样 ---- */
+const adminCss = readFileSync(join(PUB, 'admin', 'admin.css'), 'utf8');
+const pvPairs = [
+  [/\.pv-nav\s*\{[^}]*width:\s*98px/, '装修台预览左栏 98px（= 真机 196rpx）'],
+  [/\.pv-nav\s*>\s*div\.on\s*\{[^}]*background:\s*#000/, '装修台预览左栏选中态黑底'],
+  [/\.pv-nav\s*>\s*div\.on\s*\{[^}]*color:\s*#fff/, '装修台预览左栏选中态白字'],
+  [/\.pv-prods\s+\.pv-cell\s*\{[^}]*width:\s*50%/, '装修台预览型号卡片两列（真机 2 列，曾错抄成 3 列）'],
+  [/\.pv-prods\s+\.pv-cell\s+img\s*\{[^}]*height:\s*119\.5px/, '装修台预览图片区 119.5px（= 真机 239rpx）'],
+  [/\.pv-prods\s+\.pv-cell\.pv-model\s+b\s*\{[^}]*font-size:\s*14px/, '装修台预览型号名 14px（= 真机 28rpx）']
+];
+const pvPairBad = pvPairs.filter(([re]) => !re.test(adminCss)).map(([, label]) => label);
+assert('装修台的产品页预览与真机口径一致（列数 / 选中态 / 左栏宽 / 图片高 / 字号）',
+  pvPairBad.length === 0,
+  pvPairBad.length ? '不符：' + pvPairBad.join('、') : pvPairs.length + ' 项口径全部对齐真机');
 
 /* 六类编辑装饰都必须由 CTX.edit 控制，漏一处展示态就会露出真机没有的东西 */
 const editGated = ['cls', 'linkBadge', 'linkDot', 'groupTag', 'opsBar', 'kindTag'];
@@ -1607,15 +1707,6 @@ const notGated = editGated.filter((fn) => {
 assert('六类编辑装饰全部受 edit 开关控制（漏一处，预览页就会露出真机上没有的角标）',
   notGated.length === 0,
   notGated.length ? `未受控：${notGated.join(', ')}` : editGated.join(' / ') + ' 均已受控');
-
-assert('预览页复用装修台的手机壳与区块样式（样式分家 = 两处长得不一样）',
-  /href="\/admin\/admin\.css"/.test(previewHtml) && /src="\/shared\/pv-render\.js"/.test(previewHtml),
-  [/href="\/admin\/admin\.css"/.test(previewHtml) ? '' : '未复用 admin.css',
-   /src="\/shared\/pv-render\.js"/.test(previewHtml) ? '' : '未引入共享渲染核心'].filter(Boolean).join('；') || '同一份 CSS + 同一份渲染核心');
-
-assert('预览页渲染的是「已发布」数据，不是装修草稿',
-  /d\.published/.test(previewSrc) && !/CUR\.published\s*=\s*d\.data/.test(previewSrc),
-  /d\.published/.test(previewSrc) ? 'published → 预览' : '未取 published 字段');
 
 /* 真实渲染校验：已发布数据在两种形态下的差异必须「只差编辑装饰」 */
 const PvRender = pvRequire(join(PUB, 'shared', 'pv-render.js')).PvRender;

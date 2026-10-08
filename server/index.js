@@ -91,6 +91,65 @@ const UPLOAD_MIME = {
 };
 
 /**
+ * 小程序源码（只读）：GET /mp-src/<miniprogram 下的相对路径>
+ *
+ * 用途：前端预览页（/preview）**直接把真机的 WXML + WXSS 拿来渲染**，
+ * 而不是另写一套 HTML 近似 —— 近似写法会跟真机慢慢走样（实测：型号网格写成 3 列、
+ * 选中态写成红字白底，真机其实是 2 列 + 黑底白字），预览就不再可信。
+ *
+ * 安全：
+ *   - 跟随 DEBUG_PAGE 开关（关闭时一律 403），与 /admin、/console、/preview 同进同退；
+ *   - 扩展名白名单：只有小程序源码文本，图片等资源仍走 /uploads；
+ *   - 拒绝 `..` 与绝对路径，防目录穿越；
+ *   - 不缓存（改完源码刷新预览页即可生效）。
+ */
+const MP_SRC_DIR = nodePath.join(__dirname, '..', 'miniprogram');
+const MP_SRC_MIME = {
+  '.wxml': 'text/plain; charset=utf-8',
+  '.wxss': 'text/plain; charset=utf-8',
+  '.wxs': 'text/plain; charset=utf-8',
+  '.js': 'text/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8'
+};
+
+function tryMpSrc(path, res) {
+  if (path.indexOf('/mp-src/') !== 0) return false;
+
+  if (!DEBUG_PAGE) {
+    fail(res, '管理页面已关闭（设置 DEBUG_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
+    return true;
+  }
+
+  let rel = '';
+  try { rel = decodeURIComponent(path.slice('/mp-src/'.length)); } catch (e) { rel = ''; }
+  if (!rel || rel.indexOf('..') !== -1 || rel.startsWith('/') || rel.indexOf('\\') !== -1) {
+    fail(res, '源码路径不合法', ERR.PARAM, 400);
+    return true;
+  }
+
+  const type = MP_SRC_MIME[nodePath.extname(rel).toLowerCase()];
+  if (!type) {
+    fail(res, '仅支持小程序源码文本（wxml / wxss / js / json / wxs）', ERR.FORBIDDEN, 403);
+    return true;
+  }
+
+  const file = nodePath.join(MP_SRC_DIR, rel);
+  fs.readFile(file, (err, buf) => {
+    if (err) {
+      console.error('[error] 读取小程序源码失败', rel, err.code);
+      return fail(res, '源码文件不存在：' + rel, ERR.NOT_FOUND, 404);
+    }
+    res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-store'
+    });
+    res.end(buf);
+  });
+  return true;
+}
+
+/**
  * 素材静态服务：GET /uploads/<yyyyMM>/<file>
  *
  * 与调试台 / 装修台不同，这里**不受 DEBUG_PAGE 开关影响**——
@@ -207,8 +266,11 @@ const server = http.createServer(async (req, res) => {
   /* CORS 预检 */
   if (method === 'OPTIONS') return preflight(res);
 
-  /* 静态页：接口调试台（/debug）与店铺装修后台（/admin） */
+  /* 静态页：接口调试台（/debug）、店铺装修后台（/admin）、后台控制台（/console）、前端预览（/preview） */
   if (method === 'GET' && tryStatic(path, res)) return;
+
+  /* 小程序源码只读：/mp-src/…（预览页直接编译真机 WXML + WXSS 用） */
+  if (method === 'GET' && tryMpSrc(path, res)) return;
 
   /* 素材库图片：/uploads/…（不受管理页面开关影响） */
   if (method === 'GET' && tryUploads(path, req, res)) return;
@@ -337,7 +399,7 @@ server.listen(PORT, HOST, () => {
   log(`监听地址   http://127.0.0.1:${PORT}`);
   log(`接口调试台 http://127.0.0.1:${PORT}/debug  ${DEBUG_PAGE ? '（已开放，线上请设 DEBUG_PAGE=off）' : '（已关闭）'}`);
   log(`店铺装修台 http://127.0.0.1:${PORT}/admin  ${DEBUG_PAGE ? '（逐个页面改前端，发布写回 replica.js）' : '（已关闭）'}`);
-  log(`前端预览   http://127.0.0.1:${PORT}/preview  ${DEBUG_PAGE ? '（发布后看线上效果，与装修台预览同一份渲染）' : '（已关闭）'}`);
+  log(`前端预览   http://127.0.0.1:${PORT}/preview  ${DEBUG_PAGE ? '（发布后看线上效果，直接编译真机 WXML+WXSS）' : '（已关闭）'}`);
   log(`后台控制台 http://127.0.0.1:${PORT}/console  ${DEBUG_PAGE ? '（商品/订单/客户/营销/设置）' : '（已关闭）'}`);
   log(`管理接口   ${DEBUG_PAGE ? '（41 个 admin/decorate/media 点位随页面一同开放）' : '（已随页面一同关闭，返回 403）'}`);
   log(`点位总数   ${routes.length + 2} 个（业务 ${routes.length} + 运维 2，需登录 ${authed} 个）`);
