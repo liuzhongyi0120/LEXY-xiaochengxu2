@@ -1,3 +1,4 @@
+const { syncTabBar } = require('../../utils/tabbar');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
 const { openLink } = require('../../utils/link');
@@ -11,6 +12,11 @@ function clone(data) {
 const BRANDS = resolveAssets(replica.PRODUCT_BRANDS);
 
 Page({
+  /** 切页时同步底部导航高亮（自定义 tabBar 的实例每页一份，必须由页面主动通知） */
+  onShow() {
+    syncTabBar(this);
+  },
+
   data: {
     /** 页面背景色（装修后台「页面设置」可改，对应 replica.PAGE_META） */
     pageBg: (replica.PAGE_META && replica.PAGE_META.product && replica.PAGE_META.product.bg) || '#ffffff',

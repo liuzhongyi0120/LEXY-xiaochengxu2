@@ -30,7 +30,7 @@ function jsExpr(value) {
 /**
  * 生成 replica.js 全文
  * @param {object} data { SHOP, HOME_BLOCKS, LEXY_SERIES, NEWS, PRODUCT_NAV_LOGO, PRODUCT_BRANDS,
- *                        PAGE_META?, CUSTOM_PAGES? }
+ *                        PAGE_META?, CUSTOM_PAGES?, TABBAR? }
  * @param {object} opt  { originalSrc, publishedAt, by }
  */
 function emitReplica(data, opt = {}) {
@@ -86,10 +86,30 @@ function emitReplica(data, opt = {}) {
     L.push('');
   }
 
+  /*
+   * 店铺导航（底部 tabBar 外观）。
+   * 生成器这一层是「可选字段」：data.TABBAR === undefined 时整段省略，
+   * 导出清单也不会多出 TABBAR 这个键（老数据 / 直接调用生成器的场景走这条分支）。
+   *
+   * ⚠️ 但走正常发布链路时它不是可选的 —— schema 里 nav 页的 from() 会把
+   *   「replica 里没有 TABBAR」也归一成默认值（这样运营第一次打开「店铺导航」
+   *   面板看到的是当前生效的默认外观，而不是一片空白）。于是 assemble() 永远
+   *   会产出 TABBAR，**下一次发布任意页面时 replica.js 就会显式写上这份默认导航**。
+   *   这是有意为之的结果，不是 bug：默认值本来就在生效，写出来只是把
+   *   「唯一真源」显式化。custom-tab-bar 组件里仍保留一份兜底，
+   *   用于「代码已更新但还没重新发布过」的中间状态。
+   */
+  if (data.TABBAR !== undefined) {
+    L.push('/** ---------------- 店铺导航（底部 tabBar 外观，装修后台「店铺导航」面板） ---------------- */');
+    L.push('const TABBAR = ' + jsExpr(data.TABBAR) + ';');
+    L.push('');
+  }
+
   /* 导出清单按实际写出的字段动态生成，杜绝「导出了不存在的变量」这种低级错误 */
   const fields = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   if (hasCustom) fields.push('CUSTOM_PAGES');
   if (data.PAGE_META !== undefined) fields.push('PAGE_META');
+  if (data.TABBAR !== undefined) fields.push('TABBAR');
 
   L.push('module.exports = {');
   fields.forEach((f, i) => { L.push('  ' + f + (i < fields.length - 1 ? ',' : '')); });

@@ -79,9 +79,8 @@
       </div>
       <!-- 手机屏 = 小程序 page 的根节点（WXSS 里的 page{} 就编译到 .mp-root 上） -->
       <div class="phone-screen mp-root" id="preview"></div>
-      <div class="tabbar" id="phTabbar">
-        <span>首页</span><span>莱克</span><span>资讯</span><span>产品</span><span>我的</span>
-      </div>
+      <!-- 底部导航按 replica.TABBAR 渲染（装修台「店铺导航」发布写回），与真机 custom-tab-bar 同一份配置 -->
+      <div id="phTabbar"></div>
     </div>
     <div class="pv-note" id="pvNote"></div>
   </section>
@@ -92,6 +91,8 @@
 <script src="/shared/mp-wxss.js"></script>
 <script src="/shared/mp-wxml.js"></script>
 <script src="/shared/mp-runtime.js"></script>
+<!-- 底部导航渲染：与装修台手机壳共用同一份（样式也由它自带注入） -->
+<script src="/shared/pv-tabbar.js"></script>
 <script src="/preview/preview.js"></script>
 </body>
 </html>

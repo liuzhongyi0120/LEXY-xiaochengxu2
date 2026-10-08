@@ -121,7 +121,21 @@
     libTab: 'common',
     common: [],         // 常用组件（localStorage 可自定义）
     device: 375,
-    pvSlide: {}         // 预览里各轮播区块的手动翻页位置：{ 'blocks.1': 2 }
+    pvSlide: {},        // 预览里各轮播区块的手动翻页位置：{ 'blocks.1': 2 }
+    tabbar: null        // 店铺导航（底部导航）的**已发布**配置，装修台手机壳按它渲染
+  };
+
+  /**
+   * 页面 key → 真机页面路径。
+   * 底部导航的高亮必须按**路径**匹配（与小程序 custom-tab-bar 的 setActive 同一口径），
+   * 不能按序号 —— 运营在「店铺导航」里调整顺序后，序号就全错位了。
+   */
+  var TAB_PATH = {
+    home: '/pages/index/index',
+    lexy: '/pages/lexy/lexy',
+    news: '/pages/news/news',
+    product: '/pages/product/product',
+    mine: '/pages/mine/mine'
   };
 
   /* ----------------------------- API ----------------------------- */
@@ -204,6 +218,8 @@
       renderStats();
       renderBelongs();
       renderList();
+      // 店铺导航是全局配置：拉到已发布配置后补渲染列表上方的独立卡片（含是否配过图标）
+      loadTabbar(true).then(renderNavCard);
     }).catch(function (e) {
       toast('加载页面列表失败：' + e.message, 'err');
     });
@@ -216,14 +232,18 @@
     $('statCustom').textContent = S.custom
       ? '自定义页 ' + S.custom.count + ' / ' + S.custom.max
       : '自定义页 —';
-    $('pageCount').textContent = S.pages.length;
+    // 计数不含「店铺导航」—— 它是全局配置，不是页面（否则这里永远多一个）
+    $('pageCount').textContent = S.pages.filter(function (p) { return !p.nav; }).length;
   }
 
   function renderBelongs() {
     var sel = $('fBelongs');
     var cur = sel.value;
     var list = [];
-    S.pages.forEach(function (p) { if (list.indexOf(p.belongs) === -1) list.push(p.belongs); });
+    S.pages.forEach(function (p) {
+      if (p.nav) return; // 店铺导航不是页面，不进「归属」筛选
+      if (list.indexOf(p.belongs) === -1) list.push(p.belongs);
+    });
     sel.innerHTML = '<option value="">全部</option>' + list.map(function (b) {
       return '<option value="' + attr(b) + '">' + esc(b) + '</option>';
     }).join('');
@@ -233,11 +253,49 @@
   function filtered() {
     var f = S.filters;
     return S.pages.filter(function (p) {
+      if (p.nav) return false; // 店铺导航走列表上方的独立卡片，不混进页面表格
       if (f.name && (p.name + p.key + p.note).toLowerCase().indexOf(f.name.toLowerCase()) === -1) return false;
       if (f.belongs && p.belongs !== f.belongs) return false;
       if (f.status === 'draft' && !p.hasDraft) return false;
       return true;
     });
+  }
+
+  /**
+   * 「店铺导航」卡片（列表页顶部）。
+   *
+   * 对标有赞的「导航设置」：底部导航是**全局**的，混在页面列表里会让人误以为
+   * 「不装修它就不生效」，所以单独拎出来一张卡 —— 显示导航项、有无未发布草稿，
+   * 以及一个直达编辑器的入口。
+   */
+  function renderNavCard() {
+    var box = $('navCard');
+    if (!box) return;
+
+    var nav = S.pages.filter(function (p) { return p.nav; })[0];
+    if (!nav) { box.hidden = true; return; }
+    box.hidden = false;
+
+    var items = (S.tabbar && S.tabbar.items) || [];
+    var chips = items.map(function (it) {
+      return '<span class="nv-chip">' + esc(it.text || '') + '</span>';
+    }).join('');
+
+    box.innerHTML =
+      '<div class="nv-main">' +
+        '<div class="nv-title">店铺导航' +
+          '<span class="type-tag nav">全局配置</span>' +
+          (nav.hasDraft
+            ? '<span class="tag warn">有未发布草稿</span>'
+            : '<span class="tag ok">已发布</span>') +
+        '</div>' +
+        '<div class="nv-sub">' + esc(nav.desc || '') + '</div>' +
+        '<div class="nv-chips">' + (chips || '<span class="dim">—</span>') + '</div>' +
+      '</div>' +
+      '<div class="nv-ops">' +
+        '<button class="btn primary" data-open="nav" title="配置小程序底部导航栏">设置底部导航</button>' +
+        '<button class="btn sm" data-vers="nav" title="历史版本与回滚">版本</button>' +
+      '</div>';
   }
 
   /**
@@ -304,15 +362,17 @@
       rows.appendChild(tr);
     });
 
-    var draftCount = S.pages.filter(function (p) { return p.hasDraft; }).length;
-    var customCount = S.pages.filter(function (p) { return p.custom; }).length;
-    $('listFoot').innerHTML = '共 <b>' + S.pages.length + '</b> 个页面（内置 5 个' +
+    var pagesOnly = S.pages.filter(function (p) { return !p.nav; });
+    var draftCount = pagesOnly.filter(function (p) { return p.hasDraft; }).length;
+    var customCount = pagesOnly.filter(function (p) { return p.custom; }).length;
+    $('listFoot').innerHTML = '共 <b>' + pagesOnly.length + '</b> 个页面（内置 5 个' +
       (customCount ? ' + 自定义 <b>' + customCount + '</b> 个' : '') + '）' +
       (draftCount ? '，其中 <b>' + draftCount + '</b> 个有未发布草稿' : '') +
       '。<br><b>内置页</b>对应小程序的固定页面，不能删除；<b>自定义页</b>用右上角「+ 新建页面」创建，' +
       '发布后写入 <code>replica.CUSTOM_PAGES</code>，小程序端通过 <code>pages/custom/index?key=标识</code> 打开。' +
       '编辑只改草稿；点「立即发布」才写回 <code>miniprogram/config/replica.js</code>，发布前自动备份到 ' +
-      '<code>server/data/decorate/backup/</code>，可随时回滚（保留最近 20 个版本）。';
+      '<code>server/data/decorate/backup/</code>，可随时回滚（保留最近 20 个版本）。' +
+      '<br><b>底部导航</b>是全局配置，不在上面的页面列表里 —— 点列表上方的「店铺导航」设置。';
   }
 
   /* =========================================================================
@@ -331,8 +391,9 @@
       $('edName').textContent = d.meta.name;
       $('edPath').textContent = d.meta.path;
       $('phTitle').textContent = d.meta.name;
-      highlightTab(d.meta.key);
       applyPageChrome(d.meta);
+      // 底部导航是全局配置，异步补一次（不阻塞编辑器打开）
+      loadTabbar().then(function () { renderTabbar(); });
       renderLib();
       renderTree();
       renderInspector();
@@ -345,26 +406,62 @@
     });
   }
 
-  function highlightTab(key) {
-    var order = ['home', 'lexy', 'news', 'product', 'mine'];
-    var idx = order.indexOf(key);
-    var spans = $('phTabbar').querySelectorAll('span');
-    for (var i = 0; i < spans.length; i++) {
-      spans[i].style.color = i === idx ? '#C8102E' : '';
-      spans[i].style.fontWeight = i === idx ? '600' : '';
+  /**
+   * 底部导航（手机壳）渲染。
+   *
+   * 配置来自装修台「店铺导航」的**已发布**数据 —— 它是全局设置，不属于正在编辑的这个页面，
+   * 所以编辑别的页面时这里显示的就是线上状态（与真机一致）。
+   * 渲染实现与 /preview 共用 PvTabbar：各写一份必然走样，这个项目已经踩过这种坑。
+   */
+  function renderTabbar() {
+    var meta = (S.cur && S.cur.meta) || null;
+    var isCustom = !!(meta && meta.custom);
+    var cfg = S.tabbar;
+    var active = '';
+
+    if (meta && meta.nav) {
+      /*
+       * 正在编辑「店铺导航」：用**草稿**实时预览（改一个字就能在手机壳上看到），
+       * 并把「页面布局」里选中的那一项高亮出来 —— 否则看不出选中态长什么样。
+       */
+      cfg = (S.cur && S.cur.data) || S.tabbar;
+      var m = /^items\.(\d+)$/.exec(String(S.sel || ''));
+      if (m) {
+        var item = ((S.cur.data || {}).items || [])[Number(m[1])];
+        if (item && item.path) active = item.path;
+      }
+    } else if (!isCustom) {
+      active = TAB_PATH[(meta && meta.key) || ''] || '';
     }
+
+    window.PvTabbar.apply($('phTabbar'), cfg, active, isCustom);
+  }
+
+  /** 拉一次「店铺导航」的已发布配置（全局配置，缓存住；回到列表页时清缓存以便发布后刷新） */
+  function loadTabbar(force) {
+    if (S.tabbar && !force) return Promise.resolve(S.tabbar);
+    return api('GET', '/api/decorate/page', { query: { key: 'nav' } }).then(function (d) {
+      S.tabbar = d.published || null;
+      return S.tabbar;
+    }).catch(function () {
+      return null; // 拉不到就用 PvTabbar 的兜底默认值，不阻塞编辑器
+    });
   }
 
   /**
    * 自定义页与内置页在编辑器里的外观差异：
    * 自定义页是独立落地页，不属于 tabBar 的 5 个主页面，预览里把底部导航隐藏掉，
-   * 免得运营误以为它会出现在 tabBar 上。
+   * 免得运营误以为它会出现在 tabBar 上（真机上也没有）。
    */
   function applyPageChrome(meta) {
     var isCustom = !!(meta && meta.custom);
-    $('phTabbar').hidden = isCustom;
-    $('edPageTag').textContent = isCustom ? '自定义页' : '内置页';
-    $('edPageTag').style.color = isCustom ? '#155bd4' : '';
+    var isNav = !!(meta && meta.nav);
+    $('edPageTag').textContent = isNav ? '全局配置' : (isCustom ? '自定义页' : '内置页');
+    $('edPageTag').style.color = isNav ? '#b76e00' : (isCustom ? '#155bd4' : '');
+    $('phTitle').textContent = (meta && meta.name) || '首页';
+    // 店铺导航没有「区块」可加，左栏组件库整栏收起（见 admin.css 的 .nav-mode）
+    $('viewEdit').classList.toggle('nav-mode', isNav);
+    renderTabbar();
   }
 
   function renderDirty() {
@@ -735,7 +832,7 @@
     S.sel = path;
     renderTree();
     renderInspector();
-    renderPreview();
+    renderPreview();  // 内部会一并刷新底部导航（选中哪一项就高亮哪一项）
     if ($('autoScroll').checked) scrollToSel();
   }
 
@@ -768,9 +865,13 @@
     var lists = [];
 
     if (loc.root) {
-      titleName = '页面设置 · ' + S.cur.meta.name;
+      // 店铺导航没有「页面设置」的概念，标题与提示都换成导航自己的说法
+      var isNavRoot = !!(S.cur.meta && S.cur.meta.nav);
+      titleName = (isNavRoot ? '' : '页面设置 · ') + S.cur.meta.name;
       titleDesc = S.cur.meta.desc || '';
-      tip = '页面级设置作用于整页；页面内的区块请在左侧「页面布局」中增删排序。';
+      tip = isNavRoot
+        ? '底部导航是小程序的全局配置：这里的改动发布后，5 个内置页面的底部导航会同时生效。'
+        : '页面级设置作用于整页；页面内的区块请在左侧「页面布局」中增删排序。';
       splitFields(S.cur.schema.fields, fields, lists);
     } else if (loc.node.type === 'union') {
       var kind = loc.node.kinds[loc.data ? loc.data[loc.node.kindField] : ''] || null;
@@ -1481,8 +1582,33 @@
    * ========================================================================= */
 
   function renderPreview() {
+    /*
+     * 底部导航跟着一起刷新。
+     * 放在这里而不是逐个改 write / moveItem / dupItem / removeItem ——
+     * 装修台的约定是「数据变了就 renderPreview()」，挂在这里就不会漏；
+     * 逐个加的话，哪天新增一个改数据的方法忘了同步，底部导航就会悄悄停在旧样子。
+     */
+    renderTabbar();
+
     var host = $('preview');
     if (!S.cur) { host.innerHTML = ''; return; }
+
+    /*
+     * 店铺导航：底部导航是全局配置，没有「页面内容」可预览，
+     * 真正的导航条画在手机壳底部的 #phTabbar（见 renderTabbar）。
+     * 这里给手机屏里一块说明，免得中间空着让人以为没加载出来。
+     */
+    if (S.cur.meta && S.cur.meta.nav) {
+      host.innerHTML =
+        '<div class="nv-hint">' +
+          '<b>底部导航是全局设置</b>' +
+          '每个「内置页」底部都会出现这一条，改完后小程序里 5 个主页面同时生效。<br>' +
+          '点左侧任一项可改名称 / 图标 / 跳转页面；<br>' +
+          '在底部这条导航栏里看实时效果，颜色与项数在右侧属性面板里调。' +
+        '</div>';
+      return;
+    }
+
     try {
       /*
        * 渲染核心在 /shared/pv-render.js —— 装修台（编辑态）与前端预览页（展示态）
@@ -2434,10 +2560,21 @@
 
   $('btnCreatePage').onclick = createPageDialog;
 
-  $('pageRows').addEventListener('click', function (e) {
-    var t = e.target;
-    var key = t.getAttribute('data-open');
-    if (key) { openPage(key); return; }
+  /*
+   * 列表页的点击委托挂在 document 上。
+   *
+   * 原来只绑在 #pageRows（页面表格）上 —— 这次新增的「店铺导航」卡片在表格**之外**，
+   * 沿用旧写法会点了没反应（按钮有、事件收不到，最难查的一类 bug）。
+   * 改用 closest 取最近的命中元素：按钮里的文字节点也能点中。
+   * 用「列表视图可见」做闸门，避免编辑器视图里的同名 data-* 属性被误处理。
+   */
+  document.addEventListener('click', function (e) {
+    if ($('viewList').hidden) return;
+    var t = e.target && e.target.closest
+      ? e.target.closest('[data-open],[data-diff],[data-vers],[data-discard],[data-rename],[data-del]')
+      : null;
+    if (!t) return;
+    var key = t.getAttribute('data-open'); if (key) { openPage(key); return; }
     key = t.getAttribute('data-diff'); if (key) { showDiff(key); return; }
     key = t.getAttribute('data-vers'); if (key) { showVersions(key); return; }
     key = t.getAttribute('data-discard'); if (key) { discardDraft(key); return; }

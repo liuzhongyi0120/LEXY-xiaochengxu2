@@ -209,22 +209,10 @@ html, body { height: 100%; margin: 0; }
 }
 
 /* tabBar：app.json 里没配 iconPath，所以真机上是纯文字（别自作主张加图标） */
-.tabbar {
-  display: flex;
-  height: 50px;
-  border-top: 1px solid rgba(0, 0, 0, .12);
-  background: #fff;
-}
-.tabbar span {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 10px;
-  color: #999;
-}
-.tabbar span.on { color: #C8102E; }
-.tabbar[hidden] { display: none !important; }
+/*
+ * 底部导航（#phTabbar）的结构与样式统一在 /shared/pv-tabbar.js 里（与装修台手机壳共用一份），
+ * 这里不再重复写 —— 各写一份必然走样。
+ */
 
 /* 手机壳下方的底部安全区（真机的 home indicator 区域） */
 .phone::after {

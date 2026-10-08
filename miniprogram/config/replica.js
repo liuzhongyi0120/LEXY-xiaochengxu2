@@ -13,7 +13,7 @@
  *    接入真实商品库后，把 onTapGoods 的预览逻辑替换为商品详情跳转即可。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 16:32:51（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-08 17:34:20（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -821,6 +821,47 @@ const PAGE_META = {
   }
 };
 
+/** ---------------- 店铺导航（底部 tabBar 外观，装修后台「店铺导航」面板） ---------------- */
+const TABBAR = {
+  color: "#8A8A8A",
+  selectedColor: "#C8102E",
+  background: "#FFFFFF",
+  borderColor: "#EEEEEE",
+  iconMode: "always",
+  items: [
+    {
+      path: "/pages/index/index",
+      text: "首页",
+      icon: "",
+      activeIcon: ""
+    },
+    {
+      path: "/pages/lexy/lexy",
+      text: "莱克",
+      icon: "",
+      activeIcon: ""
+    },
+    {
+      path: "/pages/news/news",
+      text: "资讯",
+      icon: "",
+      activeIcon: ""
+    },
+    {
+      path: "/pages/product/product",
+      text: "产品",
+      icon: "",
+      activeIcon: ""
+    },
+    {
+      path: "/pages/mine/mine",
+      text: "我的",
+      icon: "",
+      activeIcon: ""
+    }
+  ]
+};
+
 module.exports = {
   SHOP,
   HOME_BLOCKS,
@@ -828,5 +869,6 @@ module.exports = {
   NEWS,
   PRODUCT_NAV_LOGO,
   PRODUCT_BRANDS,
-  PAGE_META
+  PAGE_META,
+  TABBAR
 };

@@ -350,9 +350,11 @@ await call('POST', '/api/auth/logout', { body: {} });
 
 /* 15.5 店铺装修后台点位（全部无副作用：发布/回滚走「无草稿/无版本」的预期失败分支） */
 const decoPages = await call('GET', '/api/decorate/pages', { auth: false });
-assert('装修页面列表返回 5 个页面',
-  decoPages.ok && decoPages.data.list.length === 5,
-  `实际 ${decoPages.data ? decoPages.data.list.length : 0} 个`);
+assert('装修页面列表 = 5 个内置页面 + 1 个全局配置项（店铺导航，nav 标记）',
+  decoPages.ok && decoPages.data.list.length === 6 &&
+  decoPages.data.list.filter((p) => !p.nav).length === 5 &&
+  decoPages.data.list.filter((p) => p.nav).length === 1,
+  decoPages.data ? `共 ${decoPages.data.list.length} 项，其中 nav 标记 ${decoPages.data.list.filter((p) => p.nav).length} 项` : '无返回');
 
 /* 组件库清单：基础组件需与有赞实测的 54 个一致；已接入组件数 = 首页区块类型数 */
 const decoLib = await call('GET', '/api/decorate/lib', { auth: false });
@@ -1739,6 +1741,232 @@ for (const key of ['home', 'lexy', 'news', 'product', 'mine']) {
 assert('真实已发布数据渲染：展示态无编辑装饰、编辑态保留装饰（两态确实不同）',
   pvSeen.length > 0 && pvBad.length === 0,
   pvBad.length ? pvBad.join(' | ') : `${pvSeen.join('/')} 共 ${pvSeen.length} 页，两态渲染均正常`);
+
+/* ---------------------------------------------------------------------------
+ * 15.11 店铺导航（底部 tabBar）—— 复刻有赞「店铺导航」独立装修页
+ *
+ * 有赞把这件事做成了独立入口（/v4/deco/retail-shopnav-config#bottom），本项目复刻为
+ * 装修台列表上方的「店铺导航」卡片，数据落在**全局字段** replica.TABBAR（key = nav）。
+ *
+ * 它与其它页有一个本质区别：它不是页面，是全局配置 —— 5 个 tab 页共用同一份。
+ * 因此这里锁死四组「错了就静默失效」的约束：
+ *
+ *  A. 微信硬限制：tabBar 页面必须静态声明在 app.json。schema.TABBAR_PAGES 必须与
+ *     app.json 的 tabBar.list **完全一致** —— 否则运营能选中一个 switchTab 打不开的
+ *     页面（真机点击没反应，而开发者工具不报任何错）。
+ *  B. custom-tab-bar 四件套 + tabBar.custom:true + 每个 tab 页的 usingComponents：
+ *     漏 usingComponents，真机上底部导航**整个不渲染**（同样不报错）。
+ *  C. 高亮同步必须 5 个 tab 页**全都有**：组件实例每页一份，漏一个就是
+ *     「切过去了还高亮着上一个」，且只在切到那个页面时才复现，极易漏测。
+ *  D. 兜底值三处一致（后端 schema / 小程序组件 / 预览渲染 pv-tabbar.js）：
+ *     本项目吃过「同一份数据多处消费各写一份必然走样」的亏，这里直接做值对账。
+ *
+ * 写入类断言只在「当前没有未发布的导航草稿」时执行，跑完立刻丢弃 ——
+ * 绝不覆盖运营手上那份未发布的导航改动。
+ * ------------------------------------------------------------------------- */
+const NAV_SCHEMA = pvRequire(join(__dirname, '..', 'decorate', 'schema.js'));
+const NAV_CTB = join(MP_ROOT, 'custom-tab-bar');
+const NAV_APP_PATHS = ((appJson.tabBar || {}).list || []).map((t) => '/' + t.pagePath);
+const NAV_SCHEMA_PATHS = NAV_SCHEMA.TABBAR_PAGES.map((p) => p.path);
+
+/* ---- A. 候选页面 = app.json 的 tabBar.list（微信硬限制） ---- */
+assert('店铺导航的候选页面与 app.json 的 tabBar.list 完全一致（微信限制：tabBar 页面必须静态声明）',
+  NAV_APP_PATHS.length === NAV_SCHEMA_PATHS.length && NAV_APP_PATHS.every((p, i) => p === NAV_SCHEMA_PATHS[i]),
+  `app.json: ${NAV_APP_PATHS.join(' ')} ｜ schema: ${NAV_SCHEMA_PATHS.join(' ')}`);
+assert('app.json 开启自定义 tabBar 且 list 仍完整声明（微信要求 list 必填，缺了直接启动失败）',
+  (appJson.tabBar || {}).custom === true && NAV_APP_PATHS.length >= 2 && NAV_APP_PATHS.length <= 5,
+  `custom=${(appJson.tabBar || {}).custom} · list ${NAV_APP_PATHS.length} 项`);
+assert('导航项数与文案上限锁定微信口径（2~5 项 · 文案 ≤5 字）',
+  NAV_SCHEMA.TABBAR_MIN === 2 && NAV_SCHEMA.TABBAR_MAX === 5 && NAV_SCHEMA.TABBAR_TEXT_MAX === 5,
+  `min=${NAV_SCHEMA.TABBAR_MIN} · max=${NAV_SCHEMA.TABBAR_MAX} · 文案≤${NAV_SCHEMA.TABBAR_TEXT_MAX}字`);
+assert('app.json 的 tabBar 配色与 schema 默认值一致（custom:true 后不生效，但它是「初始外观」的说明）',
+  (((appJson.tabBar || {}).color || '').toLowerCase() === NAV_SCHEMA.TABBAR_DEFAULTS.color.toLowerCase()) &&
+  (((appJson.tabBar || {}).selectedColor || '').toLowerCase() === NAV_SCHEMA.TABBAR_DEFAULTS.selectedColor.toLowerCase()),
+  `app.json ${(appJson.tabBar || {}).color}/${(appJson.tabBar || {}).selectedColor}`);
+
+/* ---- B. custom-tab-bar 四件套 + 每个 tab 页的 usingComponents ---- */
+const navCtbMissing = ['index.js', 'index.json', 'index.wxml', 'index.wxss'].filter((f) => !existsSync(join(NAV_CTB, f)));
+assert('custom-tab-bar 四件套齐全（目录名与文件名都是微信写死的，不可自定义）',
+  navCtbMissing.length === 0,
+  navCtbMissing.length ? '缺失：' + navCtbMissing.join(', ') : 'index.js / index.json / index.wxml / index.wxss');
+const navCtbJson = JSON.parse(readFileSync(join(NAV_CTB, 'index.json'), 'utf8'));
+assert('custom-tab-bar/index.json 声明为组件',
+  navCtbJson.component === true && !!navCtbJson.usingComponents && typeof navCtbJson.usingComponents === 'object',
+  JSON.stringify(navCtbJson));
+const navNoUC = NAV_APP_PATHS.filter((p) => {
+  try {
+    return !('usingComponents' in JSON.parse(readFileSync(join(MP_ROOT, p.replace(/^\//, '') + '.json'), 'utf8')));
+  } catch (e) { return true; }
+});
+assert('每个 tab 页的 json 都声明了 usingComponents（漏写真机上底部导航整个不渲染，且不报错）',
+  navNoUC.length === 0,
+  navNoUC.length ? '未声明：' + navNoUC.join('、') : `${NAV_APP_PATHS.length} 个 tab 页全部声明`);
+
+/* ---- C. 高亮同步：5 个 tab 页全都要有，且只能有一处实现 ---- */
+const navCtbSrc = readFileSync(join(NAV_CTB, 'index.js'), 'utf8');
+const navPageJs = (p) => readFileSync(join(MP_ROOT, p.replace(/^\//, '') + '.js'), 'utf8');
+const navNoSync = NAV_APP_PATHS.filter((p) => !/utils\/tabbar/.test(navPageJs(p)) || !/syncTabBar\s*\(\s*this\s*\)/.test(navPageJs(p)));
+assert('5 个 tab 页都在 onShow 里同步底部导航高亮（组件实例每页一份，漏一个 = 切过去还高亮着上一个）',
+  navNoSync.length === 0,
+  navNoSync.length ? '未同步：' + navNoSync.join('、') : `${NAV_APP_PATHS.length} 个 tab 页全部同步`);
+const navSelfSync = NAV_APP_PATHS.filter((p) => /getTabBar\s*\(/.test(navPageJs(p)));
+assert('tab 页不自己调 getTabBar()（同步逻辑收敛在 utils/tabbar.js 一处实现）',
+  navSelfSync.length === 0 && /function syncTabBar/.test(readFileSync(join(MP_ROOT, 'utils', 'tabbar.js'), 'utf8')),
+  navSelfSync.length ? '页面内自写同步：' + navSelfSync.join('、') : 'syncTabBar 唯一实现，页面只传 this');
+assert('高亮按页面路径匹配、未命中置 -1（装修台可改顺序，用序号必然错位；宁可不亮也不错亮）',
+  /setActive\s*\(\s*path\s*\)/.test(navCtbSrc) && /items\[i\]\.path === path/.test(navCtbSrc) && /index = -1/.test(navCtbSrc),
+  'setActive(path)：按 items[i].path 匹配，找不到给 selected=-1');
+const navOnTapSrc = navCtbSrc.slice(navCtbSrc.indexOf('onTap('));
+assert('点击导航项时不立刻在组件里改高亮（否则与目标页 onShow 的同步打架 → 高亮闪烁）',
+  navCtbSrc.indexOf('onTap(') > 0 && !/setData\s*\(/.test(navOnTapSrc),
+  'onTap 内只 wx.switchTab，高亮交给目标页同步');
+
+/* ---- D. 兜底值三处一致（后端 schema / 小程序组件 / 预览渲染） ---- */
+const NAV_PV = pvRequire(join(PUB, 'shared', 'pv-tabbar.js')).PvTabbar;
+// 组件文件需要 Component / wx 全局，直接 require 跑不起来 —— 用 vm 跑一遍，取出它内部算好的初始渲染数据
+const navVm = await import('node:vm');
+const navMakeRequire = (await import('node:module')).createRequire;
+const navCtbDef = {};
+const navSandbox = { console, require: navMakeRequire(join(NAV_CTB, 'index.js')), Component: (d) => { navCtbDef.value = d; } };
+navVm.createContext(navSandbox);
+navVm.runInContext(navCtbSrc, navSandbox, { filename: 'custom-tab-bar/index.js' });
+const navCanon = (c) => JSON.stringify({
+  color: c.color, selectedColor: c.selectedColor, background: c.background,
+  borderColor: c.borderColor, iconMode: c.iconMode,
+  items: (c.items || []).map((i) => [i.path, i.text, i.icon || '', i.activeIcon || ''])
+});
+const navTrio = {
+  '后端 schema': NAV_SCHEMA.tabbarDefault(),
+  '小程序组件': ((navCtbDef.value || {}).data) || {},
+  '预览渲染': NAV_PV.normalize(null)
+};
+const navTrioVals = Object.keys(navTrio).map((k) => [k, navCanon(navTrio[k])]);
+const navTrioUniq = Array.from(new Set(navTrioVals.map((x) => x[1])));
+assert('底部导航兜底值三处一致（后端 schema / 小程序组件 / 预览渲染 pv-tabbar.js）',
+  navTrioVals[1][1].indexOf('"items":[]') < 0 && navTrioUniq.length === 1,
+  navTrioUniq.length === 1
+    ? `${navTrioVals.length} 处一致（当前 replica.js 尚未发布过导航，组件正是靠这份兜底渲染）：${navTrioUniq[0].slice(0, 72)}…`
+    : navTrioVals.map((x) => x[0] + '=' + x[1]).join(' ｜ '));
+
+/* ---- E. 装修链路：列表 / 字段结构 / 校验边界（写入类断言跑完即丢弃草稿） ---- */
+const navPagesRes = await call('GET', '/api/decorate/pages', { auth: false });
+const navMeta = ((navPagesRes.data || {}).list || []).filter((x) => x.key === 'nav')[0];
+assert('「店铺导航」以全局配置项出现在装修台列表（belongs=全局设置 · source=replica.TABBAR · nav 标记）',
+  !!navMeta && navMeta.belongs === '全局设置' && navMeta.source === 'replica.TABBAR' && navMeta.nav === true,
+  navMeta ? `${navMeta.name} · ${navMeta.belongs} · ${navMeta.source}` : '未找到 key=nav');
+assert('店铺导航是全局配置，不被当成第 6 个页面混进页面列表（仅 nav 标记一项）',
+  ((navPagesRes.data || {}).list || []).filter((x) => x.nav === true).length === 1,
+  `列表 ${((navPagesRes.data || {}).list || []).length} 项，其中 nav 1 项`);
+
+const navOpen = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'nav' } });
+const navFields = navOpen.ok ? (navOpen.data.schema.fields || []) : [];
+assert('店铺导航的字段结构 = 图标样式 / 导航项 / 配色组（由 schema 自动推导，后台表单不硬编码）',
+  navOpen.ok && navFields.length === 3 && navFields[0].k === 'iconMode' && navFields[1].k === 'items' &&
+  navFields[2].type === 'group',
+  navOpen.ok ? navFields.map((f) => f.k || ('group:' + f.label)).join(' / ') : navOpen.json.msg);
+assert('导航项的「跳转页面」是下拉选择，选项恰为 app.json 的 5 个 tabBar 页面',
+  (() => {
+    const items = navFields.filter((f) => f.k === 'items')[0];
+    const pathField = items && items.item && (items.item.fields || []).filter((f) => f.k === 'path')[0];
+    return !!pathField && pathField.type === 'select' && (pathField.options || []).length === NAV_APP_PATHS.length;
+  })(),
+  'items.item.fields.path → select（5 个候选页面）');
+
+const navDiff0 = await call('GET', '/api/decorate/diff', { auth: false, query: { key: 'nav' } });
+if (navDiff0.data && navDiff0.data.hasDraft) {
+  assert('店铺导航：检测到未发布的导航草稿，跳过写入类断言（不覆盖运营手上那份改动）',
+    true, '仅做只读校验，草稿原样保留');
+} else {
+  const navBase = NAV_SCHEMA.tabbarDefault();
+  const navDraft = (data, expectFail) => call('POST', '/api/decorate/draft', { body: { key: 'nav', data }, expectFail });
+
+  const navBadPath = await navDraft(Object.assign({}, navBase, { items: [
+    { path: '/pages/product/product', text: '产品' }, { path: '/pages/custom/index', text: '自定义页' }
+  ] }), '跳转页面必须是 app.json 里声明过的 tabBar 页面');
+  assert('导航项挑了非 tabBar 页面时被拦（否则真机上点了没反应，而开发者工具不报错）',
+    navBadPath.json.code !== 0 && /微信限制|不在小程序底部导航候选/.test(navBadPath.json.msg || ''),
+    navBadPath.json.msg);
+
+  const navFew = await navDraft(Object.assign({}, navBase, {
+    items: [{ path: '/pages/index/index', text: '首页' }]
+  }), '底部导航至少 2 项');
+  assert('导航项只有 1 项时被拦（微信要求 2~5 项）',
+    navFew.json.code !== 0 && /至少需要 2 项/.test(navFew.json.msg || ''), navFew.json.msg);
+
+  const navMany = await navDraft(Object.assign({}, navBase, { items: [
+    { path: '/pages/index/index', text: '一' }, { path: '/pages/lexy/lexy', text: '二' },
+    { path: '/pages/news/news', text: '三' }, { path: '/pages/product/product', text: '四' },
+    { path: '/pages/mine/mine', text: '五' }, { path: '/pages/index/index', text: '六' }
+  ] }), '底部导航最多 5 项');
+  assert('导航项超过 5 项时被拦（微信要求 2~5 项）',
+    navMany.json.code !== 0 && /最多 5 项/.test(navMany.json.msg || ''), navMany.json.msg);
+
+  const navDup = await navDraft(Object.assign({}, navBase, { items: [
+    { path: '/pages/index/index', text: '首页' }, { path: '/pages/lexy/lexy', text: '莱克' },
+    { path: '/pages/news/news', text: '资讯' }, { path: '/pages/lexy/lexy', text: '莱克又一次' }
+  ] }), '同一个页面只能出现一次');
+  assert('同一页面配两次被拦（否则运营配了 4 项、真机只显示 3 项，且两处指向同一页 —— 静默少一项最难查）',
+    navDup.json.code !== 0 && /同一个页面只能出现一次/.test(navDup.json.msg || ''), navDup.json.msg);
+
+  const navOkDraft = await navDraft({
+    iconMode: 'active', color: '#123456', selectedColor: '#abcdef',
+    background: '#FFFFFF', borderColor: '#EEEEEE',
+    items: [{ path: '/pages/mine/mine', text: '我的首页啦啊哦' }, { path: '/pages/index/index', text: '' }]
+  });
+  assert('导航草稿可保存（顺序可改、文案可留空、色值大小写随意）',
+    navOkDraft.ok, navOkDraft.ok ? '已保存' : navOkDraft.json.msg);
+
+  const navDiff1 = await call('GET', '/api/decorate/diff', { auth: false, query: { key: 'nav' } });
+  assert('导航改动进入「待发布」状态并给出变更清单',
+    navDiff1.ok && navDiff1.data.hasDraft === true && navDiff1.data.total > 0,
+    navDiff1.ok ? `hasDraft=${navDiff1.data.hasDraft} · 变更 ${navDiff1.data.total} 处` : navDiff1.json.msg);
+
+  /*
+   * 归一化发生在**发布**那一刻（草稿原样保留，写回 replica.js 前统一收敛）。
+   * 这里直接跑发布器用到的那一步：去重 / 文案截 5 字 / 空文案回落页面名 / 色值转大写，
+   * 且必须幂等 —— 发布链路的「无损校验」正是靠幂等才成立。
+   */
+  const navOut = {};
+  NAV_SCHEMA.get('nav').to({
+    iconMode: 'active', color: '#123456', selectedColor: '#abcdef',
+    items: [
+      { path: '/pages/mine/mine', text: '我的首页啦啊哦' },
+      { path: '/pages/index/index', text: '' },
+      { path: '/pages/mine/mine', text: '重复项' }
+    ]
+  }, navOut);
+  const navOutItems = (navOut.TABBAR || {}).items || [];
+  assert('发布前归一化：去重 / 文案截 5 字 / 空文案回落页面名 / 色值转大写 / 幂等',
+    navOutItems.length === 2 && navOutItems[0].text === '我的首页啦' && navOutItems[0].path === '/pages/mine/mine' &&
+    navOutItems[1].text === '首页' && navOut.TABBAR.color === '#123456' && navOut.TABBAR.selectedColor === '#ABCDEF' &&
+    navOut.TABBAR.iconMode === 'active' &&
+    JSON.stringify(NAV_SCHEMA.normalizeTabbar(navOut.TABBAR)) === JSON.stringify(navOut.TABBAR),
+    `${navOutItems.map((i) => i.text + '@' + i.path).join(' / ')} · color=${navOut.TABBAR.color} · 幂等=${JSON.stringify(NAV_SCHEMA.normalizeTabbar(navOut.TABBAR)) === JSON.stringify(navOut.TABBAR)}`);
+
+  await call('POST', '/api/decorate/discard', { body: { key: 'nav' } });
+  const navDiff2 = await call('GET', '/api/decorate/diff', { auth: false, query: { key: 'nav' } });
+  assert('导航草稿已丢弃，自检对环境零影响（可重复运行）',
+    navDiff2.ok && navDiff2.data.hasDraft === false, 'nav 草稿已清空');
+}
+
+/* ---- F. 发布器 / 装修台 / 预览页三处接线 ---- */
+const navEmitSrc = readFileSync(join(__dirname, '..', 'decorate', 'emit.js'), 'utf8');
+assert('发布器把 TABBAR 写进 replica.js 并列入导出清单（未发布过导航时整段省略，向后兼容）',
+  /data\.TABBAR !== undefined/.test(navEmitSrc) && /fields\.push\('TABBAR'\)/.test(navEmitSrc),
+  'emit.js：条件输出 const TABBAR + 导出清单追加');
+const navAdminHtml = readFileSync(join(PUB, 'admin', 'index.html'), 'utf8');
+const navPreviewHtmlSrc = readFileSync(join(PUB, 'preview', 'index.html'), 'utf8');
+assert('装修台与 /preview 的底部导航共用唯一实现 pv-tabbar.js（拒绝第二份手抄）',
+  /PvTabbar\.apply\(/.test(adminSrc) && /PvTabbar\.apply\(/.test(previewSrc) &&
+  adminSrc.indexOf('pvtb-item') < 0 && previewSrc.indexOf('pvtb-item') < 0,
+  'admin.js / preview.js 只传配置与高亮项，结构与样式都在 shared/pv-tabbar.js');
+assert('装修台手机壳与 /preview 都留有底部导航容器（#phTabbar），由 PvTabbar 接管',
+  /id="phTabbar"/.test(navAdminHtml) && /id="phTabbar"/.test(navPreviewHtmlSrc),
+  '#phTabbar 两处均存在');
+assert('装修台已删掉写死的文字导航条，底部导航改为独立可配置入口（列表上方 navCard）',
+  !/\.tabbar\s*[,{]/.test(adminCss) && !/\.tabbar\s*[,{]/.test(readFileSync(join(PUB, 'preview', 'preview.css'), 'utf8')) &&
+  /id="navCard"/.test(navAdminHtml) && /data-open="nav"/.test(adminSrc),
+  'admin.css / preview.css 已无 .tabbar 规则；列表页 navCard + data-open="nav"');
 
 /* 15.95 把本次自检消耗掉的库存补回（与 0.5 节呼应，保证可重复运行） */
 if (stockBefore.length) {

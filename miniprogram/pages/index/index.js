@@ -1,9 +1,15 @@
+const { syncTabBar } = require('../../utils/tabbar');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
 const { normalizeBlocks, loadGoodsData, applyShopAvatar } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
 
 Page(Object.assign({}, blockPageBehavior, {
+  /** 切页时同步底部导航高亮（自定义 tabBar 的实例每页一份，必须由页面主动通知） */
+  onShow() {
+    syncTabBar(this);
+  },
+
   data: {
     shop: resolveAssets(replica.SHOP),
     meta: (replica.PAGE_META && replica.PAGE_META.home) || { bg: '#F5F6F8', desc: '' },

@@ -883,6 +883,168 @@ const HOME_BLOCKS_NODE = {
   sortable: true, addable: true
 };
 
+/* ============================ 店铺导航（底部 tabBar，全局配置） ============================ */
+
+/**
+ * 小程序底部导航（tabBar）配置 —— 对标有赞「店铺导航」的底部导航面板。
+ *
+ * ⚠️ 微信硬限制（决定了这个功能的能力边界，必须写清楚，避免运营以为能随便加页面）：
+ *   tabBar 的页面必须**静态写死在 app.json 的 tabBar.list 里**（2~5 项），
+ *   运行时只能 wx.switchTab 打开这 5 个页面，且不支持带参数。
+ *   因此「店铺导航」能改的是 —— **文案 / 图标 / 顺序 / 显示哪几个 / 配色**，
+ *   不能把一个 app.json 没声明的页面（如自定义页）塞进底部导航。
+ *   候选页面因此固定为下面这 5 个。
+ *
+ * 项目实现方式：app.json 的 tabBar 开 `custom: true` + 新增 custom-tab-bar 组件，
+ * 组件从 replica.TABBAR 读配置渲染，于是「改导航」不再需要动代码、重新提审。
+ */
+const TABBAR_PAGES = [
+  { path: '/pages/index/index', name: '首页' },
+  { path: '/pages/lexy/lexy', name: '莱克' },
+  { path: '/pages/news/news', name: '资讯' },
+  { path: '/pages/product/product', name: '产品' },
+  { path: '/pages/mine/mine', name: '我的' }
+];
+
+/** 「跳转页面」下拉选项（value 用页面路径，与 replica 里存的一致） */
+const TABBAR_PAGE_OPTIONS = TABBAR_PAGES.map((p) => ({ value: p.path, label: p.name }));
+
+const TABBAR_MIN = 2;      // 微信要求 tabBar 至少 2 项
+const TABBAR_MAX = 5;      // 微信要求 tabBar 最多 5 项
+const TABBAR_TEXT_MAX = 5; // 导航文字最多 5 个字（与有赞一致）
+
+/** 全局默认配色与图标显示策略 */
+const TABBAR_DEFAULTS = {
+  color: '#8A8A8A',         // 未选中文字/图标色
+  selectedColor: '#C8102E', // 选中色（LEXY 品牌红）
+  background: '#FFFFFF',    // 导航栏背景色
+  borderColor: '#EEEEEE',   // 顶部分割线
+  iconMode: 'always'        // always 图标+文字 / active 仅选中显示图标 / never 纯文字
+};
+
+/** 默认 5 个导航项 = 当前 app.json 里的样子（纯文字、按内置顺序） */
+const TABBAR_DEFAULT_ITEMS = TABBAR_PAGES.map((p) => ({
+  path: p.path, text: p.name, icon: '', activeIcon: ''
+}));
+
+const TABBAR_ICON_MODES = ['always', 'active', 'never'];
+const TABBAR_HEX_RE = /^#[0-9a-fA-F]{6}$/;
+
+/** 默认整份导航配置（深拷贝，调用方可安全改写） */
+function tabbarDefault() {
+  return Object.assign({}, TABBAR_DEFAULTS, { items: clone(TABBAR_DEFAULT_ITEMS) });
+}
+
+/** 页面路径 → 中文名（装修台列表项标题用） */
+function tabbarPageName(path) {
+  const hit = TABBAR_PAGES.filter((p) => p.path === path)[0];
+  return hit ? hit.name : String(path || '未选择');
+}
+
+/** 归一化色值：非法值回落默认，绝不把 undefined / 脏值写进 replica.js */
+function tabbarColor(v, def) {
+  const s = typeof v === 'string' ? v.trim() : '';
+  return TABBAR_HEX_RE.test(s) ? s.toUpperCase() : def;
+}
+
+/** 归一化一个导航项 */
+function tabbarItem(it) {
+  const o = (it && typeof it === 'object') ? it : {};
+  const path = TABBAR_PAGES.some((p) => p.path === o.path) ? o.path : TABBAR_PAGES[0].path;
+  const raw = o.text === undefined || o.text === null ? '' : String(o.text);
+  /*
+   * 先 trim 再截断 —— 反过来写的话，粘贴进来的前导空格会**吃掉字数配额**
+   * （'   首页卡片' 会截成 '首页'）。末尾再 trim 一次是为了幂等：
+   * 截断结果可能以空格结尾，不收敛的话第二次归一化结果又会变。
+   * 「trim → slice → trim」在 schema / 小程序组件 / pv-tabbar 三处必须字面一致。
+   */
+  const text = raw.trim().slice(0, TABBAR_TEXT_MAX).trim();
+  return {
+    path,
+    text: text || tabbarPageName(path),
+    icon: typeof o.icon === 'string' ? o.icon : '',
+    activeIcon: typeof o.activeIcon === 'string' ? o.activeIcon : ''
+  };
+}
+
+/**
+ * 归一化整份导航配置。
+ *
+ * 幂等 —— 新老数据跑一遍结果一致（发布链路的「无损校验」依赖这一点）。
+ * 处理三件事：字段缺省回落默认、导航项去重（同一页面只能出现一次，
+ * 否则底部会有两处同时高亮）、项数收敛到微信要求的 2~5。
+ */
+function normalizeTabbar(v) {
+  const src = (v && typeof v === 'object') ? v : {};
+
+  let items = (Array.isArray(src.items) && src.items.length ? src.items : TABBAR_DEFAULT_ITEMS).map(tabbarItem);
+
+  // 去重：同一个页面在导航栏里只保留第一次出现的位置
+  const seen = {};
+  items = items.filter((it) => {
+    if (seen[it.path]) return false;
+    seen[it.path] = true;
+    return true;
+  });
+
+  if (items.length > TABBAR_MAX) items = items.slice(0, TABBAR_MAX);
+  while (items.length < TABBAR_MIN) {
+    const used = items.map((x) => x.path);
+    const free = TABBAR_PAGES.filter((p) => used.indexOf(p.path) < 0)[0] || TABBAR_PAGES[0];
+    items.push({ path: free.path, text: free.name, icon: '', activeIcon: '' });
+  }
+
+  const mode = TABBAR_ICON_MODES.indexOf(src.iconMode) >= 0 ? src.iconMode : TABBAR_DEFAULTS.iconMode;
+
+  return {
+    color: tabbarColor(src.color, TABBAR_DEFAULTS.color),
+    selectedColor: tabbarColor(src.selectedColor, TABBAR_DEFAULTS.selectedColor),
+    background: tabbarColor(src.background, TABBAR_DEFAULTS.background),
+    borderColor: tabbarColor(src.borderColor, TABBAR_DEFAULTS.borderColor),
+    iconMode: mode,
+    items
+  };
+}
+
+/** 店铺导航的字段声明（装修台表单由此自动推导） */
+const TABBAR_NODE = {
+  k: 'tabbar', label: '底部导航', type: 'object',
+  fields: [
+    {
+      k: 'iconMode', label: '图标样式', type: 'radiobutton', def: 'always',
+      options: [
+        { value: 'always', label: '图标+文字' },
+        { value: 'active', label: '仅选中显示图标' },
+        { value: 'never', label: '纯文字' }
+      ],
+      hint: '对标有赞「标准版：仅选中时展示图标」'
+    },
+    {
+      k: 'items', label: '导航项', type: 'list', max: TABBAR_MAX, sortable: true, addable: true,
+      item: {
+        type: 'object',
+        title: (v) => (v.text || '未命名') + ' → ' + tabbarPageName(v.path),
+        fields: [
+          { k: 'text', label: '导航名称', type: 'text', hint: '最多 ' + TABBAR_TEXT_MAX + ' 个字（超出自动截断）' },
+          { k: 'path', label: '跳转页面', type: 'select', options: TABBAR_PAGE_OPTIONS, hint: '只能选小程序底部导航自带的 5 个页面（微信限制）' },
+          { k: 'icon', label: '未选中图标', type: 'image', hint: '建议 80×80 透明底 PNG' },
+          { k: 'activeIcon', label: '选中图标', type: 'image', hint: '留空则选中态沿用未选中图标（配合选中色显示）' }
+        ]
+      },
+      hint: '最少 2 项、最多 5 项（微信限制）。拖动可排序，顺序即底部导航从左到右的顺序'
+    },
+    {
+      type: 'group', label: '配色',
+      fields: [
+        { k: 'color', label: '未选中颜色', type: 'color', def: '#8A8A8A' },
+        { k: 'selectedColor', label: '选中颜色', type: 'color', def: '#C8102E' },
+        { k: 'background', label: '导航背景色', type: 'color', def: '#FFFFFF' },
+        { k: 'borderColor', label: '顶部分割线', type: 'color', def: '#EEEEEE' }
+      ]
+    }
+  ]
+};
+
 /* ============================ 页面定义 ============================ */
 
 const PAGES = [
@@ -1100,6 +1262,21 @@ const PAGES = [
         SHOP_NODE
       ]
     }
+  },
+
+  /* ---------------------------- 店铺导航（全局配置，不是页面） ---------------------------- */
+  {
+    key: 'nav',
+    name: '店铺导航',
+    note: '底部导航栏',
+    belongs: '全局设置',
+    path: '(全局 · 不属于单个页面)',
+    desc: '小程序底部导航栏：导航名称 / 图标 / 顺序 / 配色，改完发布即刻生效',
+    source: 'replica.TABBAR',
+    nav: true,
+    from(R) { return normalizeTabbar(R && R.TABBAR); },
+    to(data, out) { out.TABBAR = normalizeTabbar(data); },
+    root: { type: 'object', fields: TABBAR_NODE.fields }
   }
 ];
 
@@ -1266,7 +1443,8 @@ function list() {
     path: p.path,
     desc: p.desc,
     source: p.source,
-    custom: !!p.custom
+    custom: !!p.custom,
+    nav: !!p.nav
   }));
 }
 
@@ -1315,4 +1493,4 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS };
+module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX };

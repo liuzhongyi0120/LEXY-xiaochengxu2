@@ -50,6 +50,9 @@
     <button class="btn" id="btnReload" title="重新拉取页面列表">刷新</button>
   </div>
 
+  <!-- 店铺导航：全局配置（对标有赞「导航设置」），单独一张卡，不混在页面列表里 -->
+  <div class="navcard" id="navCard" hidden></div>
+
   <div class="toolbar">
     <div class="filters">
       <label>页面名称 <input id="fName" placeholder="搜索页面名称 / 备注"></label>
@@ -136,9 +139,8 @@
           <span class="ph-dots">···</span>
         </div>
         <div class="phone-screen" id="preview"></div>
-        <div class="tabbar" id="phTabbar">
-          <span>首页</span><span>莱克</span><span>资讯</span><span>产品</span><span>我的</span>
-        </div>
+        <!-- 底部导航由 PvTabbar 按「店铺导航」的已发布配置渲染（不再写死 5 个文字） -->
+        <div id="phTabbar"></div>
       </div>
     </div>
   </div>
@@ -170,6 +172,8 @@
 
 <!-- 预览渲染核心：装修台（编辑态）与前端预览页（/preview）共用同一份实现，必须先于 admin.js 加载 -->
 <script src="/shared/pv-render.js"></script>
+<!-- 底部导航渲染：装修台手机壳与 /preview 共用同一份（样式也由它自带注入） -->
+<script src="/shared/pv-tabbar.js"></script>
 <script src="/admin/admin.js"></script>
 </body>
 </html>

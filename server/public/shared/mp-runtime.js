@@ -482,10 +482,23 @@
     });
   }
 
+  /**
+   * 读一个模块的导出。
+   * 预览页要拿 replica.TABBAR 渲染底部导航，走的就是这里 ——
+   * 与 renderPage 共用同一套源码缓存与依赖预取，不另起一套加载逻辑。
+   */
+  function loadModule(absPath) {
+    var abs = normalize(ensureExt(absPath));
+    return preload(abs).then(function () {
+      return runModule(abs).exports;
+    });
+  }
+
   root.MpRuntime = {
     fetchText: fetchText,
     preload: preload,
     renderPage: renderPage,
+    loadModule: loadModule,
     loadComponent: loadComponent,
     normalize: normalize,
     clearCache: function () { MODULES = {}; SOURCES = {}; TEXT_PROMISE = {}; }

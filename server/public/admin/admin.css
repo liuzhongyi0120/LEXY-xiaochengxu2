@@ -515,20 +515,62 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .ph-title { flex: 1; text-align: center; color: #666; }
 .ph-dots { color: #bbb; letter-spacing: 1px; }
 .phone-screen { position: relative; background: #fff; }
-.tabbar {
-  display: flex;
-  height: 46px;
-  border-top: 1px solid var(--line-2);
-  background: #fff;
+/*
+ * 底部导航不再由装修台自己画：结构与样式统一在 /shared/pv-tabbar.js（与 /preview 共用一份，
+ * 各写一份必然走样 —— 本项目的首屏海报就因为两处换算口径不同而错成 1.55 屏高）。
+ */
+
+/*
+ * 店铺导航编辑（.view.edit.nav-mode）：
+ * 底部导航是全局配置，没有「区块」可加，左栏组件库整栏收起；
+ * 手机屏里也没有页面内容，给一块说明占位。
+ */
+.view.edit.nav-mode .col-lib { display: none; }
+.nv-hint {
+  padding: 46px 24px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 2;
+  color: var(--gray-2);
 }
-.tabbar span {
-  flex: 1;
+.nv-hint b { display: block; margin-bottom: 10px; font-size: 13px; color: var(--gray); }
+
+/* 店铺导航卡片（列表页顶部）：全局配置，刻意不混进页面表格 */
+.navcard {
   display: flex;
   align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  color: #8a919e;
+  gap: 16px;
+  margin: 14px 24px 0;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--blue);
+  border-radius: var(--radius);
 }
+.navcard[hidden] { display: none !important; }
+.navcard .nv-main { flex: 1; min-width: 0; }
+.navcard .nv-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.navcard .nv-sub { margin-top: 4px; font-size: 12px; color: var(--gray); }
+.navcard .nv-chips { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+.navcard .nv-chip {
+  display: inline-block;
+  height: 22px;
+  line-height: 21px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: #fafbfc;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.navcard .nv-ops { display: flex; gap: 8px; flex: 0 0 auto; }
 
 /* 预览内的组件块 */
 .pv-block { position: relative; }
@@ -1266,6 +1308,8 @@ kbd {
   border-color: var(--blue-border);
   font-weight: 600;
 }
+/* 全局配置（店铺导航）：不是页面，用中性色区分，避免与「内置页」混淆 */
+.type-tag.nav { background: #fff7e6; color: #b76e00; border-color: #ffe0a3; font-weight: 600; }
 
 /* =========================================================================
  * 跳转链接（属性面板控件 + 「选择链接」弹层 + 预览角标）

@@ -181,7 +181,32 @@ const REQUIRED = {
     if (!d.navLogo) return '产品页缺少左栏 Logo';
     return '';
   },
-  mine: (d) => (d && d.shop && typeof d.shop === 'object' ? '' : '我的页缺少 shop 对象')
+  mine: (d) => (d && d.shop && typeof d.shop === 'object' ? '' : '我的页缺少 shop 对象'),
+  nav: (d) => {
+    if (!d || typeof d !== 'object') return '导航配置必须是对象';
+    if (!Array.isArray(d.items)) return '导航配置缺少 items 数组';
+    const items = d.items.filter((x) => x && x.path);
+    if (items.length < schema.TABBAR_MIN) return `底部导航至少需要 ${schema.TABBAR_MIN} 项（微信限制）`;
+    if (items.length > schema.TABBAR_MAX) return `底部导航最多 ${schema.TABBAR_MAX} 项（微信限制）`;
+    for (let i = 0; i < items.length; i++) {
+      if (!schema.TABBAR_PAGES.some((p) => p.path === items[i].path)) {
+        return `第 ${i + 1} 个导航项的跳转页面不在小程序底部导航候选里：${items[i].path}` +
+          '（只能选 app.json 里已声明的 5 个 tabBar 页面，微信限制）';
+      }
+      /*
+       * 同一个页面只能出现一次。
+       * 归一化里虽然有「重复只保留第一次」的兜底，但那是给历史数据/手改文件用的 ——
+       * 运营在装修台里配重复时**必须当场报错**：否则他配了 5 项、真机只有 4 项，
+       * 而且底部两项都点去同一个页面，属于「静默少一项」，比报错难查得多。
+       */
+      const dup = items.slice(0, i).findIndex((x) => x.path === items[i].path);
+      if (dup > -1) {
+        return `第 ${i + 1} 个导航项与第 ${dup + 1} 项跳转到同一个页面：${items[i].path}` +
+          '（同一个页面只能出现一次，否则底部会有两处同时高亮）';
+      }
+    }
+    return '';
+  }
 };
 
 function validate(key, data) {
@@ -219,6 +244,7 @@ function listPages() {
 function countBlocks(key, data) {
   if (!data) return 0;
   const page = schema.get(key);
+  if (key === 'nav') return (data.items || []).length;
   if (key === 'home' || (page && page.custom)) return (data.blocks || []).length;
   if (key === 'lexy') return (data.series || []).length;
   if (key === 'news') return (data.big || []).length + (data.small || []).length;

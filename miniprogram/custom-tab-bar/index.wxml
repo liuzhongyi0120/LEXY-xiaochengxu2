@@ -1,0 +1,31 @@
+<!--
+  自定义底部导航（tabBar）—— 由 app.json 的 tabBar.custom = true 接管渲染。
+
+  三个关键点（改这个文件前先读一遍）：
+    1. 高度必须自己撑到 50px + 底部安全区（env(safe-area-inset-bottom)），
+       与微信原生 tabBar 的高度一致，否则页面切换时底部会跳一下。
+    2. 选中色 / 未选中色 / 背景色来自装修台配置，只能用内联 style 传（wxss 里读不到 data）。
+    3. 图标用 image 而不是 cover-image：底部导航不需要盖在 map / video 之上，
+       普通 image 支持网络地址（装修台「本地上传」的素材就是 /uploads 地址）。
+-->
+<view class="tb" style="background: {{background}}; border-top: 1px solid {{borderColor}}">
+  <view
+    class="tb-item"
+    wx:for="{{items}}"
+    wx:key="path"
+    data-index="{{index}}"
+    bindtap="onTap"
+    style="color: {{selected === index ? selectedColor : color}}"
+  >
+    <!-- 图标框常驻占位：这样「仅选中显示图标」时文字不会上下跳动 -->
+    <view class="tb-icon-box" wx:if="{{item.hasIcon && iconMode !== 'never'}}">
+      <image
+        class="tb-icon"
+        src="{{(selected === index ? item.activeIcon : item.icon) || item.icon || item.activeIcon}}"
+        mode="aspectFit"
+        style="{{iconMode === 'active' && selected !== index ? 'visibility: hidden' : ''}}"
+      />
+    </view>
+    <text class="tb-text">{{item.text}}</text>
+  </view>
+</view>

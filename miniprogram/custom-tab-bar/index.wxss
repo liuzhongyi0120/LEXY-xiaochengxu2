@@ -1,0 +1,64 @@
+/**
+ * 自定义底部导航（tabBar）样式
+ *
+ * 高度口径必须与微信原生 tabBar 对齐：50px（iPhone 安全区另加）。
+ * 这个 50px 不只是「好看」——页面可视区高度是按它扣减的，
+ * 真机截图量出来的 718px = 832 − 44 导航栏 − 50 tabBar − 20 安全区，
+ * 装修台预览与 /preview 也都按这个值换算 100vh。改高度前先确认这两处不会跟着错位。
+ *
+ * 用普通 view 而不是官方推荐的 cover-view：微信原生组件（video / map 等）
+ * 已支持同层渲染，普通 view 配 z-index 足够盖住；cover-view 的 CSS 限制太多，
+ * 反而不容易把「可配色的文字 / 圆角 / 图标」做对。
+ */
+
+.tb {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  display: flex;
+  height: 50px;
+  /* 全面屏底部安全区，与原生 tabBar 行为一致 */
+  padding-bottom: env(safe-area-inset-bottom);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", Helvetica, sans-serif;
+  /* 文字颜色由内联 style 控制（装修台可配），这里只保证继承生效 */
+  color: inherit;
+}
+
+.tb-item {
+  flex: 1;
+  height: 50px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* 去掉点击高亮，与原生 tabBar 观感一致 */
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tb-icon-box {
+  height: 22px;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tb-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.tb-text {
+  max-width: 100%;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* 颜色从 .tb-item 的内联 style 继承过来 */
+  color: inherit;
+}

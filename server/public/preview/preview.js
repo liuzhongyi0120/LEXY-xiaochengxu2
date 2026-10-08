@@ -30,7 +30,7 @@
     { key: 'mine', name: '我的', path: '/pages/mine/mine', tab: 4 }
   ];
 
-  var CUR = { key: '', target: null, meta: null, hasDraft: false, publishedAt: null };
+  var CUR = { key: '', target: null, meta: null, hasDraft: false, publishedAt: null, tabbar: null };
   var SWIPER = {};   // 页面 key → 当前轮播页码（真机自动播放，这里手动翻）
   var TIMER = null;
   var LAST_SIG = '';
@@ -84,7 +84,8 @@
 
   function loadPages() {
     return req('/api/decorate/pages').then(function (d) {
-      var list = d.list || [];
+      // 「店铺导航」是全局配置不是页面，不列进左栏（它体现在每个 tab 页的底部导航上）
+      var list = (d.list || []).filter(function (p) { return !p.nav; });
       renderList(list);
       var sig = list.map(function (p) {
         return p.key + ':' + (p.lastVersion ? p.lastVersion.at : 0) + ':' + (p.hasDraft ? 1 : 0);
@@ -127,6 +128,8 @@
     CUR.target = targetOf(key);
     markActive();
     applyChrome();
+    // 底部导航配置与页面内容同源（replica.js），异步到位后补画一次
+    loadTabbar().then(function (cfg) { CUR.tabbar = cfg; applyChrome(); });
 
     var screen = $('preview');
     screen.innerHTML = '<div class="pv-loading">正在编译真机页面源码…</div>';
@@ -168,13 +171,34 @@
     });
   }
 
-  /** 展示态真机观感：自定义页不属于 tabBar，真机上也没有底部导航 */
+  /**
+   * 底部导航配置（replica.TABBAR）。
+   *
+   * 与真机 custom-tab-bar 读的是**同一份数据** —— 装修台「店铺导航」发布时写回 replica.js，
+   * 这里直接编译真机的 replica.js 取 TABBAR，所以预览里的底部导航与真机天然一致。
+   */
+  var TABBAR_PROMISE = null;
+  function loadTabbar() {
+    if (!TABBAR_PROMISE) {
+      TABBAR_PROMISE = (window.MpRuntime && window.MpRuntime.loadModule)
+        ? window.MpRuntime.loadModule('/config/replica.js')
+          .then(function (R) { return (R && R.TABBAR) || null; })
+          .catch(function () { return null; })
+        : Promise.resolve(null);
+    }
+    return TABBAR_PROMISE;
+  }
+
+  /**
+   * 展示态真机观感：底部导航按 replica.TABBAR 渲染，高亮当前页。
+   * 自定义页不属于 tabBar，真机上也确实没有底部导航 —— 直接隐藏。
+   *
+   * 渲染实现与装修台手机壳共用 PvTabbar（各写一份必然走样）。
+   */
   function applyChrome() {
-    var t = CUR.target || { tab: -1 };
-    var bar = $('phTabbar');
-    bar.hidden = t.tab < 0;
-    var spans = bar.querySelectorAll('span');
-    for (var i = 0; i < spans.length; i++) spans[i].classList.toggle('on', i === t.tab);
+    var t = CUR.target || {};
+    var isTab = typeof t.tab === 'number' && t.tab >= 0;
+    window.PvTabbar.apply($('phTabbar'), CUR.tabbar, isTab ? (t.path || '') : '', !isTab);
   }
 
   function renderStatus() {
