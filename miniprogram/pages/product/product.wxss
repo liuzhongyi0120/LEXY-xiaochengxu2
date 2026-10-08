@@ -16,18 +16,15 @@ page {
   background: var(--color-bg);
 }
 
-/* 导航顶部固定品牌 logo（源页面左栏顶部） */
+/* 导航顶部固定品牌 logo（源页面左栏顶部，669×414 横幅，按宽度自适应高度） */
 .side-top {
   width: 196rpx;
-  height: 116rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  line-height: 0;
 }
 
 .side-top-logo {
   width: 196rpx;
-  height: 116rpx;
+  display: block;
 }
 
 .side-item {
@@ -77,10 +74,15 @@ page {
   flex-wrap: wrap;
 }
 
+/*
+ * 型号卡片。尺寸按源页面取值：
+ *   列宽 = 右栏一半（554rpx / 2 = 277rpx），源页面 li 无内边距、图片撑满列宽
+ *   图片比例 = 源页面 padding-top 86.15%（实测原图约 1.158），故高度 = 277 / 1.158 ≈ 239rpx
+ */
 .prod {
   width: 50%;
   box-sizing: border-box;
-  padding: 12rpx 8rpx 20rpx;
+  padding: 10rpx 0 20rpx;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -92,7 +94,7 @@ page {
 
 .prod-pic {
   width: 100%;
-  height: 260rpx;
+  height: 239rpx;
   background: var(--color-bg-card);
   display: flex;
   align-items: center;
@@ -106,7 +108,7 @@ page {
 }
 
 .prod-model {
-  margin-top: 12rpx;
+  margin-top: 20rpx;
   font-size: 28rpx;
   color: var(--color-text);
 }

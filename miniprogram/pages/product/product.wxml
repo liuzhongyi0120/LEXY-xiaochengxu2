@@ -1,9 +1,9 @@
 <view class="page" style="background: {{pageBg}};">
   <!-- 左侧品牌导航 -->
   <scroll-view class="side" scroll-y>
-    <!-- 导航顶部固定 logo（源页面左栏顶部） -->
+    <!-- 导航顶部固定 logo（源页面左栏顶部，669×414 横幅，按宽度自适应高度） -->
     <view class="side-top">
-      <image class="side-top-logo" src="{{navLogo}}" mode="aspectFit" />
+      <image class="side-top-logo" src="{{navLogo}}" mode="widthFix" />
     </view>
 
     <view
