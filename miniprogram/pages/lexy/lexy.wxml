@@ -1,0 +1,50 @@
+<view class="page" style="background: {{pageBg}};">
+  <view class="series" wx:for="{{series}}" wx:key="id" wx:for-item="group" wx:for-index="sindex">
+    <!-- 系列头图 + 文案（文案为源页面真实覆盖文字） -->
+    <view class="hero">
+      <image
+        wx:if="{{!group.heroFailed}}"
+        class="hero-img"
+        src="{{group.hero}}"
+        mode="aspectFill"
+        lazy-load
+        data-sindex="{{sindex}}"
+        binderror="onHeroError"
+      />
+      <view wx:else class="hero-fallback"></view>
+      <view class="hero-mask">
+        <text class="hero-title">{{group.title}}</text>
+        <text class="hero-sub">{{group.subtitle}}</text>
+        <text class="hero-tag">{{group.name}}</text>
+      </view>
+    </view>
+
+    <!-- 系列商品横滑卡片（卡片图内含官方型号与价格） -->
+    <scroll-view class="row" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="row-inner">
+        <view
+          class="card"
+          wx:for="{{group.products}}"
+          wx:key="id"
+          wx:for-item="prod"
+          wx:for-index="pindex"
+          data-src="{{prod.image}}"
+          bindtap="onTapProduct"
+          hover-class="card-hover"
+        >
+          <image
+            wx:if="{{!prod.failed}}"
+            class="card-img"
+            src="{{prod.image}}"
+            mode="widthFix"
+            lazy-load
+            data-sindex="{{sindex}}"
+            data-pindex="{{pindex}}"
+            binderror="onProdError"
+          />
+          <view wx:else class="card-fallback"></view>
+        </view>
+      </view>
+    </scroll-view>
+  </view>
+</view>

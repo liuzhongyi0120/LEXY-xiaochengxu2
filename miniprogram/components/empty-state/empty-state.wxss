@@ -1,0 +1,40 @@
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 40rpx;
+}
+
+.empty-icon {
+  width: 240rpx;
+  height: 240rpx;
+  background-color: transparent;
+}
+
+/* 无图标时的内置占位图形 */
+.empty-shape {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 50%;
+  background-color: #F2F3F5;
+  border: 2rpx solid #E6E8EB;
+}
+
+.empty-text {
+  margin-top: 32rpx;
+  font-size: 28rpx;
+  color: #969799;
+  text-align: center;
+}
+
+.empty-btn {
+  margin-top: 40rpx;
+  padding: 0 56rpx;
+  height: 72rpx;
+  line-height: 72rpx;
+  font-size: 28rpx;
+  color: #ffffff;
+  background-color: #C8102E;
+  border-radius: 36rpx;
+}

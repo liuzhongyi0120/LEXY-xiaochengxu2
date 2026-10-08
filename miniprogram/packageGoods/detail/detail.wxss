@@ -1,0 +1,313 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+/* ---------- 主图 ---------- */
+.gallery {
+  position: relative;
+  width: 100%;
+  height: 750rpx;
+  background: #F2F3F5;
+}
+
+.gallery-swiper {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-img {
+  width: 100%;
+  height: 100%;
+}
+
+.gallery-counter {
+  position: absolute;
+  right: 24rpx;
+  bottom: 24rpx;
+  padding: 0 20rpx;
+  height: 44rpx;
+  line-height: 44rpx;
+  font-size: 22rpx;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 22rpx;
+}
+
+/* ---------- 通用卡片 ---------- */
+.card {
+  margin: 20rpx 24rpx;
+  padding: 24rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+}
+
+.main-card {
+  margin-top: 20rpx;
+}
+
+/* ---------- 价格与标题 ---------- */
+.price-row {
+  display: flex;
+  align-items: baseline;
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  color: #C8102E;
+}
+
+.price-symbol {
+  font-size: 26rpx;
+}
+
+.price-int {
+  font-size: 52rpx;
+  font-weight: 600;
+}
+
+.price-dec {
+  font-size: 26rpx;
+}
+
+.price-range {
+  font-size: 26rpx;
+  color: #C8102E;
+}
+
+.sales {
+  margin-left: auto;
+  font-size: 24rpx;
+  color: #969799;
+}
+
+.name {
+  margin-top: 16rpx;
+  font-size: 34rpx;
+  font-weight: 600;
+  line-height: 48rpx;
+  color: #323233;
+}
+
+.subtitle {
+  margin-top: 10rpx;
+  font-size: 26rpx;
+  color: #969799;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.tag {
+  margin-right: 12rpx;
+  padding: 0 14rpx;
+  height: 34rpx;
+  line-height: 34rpx;
+  font-size: 20rpx;
+  color: #C8102E;
+  background: #FDECEE;
+  border-radius: 6rpx;
+}
+
+/* ---------- 规格入口 ---------- */
+.cell {
+  display: flex;
+  align-items: center;
+  padding: 18rpx 0;
+}
+
+.cell-hover {
+  opacity: 0.75;
+}
+
+.cell-label {
+  width: 100rpx;
+  font-size: 28rpx;
+  color: #969799;
+}
+
+.cell-value {
+  flex: 1;
+  font-size: 28rpx;
+  color: #323233;
+}
+
+.cell-arrow {
+  font-size: 32rpx;
+  color: #C8C9CC;
+}
+
+/* ---------- 服务承诺 ---------- */
+.service-card {
+  display: flex;
+  padding: 24rpx;
+}
+
+.service-item {
+  display: flex;
+  align-items: center;
+  margin-right: 32rpx;
+}
+
+.service-dot {
+  width: 12rpx;
+  height: 12rpx;
+  margin-right: 10rpx;
+  border-radius: 50%;
+  background: #C8102E;
+}
+
+.service-text {
+  font-size: 24rpx;
+  color: #323233;
+}
+
+/* ---------- 图文详情 ---------- */
+.detail-card {
+  padding: 0;
+  overflow: hidden;
+}
+
+.detail-title {
+  padding: 28rpx 24rpx 20rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #323233;
+  text-align: center;
+}
+
+.detail-text {
+  display: block;
+  padding: 16rpx 24rpx;
+  font-size: 28rpx;
+  line-height: 44rpx;
+  color: #444441;
+}
+
+.detail-image {
+  width: 100%;
+}
+
+/* ---------- 推荐 ---------- */
+.section-title {
+  display: flex;
+  align-items: center;
+  padding: 32rpx 24rpx 20rpx;
+}
+
+.section-bar {
+  width: 8rpx;
+  height: 30rpx;
+  margin-right: 14rpx;
+  background: #C8102E;
+  border-radius: 4rpx;
+}
+
+.section-text {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #323233;
+}
+
+.recommend-scroll {
+  white-space: nowrap;
+  padding-left: 24rpx;
+}
+
+.recommend-item {
+  display: inline-block;
+  width: 280rpx;
+  margin-right: 20rpx;
+  vertical-align: top;
+}
+
+/* ---------- 底部操作栏 ---------- */
+.footer-placeholder {
+  height: 140rpx;
+}
+
+.footer-inner {
+  display: flex;
+  align-items: center;
+  padding: 12rpx 24rpx;
+}
+
+.footer-icon {
+  position: relative;
+  width: 110rpx;
+  text-align: center;
+}
+
+.footer-icon-text {
+  font-size: 22rpx;
+  color: #323233;
+}
+
+.footer-badge {
+  position: absolute;
+  top: -10rpx;
+  right: 16rpx;
+  min-width: 32rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  padding: 0 8rpx;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: #C8102E;
+  border-radius: 16rpx;
+}
+
+.footer-btns {
+  flex: 1;
+  display: flex;
+  margin-left: 12rpx;
+}
+
+.footer-btn {
+  flex: 1;
+  height: 84rpx;
+  line-height: 84rpx;
+  text-align: center;
+  font-size: 30rpx;
+}
+
+.btn-cart {
+  color: #C8102E;
+  background: #FDECEE;
+  border-radius: 42rpx 0 0 42rpx;
+}
+
+.btn-buy {
+  color: #ffffff;
+  background: #C8102E;
+  border-radius: 0 42rpx 42rpx 0;
+}
+
+/* ---------- 骨架屏 ---------- */
+.loading-placeholder {
+  padding: 24rpx;
+}
+
+.skeleton {
+  background: #EDEEF0;
+  border-radius: 8rpx;
+}
+
+.sk-main {
+  width: 100%;
+  height: 700rpx;
+  border-radius: 16rpx;
+}
+
+.sk-text {
+  height: 32rpx;
+  margin-top: 24rpx;
+}
+
+.sk-text.short {
+  width: 50%;
+}

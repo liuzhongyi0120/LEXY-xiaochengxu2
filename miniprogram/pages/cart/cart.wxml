@@ -1,0 +1,81 @@
+<view class="page">
+  <block wx:if="{{items.length}}">
+    <view class="list">
+      <view class="cart-item" wx:for="{{items}}" wx:key="cartItemId">
+        <!-- 勾选 -->
+        <view
+          class="checkbox {{item.selected ? 'is-checked' : ''}}"
+          data-id="{{item.cartItemId}}"
+          bindtap="onToggleSelect"
+        ></view>
+
+        <!-- 商品图 -->
+        <image
+          class="item-img"
+          src="{{item.image}}"
+          mode="aspectFill"
+          data-id="{{item.goodsId}}"
+          bindtap="onTapGoods"
+        />
+
+        <!-- 信息 -->
+        <view class="item-info">
+          <view class="item-head">
+            <text class="item-name" data-id="{{item.goodsId}}" bindtap="onTapGoods">{{item.name}}</text>
+            <text class="item-remove" data-id="{{item.cartItemId}}" bindtap="onRemove">删除</text>
+          </view>
+
+          <text class="item-spec">{{item.specText}}</text>
+
+          <view class="item-bottom">
+            <text class="item-price">¥{{item.priceText}}</text>
+            <view class="stepper">
+              <view
+                class="stepper-btn {{item.quantity <= 1 ? 'is-disabled' : ''}}"
+                data-id="{{item.cartItemId}}"
+                data-delta="-1"
+                bindtap="onQuantityChange"
+              >−</view>
+              <text class="stepper-num">{{item.quantity}}</text>
+              <view
+                class="stepper-btn {{item.quantity >= item.stock ? 'is-disabled' : ''}}"
+                data-id="{{item.cartItemId}}"
+                data-delta="1"
+                bindtap="onQuantityChange"
+              >+</view>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="footer-placeholder"></view>
+
+    <!-- 结算栏 -->
+    <view class="footer-bar">
+      <view class="checkout-bar">
+        <view class="checkout-all" bindtap="onToggleAll">
+          <view class="checkbox {{allSelected ? 'is-checked' : ''}}"></view>
+          <text class="checkout-all-text">全选</text>
+        </view>
+
+        <view class="checkout-total">
+          <text class="checkout-label">合计</text>
+          <text class="checkout-price">¥{{totalParts.int}}{{totalParts.dec}}</text>
+        </view>
+
+        <view class="checkout-btn {{selectedCount ? '' : 'is-disabled'}}" bindtap="onCheckout">
+          结算{{selectedCount ? '(' + selectedCount + ')' : ''}}
+        </view>
+      </view>
+    </view>
+  </block>
+
+  <!-- 空状态 -->
+  <empty-state
+    wx:elif="{{!loading}}"
+    text="购物车还是空的"
+    buttonText="去逛逛"
+    bind:action="onGoShopping"
+  />
+</view>

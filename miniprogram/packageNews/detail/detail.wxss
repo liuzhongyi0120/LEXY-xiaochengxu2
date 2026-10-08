@@ -1,0 +1,284 @@
+.pg {
+  min-height: 100vh;
+  background: #f7f7f7;
+  padding-bottom: 40rpx;
+}
+
+/* ---------- 页头 ---------- */
+.hd {
+  display: flex;
+  flex-direction: column;
+  padding: 36rpx 32rpx 20rpx;
+  background: #ffffff;
+}
+
+.hd-t {
+  font-size: 40rpx;
+  font-weight: 700;
+  color: #323233;
+}
+
+.hd-s {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #969799;
+}
+
+/* ---------- 二级栏目 ---------- */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: #ffffff;
+  box-shadow: 0 2rpx 0 0 #ececec;
+  white-space: nowrap;
+}
+
+.tabs-in {
+  display: inline-flex;
+  align-items: flex-end;
+  padding: 0 20rpx;
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 92rpx;
+  padding: 0 22rpx;
+  flex: none;
+}
+
+.tab-t {
+  font-size: 30rpx;
+  color: #444444;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.tab-on .tab-t {
+  font-weight: 700;
+}
+
+/* 选中指示条：源页面为 40px 宽 2px 高的深灰短条 */
+.tab-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18rpx;
+  width: 80rpx;
+  height: 4rpx;
+  margin-left: -40rpx;
+  background: #444444;
+}
+
+/* ---------- 内容 ---------- */
+.bd {
+  padding: 20rpx;
+}
+
+.blk {
+  display: block;
+}
+
+.blk-img {
+  margin-bottom: 20rpx;
+}
+
+.blk-hover {
+  opacity: 0.9;
+}
+
+.pic {
+  width: 100%;
+  display: block;
+  background: #efefef;
+}
+
+.cap-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14rpx 4rpx 0;
+}
+
+.cap {
+  flex: 1;
+  font-size: 26rpx;
+  color: #323233;
+  font-weight: 600;
+}
+
+.lk {
+  flex: none;
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #999999;
+  padding: 2rpx 12rpx;
+  border: 1rpx solid #dddddd;
+  border-radius: 20rpx;
+}
+
+.lk-go {
+  color: #c8102e;
+  border-color: #f0c9d0;
+}
+
+/* ---------- 宫格 ---------- */
+.cube {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+
+.cube-i {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 1rpx;
+}
+
+.cube-pic {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: #efefef;
+}
+
+/* ---------- 卡片 ---------- */
+.cards {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 -10rpx;
+}
+
+.card {
+  width: 50%;
+  box-sizing: border-box;
+  padding: 10rpx;
+}
+
+.card-hover {
+  opacity: 0.85;
+}
+
+.card-pic {
+  position: relative;
+  width: 100%;
+  height: 0;
+  background: #efefef;
+  overflow: hidden;
+}
+
+.card-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.card-tag {
+  position: absolute;
+  right: 8rpx;
+  top: 8rpx;
+  font-size: 20rpx;
+  color: #ffffff;
+  background: rgba(0, 0, 0, 0.42);
+  padding: 2rpx 10rpx;
+  border-radius: 16rpx;
+}
+
+.card-t {
+  display: block;
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  line-height: 34rpx;
+  color: #444444;
+  font-weight: 600;
+}
+
+/* ---------- 小标题 ---------- */
+.sec {
+  display: flex;
+  flex-direction: column;
+  padding: 26rpx 4rpx 18rpx;
+}
+
+.sec-bar {
+  width: 56rpx;
+  height: 6rpx;
+  background: #c8102e;
+  border-radius: 4rpx;
+}
+
+.sec-t {
+  margin-top: 14rpx;
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #323233;
+}
+
+.sec-d {
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: #969799;
+}
+
+/* ---------- 视频 ---------- */
+.video {
+  width: 100%;
+  height: 420rpx;
+  background: #000000;
+}
+
+/* ---------- 电梯导航 ---------- */
+.anchor {
+  display: flex;
+  flex-wrap: wrap;
+  background: #ffffff;
+  border-radius: 12rpx;
+  padding: 12rpx;
+  margin-bottom: 20rpx;
+}
+
+.anchor-i {
+  flex: 1;
+  min-width: 30%;
+  text-align: center;
+  padding: 20rpx 8rpx;
+  font-size: 26rpx;
+  color: #323233;
+  font-weight: 500;
+}
+
+.anchor-hover {
+  background: #f5f5f5;
+}
+
+/* ---------- 说明 ---------- */
+.foot {
+  padding: 18rpx 20rpx;
+  background: #ffffff;
+  border-radius: 12rpx;
+}
+
+.foot text {
+  font-size: 22rpx;
+  color: #999999;
+  line-height: 34rpx;
+}
+
+.gap {
+  height: 20rpx;
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 60vh;
+  font-size: 26rpx;
+  color: #999999;
+}

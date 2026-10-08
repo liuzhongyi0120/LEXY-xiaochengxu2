@@ -1,0 +1,241 @@
+.sku-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  visibility: hidden;
+}
+
+.sku-layer.is-show {
+  visibility: visible;
+}
+
+/* ---------- 遮罩 ---------- */
+.sku-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.is-show .sku-mask {
+  opacity: 1;
+}
+
+/* ---------- 弹层 ---------- */
+.sku-sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: 82vh;
+  background: #ffffff;
+  border-radius: 24rpx 24rpx 0 0;
+  transform: translateY(100%);
+  transition: transform 0.26s ease;
+}
+
+.is-show .sku-sheet {
+  transform: translateY(0);
+}
+
+/* ---------- 头部 ---------- */
+.sku-head {
+  position: relative;
+  display: flex;
+  padding: 32rpx 24rpx 24rpx;
+}
+
+.sku-thumb {
+  width: 180rpx;
+  height: 180rpx;
+  border-radius: 12rpx;
+  background-color: #F2F3F5;
+  flex-shrink: 0;
+}
+
+.sku-head-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-left: 24rpx;
+  padding-right: 56rpx;
+}
+
+.sku-price {
+  display: flex;
+  align-items: baseline;
+  color: #C8102E;
+}
+
+.sku-price-symbol {
+  font-size: 24rpx;
+}
+
+.sku-price-int {
+  font-size: 44rpx;
+  font-weight: 600;
+}
+
+.sku-price-dec {
+  font-size: 24rpx;
+}
+
+.sku-tips {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  color: #969799;
+}
+
+.sku-selected {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #323233;
+}
+
+.sku-close {
+  position: absolute;
+  right: 24rpx;
+  top: 24rpx;
+  width: 48rpx;
+  height: 48rpx;
+  line-height: 44rpx;
+  text-align: center;
+  font-size: 40rpx;
+  color: #969799;
+}
+
+.sku-close-hover {
+  opacity: 0.6;
+}
+
+/* ---------- 规格区 ---------- */
+.sku-body {
+  flex: 1;
+  max-height: 56vh;
+  padding: 0 24rpx;
+}
+
+.sku-group {
+  padding: 20rpx 0 8rpx;
+}
+
+.sku-group-title {
+  font-size: 26rpx;
+  color: #323233;
+}
+
+.sku-values {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 16rpx;
+}
+
+.sku-value {
+  margin: 0 16rpx 16rpx 0;
+  padding: 0 28rpx;
+  height: 64rpx;
+  line-height: 60rpx;
+  font-size: 26rpx;
+  color: #323233;
+  background: #F5F5F5;
+  border: 2rpx solid transparent;
+  border-radius: 32rpx;
+}
+
+.sku-value.is-active {
+  color: #C8102E;
+  background: #FDECEE;
+  border-color: #C8102E;
+}
+
+.sku-value.is-disabled {
+  color: #C8C9CC;
+  background: #FAFAFA;
+  text-decoration: line-through;
+}
+
+/* ---------- 数量 ---------- */
+.sku-qty-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sku-limit {
+  margin-top: 12rpx;
+  font-size: 22rpx;
+  color: #969799;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+}
+
+.stepper-btn {
+  width: 60rpx;
+  height: 60rpx;
+  line-height: 56rpx;
+  text-align: center;
+  font-size: 34rpx;
+  color: #323233;
+  background: #F5F5F5;
+  border-radius: 8rpx;
+}
+
+.stepper-btn.is-disabled {
+  color: #C8C9CC;
+}
+
+.stepper-input {
+  width: 96rpx;
+  height: 60rpx;
+  margin: 0 12rpx;
+  text-align: center;
+  font-size: 28rpx;
+  background: #F5F5F5;
+  border-radius: 8rpx;
+}
+
+/* ---------- 底部按钮 ---------- */
+.sku-footer {
+  display: flex;
+  padding: 20rpx 24rpx;
+  border-top: 1rpx solid #EBEDF0;
+}
+
+.sku-btn {
+  flex: 1;
+  height: 84rpx;
+  line-height: 84rpx;
+  text-align: center;
+  font-size: 30rpx;
+  border-radius: 42rpx;
+}
+
+.sku-btn-cart {
+  color: #C8102E;
+  background: #FDECEE;
+  margin-right: 20rpx;
+}
+
+.sku-btn-buy {
+  color: #ffffff;
+  background: #C8102E;
+}
+
+.sku-btn.is-disabled {
+  color: #ffffff;
+  background: #D8D8D8;
+}

@@ -1,0 +1,87 @@
+<view class="page">
+  <!-- ---------- 搜索栏 ---------- -->
+  <view class="search-bar">
+    <view class="search-box">
+      <view class="search-icon"></view>
+      <input
+        class="search-input"
+        value="{{inputValue}}"
+        placeholder="搜索商品名称"
+        placeholder-class="search-ph"
+        confirm-type="search"
+        focus="{{focus}}"
+        bindinput="onInput"
+        bindconfirm="onSearchConfirm"
+        bindfocus="onInputFocus"
+      />
+      <view class="search-clear" wx:if="{{inputValue}}" bindtap="onClearInput">×</view>
+    </view>
+    <text class="search-cancel" bindtap="onCancel">取消</text>
+  </view>
+
+  <!-- ---------- 搜索历史 ---------- -->
+  <view class="history" wx:if="{{showHistory && !keyword}}">
+    <view class="history-head" wx:if="{{searchHistory.length}}">
+      <text class="history-title">搜索历史</text>
+      <text class="history-clear" bindtap="onClearHistory">清空</text>
+    </view>
+    <view class="history-tags" wx:if="{{searchHistory.length}}">
+      <text
+        class="history-tag"
+        wx:for="{{searchHistory}}"
+        wx:key="*this"
+        data-word="{{item}}"
+        bindtap="onTapHistory"
+      >{{item}}</text>
+    </view>
+    <text class="history-empty" wx:else>还没有搜索记录</text>
+  </view>
+
+  <!-- ---------- 排序栏 ---------- -->
+  <view class="sort-bar" wx:else>
+    <view
+      class="sort-item {{sort === item.key ? 'is-active' : ''}}"
+      wx:for="{{sortOptions}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onTapSort"
+    >
+      <text>{{item.label}}</text>
+      <text class="sort-arrow" wx:if="{{item.key === 'price'}}">{{sort === 'price' ? (priceAsc ? '↑' : '↓') : '↕'}}</text>
+    </view>
+    <text class="sort-count" wx:if="{{!loading}}">共 {{list.length}} 件</text>
+  </view>
+
+  <!-- ---------- 列表内容 ---------- -->
+  <block wx:if="{{!showHistory || keyword}}">
+    <!-- 骨架屏 -->
+    <view class="grid" wx:if="{{loading && !list.length}}">
+      <view class="grid-item" wx:for="{{[1,2,3,4]}}" wx:key="*this">
+        <view class="skeleton sk-img"></view>
+        <view class="skeleton sk-line"></view>
+        <view class="skeleton sk-line sk-short"></view>
+      </view>
+    </view>
+
+    <!-- 商品网格 -->
+    <view class="grid" wx:elif="{{list.length}}">
+      <view class="grid-item" wx:for="{{list}}" wx:key="id">
+        <goods-card goods="{{item}}" bind:tap="onTapGoods" />
+      </view>
+    </view>
+
+    <!-- 空状态 -->
+    <empty-state
+      wx:elif="{{!loading}}"
+      text="没有找到相关商品"
+      buttonText="重置筛选"
+      bind:action="onResetFilter"
+    />
+
+    <!-- 加载更多 -->
+    <view class="load-more" wx:if="{{list.length}}">
+      <text wx:if="{{loadingMore}}" class="load-more-text">正在加载...</text>
+      <text wx:elif="{{!hasMore}}" class="load-more-text">— 已经到底了 —</text>
+    </view>
+  </block>
+</view>

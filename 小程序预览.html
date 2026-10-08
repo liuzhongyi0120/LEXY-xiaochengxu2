@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LEXY莱克官方旗舰店 · 小程序 5 页复刻预览</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0; background: #eef1f5; color: #1f2329;
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    padding-bottom: 40px;
+  }
+  .bar { padding: 24px 28px 4px; text-align: center; }
+  .bar-title { font-size: 18px; font-weight: 700; letter-spacing: .3px; }
+  .bar-sub { margin-top: 7px; font-size: 12.5px; color: #7a8391; line-height: 1.6; }
+  .tabs { display: flex; gap: 8px; justify-content: center; padding: 16px 12px 20px; flex-wrap: wrap; }
+  .tab-btn {
+    border: 1px solid #d7dce3; background: #fff; color: #3c4350;
+    padding: 7px 20px; border-radius: 999px; font-size: 13px; cursor: pointer;
+    transition: .18s; font-family: inherit;
+  }
+  .tab-btn:hover { border-color: #C8102E; color: #C8102E; }
+  .tab-btn.active { background: #C8102E; border-color: #C8102E; color: #fff; font-weight: 600; }
+  .stage { display: flex; gap: 40px; justify-content: center; align-items: flex-start; padding: 0 24px 20px; flex-wrap: wrap; }
+
+  /* ---------------- 手机外框 ---------------- */
+  .device {
+    width: 375px; height: 812px; flex: 0 0 auto;
+    border-radius: 40px; overflow: hidden; background: #fff;
+    display: flex; flex-direction: column; position: relative;
+    box-shadow: 0 0 0 10px #16181c, 0 0 0 11px #303540, 0 26px 70px rgba(16, 24, 40, .28);
+  }
+  .statusbar {
+    height: 24px; flex: 0 0 24px; display: flex; align-items: center; justify-content: space-between;
+    padding: 0 18px; font-size: 11px; font-weight: 600; color: #111; background: #fff;
+  }
+  .navbar {
+    height: 44px; flex: 0 0 44px; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; font-weight: 600; color: #1f2329; background: #fff; border-bottom: 1px solid #f2f2f2;
+  }
+  .screen { position: relative; flex: 1; overflow: hidden; background: #fff; }
+  .page { position: absolute; top: 0; left: 0; right: 0; bottom: 0; display: none; overflow-y: auto; overflow-x: hidden; }
+  .page.active { display: block; }
+  .page::-webkit-scrollbar, .row::-webkit-scrollbar, .side::-webkit-scrollbar, .main::-webkit-scrollbar { width: 0; height: 0; }
+  #p-product { overflow: hidden; }
+  #p-product.active { display: flex; }
+  .tabbar { height: 50px; flex: 0 0 50px; display: flex; border-top: 1px solid #ececec; background: #fafafa; }
+  .tb-item {
+    flex: 1; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; color: #7a7e83; cursor: pointer; user-select: none; transition: .15s;
+  }
+  .tb-item.active { color: #C8102E; font-weight: 600; }
+
+  /* ---------------- 首页 ---------------- */
+  .swiper { position: relative; width: 100%; height: 661px; overflow: hidden; background: #f0f0f0; }
+  .swiper-track { display: flex; height: 100%; transition: transform .45s ease; }
+  .swiper-img { height: 100%; object-fit: cover; display: block; flex-shrink: 0; }
+  .swiper-dots { position: absolute; left: 0; right: 0; bottom: 14px; display: flex; justify-content: center; gap: 6px; }
+  .swiper-dots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .55); }
+  .swiper-dots i.on { background: #fff; width: 14px; border-radius: 3px; }
+  .iblock { width: 100%; }
+  .iblock img { width: 100%; display: block; }
+  .vblock { width: 100%; height: 210px; background: #000; }
+  .vblock video { width: 100%; height: 100%; display: block; object-fit: cover; background: #000; }
+  .img-fail { display: none !important; }
+  .shop { display: flex; flex-direction: column; align-items: center; padding: 24px 0 32px; background: #f7f7f7; }
+  .shop-avatar { width: 60px; height: 60px; border-radius: 50%; background: #eee; object-fit: cover; }
+  .shop-name { margin-top: 10px; font-size: 14px; color: #333; font-weight: 500; }
+  .shop-slogan { margin-top: 4px; font-size: 12px; color: #999; }
+
+  /* ---------------- 莱克 ---------------- */
+  #p-lexy { background: #fff; padding-bottom: 16px; }
+  .hero { position: relative; width: 100%; height: 375px; overflow: hidden; background: #f2f0ec; }
+  .hero-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .hero-mask { position: absolute; left: 0; bottom: 30px; width: 100%; display: flex; flex-direction: column; align-items: flex-start; }
+  .hero-title { margin-left: 12px; font-size: 18px; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 6px rgba(0, 0, 0, .25); }
+  .hero-sub { margin-left: 12px; margin-top: 7px; font-size: 12.5px; color: #fff; letter-spacing: .5px; text-shadow: 0 1px 5px rgba(0, 0, 0, .25); }
+  .hero-tag { margin-left: 142px; margin-top: 9px; font-size: 14px; color: #fff; letter-spacing: 1px; text-shadow: 0 1px 5px rgba(0, 0, 0, .3); }
+  .row { margin-top: 20px; overflow-x: auto; white-space: nowrap; padding-bottom: 6px; }
+  .pcard { display: inline-block; width: 150px; margin-left: 5px; background: #fff; border-radius: 4px; overflow: hidden; vertical-align: top; }
+  .pcard:first-child { margin-left: 0; }
+  .pcard img { width: 100%; display: block; background: #f7f7f7; }
+
+  /* ---------------- 资讯 ---------------- */
+  #p-news { background: #f0f0f0; }
+  #newsList { padding: 20px 12px 32px; }
+  #newsDetail { background: #f7f7f7; padding-bottom: 20px; }
+  .head { padding: 0 4px 16px; display: flex; flex-direction: column; }
+  .head-en { font-size: 12px; color: #8a8a8a; letter-spacing: 1.5px; }
+  .head-title { margin-top: 3px; font-size: 20px; color: #444; font-weight: 700; }
+  .grid { display: flex; flex-wrap: wrap; }
+  .grid-2 { margin: 0 -4.5px; }
+  .grid-2 .cell { width: 50%; padding: 4.5px; }
+  .grid-3 { margin: 9px -4.5px 0; }
+  .grid-3 .cell { width: 33.3333%; padding: 4.5px; }
+  .cell { display: flex; flex-direction: column; align-items: center; }
+  .cell { cursor: pointer; }
+  .cell-pic { width: 100%; background: #e6e2dc; overflow: hidden; }
+  .pic-big { height: 228px; }
+  .pic-small { height: 148px; }
+  .cell-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell-label { margin-top: 8px; font-size: 13px; color: #444; font-weight: 600; padding-bottom: 8px; }
+
+  /* ---------------- 资讯内容页 ---------------- */
+  .nd-top { display: flex; align-items: center; height: 40px; padding: 0 12px; background: #fff; position: sticky; top: 0; z-index: 5; border-bottom: 1px solid #eee; }
+  .nd-back { font-size: 14px; color: #c8102e; cursor: pointer; flex: none; }
+  .nd-title { flex: 1; text-align: center; font-size: 15px; font-weight: 600; color: #323233; margin-right: 34px; }
+  .nd-sub { padding: 10px 16px 0; font-size: 12px; color: #969799; background: #fff; }
+  .nd-tabs { position: sticky; top: 40px; z-index: 4; display: flex; background: #fff; overflow-x: auto; white-space: nowrap; box-shadow: 0 1px 0 #ececec; }
+  .nd-tab { flex: none; padding: 0 11px; height: 46px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; position: relative; }
+  .nd-tab span { font-size: 15px; color: #444; }
+  .nd-tab.on span { font-weight: 700; }
+  .nd-tab i { display: none; position: absolute; left: 50%; bottom: 9px; width: 40px; height: 2px; margin-left: -20px; background: #444; }
+  .nd-tab.on i { display: block; }
+  .nd-bd { padding: 10px; }
+  .nd-bd .pic { width: 100%; display: block; background: #efefef; }
+  .nd-bd .blk-img { margin-bottom: 10px; }
+  .nd-cap { display: flex; align-items: center; justify-content: space-between; padding: 7px 2px 0; }
+  .nd-cap b { font-size: 13px; color: #323233; font-weight: 600; }
+  .nd-cap em { font-style: normal; font-size: 11px; color: #999; border: 1px solid #ddd; border-radius: 10px; padding: 0 6px; }
+  .nd-cap em.go { color: #c8102e; border-color: #f0c9d0; }
+  .nd-cube { position: relative; width: 100%; }
+  .nd-cube div { position: absolute; box-sizing: border-box; padding: .5px; }
+  .nd-cube img { width: 100%; height: 100%; object-fit: cover; display: block; background: #efefef; }
+  .nd-cards { display: flex; flex-wrap: wrap; margin: 0 -5px; }
+  .nd-card { width: 50%; box-sizing: border-box; padding: 5px; cursor: pointer; }
+  .nd-card .cp { position: relative; width: 100%; background: #efefef; overflow: hidden; }
+  .nd-card .cp img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+  .nd-card .tag { position: absolute; right: 4px; top: 4px; font-size: 10px; color: #fff; background: rgba(0,0,0,.42); padding: 0 5px; border-radius: 8px; }
+  .nd-card .ct { display: block; margin-top: 6px; font-size: 12px; line-height: 17px; color: #444; font-weight: 600; }
+  .nd-sec { padding: 13px 2px 9px; }
+  .nd-sec i { display: block; width: 28px; height: 3px; background: #c8102e; border-radius: 2px; }
+  .nd-sec b { display: block; margin-top: 7px; font-size: 16px; font-weight: 600; color: #323233; }
+  .nd-sec s { display: block; margin-top: 3px; font-size: 12px; color: #969799; text-decoration: none; }
+  .nd-video { width: 100%; background: #000; }
+  .nd-anchor { display: flex; background: #fff; border-radius: 6px; padding: 6px; margin-bottom: 10px; }
+  .nd-anchor div { flex: 1; text-align: center; padding: 10px 4px; font-size: 13px; color: #323233; font-weight: 500; cursor: pointer; }
+  .nd-foot { padding: 9px 10px; background: #fff; border-radius: 6px; font-size: 11px; color: #999; line-height: 17px; }
+  .nd-space { display: block; }
+
+  /* ---------------- 产品 ---------------- */
+  #p-product { background: #fff; }
+  .side { width: 98px; flex: 0 0 98px; height: 100%; overflow-y: auto; background: #f5f5f5; }
+  .side-top { width: 98px; height: 58px; display: flex; align-items: center; justify-content: center; }
+  .side-top img { width: 98px; height: 58px; object-fit: contain; }
+  .side-item { height: 45px; padding: 0 12px; font-size: 15px; color: #050505; display: flex; align-items: center; cursor: pointer; }
+  .side-item.active { background: #000000; color: #fff; font-weight: 600; }
+  .main { flex: 1; height: 100%; overflow-y: auto; background: #fff; }
+  .group-head img { width: 100%; display: block; }
+  .prod-grid { display: flex; flex-wrap: wrap; }
+  .prod { width: 50%; padding: 6px 4px 10px; display: flex; flex-direction: column; align-items: center; }
+  .prod-pic { width: 100%; height: 130px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .prod-pic img { width: 100%; height: 100%; object-fit: contain; }
+  .prod-model { margin-top: 6px; font-size: 13px; color: #323233; }
+
+  /* ---------------- 我的 ---------------- */
+  #p-mine { padding-bottom: 30px; background: #f5f6f8; }
+  .profile { display: flex; align-items: center; padding: 30px 16px 40px; background: #C8102E; }
+  .avatar { width: 60px; height: 60px; border-radius: 50%; background: rgba(255, 255, 255, .25); border: 1px solid rgba(255, 255, 255, .5); flex-shrink: 0; object-fit: cover; }
+  .profile-info { flex: 1; min-width: 0; display: flex; flex-direction: column; margin-left: 12px; }
+  .nickname { font-size: 18px; font-weight: 600; color: #fff; }
+  .profile-tip { margin-top: 6px; font-size: 12px; color: rgba(255, 255, 255, .78); }
+  .profile-action { padding: 0 16px; height: 29px; line-height: 29px; font-size: 13px; color: #C8102E; background: #fff; border-radius: 14.5px; }
+  .mcard { padding: 12px; background: #fff; border-radius: 8px; }
+  .order-card { margin: -20px 12px 10px; }
+  .asset-card { display: flex; margin: 10px 12px 10px; }
+  .tool-card { margin: 0 12px 10px; }
+  .service-card { display: flex; align-items: center; justify-content: space-between; margin: 0 12px 10px; }
+  .card-head { display: flex; align-items: center; justify-content: space-between; padding-bottom: 10px; }
+  .card-title { font-size: 15px; font-weight: 600; color: #323233; }
+  .card-more { font-size: 12px; color: #969799; }
+  .order-tabs { display: flex; }
+  .order-tab { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 8px 0; }
+  .order-icon { width: 28px; height: 28px; border-radius: 6px; background: #FDECEE; border: 1px solid #F5C4B3; }
+  .order-label { margin-top: 7px; font-size: 12px; color: #323233; }
+  .asset-item { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 16px 0; }
+  .asset-num { font-size: 17px; font-weight: 600; color: #323233; }
+  .asset-label { margin-top: 5px; font-size: 12px; color: #666; }
+  .tool-grid { display: flex; flex-wrap: wrap; }
+  .tool-item { width: 33.33%; display: flex; flex-direction: column; align-items: center; padding: 12px 0; }
+  .tool-icon { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; background: #F5F5F5; border-radius: 50%; }
+  .tool-icon span { font-size: 14px; color: #969799; }
+  .tool-label { margin-top: 7px; font-size: 12px; color: #323233; }
+  .service-text { font-size: 14px; color: #323233; }
+  .service-arrow { font-size: 16px; color: #C8C9CC; }
+  .version { padding: 20px 0 0; text-align: center; font-size: 11px; color: #C8C9CC; }
+
+  /* ---------------- 右侧说明 ---------------- */
+  .hint { width: 300px; flex: 0 0 auto; background: #fff; border-radius: 14px; padding: 20px 22px; box-shadow: 0 8px 26px rgba(16, 24, 40, .07); }
+  .hint h2 { margin: 0 0 12px; font-size: 15px; }
+  .hint h3 { margin: 18px 0 8px; font-size: 13px; color: #1f2329; }
+  .hint ul { margin: 0; padding-left: 18px; }
+  .hint li { font-size: 12.5px; line-height: 1.85; color: #5a6270; }
+  .hint .badge { display: inline-block; font-size: 11px; padding: 2px 7px; border-radius: 5px; margin-right: 5px; font-weight: 600; }
+  .b-ok { background: #e8f6ee; color: #17794a; }
+  .b-todo { background: #fdf0e6; color: #a85c12; }
+  .hint p { font-size: 12px; line-height: 1.8; color: #7a8391; margin: 14px 0 0; }
+
+  @media (max-width: 900px) {
+    .stage { gap: 26px; padding: 0 10px 20px; }
+    .device { transform: scale(.92); transform-origin: top center; margin-bottom: -60px; }
+    .hint { width: 100%; max-width: 375px; }
+  }
+  @media (max-width: 420px) {
+    .device { transform: scale(.86); margin-bottom: -110px; }
+  }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="bar-title">LEXY莱克官方旗舰店 · 小程序 5 页复刻预览</div>
+  <div class="bar-sub">浏览器预览版，用于确认版式与素材；点底部导航或上方按钮切换页面。真机效果请用微信开发者工具导入工程目录。</div>
+</header>
+
+<div class="tabs" id="tabs">
+  <button class="tab-btn active" data-tab="home">首页</button>
+  <button class="tab-btn" data-tab="lexy">莱克</button>
+  <button class="tab-btn" data-tab="news">资讯</button>
+  <button class="tab-btn" data-tab="product">产品</button>
+  <button class="tab-btn" data-tab="mine">我的</button>
+</div>
+
+<div class="stage">
+  <div class="device">
+    <div class="statusbar"><span>9:41</span><span>5G &#9679;&#9679;&#9679;</span></div>
+    <div class="navbar" id="navTitle">首页</div>
+    <div class="screen">
+      <section class="page active" id="p-home"></section>
+      <section class="page" id="p-lexy"></section>
+      <section class="page" id="p-news">
+        <div id="newsList"></div>
+        <div id="newsDetail" style="display:none"></div>
+      </section>
+      <section class="page" id="p-product"></section>
+      <section class="page" id="p-mine"></section>
+    </div>
+    <nav class="tabbar" id="tabbar">
+      <div class="tb-item active" data-tab="home">首页</div>
+      <div class="tb-item" data-tab="lexy">莱克</div>
+      <div class="tb-item" data-tab="news">资讯</div>
+      <div class="tb-item" data-tab="product">产品</div>
+      <div class="tb-item" data-tab="mine">我的</div>
+    </nav>
+  </div>
+
+  <aside class="hint">
+    <h2>预览说明</h2>
+    <h3>页面构成</h3>
+    <ul>
+      <li><strong>首页</strong>：轮播 2 图 + 视频 4 段 + 6 张品牌图文</li>
+      <li><strong>莱克</strong>：7 大系列头图 + 官方覆盖文案 + 商品横滑</li>
+      <li><strong>资讯</strong>：了解莱克 2 大 + 6 小宫格</li>
+      <li><strong>产品</strong>：左侧 6 个品牌<strong>可点击切换</strong>，右侧是该品牌的真实分组与型号（共 66 个型号）</li>
+      <li><strong>我的</strong>：会员中心式（订单 + 资产 + 常用功能）</li>
+    </ul>
+    <h3>实现状态</h3>
+    <ul>
+      <li><span class="badge b-ok">已完成</span>5 页版式与素材（91 个素材全部可达）</li>
+      <li><span class="badge b-ok">已完成</span>购物车 / 商品列表 / 商品详情 / 分类</li>
+      <li><span class="badge b-ok">已完成</span>产品页 6 个品牌的真实内容与切换</li>
+      <li><span class="badge b-todo">待开发</span>交易链路（确认订单 + 支付）</li>
+      <li><span class="badge b-todo">待提供</span>tabBar 图标 PNG、品牌 VI 色值</li>
+    </ul>
+    <p>商品卡片图内自带官方型号与价格（源页面即如此），本预览不做任何二次编造。</p>
+  </aside>
+</div>
+
+<script>
+const D = {"SHOP":{"name":"LEXY莱克官方旗舰店","avatar":"https://img.yzcdn.cn/upload_files/2022/06/24/FnmIoAG300wwWTtliJBcLGB1YJar.png","slogan":"莱克 · 让家更干净"},"HOME":[{"type":"swiper","height":1322,"images":["https://img.yzcdn.cn/upload_files/2026/01/04/Fo69HIsVHfOzMC08PSX7N7uFY8s1.png!large.webp","https://img.yzcdn.cn/upload_files/2026/01/04/Fl6yiLDP_qD77xcIPwrKfpbdgn3l.jpg!large.webp"]},{"type":"video","height":420,"poster":"https://img.yzcdn.cn/upload_files/2026/01/04/FmWuKKYDvg5Wt4aDDF0BzrOtFjJ6.png!large.webp","src":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/Uz-MZEKf6NthE7u5biW2W-qky5Rr46V_KLnKvA_HD.mp4?sign=8145287703d988569d0617decec05386&t=6ac72d78"},{"type":"image","height":1342,"src":"https://img.yzcdn.cn/upload_files/2026/03/23/FpEmv38JlZ6Gs7uqOc3Oc45c8ZyO.png!large.webp"},{"type":"image","height":1642,"src":"https://img.yzcdn.cn/upload_files/2026/01/07/Fs2JC2Rd_zFcdWuYOzLkNR_PKFP8.jpg!large.webp"},{"type":"video","height":420,"poster":"https://img.yzcdn.cn/upload_files/2025/10/24/FuFIgF8CRwJ0Ea6su5y3izD9gGKe.png!large.webp","src":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/M0W-mlTq_dNu2gupiUqkuqLOUxmnvuMr5POv5w_HD.mp4?sign=792ae03ea00a0d71dbb2d277dbdd4f12&t=6ac72d78"},{"type":"image","height":756,"src":"https://img.yzcdn.cn/upload_files/2026/01/04/Fr_tsF2gAxM2M35MG16j34djUjZs.png!large.webp"},{"type":"image","height":1326,"src":"https://img.yzcdn.cn/upload_files/2026/01/07/FhZ_bsHU5p4qvtJlg5a7rprmsHhB.png!large.webp"},{"type":"video","height":420,"poster":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/XvLEB33Z0lZ-QiYQ2eRMzI899fRo2arKyE_6qg_cover.jpg","src":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/XvLEB33Z0lZ-QiYQ2eRMzI899fRo2arKyE_6qg_HD.mp4?sign=61361b18bbc123202fc7f9ac2df1ec41&t=6ac72d78"},{"type":"image","height":652,"src":"https://img.yzcdn.cn/upload_files/2026/01/04/FhkZ06W7Z8D16Cd0ULEu700z0_kr.png!large.webp"},{"type":"image","height":882,"src":"https://img.yzcdn.cn/upload_files/2026/01/07/Fs-nj3UEvr_44TFpny7zs8_0TZB2.png!large.webp"},{"type":"video","height":420,"poster":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/J2S8RqWN_Lla-3X3b99IvkTEmX4tvEsMaSCWog_cover.jpg","src":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/J2S8RqWN_Lla-3X3b99IvkTEmX4tvEsMaSCWog_HD.mp4?sign=719d3d802f7a647feb6e2609074f08b2&t=6ac72d78"}],"LEXY":[{"id":"tianlangxing","name":"天狼星系列","title":"三合一 大吸力","subtitle":"洗地机丨除螨机丨吸尘器","hero":"https://img01.yzcdn.cn/upload_files/2025/11/03/FhL5SFjTD4twqazFt_Aj6S-f8ROe.jpg!large.webp","products":[{"id":"t1","image":"https://img.yzcdn.cn/upload_files/2025/10/24/FhbUPVZ2L4pTbP9KiD9YuCBKFKHz.jpg!large.webp"},{"id":"t2","image":"https://img.yzcdn.cn/upload_files/2024/12/11/FvbNbJK_Azo9evrthrh-DxXzPgBc.png!large.webp"},{"id":"t3","image":"https://img.yzcdn.cn/upload_files/2024/12/11/FgQ5Vn2d6FVBnzloRyq2_3TTxhbA.png!large.webp"}]},{"id":"tianwangxing","name":"天王星系列","title":"三合一 大吸力","subtitle":"吸尘器 | 擦地机 | 除螨机","hero":"https://img01.yzcdn.cn/upload_files/2024/10/26/Fn0VTWldpDlzZ6yjf_7tU9GYPiAR.png!large.webp","products":[{"id":"w1","image":"https://img.yzcdn.cn/upload_files/2024/11/27/Fs0mn4BTQOywMmFO2KPJKI5CeEc0.png!large.webp"},{"id":"w2","image":"https://img.yzcdn.cn/upload_files/2024/11/27/Fkap9MaaJZE6Y1MzDmRMOhLoRf7Q.png!large.webp"},{"id":"w3","image":"https://img.yzcdn.cn/upload_files/2024/11/27/Fqhat9-D5nWUbl8jXDFingSWaGUp.png!large.webp"}]},{"id":"haiwangxing","name":"海王星系列","title":"三合一 大吸力","subtitle":"洗地机丨除螨机丨吸尘器","hero":"https://img01.yzcdn.cn/upload_files/2023/08/17/FjcLbGZAvlDqt5gFi-4XQ3_ksID8.jpg!large.webp","products":[{"id":"h1","image":"https://img.yzcdn.cn/upload_files/2023/08/17/Fm0qE7-iDMjl1fg69mpeUkcIAfM5.jpg!large.webp"},{"id":"h2","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FksvwngdwWGcuO9Y_CSWEQk1zjFc.jpg!large.webp"},{"id":"h3","image":"https://img.yzcdn.cn/upload_files/2023/08/17/Fi3IHs-mJ5hrC-fmZvXAUOW1sJ54.jpg!large.webp"},{"id":"h4","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FjoB3ke-gqcD7Q4Y1OZS_F0W26Vf.jpg!large.webp"}]},{"id":"kongjing","name":"空净系列","title":"大洁净空气量甲醛净化器","subtitle":"快速除醛丨入住无忧","hero":"https://img01.yzcdn.cn/upload_files/2023/08/17/Ft2Fh97u6ZrsczSIpPs5hJeofEqs.jpg!large.webp","products":[{"id":"k1","image":"https://img.yzcdn.cn/upload_files/2023/10/24/FoU-EV_UaGilDLUNy0rR-Vk0JHUb.png!large.webp"},{"id":"k2","image":"https://img.yzcdn.cn/upload_files/2023/10/24/Fns3sJQW1ljyqUmp_9p_eHoVUlWW.png!large.webp"},{"id":"k3","image":"https://img.yzcdn.cn/upload_files/2023/10/24/Fo7Q_IGaDywnh59ooGySHDk5bTtm.png!large.webp"},{"id":"k4","image":"https://img.yzcdn.cn/upload_files/2023/10/24/FrqIKTJUTNE4HarMiH0sIR00p87e.png!large.webp"}]},{"id":"xunhuaneshan","name":"循环扇系列","title":"智能空气调节扇","subtitle":"全屋循环丨静音轻享","hero":"https://img01.yzcdn.cn/upload_files/2023/08/17/FqOj2XsFy3dpqEfidl0Tb1pJTNSl.jpg!large.webp","products":[{"id":"f1","image":"https://img.yzcdn.cn/upload_files/2024/06/06/FkUE7J2fqJAd6bWCwQxlF01ff9Zs.jpg!large.webp"},{"id":"f2","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FtCowr9egFSfsvZ6KXlDzdUTl03e.jpg!large.webp"},{"id":"f3","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FsoaIBmVgmXb33z_FMM9Mvc8O6o0.jpg!large.webp"}]},{"id":"mojie","name":"魔洁系列","title":"魔洁丨立式无线吸尘器","subtitle":"立式设计 更轻便","hero":"https://img01.yzcdn.cn/upload_files/2023/10/09/FmEqqe9Me172CI3n75WfUzos8PBT.jpg!large.webp","products":[{"id":"m1","image":"https://img.yzcdn.cn/upload_files/2023/10/24/FvdBdDcQcOdP6eoebRbyUb43qaq2.png!large.webp"},{"id":"m2","image":"https://img.yzcdn.cn/upload_files/2023/10/24/FjzExe9mJ2XDeBqmaoKxAS_Oz2__.png!large.webp"},{"id":"m3","image":"https://img.yzcdn.cn/upload_files/2023/08/17/Fi5mS2KVfiY7J22pQ3WwQyx3PcpI.jpg!large.webp"},{"id":"m4","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FtEU8EwjEfT9_0298l1PMftagrnc.jpg!large.webp"}]},{"id":"chuifengji","name":"吹风机系列","title":"水离子涡扇吹风机","subtitle":"纳米水离子丨吹发更丝滑","hero":"https://img01.yzcdn.cn/upload_files/2023/10/09/FozxJM1YpB7WS1C3l9-aVTUVeezl.jpg!large.webp","products":[{"id":"c1","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FmRo_QgyDOPnMjSDkfOEJI_XWfnY.jpg!large.webp"},{"id":"c2","image":"https://img.yzcdn.cn/upload_files/2023/08/17/FhPlih9_l-80MAHsZP7AIYz17Run.jpg!large.webp"}]}],"NEWS":{"en":"UNDERSTAND LEXY","title":"了解莱克","big":[{"id":"n1","key":"about","label":"关于莱克","image":"https://img01.yzcdn.cn/upload_files/2025/01/17/FqSuZDEO9tXps6i-YyTynZ5WdwrU.png!large.webp"},{"id":"n2","key":"news","label":"新闻大事","image":"https://img01.yzcdn.cn/upload_files/2025/01/18/FsHt5BUUESrpu1Dhc-nw-gzKxvue.png!large.webp"}],"small":[{"id":"n3","key":"history","label":"创业故事","image":"https://img01.yzcdn.cn/upload_files/2025/01/16/FvPNYdc7cOq1Z2qOnMJfQZ_6QGvL.png!large.webp"},{"id":"n4","key":"brands","label":"我们品牌","image":"https://img01.yzcdn.cn/upload_files/2026/01/06/Fml3p5gzwaZIBu59McvIzciUd9Yd.jpg!large.webp"},{"id":"n5","key":"share","label":"用户分享","image":"https://img01.yzcdn.cn/upload_files/2025/01/18/FjRf6fbuGMS-0NtLDLJhvhuLQ-RW.png!large.webp"},{"id":"n6","key":"business","label":"业务模式","image":"https://img01.yzcdn.cn/upload_files/2025/01/15/FlEGD1Kzz0DhqQIPBT_9IuG3Mx57.png!large.webp"},{"id":"n7","key":"service","label":"售后服务","image":"https://img01.yzcdn.cn/upload_files/2025/01/18/FgXBmhC4vgU2Zzj883y6u5HwpE5r.png!large.webp"},{"id":"n8","key":"join","label":"加入我们","image":"https://img01.yzcdn.cn/upload_files/2025/01/18/Fu667fFSbNvtJW0LY75s1VmaLJbN.png!large.webp"}]},"NAV_LOGO":"https://img01.yzcdn.cn/upload_files/2023/05/31/Fh-29typqZvQ3S048FbLTMAlGaX1.png","BRANDS":[{"id":"lexy","name":"莱克","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2025/01/20/Fn8be9SP17alZYMbeE_Kspu6wyeI.png!large.webp","products":[{"id":"lexy-1-1","model":"U7","image":"https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp"},{"id":"lexy-1-2","model":"U5","image":"https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp"},{"id":"lexy-1-3","model":"U3","image":"https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2025/01/21/FvUVL-acP0gJpAdNhi2wQpS1aUuq.png!large.webp","products":[{"id":"lexy-2-1","model":"S9 Max","image":"https://img01.yzcdn.cn/upload_files/2023/10/12/FpnR4wiWr7c6rwCtbKQOcJ3iKFlp.png!middle.webp"},{"id":"lexy-2-2","model":"S7 Max","image":"https://img01.yzcdn.cn/upload_files/2023/10/12/Fqt4pNhhLN9jcYlmS8lnB5GQz4XU.png!middle.webp"},{"id":"lexy-2-3","model":"S7s Max","image":"https://img01.yzcdn.cn/upload_files/2023/10/12/FnUCxzuiJEFudWPNwEUWI50P2pJY.png!middle.webp"},{"id":"lexy-2-4","model":"S6 Plus Max","image":"https://img01.yzcdn.cn/upload_files/2023/10/12/FnUCxzuiJEFudWPNwEUWI50P2pJY.png!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2025/01/20/FlfrCPNuVD_aHhNg-lcyWPN13Njo.png!large.webp","products":[{"id":"lexy-3-1","model":"N7 Pro","image":"https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp"},{"id":"lexy-3-2","model":"N7","image":"https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp"},{"id":"lexy-3-3","model":"N5 Pro","image":"https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp"},{"id":"lexy-3-4","model":"N5","image":"https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2025/01/20/FgTT1sS8S7ve0F0ZF_gYWMx8gThw.png!large.webp","products":[{"id":"lexy-4-1","model":"M9","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FtkTuoukoSuOUR80HRKnAgnGFe21.jpg!middle.webp"},{"id":"lexy-4-2","model":"M7","image":"https://img01.yzcdn.cn/upload_files/2023/10/24/Fl1eE8P3zPUmYL0YxRUBp2uCEFWc.png!middle.webp"},{"id":"lexy-4-3","model":"M5","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/Fo8EpPGIS7NUMqWoYMVBUwL6ESD2.jpg!middle.webp"},{"id":"lexy-4-4","model":"M3","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FopGi0Nac24IUPFSj91UfrQh2eww.jpg!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2023/10/12/Fly0Iqq-6phfjjjVqoPMie-XoELb.jpg!large.webp","products":[{"id":"lexy-5-1","model":"K9Pro","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/FnlRhVhmau19DCuj4GmJaobKU_cE.png!middle.webp"},{"id":"lexy-5-2","model":"K8Pro","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fm-cxiBjfRZX1KsmAd9KIjQAOVos.png!middle.webp"},{"id":"lexy-5-3","model":"K6Pro","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fukc0GQ_e7u7hMRItEPMv0R1IzI5.png!middle.webp"},{"id":"lexy-5-4","model":"K5Pro","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fljryg1yz5a5CCWaUo9i2k7np-bi.png!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2023/10/12/Fizyr2zbS1sQZ7ek70cjCBlWjNiG.jpg!large.webp","products":[{"id":"lexy-6-1","model":"F701","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FojMRjEyLfK2bvq_Xs0SB2NdIyxo.jpg!middle.webp"},{"id":"lexy-6-2","model":"F503","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FpBGxe1IUNELPWyViS4rqmdV9iUE.jpg!middle.webp"},{"id":"lexy-6-3","model":"F402","image":"https://img01.yzcdn.cn/upload_files/2024/09/02/FmqUYSralGqTctMVG0wH7X6O3c2j.png!middle.webp"},{"id":"lexy-6-4","model":"F305","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FvJdPFKBFGs9g4z90unm1IdyFsh2.jpg!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2023/10/12/FuHV68XwTx--aYU6cJbV9CKifsn4.jpg!large.webp","products":[{"id":"lexy-7-1","model":"F8","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FjdlbJMsJF-zgEk2f0zy7sOgjJHK.jpg!middle.webp"},{"id":"lexy-7-2","model":"F6","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FgVnlHGKtX0Y9gesfAAaeUhemmg8.jpg!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2023/11/04/FkrLDYLcBIw756KlGY1lUdxriITk.jpg!large.webp","products":[{"id":"lexy-8-1","model":"HU801","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fh-AqUmxQO31VRmDNjqnslzkcKz9.png!middle.webp"},{"id":"lexy-8-2","model":"HU701","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fh898PuKTYwwOEmE6m_Qan2d0__p.png!middle.webp"},{"id":"lexy-8-3","model":"HU301","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fva-SHmiuHq0BXrOBDX0eyn8RH3R.png!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2023/10/12/Fr2hKXFhQyqgFq2h7wTAidpLVoxl.jpg!large.webp","products":[{"id":"lexy-9-1","model":"DH650","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/FnnBw93sMhFR4aDDxYI_-juXhqTL.png!middle.webp"},{"id":"lexy-9-2","model":"DH350","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fg2vaP3wOk-0TSj3HN-4OPZ99ubk.png!middle.webp"},{"id":"lexy-9-3","model":"DH200","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/Fmjt9H5C1Mpl40uBiTZ2jL5N6wVh.png!middle.webp"},{"id":"lexy-9-4","model":"DH180","image":"https://img01.yzcdn.cn/upload_files/2023/10/13/FtkqbdSYdPcurK28-u_lejPooyIz.png!middle.webp"}]}]},{"id":"jimi","name":"吉米","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2023/10/18/Fu1hIeOrlmLLNFEopLoee6dW8DBz.jpg!large.webp","products":[{"id":"jimi-1-1","model":"M7Ultra","image":"https://img01.yzcdn.cn/upload_files/2025/02/11/FkRcNDJuKJIxOSXPsyCd24Rbbe2m.png!middle.webp"},{"id":"jimi-1-2","model":"M7 Pro","image":"https://img01.yzcdn.cn/upload_files/2023/06/02/FklZ_76ViIQOyRqecTvbrWMyRhFE.png!middle.webp"},{"id":"jimi-1-3","model":"B6 Pro","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/FqdkUaI0hmZ6m-UhJFeT3CtV3yUq.png!middle.webp"},{"id":"jimi-1-4","model":"M5","image":"https://img01.yzcdn.cn/upload_files/2023/06/02/Fi60unEUKxU9vReKZ7Q4mdxMHaid.png!middle.webp"},{"id":"jimi-1-5","model":"M4 Pro","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/FrLqROzKp9AP6yoSHlXhLyiX60GU.png!middle.webp"}]}]},{"id":"biquan","name":"碧云泉","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2025/01/20/FpWydtngDrTl_tYonzC7MYEIK73b.png!large.webp","products":[{"id":"biquan-1-1","model":"N7","image":"https://img01.yzcdn.cn/upload_files/2024/11/26/Fuj5h4AH-QKZe35zJ7priJlS4Bad.png!middle.webp"},{"id":"biquan-1-2","model":"RT701","image":"https://img01.yzcdn.cn/upload_files/2023/06/02/FpoMcR9Kc_kb8rliUxJ_etCnDRY9.png!middle.webp"},{"id":"biquan-1-3","model":"N9s","image":"https://img01.yzcdn.cn/upload_files/2024/12/20/FiwvJA9VYKmwpeVPUcuUHiWmsGH_.png!middle.webp"},{"id":"biquan-1-4","model":"T5 系列","image":"https://img01.yzcdn.cn/upload_files/2023/09/09/FoHohzTslHGuQsxmSGDfkC-5ErFU.jpg!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2025/01/20/FlPTGtWuFOzOLFzo7keX8jiCUvV7.png!large.webp","products":[{"id":"biquan-2-1","model":"R803","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/Fp9zYV7cHr9YOh5DzOcO0NsK1oZA.png!middle.webp"},{"id":"biquan-2-2","model":"G5小积木","image":"https://img01.yzcdn.cn/upload_files/2025/04/25/Fk0wmjaAnbVZqvuAlndAkmxC_3C2.png!middle.webp"},{"id":"biquan-2-3","model":"R702","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FjWf-30PhfYy-7ELe3Z9pnYrgv1I.jpg!middle.webp"},{"id":"biquan-2-4","model":"G7","image":"https://img01.yzcdn.cn/upload_files/2023/04/27/FoywEzKx8O3FRLewnNwMB4FfXBDJ.jpeg!middle.webp"},{"id":"biquan-2-5","model":"C5Pro","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/FjAY_AyPJaocaX-c4v_Wmx8xRWhL.png!middle.webp"},{"id":"biquan-2-6","model":"C5Plus","image":"https://img01.yzcdn.cn/upload_files/2025/05/14/Fk4qV94T1OvQmyBNtnB7t5pO0yXc.png!middle.webp"},{"id":"biquan-2-7","model":"R7威尼斯","image":"https://img01.yzcdn.cn/upload_files/2024/01/10/FrwrK1olNWIT4tRft7xTqcPWM4Sc.jpg!middle.webp"},{"id":"biquan-2-8","model":"RB601","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/Fl74gJe76S3FaGqyi6XqrCgEm2VR.png!middle.webp"}]},{"header":"https://img01.yzcdn.cn/upload_files/2025/05/21/FphgrZTs7LtA-WxgXTHnT15EyHGo.jpg!large.webp","products":[{"id":"biquan-3-1","model":"JSC-RL801","image":"https://img01.yzcdn.cn/upload_files/2025/05/21/FloS49Lts6XXDfq1Z52JyGBIuQw2.png!middle.webp"},{"id":"biquan-3-2","model":"JSC-UL301","image":"https://img01.yzcdn.cn/upload_files/2025/05/20/FmDm01gQoG9HiR2Fzn6-DXUprtNW.png!middle.webp"}]}]},{"id":"lexiaochu","name":"莱小厨","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2023/10/18/FjhCKjoUJYoBmPkz_6CaPryyqf0T.jpg!large.webp","products":[{"id":"lexiaochu-1-1","model":"TC701","image":"https://img01.yzcdn.cn/upload_files/2024/03/19/FmDkS1V0NxxGJOk8266ZqYXV3vn6.png!middle.webp"},{"id":"lexiaochu-1-2","model":"TC602","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/FqDgpEnpJeg682D1mvxkDfUo8bG0.png!middle.webp"},{"id":"lexiaochu-1-3","model":"TC601","image":"https://img01.yzcdn.cn/upload_files/2024/09/03/FthSE5iTgiETWog6xvthG3P7EM4T.png!middle.webp"},{"id":"lexiaochu-1-4","model":"TF601","image":"https://img01.yzcdn.cn/upload_files/2023/06/05/FuTRL6Im469HI6SpHv9TFhEGiyPL.jpg!middle.webp"},{"id":"lexiaochu-1-5","model":"AF301","image":"https://img01.yzcdn.cn/upload_files/2023/06/05/Fu9c4FJU3u-f90lbnFKDEmvezveK.jpg!middle.webp"}]}]},{"id":"kaboshi","name":"咖博士","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2025/03/07/FgrlV9S_ju_GIYwKzYPzQIPIrFO3.png!large.webp","products":[{"id":"kaboshi-1-1","model":"Grace 200","image":"https://img01.yzcdn.cn/upload_files/2025/03/28/FmyWJnn9YEgPQi4tQ5r1BT6Jrl7S.png!middle.webp"},{"id":"kaboshi-1-2","model":"HOT 300","image":"https://img01.yzcdn.cn/upload_files/2025/03/07/FnnQ3yC_1T-pCYXIqZsWqdyyo7xY.png!middle.webp"},{"id":"kaboshi-1-3","model":"HOT 100","image":"https://img01.yzcdn.cn/upload_files/2025/03/07/FpFW0m03x6w69n_tek9KMqNCqVSj.png!middle.webp"}]}]},{"id":"ximandike","name":"西曼帝克","groups":[{"header":"https://img01.yzcdn.cn/upload_files/2023/10/18/Fr133MCRCfids9fctYStYOOV28Wm.jpg!large.webp","products":[{"id":"ximandike-1-1","model":"PB802","image":"https://img01.yzcdn.cn/upload_files/2023/06/12/FiBSJzhfQW83V39-nM_0CiFlqpC0.jpg!middle.webp"},{"id":"ximandike-1-2","model":"CF6","image":"https://img01.yzcdn.cn/upload_files/2023/12/16/FlTjrmJR5JUJPbtlqfuYXsOrDORh.jpg!middle.webp"},{"id":"ximandike-1-3","model":"CF7","image":"https://img01.yzcdn.cn/upload_files/2023/12/15/FhItu4yN14pLklxi2XHggFF09sGH.jpg!middle.webp"},{"id":"ximandike-1-4","model":"CF9","image":"https://img01.yzcdn.cn/upload_files/2023/12/16/Fi9MNtJuNg8fm73tB0Swczm5Le1a.jpg!middle.webp"},{"id":"ximandike-1-5","model":"C9","image":"https://img01.yzcdn.cn/upload_files/2023/06/06/FoyFpX-uFZ11E2Ht7b0nrZcOyDKD.jpg!middle.webp"},{"id":"ximandike-1-6","model":"C7","image":"https://img01.yzcdn.cn/upload_files/2023/06/05/FlZt1dv52r4gPNb9ZhcqEI3ei3O8.jpg!middle.webp"},{"id":"ximandike-1-7","model":"C5","image":"https://img01.yzcdn.cn/upload_files/2023/06/05/Ft-P4ij4HpBDNMdgq9jaJcaYnb90.jpg!middle.webp"}]}]}],"NEWS_SECTIONS":[{"key":"about","alias":"K2uVRyVOmQ","name":"关于莱克","size":"big","cover":"https://img01.yzcdn.cn/upload_files/2025/01/17/FqSuZDEO9tXps6i-YyTynZ5WdwrU.png!large.webp"},{"key":"news","alias":"PNf4dwgJtC","name":"新闻大事","size":"big","cover":"https://img01.yzcdn.cn/upload_files/2025/01/18/FsHt5BUUESrpu1Dhc-nw-gzKxvue.png!large.webp"},{"key":"history","alias":"TmNDCV77IY","name":"创业故事","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2025/01/16/FvPNYdc7cOq1Z2qOnMJfQZ_6QGvL.png!large.webp"},{"key":"brands","alias":"A6JyjnquUO","name":"我们品牌","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2026/01/06/Fml3p5gzwaZIBu59McvIzciUd9Yd.jpg!large.webp"},{"key":"share","alias":"0HBwE1ckVc","name":"用户分享","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2025/01/18/FjRf6fbuGMS-0NtLDLJhvhuLQ-RW.png!large.webp"},{"key":"business","alias":"fP8QgkJoTN","name":"业务模式","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2025/01/15/FlEGD1Kzz0DhqQIPBT_9IuG3Mx57.png!large.webp"},{"key":"service","alias":"DtFKyexm9p","name":"售后服务","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2025/01/18/FgXBmhC4vgU2Zzj883y6u5HwpE5r.png!large.webp"},{"key":"join","alias":"YZNV7abLK0","name":"加入我们","size":"small","cover":"https://img01.yzcdn.cn/upload_files/2025/01/18/Fu667fFSbNvtJW0LY75s1VmaLJbN.png!large.webp"}],"NEWS_PAGES":{"K2uVRyVOmQ":{"alias":"K2uVRyVOmQ","title":"关于莱克","subtitle":"了解莱克认识莱克","tabs":[{"n":"集团介绍","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FowXFhoD_hMzXIP2tVjojC4gxc3Z.jpg!large.webp","w":1080,"h":6125,"cap":""}]},{"n":"CEO介绍","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/13/FuIX2-fL0MJY9QP4e7O_tSOyRVv0.jpg!large.webp","w":1080,"h":6016,"cap":""}]},{"n":"发展历程","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2026/01/06/ltysaeC1iM6eUhG5QEncN9hpt1qu.jpg!large.webp","w":1080,"h":15523,"cap":""}]},{"n":"莱克荣誉","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/23/FpetdRiaFFKxtQ0KuokMO1xGhZzA.jpg!large.webp","w":1080,"h":6396,"cap":""}]},{"n":"品牌故事","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2025/05/23/FlY5L7Az1uzSNJn2u4Whnufhos9U.png!large.webp","w":1080,"h":2670,"cap":""}]}],"blocks":[]},"PNf4dwgJtC":{"alias":"PNf4dwgJtC","title":"新闻大事","subtitle":"实时把握莱克动态","tabs":[{"n":"新闻资讯","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Ft8A0h6JzdoJSiGJud0Mk5pPYHCG.png!large.webp","w":800,"h":800,"t":"绿色赋能 实力出圈｜莱克电气成功发行江苏省首单上市民企绿色超短期融资券","l":{"k":"note","a":"lKZXZvDWzL"}},{"s":"https://img01.yzcdn.cn/upload_files/2026/09/10/FjgusTy9N-JH7U1gNCPEWQUmfJxx.png!large.webp","w":350,"h":350,"t":"莱克电气“四高十法”质量数字化赋能实践入选工信部典型案例","l":{"k":"note","a":"wCFtJQH2Bi"}},{"s":"https://img01.yzcdn.cn/upload_files/2026/03/24/FkduJBS08Gn2dYLy8Ltl_xkdA0Ay.jpg!large.webp","w":800,"h":800,"t":"2026“新三件�新品质”AWE发布会精彩回顾","l":{"k":"note","a":"RD4rXhRnWD"}},{"s":"https://img01.yzcdn.cn/upload_files/2026/03/24/FuOithauaVq8cSX4NpNdSDOc-RS7.png!large.webp","w":500,"h":500,"t":"莱克电气旗下三大品牌产品荣膺AWE2026艾普兰创新奖","l":{"k":"note","a":"VowDDSS8th"}},{"s":"https://img01.yzcdn.cn/upload_files/2026/03/24/FpfwRj2X4yK-yW-mt8_jineXmi30.png!large.webp","w":556,"h":549,"t":"权威认证加冕！莱克电气荣获“三合一洗地吸尘器开创者”认证，新品类定义清洁新标准","l":{"k":"note","a":"UBy7tPTIc3"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/12/29/FmEsWtsfJzwhuU3oHMCMVEz8P3cB.jpg!large.webp","w":800,"h":800,"t":"莱克、碧云泉荣获2025中国家电行业\"好产品\"大奖","l":{"k":"note","a":"xLFPyoj49H"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/12/29/FttKlkUXKhtw6YbdFHpcWzoPSNHS.png!large.webp","w":710,"h":800,"t":"苏宁易购深入莱克电气技术探讨共启11-1月战略攻势合作新篇章","l":{"k":"note","a":"BLNCK3NkD0"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Ft8A0h6JzdoJSiGJud0Mk5pPYHCG.png!large.webp","w":800,"h":800,"t":"莱克天狼星S10 Pro、碧云泉小积木G5领跑IFA家电创新赛道","l":{"k":"note","a":"T3vQswWnnD"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/05/16/FvQ7ANvcKRCElrx9wYu2UTE7qhct.jpg!large.webp","w":820,"h":820,"t":"书香沁润职场，文化赋能未来“莱克新教育书房“正式授牌","l":{"k":"note","a":"6z0NVnfkgm"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/03/24/FkCVDJkYugDja_nC9Eqn8wmPQqDJ.png!large.webp","w":750,"h":750,"t":"2025 莱克 | 碧云泉 | 咖博士新品体验发布会现场回顾","l":{"k":"note","a":"kndesNCPUH"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/03/10/Fq1hnfBEwAbX_3phzBij3zAQYI8p.png!large.webp","w":800,"h":800,"t":"莱克电气AWE2025大放异彩，多项大奖彰显创新实力","l":{"k":"note","a":"lTkuJHUs34"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/03/10/Fq1hnfBEwAbX_3phzBij3zAQYI8p.png!large.webp","w":800,"h":800,"t":"喜讯 | 莱克入选首批中国消费名品，荣获“时代优品”认证","l":{"k":"note","a":"CuhI7varOw"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/01/13/Fio-_1-gqKPYXb_tfhASGn5Zskwc.jpg!large.webp","w":800,"h":800,"t":"喜讯 | 莱克荣获两项2024年中国家电行业年度“好产品”奖项","l":{"k":"note","a":"rZe9x7Hgev"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/01/13/Fo3HPE8d-is29OptJ5D9em1YMtj5.jpg!large.webp","w":800,"h":800,"t":"喜讯 | 莱克电气再获殊荣，荣登2024年度绿色制造名单","l":{"k":"note","a":"fssdtucowU"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/01/03/FmlaFNeQwd95x2UUo4nPPgSDumaF.jpg!large.webp","w":800,"h":800,"t":"回望2024 见证非凡之旅","l":{"k":"note","a":"1iaoCtTyiv"}}]}]},{"n":"社会责任","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/12/29/Fnpt9J0KRFSGSukU7pV5j7_jxIk7.jpg!large.webp","w":800,"h":800,"t":"莱克集团:以公益心筑教育梦，携千年府学共赴未来","l":{"k":"note","a":"JYNsPNWAue"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fpnk3Uxc_DxOc5tVWczfDime-IeY.png!large.webp","w":800,"h":800,"t":"行直道正，谊在千秋 | 莱克集团向苏州中学捐赠2000万","l":{"k":"note","a":"LIFhEufYEg"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fj384n_asRR4S8-1zKqk6J-MrTy9.png!large.webp","w":800,"h":800,"t":"莱克电气助力上海疫情防控，捐赠410万元健康家电驰援上海方舱","l":{"k":"note","a":"A7PtgXPQ2i"}}]}]},{"n":"财务报告","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/08/29/FhngD_usPDCnxof5I4sQjI_63UHn.jpg!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2025年半年报","l":{"k":"note","a":"CeXOBGeYSY"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/04/15/Fixhe-0NvhuWADZYPFOfF8mJ8SCf.png!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2024年年报","l":{"k":"note","a":"DHSUFt4POH"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/08/29/FhngD_usPDCnxof5I4sQjI_63UHn.jpg!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2024年半年报","l":{"k":"note","a":"4hIOdBM4ef"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FmkWQxe8wi94XdmQvdfW8z3Eo9Zw.png!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2023年年报和2024年一季报","l":{"k":"note","a":"4nlX2NbDuE"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fs-yCx06P2ozTIJR2Rp-VlsF_J9h.png!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2023半年报","l":{"k":"note","a":"x4sn5wVP6d"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FjlLBWTN-3p25yTczw6hhpaSK2lw.png!large.webp","w":800,"h":800,"t":"一图读懂莱克电气2022年年报和2023年一季报"}]}]}],"blocks":[]},"TmNDCV77IY":{"alias":"TmNDCV77IY","title":"创业语录","subtitle":"","tabs":[],"blocks":[{"t":"video","p":"https://img.yzcdn.cn/upload_files/2024/04/11/FhWGTQxwI85Ssvn-xe1W86moXCty.jpg!large.webp","s":"https://mps-trans.yzcdn.cn/trans/multi_trans_hd/03ylY4eFPVtei5E49gFFDO2Bb3xX6whCTzeUyA_HD.mp4?sign=e1abe37a16990362cb4a965ec8e93100&t=6ac73d85","n":"莱克�马伊琍-心有净界8分钟版"},{"t":"notes","a":[{"t":"创业语录-辞职下海","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FsS09NcMdaEkeLu9-O6Phtk2hUZQ.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=415i3jw70c"},{"t":"创业语录-龙头老大","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FsF1priHEktd5OI7ojdJXbj9u7fn.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=gUifJxkrPq"},{"t":"创业语录-目标愿景","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Ftf0VpGmKJZMKxMAnySnfsKbnbdW.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=GVlqokzy8o"},{"t":"创业语录-立身之本","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Fjpf99SfN-Er7KkQZX40sOPmGde7.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=WrdazgfBzL"},{"t":"创业语录-创造价值","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FkYTJZ1tMp-Tv2iuAd2ioKXk_VVu.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=QEOeFCWZqm"},{"t":"创业语录-产品至上","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Fqt6xRLhUR9DtYFC0fMcbSabCMnc.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=PHMQfaUMlX"},{"t":"创业语录-生意理念","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FhuzvcU323oP57iQ_ZVEiHq94yjT.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=ZaXYI27jj4"},{"t":"创业语录-与众不同","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Fl02xuE3j5doQKfzR-OJIYTBzYTS.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=4nIMgSBaAS"},{"t":"创业语录-经营管理","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FpcLTeOJ9d0QGCSQbPzdoElTmMje.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=gtU9tm1QT1"},{"t":"创业语录-终生学习","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FvS6j3sXym-B8q4Me4pY7DGtkedw.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=CFJ1vGgXCD"},{"t":"创业语录-因时而变","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FumomrnAjRnUXUBPgPrpIjqK4nJo.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=k7KBZayUPf"},{"t":"创业语录-辩证思维","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FlPwlM5IBAFcpZsbBTEGuLzJQ4Kk.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=Emvw3xpfDb"},{"t":"创业语录-居安思危","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Fj4KD3MlbozN8HfqP_stsxYPxpYZ.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=AnxfLoKw8P"},{"t":"创业语录-与时俱进","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/FltOJQlWIkJHc2HI4F2KyeipCxvi.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=sFIqNJ0eEV"},{"t":"创业语录-莱克使命","s":"https://img01.yzcdn.cn/upload_files/2024/04/11/Fv4-xcd3zx1y85Zzhx4aRFypnCwZ.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=NxKnlfj2zC"}]},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/12/FkM6R1ICf6UT9A7iqB8rKv97x4bd.jpg!large.webp","w":750,"h":420}]},"A6JyjnquUO":{"alias":"A6JyjnquUO","title":"我们品牌","subtitle":"了解莱克四大品牌","tabs":[{"n":"莱克","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/13/Fi9g52yP5koTR_Fjr0fRkRgSj3yv.jpg!large.webp","w":1080,"h":1743,"cap":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/12/11/FndJ8riWOoSebz_jv1jLonEY5w7K.png!large.webp","w":1080,"h":2432,"cap":"","l":{"k":"tab","a":"lexy"}}]},{"n":"碧云泉","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fp8eIFphO7kmwAn4V7FiYfWZuDa9.jpg!large.webp","w":1080,"h":1607,"cap":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/11/26/FgeR7OxGXs3p3k_wDJ2-Hm2vQUCu.png!large.webp","w":1080,"h":1716,"cap":"","l":{"k":"tab","a":"product"}}]},{"n":"咖博士","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2025/05/23/Fh98YFLDHKqspyUK7EMiOd3nUrNv.png!large.webp","w":1080,"h":1607,"cap":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2025/05/23/FoH3UZWJVTUs2A5PJfLH_v1jNleI.png!large.webp","w":1080,"h":1717,"cap":"","l":{"k":"tab","a":"product"}}]},{"n":"吉米","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FnWdoa3k2kdaKYcy8yjliuOzGgy0.jpg!large.webp","w":1080,"h":1533,"cap":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fglcu8Qgd1sYu1AUlucCgjnqLV1_.jpg!large.webp","w":1080,"h":1719,"cap":"","l":{"k":"tab","a":"product"}}]}],"blocks":[]},"0HBwE1ckVc":{"alias":"0HBwE1ckVc","title":"用户分享","subtitle":"莱克产品使用体验","tabs":[{"n":"城市探店","b":[{"t":"cards","cols":2,"ar":0.75,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FjqfKHanW4ZpiGZY-OMF4jvhnW_R.png!large.webp","w":1080,"h":1440,"t":"冲京东Mall挖到莱克 ，吸尘洗地除螨一步到位","l":{"k":"note","a":"0TMh0Czs9L"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FkknLvAS00c7Zk7S_CQOgs5sYRB0.png!large.webp","w":1080,"h":1440,"t":"上海 AWE 焦点！莱克天狼星，一站式解决家务","l":{"k":"note","a":"0HM5lZf3a4"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/Fm37EoNu4yPOJ4d0oV_Q0d53hvCe.png!large.webp","w":1080,"h":1440,"t":"从清洁黑科技到生活美学，这里藏着多少惊喜？","l":{"k":"note","a":"TaXJkmwek1"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FgGIIq9FyK766THm1YL26ga6hjHi.png!large.webp","w":1080,"h":1440,"t":"莱克品质生活，邂逅山城魅力！","l":{"k":"note","a":"UDvKoVBAuy"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/Ftx8H3Vmd_BQLusqQ_s_-y0oA2ce.png!large.webp","w":1080,"h":1440,"t":"主持人刘帅亲探潍坊三联家电！沉浸式体验莱克天狼星~","l":{"k":"note","a":"WXRpo98kUR"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FvQaeNSL1jNx0c1D29cPn1vX6XSC.png!large.webp","w":1080,"h":1440,"t":"逛利群家里不白来！青岛人专属莱克天狼星实测","l":{"k":"note","a":"4CEnzFHQht"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/Fl_0YAEAKcTXTR2ApF0rLfXYnveE.png!large.webp","w":1080,"h":1440,"t":"天狼星550W大吸力 “卷” 进济宁九龙家电","l":{"k":"note","a":"FlrG2aZhGK"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FjBj14oALwPv-xwldC9Z2q2QYNfm.png!large.webp","w":1080,"h":1440,"t":"跟着主持人张杰逛北国电器：石家庄的隐藏福利","l":{"k":"note","a":"zGxCBVJom4"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/11/08/FgyDMLbZzkd1pzQNLua_0p4Kg2y7.png!large.webp","w":1080,"h":1440,"t":"探同利家电天狼星：包头 “包” 藏清洁礼","l":{"k":"note","a":"IeYWScRuMy"}}]}]},{"n":"精选内容","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/07/24/FnzDhcIA8yPKsL8TsGaKy3oGGzgH.png!large.webp","w":1080,"h":1080,"t":"演员费启鸣晒新家，好夏日配好水","l":{"k":"note","a":"4EB81kOhXr"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/05/26/Fu9XfyjmHsRixL1h4Vfb3WYTJlCn.png!large.webp","w":1080,"h":1080,"t":"杨子姗亲测！模块随心搭解锁冰饮自由","l":{"k":"note","a":"YBzb7vw3xu"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/05/26/Fs8UTiooT68NH5HadJVDC32qUu7y.png!large.webp","w":1080,"h":1080,"t":"李思思的24小时喝水养生秘诀","l":{"k":"note","a":"S57Oq9c2FK"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/05/26/FnbCwgwUgrFErIvkCBJZGp7Xj-L4.png!large.webp","w":1080,"h":1080,"t":"跟着“顿顿”一起解锁夏日饮水黑科技","l":{"k":"note","a":"1DLH4jkZeL"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/04/11/FuLBo-H4TNE5JNfKOX3CGdqXfkzd.png!large.webp","w":1080,"h":1080,"t":"带三个娃还能精致生活？全靠这台天狼星「一键善后」","l":{"k":"note","a":"1nZMuESwAn"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/03/26/Fm20a6rXC_MX98qJdPYYrdIoLdUW.png!large.webp","w":1080,"h":1080,"t":"科技让爱更纯净，让生活更轻松","l":{"k":"note","a":"hSFA3SICi2"}},{"s":"https://img01.yzcdn.cn/upload_files/2025/03/26/Fo4nKVGeYvwRgp1eQHkhnLKolnwj.png!large.webp","w":1080,"h":1080,"t":"于AWE人潮中，邂逅“智能”惊喜","l":{"k":"note","a":"JcH0b0fcku"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/12/31/FgFw8NhYhFRYbZUkTVo1obBvXOxk.png!large.webp","w":1080,"h":1080,"t":"莱克30周年！感受来自苏州的洁净吧！","l":{"k":"note","a":"bCDcJZ5fBB"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/12/31/FmcV_Z5Gfr48sNm-Eg5FoyWRxndW.png!large.webp","w":1080,"h":1080,"t":"回归生活本真秩序，找寻「净」的新境界","l":{"k":"note","a":"hYjwFAZNyA"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/12/31/FtgOw8iN9FngiT4MbvffiCuBaVmy.png!large.webp","w":1080,"h":1080,"t":"在百年故居花园体验“江南之净 ”的一天","l":{"k":"note","a":"od1JOwQOup"}}]}]},{"n":"用户故事","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/09/30/FvZSZ9yJolo0UWD5hvK0EsSJfh6b.jpg!large.webp","w":350,"h":350,"t":"净家致心安","l":{"k":"note","a":"UMofPkcXuw"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/11/18/FnbXjBlOoplW50o5-hktW-xGoC4k.jpg!large.webp","w":2160,"h":2160,"t":"梦想居所，莱克天王星U7成就洁净之美","l":{"k":"note","a":"cj5ERWjhUg"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/29/FrS5kihEfBaV28pjTEN5OLoKvx0I.png!large.webp","w":800,"h":800,"t":"向不凡而生的家","l":{"k":"note","a":"XtVpHmwWFa"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/24/FvIEKiJ74rxxVSwNyFUvbudUITUR.png!large.webp","w":800,"h":800,"t":"情绪流动收容所","l":{"k":"note","a":"mwMrOLNDil"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/24/FqliK4PJCvYTNDK7TAJ6pSxIPu15.png!large.webp","w":800,"h":800,"t":"本真归真 洁来洁往","l":{"k":"note","a":"tR776bI15v"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/24/Fu_y0dJiHRnv3xj3Rv2BeTh5yJCU.png!large.webp","w":800,"h":800,"t":"挖掘记忆深处的故事","l":{"k":"note","a":"rGbB8NEQEG"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/06/03/FuLt_4nipafnsgnj01_HeN-1YW4g.png!large.webp","w":800,"h":800,"t":"“绅士”养成计划","l":{"k":"note","a":"9ssBv0z535"}}]}]},{"n":"品牌挚友","b":[{"t":"cards","cols":2,"ar":1,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/03/26/FjRpe2YqX3zIFoDg9YR3TyOpyDuU.png!large.webp","w":1080,"h":1080,"t":"智净未来，健康生活","l":{"k":"note","a":"kndesNCPUH"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/24/FuJ-BHKoseFo4pj2vytvlz3RHwp3.jpg!large.webp","w":800,"h":800,"t":"器之净美 归于心安","l":{"k":"note","a":"qOIG2UAfEx"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/24/FrE1OnJYKxqUtZPIeqLdfJXYgNh8.jpg!large.webp","w":800,"h":800,"t":"生活有净气 灵魂有香气","l":{"k":"note","a":"fcUyFufcK8"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/24/FkcZUTOVEZEa3kOZmI8lI6mHtBr9.jpg!large.webp","w":800,"h":800,"t":"诗意之宅 造景入室","l":{"k":"note","a":"9my64k7Nqy"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/24/FpESAd0zapmwCTts0u-7bLAquasX.jpg!large.webp","w":800,"h":800,"t":"寻得隐秘“天堂” 享足自然之乐","l":{"k":"note","a":"MWZSvaTlKP"}}]}]},{"n":"品牌期刊","b":[{"t":"cards","cols":2,"ar":0.545,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2025/02/04/FkAGStt_zWU9HX9VWp_2BVR1ljkA.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"zRd4fw55fH"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/12/23/FqtzxtNZJ-c5z7p7o61MvssBYaax.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"K8yLGeacsG"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/10/15/ForaSiweri0vKoKNmyY4LNY_j-Io.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"ehsOL1CvKj"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FgJHTreL04VBOb1C2LykPebLmWeB.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"UFRfF1VrIJ"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft9gEtEfiu6mrYLzoPzuORmuBakt.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"wH5ycEIB5Q"}},{"s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fmjyz6MTZaAFTv5OGVoCqVNGD1dT.png!large.webp","w":1080,"h":1980,"t":"","l":{"k":"feature","a":"L0ughwPkDL"}}]}]}],"blocks":[]},"fP8QgkJoTN":{"alias":"fP8QgkJoTN","title":"业务模式","subtitle":"持之以恒精益求精","tabs":[{"n":"国内自主品牌","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/13/FsrK81CG8hxeAckv4nkrntbDL9G5.jpg!large.webp","w":1080,"h":6823,"cap":""}]},{"n":"国外OEM/ODM","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/28/Fv2kyBcdS_eOSrPLqbnFYeUNNrSa.jpg!large.webp","w":1080,"h":3381,"cap":""}]},{"n":"核心零部件","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoKj-ikupUPxeJad1jRVxte1DiXg.jpg!large.webp","w":1050,"h":8571,"cap":""}]}],"blocks":[]},"DtFKyexm9p":{"alias":"DtFKyexm9p","title":"售后服务","subtitle":"产品售后与使用指南","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":8},{"t":"space","h":30},{"t":"anchor","a":["小莱到家","操作指南","售后政策"]},{"t":"title","x":"小莱到家","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/24/FuoDYxWfxfAoGLqpoxSjmxrr4x0b.png!large.webp","w":1080,"h":1018},{"t":"title","x":"操作指南","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2023/10/25/FnwWAZt49ix-2lUYruzRiAVgDpbI.png!large.webp","w":800,"h":377},{"s":"https://img01.yzcdn.cn/upload_files/2023/10/25/FmV2SyVIcG017pIXThehdB3zSDeS.png!large.webp","w":800,"h":377},{"s":"https://img01.yzcdn.cn/upload_files/2023/10/25/Fo8UqVP4Uuiw2G_OJdJyVKkT15Mm.png!large.webp","w":800,"h":377},{"s":"https://img01.yzcdn.cn/upload_files/2024/08/30/Fhkoti_kShW1qSSytUpm1O_Q4QOp.png!large.webp","w":800,"h":377}]},{"t":"space","h":30},{"t":"title","x":"售后政策","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2026/01/30/lj_TCBCkY0vLlKZQ9Wb49RnqvOTf.jpg!large.webp","w":7087,"h":10630},{"s":"https://img01.yzcdn.cn/upload_files/2026/01/30/lnTTM3WPPAYq58bA0PqkX0Q5-JhU.jpg!large.webp","w":7087,"h":10630}]}]},"YZNV7abLK0":{"alias":"YZNV7abLK0","title":"加入我们","subtitle":"价值理念与人才需求","tabs":[{"n":"人才理念","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/FlTupZTmqCnS2uRK48tHysdqrAJY.jpg!large.webp","w":800,"h":375,"cap":"四星计划","l":{"k":"feature","a":"CIQVWlDay7"}},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fo1bO4g-opRU3N0om3jhQgJzNuIK.jpg!large.webp","w":800,"h":375,"cap":"阳光计划","l":{"k":"feature","a":"zJ7WMEmruH"}}]},{"n":"价值主张","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/FvA6NMuJmrNpDgNj19-lWiGvE7d8.jpg!large.webp","w":800,"h":375,"cap":"员工六大行为准则","l":{"k":"feature","a":"O9OVfU6ZDM"}},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fjx-oU_o7y1cUpwX8Hny5MI-1RBa.jpg!large.webp","w":800,"h":375,"cap":"核心价值观、使命与愿景","l":{"k":"feature","a":"5LRl8Bizav"}}]},{"n":"人才需求","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fta3CwBCidfQpsGJAOiB_jQidFi9.jpg!large.webp","w":800,"h":375,"cap":"宣讲现场","l":{"k":"feature","a":"x71KsEFtQj"}},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fjmk7or2adRxvHsQPv_YnE4DIWU8.jpg!large.webp","w":800,"h":375,"cap":"岗位需求","l":{"k":"feature","a":"GE6lncjrLS"}}]},{"n":"员工风采","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/FmqzpOGtU0WYkm98Fg6nBg2tSqvq.jpg!large.webp","w":800,"h":375,"cap":"元宵节活动","l":{"k":"feature","a":"95cKW2ZwqB"}},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fsab6zNqKSD9YLJ1wQyZJr9G7a_8.jpg!large.webp","w":800,"h":375,"cap":"妇女节活动","l":{"k":"feature","a":"CZpF3sLhNb"}},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fu1HhN4JFvItcwjV23Ii3q6J53Kr.jpg!large.webp","w":800,"h":375,"cap":"趣味运动会","l":{"k":"feature","a":"1cLUBOu7P0"}}]}],"blocks":[]},"zRd4fw55fH":{"alias":"zRd4fw55fH","title":"新年特刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"除尘步新 焕彩迎春","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2025/02/04/FiIQAw0yM-BaStG-srALeLphn-sg.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"新年，将这份礼物送给自己","s":"https://img01.yzcdn.cn/upload_files/2025/01/03/FkPu3mycvff32QYqJfvARUoynbmD.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=Py5cyOACUD"},{"t":"净尘焕彩 迎春纳福","s":"https://img01.yzcdn.cn/upload_files/2025/01/20/Fp-zWPKPHRbv3gh3U4e6QFiCVz3o.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=Iv8yJ953qV"},{"t":"以冬之名 净享生活","s":"https://img01.yzcdn.cn/upload_files/2024/12/16/Ft5_mpFqj838B9OHdlGf_zgJyzHe.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=QRjsrnfJwW"},{"t":"解码2025生活趋势","s":"https://img01.yzcdn.cn/upload_files/2025/01/13/Fnbj5KvzM-n6V3difJ4G1M3cp57d.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=smc9rqTNxE"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"净界之家 静享非凡","s":"https://img01.yzcdn.cn/upload_files/2024/12/23/FlvdPWUGiGwnkfja5PHo4N6DAySl.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=usdTS6vvuc"}]},{"t":"title","x":"秋冬合刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/12/23/FutwA6vnHHFhJwpTpQXidF1_8iE5.png!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"-September Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/10/15/FusRuToIfhx-3XZ6hNGZoS_PIdU5.png!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"-August Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fq02WqfNZXZNEq6tJeLRkiIQV5dK.png!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"-July Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft5ETckhGP1T5xM9cudcgZHNSGAu.png!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"-June Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"K8yLGeacsG":{"alias":"K8yLGeacsG","title":"秋冬合刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"纯净空间 梦想居所","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/12/23/FutwA6vnHHFhJwpTpQXidF1_8iE5.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"日常居家清洁指南","s":"https://img01.yzcdn.cn/upload_files/2024/11/23/FigVBVFRx-fnHoJL4Clzur5vxC4n.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=RLoaLJBx7P"},{"t":"新品呈现 | 育儿之家清洁速成法","s":"https://img01.yzcdn.cn/upload_files/2024/11/09/Fs0mtFf5ptpGJ_pyNMScboDyK8zX.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=oy8hEvhyzx"},{"t":"新品来袭 | 养宠家庭的清洁秘籍","s":"https://img01.yzcdn.cn/upload_files/2024/12/23/Fp6H4PljrrNfxKiLm_bqsSYnEDDi.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=xwyj1oJLSj"},{"t":"国庆特辑 | 假日升级 中式美学","s":"https://img01.yzcdn.cn/upload_files/2024/10/08/FpGV1rgiK8nO7yPMf_OxolmaYU5L.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=g01VIJ3V2v"},{"t":"重阳特辑 | 爱的真正内核","s":"https://img01.yzcdn.cn/upload_files/2024/10/15/FmP9VlTRoccpyw3V2YYA3py8VZeV.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=qnIn2paiBj"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"梦想居所，莱克天王星U7成就洁净之美","s":"https://img01.yzcdn.cn/upload_files/2024/11/18/FhbLPJbqX6mipkmezqYCYQTjP2Lx.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=x8MVof5o0C"}]},{"t":"title","x":"九月期刊","d":"-September Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/10/15/FusRuToIfhx-3XZ6hNGZoS_PIdU5.png!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"-August Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fq02WqfNZXZNEq6tJeLRkiIQV5dK.png!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"-July Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft5ETckhGP1T5xM9cudcgZHNSGAu.png!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"-June Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"ehsOL1CvKj":{"alias":"ehsOL1CvKj","title":"九月期刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"秋韵悠扬 心安是家","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/10/15/FusRuToIfhx-3XZ6hNGZoS_PIdU5.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"秋韵悠扬 心安是家","s":"https://img01.yzcdn.cn/upload_files/2024/09/09/Frh6HZGqnKxYNd02k7qyXEknMXwz.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=cxm3TVSp8Y"},{"t":"中秋特辑 | 以诗之名 共此良辰","s":"https://img01.yzcdn.cn/upload_files/2024/09/18/FlYkb8i3-OGxZxRb3UaK1Z8hRIKE.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=LYfW4phcqo"},{"t":"秋分 | 一半温暖 一半清凉","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fg7A0ZqVtS5UVwtVm4ePfIrIKgme.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=gXzJ8QMXAX"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"用户故事Vo.18 | 向不凡而生的家","s":"https://img01.yzcdn.cn/upload_files/2024/09/29/FnSEoT4RywFeFKajzo_jehpG5zrk.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=VlsyHks7q3"}]},{"t":"title","x":"八月期刊","d":"-August Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fq02WqfNZXZNEq6tJeLRkiIQV5dK.png!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"-July Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft5ETckhGP1T5xM9cudcgZHNSGAu.png!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"-June Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"UFRfF1VrIJ":{"alias":"UFRfF1VrIJ","title":"八月期刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"纯粹之境 心之所向","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Fq02WqfNZXZNEq6tJeLRkiIQV5dK.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"七夕特辑 | 生生不夕 爱的“鹊桥”","s":"https://img01.yzcdn.cn/upload_files/2024/08/13/FnyWDB7CqQ515z25NUjEJYt7oPzq.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=QShf1Twscv"},{"t":"五感之境 居家疗愈","s":"https://img01.yzcdn.cn/upload_files/2024/08/19/FvEeL3qnj12LG8eyZX7Mc34J5ss6.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=CJVibttwr8"},{"t":"处暑 | 秋韵入室 心归宁谧","s":"https://img01.yzcdn.cn/upload_files/2024/08/22/FoJbWVBUIiafZ9gWUxx2ob_T_89A.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=radJEOHaXJ"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"用户故事Vo.17 | 情绪流动收容所","s":"https://img01.yzcdn.cn/upload_files/2024/08/30/FlbVsUTqQpzOe2N4pYs5llzUM5JC.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=qztPedxfAV"}]},{"t":"title","x":"七月期刊","d":"-July Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft5ETckhGP1T5xM9cudcgZHNSGAu.png!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"-June Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"wH5ycEIB5Q":{"alias":"wH5ycEIB5Q","title":"七月期刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"盛夏时光 家的况味","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/Ft5ETckhGP1T5xM9cudcgZHNSGAu.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"小暑 | 盛夏印记 居家况味","s":"https://img01.yzcdn.cn/upload_files/2024/07/08/FgcnA6LWygWPNlZSgGvUEFBfY6QF.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=RDOlBsVgH4"},{"t":"艺术共生 栖心之宅","s":"https://img01.yzcdn.cn/upload_files/2024/07/15/FjL2_uCN1oEL6jYDGtLW5WKjlvcx.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=NiPd69ONNU"},{"t":"奥运会 | 致那些虽迟但到的热血","s":"https://img01.yzcdn.cn/upload_files/2024/07/31/FnycEiXhecZJM4go5pAJSV-hhCI6.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=kUUl2U7w1V"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"用户故事Vo.16 | 本真归真 洁来洁往","s":"https://img01.yzcdn.cn/upload_files/2024/07/22/FvXH5W6bB09vPMw7C8eskWTUXZD6.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=m8HNR07dyz"}]},{"t":"title","x":"六月期刊","d":"-June Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"L0ughwPkDL":{"alias":"L0ughwPkDL","title":"六月期刊","subtitle":"","tabs":[],"blocks":[{"t":"title","x":"澄净之时 居家之雅","d":""},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FspETf32j4Jb4G-H4KW1WOahsuso.png!large.webp","w":1080,"h":667},{"t":"title","x":"洁净至美健康之家","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"六一特辑 | “足够好”的父母","s":"https://img01.yzcdn.cn/upload_files/2024/06/03/Fs6HiXjJ1nGxxHG6YU4GVHuN6a-s.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=w4HRtJIubc"},{"t":"父亲节 | 一份时刻在场的爱","s":"https://img01.yzcdn.cn/upload_files/2024/06/17/FsrxbTEqQLdBK64DvDd8nrKLc_n-.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=VE3vDpLlEe"},{"t":"夏至 | 忽而夏至 净居宁心","s":"https://img01.yzcdn.cn/upload_files/2024/06/24/Fr8ustZNyezTCoSMqTRzU-hS6ZKJ.png!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=c1Rg8RRX1v"}]},{"t":"title","x":"品质生活体验官的共同选择","d":"— 洁净 至美 宁静 健康 —"},{"t":"notes","a":[{"t":"用户故事Vo.15 | 挖掘记忆深处的故事","s":"https://img01.yzcdn.cn/upload_files/2024/07/02/FruJ219Ykb4tCbH1u4ZQSCtjO2Uh.jpg!large.webp","u":"https://h5.youzan.com/wscshop/shopnote/detail?noteAlias=TrL6EXx7jn"}]},{"t":"title","x":"五月期刊","d":"-May Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/09/23/FhehYGPgWlYXnJPwyycZ8vhBJvJX.png!large.webp","w":1080,"h":667},{"t":"title","x":"四月期刊","d":"-April Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/30/FoT8Rps4bt5UeKEErI17TU9GPsQu.png!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"-February Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FtQSuX8voTWgcLg9EXuTHEIqfjC0.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"一月期刊","d":"-January Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/FpiVSJXKazdkFNIXthyJUpEcBuWW.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十二月期刊","d":"-December Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/03/04/Fn-GTIlFoYup0vxf3byjjFDvGnSd.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"-November Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/12/11/FnA3zh4YbsV4YZAsUUoGae4OOfZM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"-October Journal-"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/30/FrMN1ZXW_9sBTcoJeEAL36-yH1LN.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"—September Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FtQLsKTKn-LMWuMRjR3pTu578w2n.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"—August Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/10/09/FolBdAaxcn3x1jnk-9aohSBmGMnG.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"—July Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FpW8CnM9SZwn679-IHnl9sLHyLAu.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"—June Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnKTNdbihgxa4lMgwSUIc7jZAmx5.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"五月期刊","d":"— May Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/08/01/FnJKt2ks44U61cj9Z1_kzVO5qzk1.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"三月期刊","d":"— March Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fll-HHNllfEDhX_hsm1zjQ6wS89J.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"二月期刊","d":"— February Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/03/31/Fk7tvRz36VOLoqsH_DZ-rznhvuS2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"年末合刊","d":"— Year-End Journal—"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/02/27/Fr6Lwd2UzamYc2o9zKeNonrmJeB2.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十一月期刊","d":"— Nov Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2023/01/16/FmlHnshe0xSo7IrmudvtpAKEH5tP.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"十月期刊","d":"— Oct Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/11/30/Fm2B-GJYC8PNOpqCGybRpykVJ6C_.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"九月期刊","d":"— Sept Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/09/28/FhyFVyKzBUDjp6mmH4Hdien90SHc.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"八月期刊","d":"— Aug Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/08/29/FllHKTLkLP4tqgok0UB7y-ab1SAg.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"七月期刊","d":"— July Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/20/FirhfOEL--nYnsmLHo7sOFbBdzsM.jpg!large.webp","w":1080,"h":667},{"t":"title","x":"六月期刊","d":"— June Journal —"},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2022/07/05/FhA2aWY8k5Wl0BuGLv9594ikRdeN.png!large.webp","w":1080,"h":667}]},"CIQVWlDay7":{"alias":"CIQVWlDay7","title":"四星计划","subtitle":"人才培养四大计划","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"title","x":"启明星计划","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fjz1E035Y-9-LSEZP01bVNLQ0gJw.jpg!large.webp","w":1707,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fsbz8bw8cx0cD7ilmm-AGgkA--zN.jpg!large.webp","w":1707,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FuxfqwueRTrMq_13YEKnlea2LJvJ.jpg!large.webp","w":1707,"h":1280}]},{"t":"title","x":"明星经纪人计划","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FqVg1ccmRSJ8bzD_5Xx1GMS_3ryn.jpg!large.webp","w":1706,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FnLcKqAkkswP4Q5b3CTH9CNPzIbV.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fjuz-FGqDGgC1_pJWfZmP4IJ5NFS.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FjD_8z_RqH4pg8Fp-m2HJtTx-ko3.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FhoYtmt0lHNJSnjNBZE9PQvj1KN7.jpg!large.webp","w":1706,"h":1278}]},{"t":"title","x":"管理之星计划","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FkJQ9rIgD0W3MqxyLMpAtrofkro4.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FrPrD9r_N5xfaIM8WzTj2d6ho3dd.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FpCxYTiUOUOfgrY8iKWRwKnt183m.jpg!large.webp","w":1706,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FuoAT_5GStslOfQ358g3i_vs7mTX.jpg!large.webp","w":1706,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FhoY35nRKAx20pjOOEZg0LAfKHpF.jpg!large.webp","w":1706,"h":1280}]},{"t":"title","x":"经营之星计划","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FvTZy7k3T18BrCVTf2U4QFwFONGE.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fl3Ye7JVF12kyGTNxts9-ws3kRaH.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FoCyr-K3gV22eIP6MRn5uQ91cy_4.jpg!large.webp","w":1702,"h":1276}]}]},"zJ7WMEmruH":{"alias":"zJ7WMEmruH","title":"阳光计划","subtitle":"新人成长的必经之路","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"title","x":"阳光计划训练营","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FgHPkMyTbSdf9ajfi9ivPPd2EsOw.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FsRl-ZTt8BbaPvLk9DpJObl5Zktp.jpg!large.webp","w":1706,"h":1280},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lrwLmTRP7khkfDZqVanNkhPrTdZn.JPG!large.webp","w":5184,"h":3456},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fium3sSWFwookpzkd2fWBd7thfzn.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lsxEAZGwdDQd2ievZuuZC3_tBNB8.JPG!large.webp","w":5184,"h":3456}]},{"t":"title","x":"产线实习","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FssycyRJVPqJl7wjbw4IGmtbYSa1.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fj0tEGcCkFnIKtDZI3tiQvxJeVjY.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fh2KN7IrLuGMBxPHn4fM3TegKLrr.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FmLVncG2UkKP18MXms6BY033WEb9.jpg!large.webp","w":1702,"h":1276},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fr23bBOhI6T4Hsjy8O11uxxJnT1e.jpg!large.webp","w":1702,"h":1276}]},{"t":"title","x":"技能比赛","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FulE9BHajFJHdR1mCATIXKCxWRhi.jpg!large.webp","w":1920,"h":1080},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/luyqs1hL39uNNsVC_lmob0NK6sLa.jpg!large.webp","w":4096,"h":3072},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fr1QYvWwLI8flIA-TI3DHJdio2NW.jpg!large.webp","w":1920,"h":1080},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fj9UiFTvGKDY9Ykz_cc5x2rpwF2o.jpg!large.webp","w":1920,"h":1080},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fgz7piji47SwjV4ot-wF7afuyiVr.jpg!large.webp","w":1706,"h":870}]},{"t":"title","x":"阳光岗训","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FkegCOkwTALH7_4FaSzqkqKAa-Sv.jpg!large.webp","w":1706,"h":1279},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fh6IJFYA923jOi10ky9NZh-5ntck.jpg!large.webp","w":1440,"h":1080},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FtrOUaYVxLSwfUxGplU64x9ap_2D.jpg!large.webp","w":1732,"h":1080}]},{"t":"title","x":"阳光成果发布会","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/ljA851U1eJZb0Nb0_p1Y4dY0zkAV.JPG!large.webp","w":6016,"h":4016},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lgKQUCvSSSkHGO56J68FQAOs-HOF.JPG!large.webp","w":6016,"h":4016},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/llRXnwJtoz72AKWnpkLM2fDSCiBL.JPG!large.webp","w":6016,"h":4016},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/livqjfFXdm0v0wJ8ESTtiTRxoriJ.JPG!large.webp","w":6016,"h":4016}]},{"t":"title","x":"青听讲堂","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lu0oTbXAU-T3Zk5sWKv3ezVqj2WO.jpg!large.webp","w":5616,"h":3744},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/llY_f7HijuOdKuBUSfR4NYyjjjrI.jpg!large.webp","w":5616,"h":3744},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lqg9BKO0kK6DowVom3ryVssNfDGK.jpg!large.webp","w":5184,"h":3456},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lq2IhSBa_Sq-DtIGThrM1fNIFAQO.jpg!large.webp","w":5184,"h":3456},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/liNKuPAF__JJLjHe7XMi94vqc4I_.jpg!large.webp","w":5616,"h":3744}]},{"t":"title","x":"师父带徒","d":""},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/lortSEfaac0hOuyromxqZlqg4f6N.jpg!large.webp","w":4032,"h":3024},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FkE768DgeDAKGwLRuojEmFo2ipDE.jpg!large.webp","w":1706,"h":1278},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fg2iQVyn0rG6BIIYdtjE38YAVamQ.jpg!large.webp","w":4000,"h":1800}]}]},"O9OVfU6ZDM":{"alias":"O9OVfU6ZDM","title":"员工六大行为准则","subtitle":"最基本的行为规范","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FgykqesTZqGYy2l9WYsHGGgU_7VP.jpg!large.webp","w":1080,"h":1974},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/Fuv00T6TxlWbl_oK3ddRVsVGAN2_.jpg!large.webp","w":1080,"h":1974},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/25/FksHbR8_JJhE6LTYCfllnfUO0Gqz.jpg!large.webp","w":1080,"h":1975}]}]},"5LRl8Bizav":{"alias":"5LRl8Bizav","title":"核心价值观、使命与愿景","subtitle":"贯彻职业生涯的理念","tabs":[],"blocks":[{"t":"space","h":10},{"t":"space","h":30},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/29/Fn0K45-eTC7LIYCHYKZZ-EfyXhfC.jpg!large.webp","w":750,"h":1268}]},"x71KsEFtQj":{"alias":"x71KsEFtQj","title":"宣讲现场","subtitle":"预备人才的储备阶段","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"imgs","a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/26/FsXBfDXUegW8wLe8yyW2_x3cy9oq.jpg!large.webp","w":1920,"h":1080},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/26/FplwB4Nt4neR9GpzULT6_3qrlfxp.jpg!large.webp","w":3280,"h":2464},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/26/Fg1OdFTef4LpLNrymL-w8vZ4rH1G.jpg!large.webp","w":1920,"h":1080}]}]},"GE6lncjrLS":{"alias":"GE6lncjrLS","title":"岗位需求","subtitle":"非常期待你的加入","tabs":[{"n":"销售经理","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/FioPnJ_HftiG_nGKnYiIhbJgnQ5p.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"IE工程师","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/Fn7mJry7AvW1t6zns4ze3VnUYfSt.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"UI设计","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/Fv0bvMxvGKRFw9NbPfI63SUV-Ej0.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"电子工程师","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/Fip1smSWVdaa9tBKY92a5jGc7OjD.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"结构工程师","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/FvI2ObHPTSM45hggaAE8-wLR7WH9.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"平面设计","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/FtWoBodSB_WT6gfuAmBtUmY9ssch.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"线上营销活动策划","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/FsJYpS-Pizx5ulpMoiF64KnoqHTS.jpg!large.webp","w":1080,"h":2434,"cap":""}]},{"n":"实习生","b":[{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/05/08/FkczaQ-p6bWiNWcvCqCaAlrD35V7.jpg!large.webp","w":1080,"h":2434,"cap":""}]}],"blocks":[]},"95cKW2ZwqB":{"alias":"95cKW2ZwqB","title":"元宵节活动","subtitle":"团圆30载，喜乐闹元宵","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"cube","cols":4,"rows":4,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/lpM4bDpZmVx9LOuc81alVP5IHcY5.JPG!large.webp","x":0,"y":0,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/lqg_GnhUtTDzZWxZp4WoFmyHKPto.JPG!large.webp","x":2,"y":0,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/lhDASaPmOKQ-oQuS-T2MnWF4QFTf.JPG!large.webp","x":0,"y":2,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/lrknv5DAKQmf1h0oGYzhg2uH2EZa.JPG!large.webp","x":2,"y":2,"w":2,"h":2}]}]},"CZpF3sLhNb":{"alias":"CZpF3sLhNb","title":"妇女节活动","subtitle":"卅年她力量","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"img","s":"https://img01.yzcdn.cn/upload_files/2024/04/29/lnvrFyq_uqT_FamnL2NbN54ONfIv.jpg!large.webp","w":3522,"h":3072},{"t":"space","h":8},{"t":"cube","cols":4,"rows":4,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/29/Fh4yoMknSU4YoxTPPgLX10NoidSs.jpg!large.webp","x":0,"y":0,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/29/lt8nHZP3RT5FKvm-cXR6rFG18rre.jpg!large.webp","x":2,"y":0,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/29/lgabiy2VXaswdQSz3Boy9CMD1L_e.jpg!large.webp","x":0,"y":2,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/29/lk8rdFlDV1ESLcp0ao3IpuaelZXI.jpg!large.webp","x":2,"y":2,"w":2,"h":2}]}]},"1cLUBOu7P0":{"alias":"1cLUBOu7P0","title":"趣味运动会","subtitle":"拥抱30th，跑出加速度","tabs":[],"blocks":[{"t":"space","h":8},{"t":"space","h":30},{"t":"cube","cols":4,"rows":4,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/Ft8pA8Up0ht4gLvDzHslbnCkjuB7.jpg!large.webp","x":0,"y":0,"w":4,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/Fq90k2W1gsQIt4E10ODFgYNRUPGy.jpg!large.webp","x":0,"y":2,"w":2,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/FjdpvQXzjTAZPHGXCyTbkrTOC2BN.jpg!large.webp","x":2,"y":2,"w":2,"h":2}]},{"t":"space","h":30},{"t":"cube","cols":4,"rows":4,"a":[{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/Fhp0By3giIk8_5tg851AfbvqfQ0U.JPG!large.webp","x":0,"y":0,"w":4,"h":2},{"s":"https://img01.yzcdn.cn/upload_files/2024/04/28/Fv-vmuc5VMGcxJaGLw9LIi7ZNWEL.JPG!large.webp","x":0,"y":2,"w":4,"h":2}]}]}}};
+
+const TITLES = { home: '首页', lexy: '莱克', news: '资讯', product: '产品', mine: '我的' };
+
+/* ---------------- 首页 ---------------- */
+let swiperTimer = null;
+
+function renderHome() {
+  const p = document.getElementById('p-home');
+  let h = '';
+
+  D.HOME.forEach(function (b) {
+    if (b.type === 'swiper') {
+      const n = b.images.length;
+      /* track 宽度 = n × 容器宽，每张图占容器一整屏，靠 translateX 平移切换；
+         若 track 只有 100% 宽且每图 1/n，会出现「多张图并排各占半宽」的裁切断图 */
+      h += '<div class="swiper"><div class="swiper-track" id="swiperTrack" style="width:' + (n * 100) + '%">';
+      b.images.forEach(function (u) {
+        h += '<img class="swiper-img" style="flex:0 0 ' + (100 / n) + '%" src="' + u + '" alt="">';
+      });
+      h += '</div><div class="swiper-dots" id="swiperDots">';
+      b.images.forEach(function (_, k) {
+        h += '<i class="' + (k === 0 ? 'on' : '') + '"></i>';
+      });
+      h += '</div></div>';
+    } else if (b.type === 'video') {
+      h += '<div class="vblock"><video src="' + b.src + '" poster="' + b.poster + '" controls playsinline preload="none"></video></div>';
+    } else {
+      h += '<div class="iblock"><img src="' + b.src + '" alt="" loading="lazy" onerror="this.classList.add(\'img-fail\')"></div>';
+    }
+  });
+
+  h += '<div class="shop">'
+    + '<img class="shop-avatar" src="' + D.SHOP.avatar + '" alt="">'
+    + '<div class="shop-name">' + D.SHOP.name + '</div>'
+    + '<div class="shop-slogan">' + D.SHOP.slogan + '</div>'
+    + '</div>';
+
+  p.innerHTML = h;
+
+  const sw = D.HOME.find(function (b) { return b.type === 'swiper'; });
+  if (!sw) return;
+  const track = document.getElementById('swiperTrack');
+  const dots = Array.prototype.slice.call(document.querySelectorAll('#swiperDots i'));
+  const n = sw.images.length;
+  let i = 0;
+  if (swiperTimer) clearInterval(swiperTimer);
+  swiperTimer = setInterval(function () {
+    i = (i + 1) % n;
+    track.style.transform = 'translateX(-' + (i * 100 / n) + '%)';
+    dots.forEach(function (d, k) { d.classList.toggle('on', k === i); });
+  }, 4500);
+}
+
+/* ---------------- 莱克 ---------------- */
+function renderLexy() {
+  let h = '';
+  D.LEXY.forEach(function (g) {
+    h += '<div class="series">'
+      + '<div class="hero">'
+      + '<img class="hero-img" src="' + g.hero + '" alt="" loading="lazy">'
+      + '<div class="hero-mask">'
+      + '<span class="hero-title">' + g.title + '</span>'
+      + '<span class="hero-sub">' + g.subtitle + '</span>'
+      + '<span class="hero-tag">' + g.name + '</span>'
+      + '</div></div>'
+      + '<div class="row">';
+    g.products.forEach(function (pd) {
+      h += '<div class="pcard"><img src="' + pd.image + '" alt="" loading="lazy"></div>';
+    });
+    h += '</div></div>';
+  });
+  document.getElementById('p-lexy').innerHTML = h;
+}
+
+/* ---------------- 资讯 ---------------- */
+function renderNews() {
+  let h = '<div class="head"><span class="head-en">' + D.NEWS.en + '</span><span class="head-title">' + D.NEWS.title + '</span></div>';
+
+  h += '<div class="grid grid-2">';
+  D.NEWS.big.forEach(function (it) {
+    h += '<div class="cell" data-key="' + it.key + '" data-label="' + it.label + '"><div class="cell-pic pic-big"><img src="' + it.image + '" alt=""></div><span class="cell-label">' + it.label + '</span></div>';
+  });
+  h += '</div>';
+
+  h += '<div class="grid grid-3">';
+  D.NEWS.small.forEach(function (it) {
+    h += '<div class="cell" data-key="' + it.key + '" data-label="' + it.label + '"><div class="cell-pic pic-small"><img src="' + it.image + '" alt=""></div><span class="cell-label">' + it.label + '</span></div>';
+  });
+  h += '</div>';
+
+  document.getElementById('newsList').innerHTML = h;
+  Array.prototype.forEach.call(document.getElementById('newsList').querySelectorAll('img'), function (im) {
+    if (im.complete && im.naturalWidth) return;
+    if (im.decode) { im.decode().catch(function () {}); }
+  });
+}
+
+/* ---------------- 资讯内容页（对应小程序 packageNews/detail） ---------------- */
+function esc(s) {
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function renderBlocks(host, blocks) {
+  let h = '';
+  blocks.forEach(function (b) {
+    if (b.t === 'img') {
+      h += '<div class="blk-img"' + (b.l ? ' data-lk="' + b.l.k + '" data-lv="' + (b.l.a || '') + '" data-title="' + esc(b.cap) + '"' : '') + '>' +
+        '<img class="pic" src="' + b.s + '" data-src="' + b.s + '">' +
+        (b.cap || b.l ? '<div class="nd-cap"><b>' + esc(b.cap) + '</b>' + (b.l ? (b.l.k === 'note' ? '<em>笔记</em>' : '<em class="go">查看详情 ›</em>') : '') + '</div>' : '') +
+        '</div>';
+    } else if (b.t === 'imgs') {
+      b.a.forEach(function (x) { h += '<img class="pic" src="' + x.s + '" data-src="' + x.s + '">'; });
+    } else if (b.t === 'cube') {
+      h += '<div class="nd-cube" style="padding-bottom:' + (100 * b.rows / b.cols) + '%">';
+      b.a.forEach(function (x) {
+        h += '<div style="left:' + (x.x * 100 / b.cols) + '%;top:' + (x.y * 100 / b.rows) + '%;width:' + (x.w * 100 / b.cols) + '%;height:' + (x.h * 100 / b.rows) + '%">' +
+          '<img src="' + x.s + '" data-src="' + x.s + '"></div>';
+      });
+      h += '</div>';
+    } else if (b.t === 'cards' || b.t === 'notes') {
+      const isNote = b.t === 'notes';
+      h += '<div class="nd-cards">';
+      b.a.forEach(function (x) {
+        const lk = isNote ? 'note' : (x.l ? x.l.k : '');
+        const lv = isNote ? '' : (x.l ? x.l.a : '');
+        const ar = isNote ? 1.3333 : (b.ar || 1);
+        h += '<div class="nd-card" data-src="' + x.s + '" data-lk="' + lk + '" data-lv="' + lv + '" data-title="' + esc(x.t) + '">' +
+          '<div class="cp" style="padding-bottom:' + (100 / ar) + '%"><img src="' + x.s + '">' +
+          (lk === 'note' ? '<span class="tag">笔记</span>' : '') + '</div>' +
+          (x.t ? '<span class="ct">' + esc(x.t) + '</span>' : '') + '</div>';
+      });
+      h += '</div>';
+    } else if (b.t === 'title') {
+      h += '<div class="nd-sec"><i></i><b>' + esc(b.x) + '</b>' + (b.d ? '<s>' + esc(b.d) + '</s>' : '') + '</div>';
+    } else if (b.t === 'video') {
+      h += '<video class="nd-video" src="' + b.s + '" poster="' + b.p + '" controls preload="none"></video>';
+    } else if (b.t === 'anchor') {
+      h += '<div class="nd-anchor">';
+      b.a.forEach(function (x, i) { h += '<div data-anc="' + i + '">' + esc(x) + '</div>'; });
+      h += '</div>';
+    } else if (b.t === 'space') {
+      h += '<div class="nd-space" style="height:' + b.h + 'px"></div>';
+    }
+  });
+  host.innerHTML = h;
+  /* 内容页位于 position:absolute + overflow-y:auto 容器内，lazy 判定不触发，
+     这里统一主动解码，确保切换 tab / 返回后图片立即呈现 */
+  Array.prototype.forEach.call(host.querySelectorAll('img'), function (im) {
+    if (im.complete && im.naturalWidth) return;
+    if (im.decode) { im.decode().catch(function () {}); }
+  });
+}
+
+function openNews(rawKey) {
+  let key = rawKey;
+  if (!D.NEWS_PAGES[key]) {
+    const s = (D.NEWS_SECTIONS || []).filter(function (x) { return x.key === rawKey; })[0];
+    key = s ? s.alias : '';
+  }
+  const p = D.NEWS_PAGES[key];
+  if (!p) { alert('内容不存在：' + rawKey); return; }
+  document.getElementById('newsList').style.display = 'none';
+  const host = document.getElementById('newsDetail');
+  host.style.display = 'block';
+  host.scrollTop = 0;
+
+  const notePages = JSON.stringify(p);
+  const hasNote = /"k":"note"/.test(notePages);
+
+  let h = '<div class="nd-top"><span class="nd-back" data-back="1">‹ 返回</span><span class="nd-title">' + esc(p.title) + '</span></div>';
+  if (p.subtitle) h += '<div class="nd-sub">' + esc(p.subtitle) + '</div>';
+  if (p.tabs.length) {
+    h += '<div class="nd-tabs">';
+    p.tabs.forEach(function (t, i) {
+      h += '<div class="nd-tab' + (i === 0 ? ' on' : '') + '" data-nt="' + i + '"><span>' + esc(t.n) + '</span><i></i></div>';
+    });
+    h += '</div>';
+  }
+  h += '<div class="nd-bd" id="ndBody"></div>';
+  h += '<div class="nd-bd" id="ndFoot">' + (hasNote ? '<div class="nd-foot">标注「笔记」的条目在源站为店铺笔记，需登录后查看原文，此处展示其封面与标题。</div>' : '') + '</div>';
+  host.innerHTML = h;
+
+  host.__page = p;
+  renderBlocks(document.getElementById('ndBody'), p.tabs.length ? p.tabs[0].b : p.blocks);
+  document.getElementById('p-news').scrollTop = 0;
+
+  host.onclick = function (e) {
+    const back = e.target.closest('[data-back]');
+    if (back) { closeNews(); return; }
+
+    const tab = e.target.closest('[data-nt]');
+    if (tab) {
+      const i = Number(tab.dataset.nt);
+      Array.prototype.forEach.call(host.querySelectorAll('.nd-tab'), function (el, k) { el.classList.toggle('on', k === i); });
+      renderBlocks(document.getElementById('ndBody'), p.tabs[i].b);
+      document.getElementById('p-news').scrollTop = 0;
+      return;
+    }
+
+    const anc = e.target.closest('[data-anc]');
+    if (anc) {
+      const idx = Number(anc.dataset.anc);
+      const titles = [];
+      const blocks = p.tabs.length ? p.tabs[0].b : p.blocks;
+      blocks.forEach(function (b, k) { if (b.t === 'title') titles.push(k); });
+      const el = document.getElementById('ndBody').children[titles[idx]];
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    const card = e.target.closest('[data-lk]');
+    if (card) {
+      const lk = card.dataset.lk;
+      const lv = card.dataset.lv;
+      if (lk === 'feature' && lv) { openNews(lv); return; }
+      if (lk === 'tab' && lv) { switchTab(lv); return; }
+      if (lk === 'note') {
+        alert('该项在源站为「店铺笔记」，需登录后查看原文。\n\n此处仅展示其封面图。');
+        return;
+      }
+    }
+    const img = e.target.closest('img[data-src]');
+    if (img) { window.open(img.dataset.src, '_blank'); }
+  };
+}
+
+function closeNews() {
+  document.getElementById('newsDetail').style.display = 'none';
+  document.getElementById('newsDetail').innerHTML = '';
+  document.getElementById('newsList').style.display = 'block';
+}
+
+
+/* ---------------- 产品 ---------------- */
+function renderBrand(i) {
+  const b = D.BRANDS[i];
+  const main = document.getElementById('prodMain');
+  if (!b) { main.innerHTML = ''; return; }
+
+  let h = '';
+  b.groups.forEach(function (g) {
+    if (g.header) {
+      h += '<div class="group-head"><img src="' + g.header + '" alt="" loading="lazy"></div>';
+    }
+    h += '<div class="prod-grid">';
+    g.products.forEach(function (p) {
+      h += '<div class="prod"><div class="prod-pic"><img src="' + p.image + '" alt="" loading="lazy"></div>'
+        + '<span class="prod-model">' + p.model + '</span></div>';
+    });
+    h += '</div>';
+  });
+  h += '<div style="height:20px"></div>';
+
+  main.innerHTML = h;
+  main.scrollTop = 0;
+}
+
+function renderProduct() {
+  let nav = '<div class="side-top"><img src="' + D.NAV_LOGO + '" alt="LEXY"></div>';
+  D.BRANDS.forEach(function (b, i) {
+    nav += '<div class="side-item' + (i === 0 ? ' active' : '') + '" data-i="' + i + '">' + b.name + '</div>';
+  });
+
+  document.getElementById('p-product').innerHTML =
+    '<div class="side" id="sideNav">' + nav + '</div><div class="main" id="prodMain"></div>';
+
+  renderBrand(0);
+
+  document.getElementById('sideNav').addEventListener('click', function (e) {
+    const it = e.target.closest('.side-item');
+    if (!it) return;
+    const i = Number(it.dataset.i);
+    Array.prototype.forEach.call(document.querySelectorAll('#sideNav .side-item'), function (el, k) {
+      el.classList.toggle('active', k === i);
+    });
+    renderBrand(i);
+  });
+}
+
+/* ---------------- 我的 ---------------- */
+function renderMine() {
+  const orderTabs = ['待付款', '待发货', '待收货', '已完成'];
+  const assets = ['优惠券', '积分', '余额', '会员卡'];
+  const tools = [
+    { label: '收货地址', icon: '址' }, { label: '我的收藏', icon: '藏' }, { label: '优惠券', icon: '券' },
+    { label: '浏览记录', icon: '迹' }, { label: '联系客服', icon: '服' }, { label: '关于我们', icon: '关' }
+  ];
+
+  let h = '<div class="profile">'
+    + '<img class="avatar" src="' + D.SHOP.avatar + '" alt="">'
+    + '<div class="profile-info"><span class="nickname">微信用户</span>'
+    + '<span class="profile-tip">欢迎回到' + D.SHOP.name + '</span></div>'
+    + '</div>';
+
+  h += '<div class="mcard order-card"><div class="card-head"><span class="card-title">我的订单</span><span class="card-more">全部订单 &rsaquo;</span></div><div class="order-tabs">';
+  orderTabs.forEach(function (t) { h += '<div class="order-tab"><div class="order-icon"></div><span class="order-label">' + t + '</span></div>'; });
+  h += '</div></div>';
+
+  h += '<div class="mcard asset-card">';
+  assets.forEach(function (a) { h += '<div class="asset-item"><span class="asset-num">0</span><span class="asset-label">' + a + '</span></div>'; });
+  h += '</div>';
+
+  h += '<div class="mcard tool-card"><div class="card-head"><span class="card-title">常用功能</span></div><div class="tool-grid">';
+  tools.forEach(function (t) { h += '<div class="tool-item"><div class="tool-icon"><span>' + t.icon + '</span></div><span class="tool-label">' + t.label + '</span></div>'; });
+  h += '</div></div>';
+
+  h += '<div class="mcard service-card"><span class="service-text">联系在线客服</span><span class="service-arrow">&rsaquo;</span></div>';
+  h += '<div class="version">' + D.SHOP.name + ' · 开发版本</div>';
+
+  document.getElementById('p-mine').innerHTML = h;
+}
+
+/* ---------------- 切换 ---------------- */
+function switchTab(name) {
+  Array.prototype.forEach.call(document.querySelectorAll('.tab-btn'), function (el) {
+    el.classList.toggle('active', el.dataset.tab === name);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.tb-item'), function (el) {
+    el.classList.toggle('active', el.dataset.tab === name);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.page'), function (el) {
+    el.classList.remove('active');
+  });
+  document.getElementById('p-' + name).classList.add('active');
+  document.getElementById('navTitle').textContent = TITLES[name];
+}
+
+document.getElementById('tabs').addEventListener('click', function (e) {
+  const btn = e.target.closest('.tab-btn');
+  if (btn) switchTab(btn.dataset.tab);
+});
+document.getElementById('tabbar').addEventListener('click', function (e) {
+  const item = e.target.closest('.tb-item');
+  if (item) switchTab(item.dataset.tab);
+});
+document.getElementById('newsList').addEventListener('click', function (e) {
+  const cell = e.target.closest('.cell[data-key]');
+  if (cell) openNews(cell.dataset.key);
+});
+
+renderHome();
+renderLexy();
+renderNews();
+renderProduct();
+renderMine();
+</script>
+</body>
+</html>

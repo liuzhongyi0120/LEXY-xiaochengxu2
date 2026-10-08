@@ -1,0 +1,74 @@
+@import "styles/variables.wxss";
+@import "styles/reset.wxss";
+
+/* ---------- 通用布局 ---------- */
+.row {
+  display: flex;
+  align-items: center;
+}
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.row-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+}
+
+.flex-1 {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---------- 通用卡片 ---------- */
+.card {
+  background: var(--color-bg-card);
+  border-radius: var(--radius-base);
+  overflow: hidden;
+}
+
+/* ---------- 通用文本 ---------- */
+.ellipsis {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.ellipsis-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+/* ---------- 分隔条 ---------- */
+.gap {
+  height: 20rpx;
+}
+
+/* ---------- 底部固定操作栏容器 ---------- */
+.footer-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 100;
+  background: #ffffff;
+  border-top: 1rpx solid var(--color-border);
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ---------- 点击态 ---------- */
+.hover {
+  opacity: 0.7;
+}

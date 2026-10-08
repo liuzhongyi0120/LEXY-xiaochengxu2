@@ -1,0 +1,89 @@
+<view class="sku-layer {{visible ? 'is-show' : ''}}">
+  <view class="sku-mask" bindtap="onClose"></view>
+
+  <view class="sku-sheet" catchtouchmove="noop">
+    <!-- ---------- 商品信息 ---------- -->
+    <view class="sku-head">
+      <image class="sku-thumb" src="{{goods.cover}}" mode="aspectFill" />
+
+      <view class="sku-head-info">
+        <view class="sku-price">
+          <text class="sku-price-symbol">¥</text>
+          <text class="sku-price-int">{{priceParts.int}}</text>
+          <text class="sku-price-dec">{{priceParts.dec}}</text>
+        </view>
+        <text class="sku-tips">{{tips}}</text>
+        <text class="sku-selected" wx:if="{{selectedText}}">已选：{{selectedText}}</text>
+      </view>
+
+      <view class="sku-close" hover-class="sku-close-hover" bindtap="onClose">×</view>
+    </view>
+
+    <!-- ---------- 规格与数量 ---------- -->
+    <scroll-view class="sku-body" scroll-y>
+      <view
+        class="sku-group"
+        wx:for="{{specState}}"
+        wx:for-item="spec"
+        wx:for-index="specIndex"
+        wx:key="name"
+      >
+        <text class="sku-group-title">{{spec.name}}</text>
+        <view class="sku-values">
+          <view
+            wx:for="{{spec.values}}"
+            wx:for-item="option"
+            wx:key="value"
+            class="sku-value {{option.active ? 'is-active' : ''}} {{option.available ? '' : 'is-disabled'}}"
+            data-spec-index="{{specIndex}}"
+            data-value="{{option.value}}"
+            data-available="{{option.available}}"
+            bindtap="onSelectValue"
+          >{{option.value}}</view>
+        </view>
+      </view>
+
+      <view class="sku-group">
+        <view class="sku-qty-row">
+          <text class="sku-group-title">购买数量</text>
+          <view class="stepper">
+            <view
+              class="stepper-btn {{quantity <= 1 ? 'is-disabled' : ''}}"
+              data-delta="-1"
+              bindtap="onQuantityChange"
+            >−</view>
+            <input
+              class="stepper-input"
+              type="number"
+              value="{{quantity}}"
+              bindblur="onInputQuantity"
+            />
+            <view
+              class="stepper-btn {{quantity >= maxQuantity ? 'is-disabled' : ''}}"
+              data-delta="1"
+              bindtap="onQuantityChange"
+            >+</view>
+          </view>
+        </view>
+        <text class="sku-limit" wx:if="{{maxQuantity > 1}}">每单最多购买 {{maxQuantity}} 件</text>
+      </view>
+    </scroll-view>
+
+    <!-- ---------- 操作按钮 ---------- -->
+    <view class="sku-footer safe-area-bottom">
+      <view
+        wx:if="{{mode === 'both' || mode === 'cart'}}"
+        class="sku-btn sku-btn-cart {{disabled ? 'is-disabled' : ''}}"
+        data-action="cart"
+        bindtap="onConfirm"
+      >加入购物车</view>
+
+      <view
+        wx:if="{{mode === 'both' || mode === 'buy'}}"
+        class="sku-btn sku-btn-buy {{disabled ? 'is-disabled' : ''}}"
+        data-action="buy"
+        bindtap="onConfirm"
+      >立即购买</view>
+    </view>
+  </view>
+</view>

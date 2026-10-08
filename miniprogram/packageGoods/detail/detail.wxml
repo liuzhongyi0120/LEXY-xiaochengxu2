@@ -1,0 +1,125 @@
+<view class="page" wx:if="{{goods}}">
+  <!-- ---------- 主图轮播 ---------- -->
+  <view class="gallery">
+    <swiper class="gallery-swiper" circular bindchange="onSwiperChange">
+      <swiper-item
+        wx:for="{{goods.images}}"
+        wx:key="*this"
+        data-index="{{index}}"
+        bindtap="onPreviewImage"
+      >
+        <image class="gallery-img" src="{{item}}" mode="aspectFill" />
+      </swiper-item>
+    </swiper>
+    <view class="gallery-counter">{{currentImage + 1}} / {{goods.images.length}}</view>
+  </view>
+
+  <!-- ---------- 价格与标题 ---------- -->
+  <view class="card main-card">
+    <view class="price-row">
+      <view class="price">
+        <text class="price-symbol">¥</text>
+        <text class="price-int">{{priceParts.int}}</text>
+        <text class="price-dec">{{priceParts.dec}}</text>
+      </view>
+      <text class="price-range" wx:if="{{priceMaxText}}">{{priceMaxText}}</text>
+      <text class="sales">已售 {{salesText}}</text>
+    </view>
+
+    <view class="name">{{goods.name}}</view>
+    <view class="subtitle" wx:if="{{goods.subtitle}}">{{goods.subtitle}}</view>
+
+    <view class="tag-row" wx:if="{{goods.tags.length}}">
+      <text wx:for="{{goods.tags}}" wx:key="*this" class="tag">{{item}}</text>
+    </view>
+  </view>
+
+  <!-- ---------- 规格与库存入口 ---------- -->
+  <view class="card" bindtap="openSku" data-mode="both" hover-class="cell-hover">
+    <view class="cell">
+      <text class="cell-label">选择</text>
+      <text class="cell-value">请选择 规格 / 数量</text>
+      <text class="cell-arrow">›</text>
+    </view>
+    <view class="cell">
+      <text class="cell-label">库存</text>
+      <text class="cell-value">{{goods.stock}} 件</text>
+      <text class="cell-arrow"></text>
+    </view>
+  </view>
+
+  <!-- ---------- 服务承诺 ---------- -->
+  <view class="card service-card">
+    <view class="service-item">
+      <text class="service-dot"></text>
+      <text class="service-text">正品保障</text>
+    </view>
+    <view class="service-item">
+      <text class="service-dot"></text>
+      <text class="service-text">官方发货</text>
+    </view>
+    <view class="service-item">
+      <text class="service-dot"></text>
+      <text class="service-text">七天无理由</text>
+    </view>
+  </view>
+
+  <!-- ---------- 图文详情 ---------- -->
+  <view class="card detail-card">
+    <view class="detail-title">商品详情</view>
+    <block wx:for="{{detailBlocks}}" wx:key="key">
+      <text wx:if="{{item.type === 'text'}}" class="detail-text">{{item.content}}</text>
+      <image
+        wx:elif="{{item.type === 'image'}}"
+        class="detail-image"
+        src="{{item.content}}"
+        mode="widthFix"
+      />
+    </block>
+  </view>
+
+  <!-- ---------- 推荐商品 ---------- -->
+  <view class="section-title" wx:if="{{recommends.length}}">
+    <view class="section-bar"></view>
+    <text class="section-text">相关推荐</text>
+  </view>
+
+  <scroll-view class="recommend-scroll" scroll-x wx:if="{{recommends.length}}">
+    <view class="recommend-item" wx:for="{{recommends}}" wx:key="id">
+      <goods-card goods="{{item}}" showTags="{{false}}" bind:tap="onTapGoods" />
+    </view>
+  </scroll-view>
+
+  <view class="footer-placeholder"></view>
+
+  <!-- ---------- 底部操作栏 ---------- -->
+  <view class="footer-bar">
+    <view class="footer-inner">
+      <view class="footer-icon" bindtap="onTapCart">
+        <text class="footer-icon-text">购物车</text>
+        <view class="footer-badge" wx:if="{{cartCount > 0}}">{{cartCount}}</view>
+      </view>
+
+      <view class="footer-btns">
+        <view class="footer-btn btn-cart" data-mode="cart" bindtap="openSku">加入购物车</view>
+        <view class="footer-btn btn-buy" data-mode="buy" bindtap="openSku">立即购买</view>
+      </view>
+    </view>
+  </view>
+</view>
+
+<!-- ---------- 加载态 ---------- -->
+<view class="loading-placeholder" wx:elif="{{loading}}">
+  <view class="skeleton sk-main"></view>
+  <view class="skeleton sk-text"></view>
+  <view class="skeleton sk-text short"></view>
+</view>
+
+<!-- ---------- SKU 弹层 ---------- -->
+<sku-selector
+  visible="{{skuVisible}}"
+  goods="{{goods}}"
+  mode="{{skuMode}}"
+  bind:close="closeSku"
+  bind:confirm="onSkuConfirm"
+/>

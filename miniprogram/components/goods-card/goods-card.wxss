@@ -1,0 +1,115 @@
+.goods-card {
+  background: #ffffff;
+  border-radius: 16rpx;
+  overflow: hidden;
+}
+
+.card-hover {
+  opacity: 0.75;
+}
+
+/* ---------- 图片区 ---------- */
+.cover {
+  position: relative;
+  width: 100%;
+  height: 340rpx;
+  background: #F2F3F5;
+}
+
+.cover-img {
+  width: 100%;
+  height: 100%;
+}
+
+.cover-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #F6F7F9 0%, #ECEEF1 100%);
+}
+
+.cover-fallback-text {
+  font-size: 30rpx;
+  color: #B4B2A9;
+  letter-spacing: 4rpx;
+}
+
+.sold-out {
+  position: absolute;
+  left: 0;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  color: #ffffff;
+  font-size: 30rpx;
+}
+
+/* ---------- 信息区 ---------- */
+.info {
+  padding: 20rpx;
+}
+
+.name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 28rpx;
+  line-height: 40rpx;
+  color: #323233;
+  height: 80rpx;
+}
+
+.tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 12rpx;
+}
+
+.tag {
+  margin-right: 10rpx;
+  padding: 0 12rpx;
+  height: 32rpx;
+  line-height: 32rpx;
+  font-size: 20rpx;
+  color: #C8102E;
+  background: #FDECEE;
+  border-radius: 6rpx;
+}
+
+.bottom {
+  margin-top: 16rpx;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.price {
+  display: flex;
+  align-items: baseline;
+  color: #C8102E;
+}
+
+.price-symbol {
+  font-size: 22rpx;
+}
+
+.price-int {
+  font-size: 36rpx;
+  font-weight: 600;
+}
+
+.price-dec {
+  font-size: 22rpx;
+}
+
+.sales {
+  font-size: 22rpx;
+  color: #969799;
+}

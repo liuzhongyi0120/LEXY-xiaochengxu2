@@ -1,0 +1,77 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/lexy/lexy",
+    "pages/news/news",
+    "pages/product/product",
+    "pages/mine/mine",
+    "pages/cart/cart",
+    "pages/category/category",
+    "pages/custom/index"
+  ],
+  "subPackages": [
+    {
+      "name": "packageGoods",
+      "root": "packageGoods",
+      "pages": [
+        "list/list",
+        "detail/detail"
+      ]
+    },
+    {
+      "name": "packageNews",
+      "root": "packageNews",
+      "pages": [
+        "detail/detail"
+      ]
+    }
+  ],
+  "preloadRule": {
+    "pages/index/index": {
+      "network": "all",
+      "packages": ["packageGoods"]
+    },
+    "pages/news/news": {
+      "network": "all",
+      "packages": ["packageNews"]
+    }
+  },
+  "window": {
+    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarTitleText": "LEXY莱克官方旗舰店",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#f5f5f5",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "color": "#999999",
+    "selectedColor": "#C8102E",
+    "backgroundColor": "#ffffff",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页"
+      },
+      {
+        "pagePath": "pages/lexy/lexy",
+        "text": "莱克"
+      },
+      {
+        "pagePath": "pages/news/news",
+        "text": "资讯"
+      },
+      {
+        "pagePath": "pages/product/product",
+        "text": "产品"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的"
+      }
+    ]
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "style": "v2"
+}

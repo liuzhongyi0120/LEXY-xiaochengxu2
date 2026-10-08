@@ -1,0 +1,41 @@
+/* 全局设计变量：颜色 / 字号 / 间距 / 圆角
+   品牌色为占位值，请用莱克品牌 VI 主色替换后统一生效 */
+page {
+  /* ---------- 品牌色 ---------- */
+  --color-primary: #C8102E;          /* TODO 替换为品牌 VI 主色 */
+  --color-primary-light: #FDECEE;    /* 主色浅底，用于标签、选中态 */
+  --color-price: #C8102E;            /* 价格文字色 */
+
+  /* ---------- 功能色 ---------- */
+  --color-danger: #EE0A24;
+  --color-warning: #FF976A;
+  --color-success: #07C160;
+
+  /* ---------- 文字 ---------- */
+  --color-text: #323233;
+  --color-text-secondary: #969799;
+  --color-text-placeholder: #C8C9CC;
+  --color-text-inverse: #FFFFFF;
+
+  /* ---------- 背景与描边 ---------- */
+  --color-bg: #F5F5F5;
+  --color-bg-card: #FFFFFF;
+  --color-border: #EBEDF0;
+
+  /* ---------- 字号 ---------- */
+  --font-xs: 22rpx;
+  --font-sm: 24rpx;
+  --font-base: 28rpx;
+  --font-lg: 32rpx;
+  --font-xl: 36rpx;
+
+  /* ---------- 间距 ---------- */
+  --space-sm: 16rpx;
+  --space-base: 24rpx;
+  --space-lg: 32rpx;
+
+  /* ---------- 圆角 ---------- */
+  --radius-sm: 8rpx;
+  --radius-base: 16rpx;
+  --radius-lg: 24rpx;
+}

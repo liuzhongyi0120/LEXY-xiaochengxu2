@@ -1,0 +1,34 @@
+<view class="goods-card" hover-class="card-hover" hover-stay-time="80" bindtap="onTap">
+  <view class="cover">
+    <image
+      wx:if="{{!imgError}}"
+      class="cover-img"
+      src="{{goods.cover}}"
+      mode="aspectFill"
+      lazy-load
+      binderror="onImgError"
+    />
+    <view wx:else class="cover-fallback">
+      <text class="cover-fallback-text">{{fallbackText}}</text>
+    </view>
+
+    <view wx:if="{{goods.stock <= 0}}" class="sold-out">已售罄</view>
+  </view>
+
+  <view class="info">
+    <text class="name">{{goods.name}}</text>
+
+    <view wx:if="{{showTags && goods.tags.length}}" class="tag-row">
+      <text wx:for="{{goods.tags}}" wx:key="*this" class="tag">{{item}}</text>
+    </view>
+
+    <view class="bottom">
+      <view class="price">
+        <text class="price-symbol">¥</text>
+        <text class="price-int">{{priceParts.int}}</text>
+        <text class="price-dec">{{priceParts.dec}}</text>
+      </view>
+      <text class="sales">已售 {{salesText}}</text>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,67 @@
+<view class="page" style="background: {{pageBg}};">
+  <!-- 标题 -->
+  <view class="head">
+    <text class="head-en">{{news.en}}</text>
+    <text class="head-title">{{news.title}}</text>
+  </view>
+
+  <!-- 两个大栏目 -->
+  <view class="grid grid-2">
+    <view
+      class="cell cell-big"
+      wx:for="{{news.big}}"
+      wx:key="id"
+      wx:for-index="index"
+      data-group="big"
+      data-index="{{index}}"
+      data-key="{{item.key}}"
+      data-image="{{item.image}}"
+      bindtap="onTapItem"
+      hover-class="cell-hover"
+    >
+      <view class="cell-pic pic-big">
+        <image
+          wx:if="{{!item.failed}}"
+          class="cell-img"
+          src="{{item.image}}"
+          mode="aspectFill"
+          lazy-load
+          data-group="big"
+          data-index="{{index}}"
+          binderror="onImgError"
+        />
+      </view>
+      <text class="cell-label">{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- 六个小栏目 -->
+  <view class="grid grid-3">
+    <view
+      class="cell cell-small"
+      wx:for="{{news.small}}"
+      wx:key="id"
+      wx:for-index="index"
+      data-group="small"
+      data-index="{{index}}"
+      data-key="{{item.key}}"
+      data-image="{{item.image}}"
+      bindtap="onTapItem"
+      hover-class="cell-hover"
+    >
+      <view class="cell-pic pic-small">
+        <image
+          wx:if="{{!item.failed}}"
+          class="cell-img"
+          src="{{item.image}}"
+          mode="aspectFill"
+          lazy-load
+          data-group="small"
+          data-index="{{index}}"
+          binderror="onImgError"
+        />
+      </view>
+      <text class="cell-label">{{item.label}}</text>
+    </view>
+  </view>
+</view>

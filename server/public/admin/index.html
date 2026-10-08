@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>店铺装修台 · LEXY莱克官方旗舰店</title>
+<link rel="stylesheet" href="/admin/admin.css">
+</head>
+<body>
+
+<!-- ============================ 顶栏（对标有赞：退出编辑器 / 正在装修 / 预览 · 存至草稿 · 立即发布） ============================ -->
+<header class="topbar">
+  <div class="tb-left">
+    <button class="tb-back" id="btnBack" title="返回页面列表">‹ 退出编辑器</button>
+  </div>
+  <div class="tb-center">
+    <span class="tb-label">正在装修：</span>
+    <span class="tb-page" id="edName">—</span>
+    <span class="tb-tag" id="edPath">—</span>
+    <span class="tb-tag" id="edPageTag">内置页</span>
+  </div>
+  <div class="tb-right">
+    <span class="tb-dirty" id="edDirty">无未保存改动</span>
+    <button class="tb-btn" id="btnDiff">查看变更</button>
+    <button class="tb-btn" id="btnVersions">版本</button>
+    <button class="tb-btn" id="btnDiscard">丢弃草稿</button>
+    <button class="tb-btn" id="btnSave">存至草稿</button>
+    <button class="tb-btn primary" id="btnPublish">立即发布</button>
+  </div>
+</header>
+
+<!-- ============================ 一、页面列表（对标有赞「店铺页面」列表） ============================ -->
+<section id="viewList" class="view">
+  <div class="list-top">
+    <div class="lt-title">
+      <b>店铺页面</b>
+      <span class="muted">共 <b id="pageCount">0</b> 个页面 · 装修后点「发布」写回小程序</span>
+    </div>
+    <div class="spacer"></div>
+    <div class="stat" id="statTarget">目标文件：—</div>
+    <div class="stat" id="statData">草稿 — · 版本 —</div>
+    <div class="stat" id="statCustom">自定义页 — / —</div>
+    <nav class="topnav">
+      <a href="/debug" target="_blank">接口调试台</a>
+      <a href="/" target="_blank">线上预览</a>
+    </nav>
+    <button class="btn" id="btnReload" title="重新拉取页面列表">刷新</button>
+  </div>
+
+  <div class="toolbar">
+    <div class="filters">
+      <label>页面名称 <input id="fName" placeholder="搜索页面名称 / 备注"></label>
+      <label>页面状态
+        <select id="fStatus">
+          <option value="">全部状态</option>
+          <option value="published">已发布</option>
+          <option value="draft">有草稿</option>
+        </select>
+      </label>
+      <label>归属
+        <select id="fBelongs"><option value="">全部</option></select>
+      </label>
+      <button class="btn" id="btnFilter">筛选</button>
+      <button class="btn ghost" id="btnResetFilter">重置</button>
+    </div>
+    <div class="spacer"></div>
+    <button class="btn primary" id="btnCreatePage" title="新建一个自定义页面（发布后小程序端可访问）">+ 新建页面</button>
+  </div>
+
+  <div class="table-wrap">
+    <table class="grid">
+      <thead>
+        <tr>
+          <th style="width:230px">页面名称</th>
+          <th style="width:96px">类型</th>
+          <th style="width:120px">归属</th>
+          <th style="width:140px">页面状态</th>
+          <th style="width:110px">内容量</th>
+          <th style="width:150px">最近草稿</th>
+          <th style="width:190px">数据来源</th>
+          <th>备注</th>
+          <th style="width:360px">操作</th>
+        </tr>
+      </thead>
+      <tbody id="pageRows"></tbody>
+    </table>
+  </div>
+  <div class="foot-hint" id="listFoot"></div>
+</section>
+
+<!-- ============================ 二、装修编辑器（四区：组件库 / 页面布局 / 手机预览 / 属性面板） ============================ -->
+<section id="viewEdit" class="view edit" hidden>
+
+  <!-- ---------- 左：组件库 ---------- -->
+  <aside class="col col-lib">
+    <div class="lib-tabs" id="libTabs"></div>
+    <div class="lib-body">
+      <div class="lib-desc" id="libDesc"></div>
+      <div class="lib-grid" id="libGrid"></div>
+      <button class="lib-add" id="btnAddCommon">+ 添加常用组件</button>
+    </div>
+  </aside>
+
+  <!-- ---------- 中左：页面布局（组件大纲） ---------- -->
+  <aside class="col col-layout">
+    <div class="col-head">
+      <b>页面布局</b>
+      <span class="muted" id="treeCount"></span>
+    </div>
+    <div class="col-scroll">
+      <div id="tree" class="tree"></div>
+      <div id="treeAddWrap" class="tree-add"></div>
+    </div>
+    <div class="layout-foot" id="btnPageSetting">
+      <i class="ic-gear"></i>页面设置
+    </div>
+  </aside>
+
+  <!-- ---------- 中：手机预览 ---------- -->
+  <div class="col col-mid">
+    <div class="mid-head">
+      <span class="muted">点击预览中的组件可直接选中</span>
+      <div class="spacer"></div>
+      <label class="mini">机型
+        <select id="deviceSel">
+          <option value="375">iPhone 12（375）</option>
+          <option value="320">iPhone SE（320）</option>
+          <option value="414">iPhone Pro Max（414）</option>
+        </select>
+      </label>
+      <label class="mini"><input type="checkbox" id="autoScroll" checked> 选中时定位</label>
+    </div>
+    <div class="phone-stage">
+      <div class="phone" id="phone">
+        <div class="phone-bar">
+          <span class="ph-time">9:41</span>
+          <span class="ph-title" id="phTitle">首页</span>
+          <span class="ph-dots">···</span>
+        </div>
+        <div class="phone-screen" id="preview"></div>
+        <div class="tabbar" id="phTabbar">
+          <span>首页</span><span>莱克</span><span>资讯</span><span>产品</span><span>我的</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---------- 右：属性面板 ---------- -->
+  <aside class="col col-inspector">
+    <div class="insp-head">
+      <b>属性设置</b>
+      <span class="muted" id="inspectorPath"></span>
+    </div>
+    <div class="col-scroll" id="inspector"></div>
+  </aside>
+
+</section>
+
+<!-- ============================ 弹层 ============================ -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head">
+      <b id="modalTitle">标题</b>
+      <button class="btn ghost" id="modalClose">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot" id="modalFoot"></div>
+  </div>
+</div>
+<div id="toast"></div>
+<div id="imgPreview" class="img-preview" hidden><img alt=""></div>
+
+<script src="/admin/admin.js"></script>
+</body>
+</html>

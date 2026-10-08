@@ -1,0 +1,71 @@
+<view class="page" style="background: {{pageBg}};">
+  <!-- 左侧品牌导航 -->
+  <scroll-view class="side" scroll-y>
+    <!-- 导航顶部固定 logo（源页面左栏顶部） -->
+    <view class="side-top">
+      <image class="side-top-logo" src="{{navLogo}}" mode="aspectFit" />
+    </view>
+
+    <view
+      class="side-item {{activeBrand === index ? 'side-item-active' : ''}}"
+      wx:for="{{brands}}"
+      wx:key="id"
+      data-index="{{index}}"
+      bindtap="onTapBrand"
+    >
+      <text>{{item.name}}</text>
+    </view>
+  </scroll-view>
+
+  <!-- 右侧内容：随品牌切换 -->
+  <scroll-view
+    class="main"
+    scroll-y
+    scroll-top="{{scrollTop}}"
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <view class="group" wx:for="{{groups}}" wx:key="index" wx:for-item="group" wx:for-index="gindex">
+      <view class="group-head" wx:if="{{group.header && !group.headerFailed}}">
+        <image
+          class="group-head-img"
+          src="{{group.header}}"
+          mode="widthFix"
+          lazy-load
+          data-gindex="{{gindex}}"
+          binderror="onHeaderError"
+        />
+      </view>
+
+      <view class="prod-grid">
+        <view
+          class="prod"
+          wx:for="{{group.products}}"
+          wx:key="id"
+          wx:for-item="prod"
+          wx:for-index="pindex"
+          data-src="{{prod.image}}"
+          bindtap="onTapProduct"
+          hover-class="prod-hover"
+        >
+          <view class="prod-pic">
+            <image
+              wx:if="{{!prod.failed}}"
+              class="prod-img"
+              src="{{prod.image}}"
+              mode="aspectFit"
+              lazy-load
+              data-gindex="{{gindex}}"
+              data-pindex="{{pindex}}"
+              binderror="onProdError"
+            />
+          </view>
+          <text class="prod-model">{{prod.model}}</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty" wx:if="{{!groups.length}}">该品牌暂无上架产品</view>
+    <view class="main-bottom"></view>
+  </scroll-view>
+</view>

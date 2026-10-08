@@ -1,0 +1,19 @@
+/* 自定义页复用首页的区块样式，避免两边各写一套后逐渐走样 */
+@import "../../pages/index/index.wxss";
+
+.empty {
+  padding: 120rpx 56rpx;
+  text-align: center;
+}
+.empty-t {
+  display: block;
+  font-size: 30rpx;
+  color: #333333;
+  margin-bottom: 18rpx;
+}
+.empty-s {
+  display: block;
+  font-size: 24rpx;
+  color: #999999;
+  line-height: 1.75;
+}

@@ -1,0 +1,71 @@
+const replica = require('../../config/replica');
+const { resolveAssets } = require('../../utils/asset');
+
+/** 深拷贝，避免运行时错误标记污染配置数据 */
+function clone(data) {
+  return JSON.parse(JSON.stringify(data));
+}
+
+/** 装修数据先整体做一次素材地址解析，后续切换品牌都从这里取 */
+const BRANDS = resolveAssets(replica.PRODUCT_BRANDS);
+
+Page({
+  data: {
+    /** 页面背景色（装修后台「页面设置」可改，对应 replica.PAGE_META） */
+    pageBg: (replica.PAGE_META && replica.PAGE_META.product && replica.PAGE_META.product.bg) || '#ffffff',
+    /** 左侧导航顶部固定 logo */
+    navLogo: resolveAssets(replica.PRODUCT_NAV_LOGO),
+    /** 6 个品牌，各自带 groups */
+    brands: BRANDS,
+    activeBrand: 0,
+    /** 当前品牌右侧展示的分组 */
+    groups: clone(BRANDS[0].groups),
+    /** 切换品牌后右侧回到顶部（scroll-top 需产生变化才生效） */
+    scrollTop: 0
+  },
+
+  /** 左侧品牌切换：右侧内容整体替换 */
+  onTapBrand(e) {
+    const index = Number(e.currentTarget.dataset.index);
+    if (index === this.data.activeBrand) return;
+
+    const brand = this.data.brands[index];
+    if (!brand) return;
+
+    this.setData({
+      activeBrand: index,
+      groups: clone(brand.groups),
+      scrollTop: this.data.scrollTop === 0 ? 1 : 0
+    });
+  },
+
+  /**
+   * 型号卡片图内含官方产品图；接入真实商品库后
+   * 将这里替换为 wx.navigateTo 商品详情跳转。
+   */
+  onTapProduct(e) {
+    const { src } = e.currentTarget.dataset;
+    if (!src) return;
+    wx.previewImage({ urls: [src] });
+  },
+
+  onHeaderError(e) {
+    const { gindex } = e.currentTarget.dataset;
+    this.setData({ [`groups[${gindex}].headerFailed`]: true });
+  },
+
+  onProdError(e) {
+    const { gindex, pindex } = e.currentTarget.dataset;
+    this.setData({ [`groups[${gindex}].products[${pindex}].failed`]: true });
+  },
+
+  onShareAppMessage() {
+    const brand = this.data.brands[this.data.activeBrand] || {};
+    const first = this.data.groups[0] || {};
+    return {
+      title: `莱克产品 · ${brand.name || ''}`,
+      path: '/pages/product/product',
+      imageUrl: first.header || this.data.navLogo
+    };
+  }
+});

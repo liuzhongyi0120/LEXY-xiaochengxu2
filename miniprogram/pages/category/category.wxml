@@ -1,0 +1,55 @@
+<view class="page">
+  <!-- ---------- 左侧一级分类 ---------- -->
+  <view class="sidebar">
+    <scroll-view class="sidebar-scroll" scroll-y>
+      <view
+        class="sidebar-item {{activeIndex === index ? 'is-active' : ''}}"
+        wx:for="{{categories}}"
+        wx:key="id"
+        data-index="{{index}}"
+        bindtap="onTapTop"
+      >
+        <view class="sidebar-bar" wx:if="{{activeIndex === index}}"></view>
+        <text class="sidebar-text">{{item.name}}</text>
+      </view>
+    </scroll-view>
+  </view>
+
+  <!-- ---------- 右侧二级分类 ---------- -->
+  <view class="content">
+    <scroll-view class="content-scroll" scroll-y>
+      <block wx:if="{{categories[activeIndex]}}">
+        <view class="content-head">
+          <text class="content-title">{{categories[activeIndex].name}}</text>
+          <text
+            class="content-more"
+            data-id="{{categories[activeIndex].id}}"
+            bindtap="onTapCategory"
+          >查看全部 ›</text>
+        </view>
+
+        <view class="sub-grid">
+          <view
+            class="sub-item"
+            wx:for="{{categories[activeIndex].children}}"
+            wx:key="id"
+            data-id="{{item.id}}"
+            bindtap="onTapCategory"
+            hover-class="sub-hover"
+          >
+            <view class="sub-thumb">
+              <text class="sub-thumb-text">{{item.name}}</text>
+            </view>
+            <text class="sub-name">{{item.name}}</text>
+          </view>
+        </view>
+
+        <view class="content-tip">点击分类查看该品类下的全部商品</view>
+      </block>
+
+      <view class="content-empty" wx:elif="{{!loading}}">
+        <text class="content-empty-text">暂无分类数据</text>
+      </view>
+    </scroll-view>
+  </view>
+</view>

@@ -1,0 +1,79 @@
+<view class="page" style="background: {{pageBg}};">
+  <!-- ---------- 用户信息 ---------- -->
+  <view class="profile">
+    <image class="avatar" src="{{shop.avatar}}" mode="aspectFill" />
+    <view class="profile-info">
+      <text class="nickname">{{logged ? '微信用户' : '未登录'}}</text>
+      <text class="profile-tip">{{logged ? '欢迎回到' + shop.name : '登录后可同步订单与购物车'}}</text>
+    </view>
+    <view class="profile-action" bindtap="onTapLogin" wx:if="{{!logged}}">登录</view>
+  </view>
+
+  <!-- ---------- 订单入口 ---------- -->
+  <view class="card order-card">
+    <view class="card-head">
+      <text class="card-title">我的订单</text>
+      <text class="card-more" data-status="ALL" bindtap="onTapOrder">全部订单 ›</text>
+    </view>
+
+    <view class="order-tabs">
+      <view
+        class="order-tab"
+        wx:for="{{orderTabs}}"
+        wx:key="key"
+        data-status="{{item.key}}"
+        bindtap="onTapOrder"
+        hover-class="order-tab-hover"
+      >
+        <view class="order-icon"></view>
+        <text class="order-label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ---------- 资产 ---------- -->
+  <view class="card asset-card">
+    <view
+      class="asset-item"
+      wx:for="{{assets}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onTapAsset"
+      hover-class="asset-hover"
+    >
+      <text class="asset-num">0</text>
+      <text class="asset-label">{{item.label}}</text>
+    </view>
+  </view>
+
+  <!-- ---------- 工具列表 ---------- -->
+  <view class="card tool-card">
+    <view class="card-head">
+      <text class="card-title">常用功能</text>
+    </view>
+
+    <view class="tool-grid">
+      <view
+        class="tool-item"
+        wx:for="{{tools}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        bindtap="onTapTool"
+        hover-class="tool-hover"
+      >
+        <view class="tool-icon">
+          <text class="tool-icon-text">{{item.icon}}</text>
+        </view>
+        <text class="tool-label">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ---------- 服务 -------- -->
+  <view class="card service-card" bindtap="onTapService" hover-class="cell-hover">
+    <text class="service-text">联系在线客服</text>
+    <text class="service-arrow">›</text>
+  </view>
+
+  <view class="version">LEXY莱克官方旗舰店 · 开发版本</view>
+</view>

@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>莱克商城后端 · 接口调试台</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --panel:#ffffff; --line:#e3e6eb; --line-2:#eef1f5;
+    --text:#1f2329; --text-2:#5c636e; --text-3:#8a919e;
+    --brand:#C8102E; --brand-soft:#FDECEE;
+    --get:#1a73e8; --post:#0f9d58; --put:#e37400; --del:#d93025;
+    --ok:#0f9d58; --warn:#e37400; --err:#d93025;
+    --code-bg:#fbfcfd;
+    --mono:"Cascadia Code","JetBrains Mono",Consolas,"Courier New",monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg);color:var(--text);
+    font:13px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif;
+    display:flex;flex-direction:column;overflow:hidden;
+  }
+  button,input,select,textarea{font-family:inherit;font-size:inherit;color:inherit;}
+  button{cursor:pointer;}
+  code,.mono{font-family:var(--mono);}
+
+  /* ---------------- 顶栏 ---------------- */
+  header{
+    flex:0 0 auto;background:var(--panel);border-bottom:1px solid var(--line);
+    padding:10px 16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;
+  }
+  .logo{display:flex;align-items:center;gap:9px;font-size:15px;font-weight:700;letter-spacing:.2px;}
+  .logo-mark{
+    width:26px;height:26px;border-radius:7px;background:var(--brand);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;
+  }
+  .logo small{display:block;font-size:11px;font-weight:400;color:var(--text-3);letter-spacing:0;}
+  .stat{display:flex;align-items:center;gap:6px;padding:3px 9px;border:1px solid var(--line);border-radius:20px;background:#fafbfc;font-size:12px;color:var(--text-2);}
+  .stat b{color:var(--text);font-weight:600;font-family:var(--mono);font-size:12px;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--text-3);flex:0 0 auto;}
+  .dot.up{background:var(--ok);box-shadow:0 0 0 3px rgba(15,157,88,.14);}
+  .dot.down{background:var(--err);box-shadow:0 0 0 3px rgba(217,48,37,.14);}
+  .spacer{flex:1;}
+
+  /* ---------------- 按钮 ---------------- */
+  .btn{
+    border:1px solid var(--line);background:#fff;border-radius:7px;padding:5px 11px;
+    font-size:12px;color:var(--text-2);transition:.14s;white-space:nowrap;
+  }
+  .btn:hover{border-color:#c9ced6;color:var(--text);background:#fafbfc;}
+  .btn.primary{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600;}
+  .btn.primary:hover{background:#a90d26;border-color:#a90d26;color:#fff;}
+  .btn.ghost{border-color:transparent;background:transparent;}
+  .btn.ghost:hover{background:var(--line-2);}
+  .btn:disabled{opacity:.5;cursor:not-allowed;}
+
+  /* ---------------- 主布局 ---------------- */
+  .layout{flex:1;display:flex;min-height:0;}
+  aside{
+    flex:0 0 306px;background:var(--panel);border-right:1px solid var(--line);
+    display:flex;flex-direction:column;min-height:0;
+  }
+  .aside-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;}
+  .aside-head input{
+    flex:1;border:1px solid var(--line);border-radius:7px;padding:6px 10px;background:#fafbfc;outline:none;
+  }
+  .aside-head input:focus{border-color:var(--brand);background:#fff;}
+  .routes{flex:1;overflow-y:auto;padding:6px 0 20px;}
+  .grp{padding:0 12px;}
+  .grp-title{
+    font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.5px;
+    padding:11px 4px 5px;display:flex;justify-content:space-between;align-items:center;
+  }
+  .grp-title span{font-family:var(--mono);letter-spacing:0;}
+  .r{
+    display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:7px;cursor:pointer;
+    border:1px solid transparent;
+  }
+  .r:hover{background:#f7f8fa;}
+  .r.active{background:var(--brand-soft);border-color:#f5c6cd;}
+  .r .m{
+    font-family:var(--mono);font-size:9.5px;font-weight:700;letter-spacing:.3px;
+    width:44px;text-align:center;border-radius:4px;padding:1px 0;flex:0 0 auto;color:#fff;
+  }
+  .m.GET{background:var(--get);} .m.POST{background:var(--post);}
+  .m.PUT{background:var(--put);} .m.DELETE{background:var(--del);}
+  .r .p{flex:1;font-family:var(--mono);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text-2);}
+  .r.active .p{color:var(--brand);font-weight:600;}
+  .lock{font-size:10px;color:var(--text-3);flex:0 0 auto;}
+  .pin{font-size:9px;background:#e8f0fe;color:var(--get);border-radius:4px;padding:0 4px;flex:0 0 auto;}
+
+  main{flex:1;min-width:0;overflow-y:auto;padding:16px 18px 40px;}
+  .card{
+    background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    margin-bottom:14px;overflow:hidden;
+  }
+  .card-head{
+    padding:10px 14px;border-bottom:1px solid var(--line-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+  }
+  .card-title{font-weight:600;font-size:13px;display:flex;align-items:center;gap:7px;}
+  .card-title .idx{
+    width:18px;height:18px;border-radius:5px;background:#eef1f5;color:var(--text-2);
+    font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono);
+  }
+  .card-body{padding:14px;}
+  .hint{font-size:12px;color:var(--text-2);line-height:1.7;}
+
+  /* ---------------- 请求区 ---------------- */
+  .urlbar{display:flex;gap:8px;align-items:center;margin-bottom:10px;}
+  .urlbar select{
+    border:1px solid var(--line);border-radius:7px;padding:7px 8px;background:#fafbfc;
+    font-family:var(--mono);font-weight:700;font-size:12px;outline:none;width:96px;
+  }
+  .urlbar input{
+    flex:1;border:1px solid var(--line);border-radius:7px;padding:7px 11px;
+    font-family:var(--mono);font-size:12.5px;background:#fafbfc;outline:none;min-width:0;
+  }
+  .urlbar input:focus{border-color:var(--brand);background:#fff;}
+  .toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-2);white-space:nowrap;}
+
+  .sub{font-size:11px;font-family:var(--mono);color:var(--text-3);text-transform:uppercase;letter-spacing:.8px;margin:12px 0 6px;}
+  .kv{display:flex;gap:7px;margin-bottom:6px;}
+  .kv input{
+    border:1px solid var(--line);border-radius:6px;padding:5px 9px;background:#fafbfc;
+    font-family:var(--mono);font-size:12px;outline:none;min-width:0;
+  }
+  .kv input:focus{border-color:var(--brand);background:#fff;}
+  .kv .k{flex:0 0 190px;} .kv .v{flex:1;}
+  .kv .x{border:1px solid var(--line);background:#fff;border-radius:6px;width:28px;color:var(--text-3);}
+  .kv .x:hover{color:var(--del);border-color:#f3c2be;}
+  textarea.editor{
+    width:100%;min-height:132px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;
+    background:var(--code-bg);font-family:var(--mono);font-size:12.5px;line-height:1.65;
+    outline:none;resize:vertical;tab-size:2;
+  }
+  textarea.editor:focus{border-color:var(--brand);background:#fff;}
+  textarea.editor.bad{border-color:var(--del);background:#fff7f6;}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .grow{flex:1;}
+
+  /* ---------------- 响应区 ---------------- */
+  .status-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:12px;}
+  .pill{
+    font-family:var(--mono);font-weight:700;font-size:11.5px;border-radius:6px;padding:2px 9px;
+    background:#eef1f5;color:var(--text-2);
+  }
+  .pill.ok{background:#e7f6ee;color:#0b7a44;}
+  .pill.bad{background:#fdeceb;color:#b3271e;}
+  .pill.warn{background:#fdf3e5;color:#a55a00;}
+  .pill.info{background:#e8f0fe;color:#1557b0;}
+  .meta{color:var(--text-3);font-family:var(--mono);font-size:11.5px;}
+  pre.out{
+    margin:0;background:var(--code-bg);border:1px solid var(--line-2);border-radius:8px;
+    padding:11px 13px;overflow:auto;max-height:520px;
+    font-family:var(--mono);font-size:12.2px;line-height:1.62;white-space:pre;
+  }
+  .k{color:#b3271e;font-weight:600;} .s{color:#0b7a44;} .n{color:#1557b0;} .b{color:#8e44ad;}
+  .empty{color:var(--text-3);padding:22px 0;text-align:center;font-size:12.5px;}
+
+  /* ---------------- 变量池 ---------------- */
+  .vars{display:flex;gap:7px;flex-wrap:wrap;align-items:center;}
+  .varchip{
+    display:flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:20px;
+    padding:1px 4px 1px 9px;background:#fafbfc;font-family:var(--mono);font-size:11.5px;
+  }
+  .varchip span{color:var(--text-3);font-size:11px;}
+  .varchip input{border:0;background:transparent;outline:none;width:132px;font-family:var(--mono);font-size:11.5px;padding:2px 0;}
+  .varchip.ok{border-color:#bde5cf;background:#f4fcf8;}
+
+  /* ---------------- 场景 ---------------- */
+  .steps{display:flex;flex-direction:column;gap:0;}
+  .step{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px dashed var(--line-2);}
+  .step:last-child{border-bottom:0;}
+  .step .no{
+    flex:0 0 20px;height:20px;border-radius:50%;background:#eef1f5;color:var(--text-3);
+    font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;font-family:var(--mono);margin-top:1px;
+  }
+  .step.run .no{background:#e8f0fe;color:var(--get);}
+  .step.pass .no{background:#e7f6ee;color:var(--ok);}
+  .step.fail .no{background:#fdeceb;color:var(--err);}
+  .step .body{flex:1;min-width:0;}
+  .step .t{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .step .t .m{
+    font-family:var(--mono);font-size:9.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 5px;
+  }
+  .step .t .p{font-family:var(--mono);font-size:11.5px;color:var(--text-2);}
+  .step .t .r{font-size:11.5px;color:var(--text-3);font-family:var(--mono);}
+  .step .desc{font-size:12px;color:var(--text-3);}
+  .step .resp{display:none;margin-top:6px;}
+  .step.open .resp{display:block;}
+
+  /* ---------------- 历史 ---------------- */
+  .history{max-height:250px;overflow:auto;}
+  .hrow{
+    display:flex;gap:9px;align-items:center;padding:5px 7px;border-radius:6px;cursor:pointer;
+    font-family:var(--mono);font-size:11.5px;
+  }
+  .hrow:hover{background:#f7f8fa;}
+  .hrow .hm{font-size:9.5px;font-weight:700;color:#fff;border-radius:4px;padding:1px 5px;}
+  .hrow .hp{flex:1;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hrow .hc{color:var(--text-3);font-size:11px;}
+  .warnbar{
+    background:#fdf3e5;border:1px solid #f3ddb8;color:#8a5a00;border-radius:8px;
+    padding:8px 12px;font-size:12px;margin-bottom:12px;line-height:1.7;
+  }
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:#d3d8e0;border-radius:5px;}
+  ::-webkit-scrollbar-thumb:hover{background:#bcc3ce;}
+  ::-webkit-scrollbar-track{background:transparent;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-mark">LX</div>
+    <div>莱克商城后端 · 接口调试台<small id="baseUrl">—</small></div>
+  </div>
+  <div class="stat"><span class="dot" id="dotHealth"></span><span id="healthText">连接中…</span></div>
+  <div class="stat">点位 <b id="statRoutes">—</b></div>
+  <div class="stat">微信登录 <b id="statLogin">—</b></div>
+  <div class="stat">微信支付 <b id="statPay">—</b></div>
+  <div class="stat" id="statTokenBox">登录态 <b id="statToken">未登录</b></div>
+  <div class="spacer"></div>
+  <button class="btn" id="btnReload">刷新点位</button>
+  <button class="btn" id="btnScenario">▶ 一键全链路</button>
+  <button class="btn" id="btnClearToken">清除登录态</button>
+</header>
+
+<div class="layout">
+  <aside>
+    <div class="aside-head">
+      <input id="search" placeholder="搜索接口路径 / 说明…">
+    </div>
+    <div class="routes" id="routes"></div>
+  </aside>
+
+  <main>
+    <div class="warnbar">
+      <b>联调专用页面</b>：仅用于本地开发，线上部署请设置 <code>DEBUG_PAGE=off</code> 关闭。
+      小程序端联调前需在开发者工具勾选「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」。
+    </div>
+
+    <!-- 1 请求 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="idx">1</span>构造请求</div>
+        <div class="spacer grow"></div>
+        <label class="toggle"><input type="checkbox" id="useAuth" checked> 携带登录态</label>
+      </div>
+      <div class="card-body">
+        <div class="urlbar">
+          <select id="method">
+            <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option>
+          </select>
+          <input id="path" placeholder="/api/home" spellcheck="false">
+          <button class="btn primary" id="btnSend">发送（Ctrl+Enter）</button>
+        </div>
+        <div id="routeInfo" class="hint">从左侧选择一个接口，示例参数会自动填入。</div>
+
+        <div id="queryWrap" style="display:none">
+          <div class="sub">Query 参数</div>
+          <div id="queryRows"></div>
+          <button class="btn ghost" id="btnAddQuery" style="padding:3px 8px;font-size:11.5px">+ 添加参数</button>
+        </div>
+
+        <div id="bodyWrap" style="display:none">
+          <div class="sub">Body（JSON）</div>
+          <textarea class="editor" id="body" spellcheck="false"></textarea>
+          <div class="row" style="margin-top:7px">
+            <button class="btn" id="btnFormat">格式化</button>
+            <button class="btn" id="btnClearBody">清空</button>
+            <span class="meta" id="bodyHint"></span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2 响应 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="idx">2</span>响应结果</div>
+        <div class="spacer grow"></div>
+        <div class="status-bar" id="respStatus"></div>
+        <button class="btn" id="btnCopyCurl">复制 cURL</button>
+        <button class="btn" id="btnCopyResp">复制响应</button>
+      </div>
+      <div class="card-body">
+        <pre class="out" id="respOut"><div class="empty">发送请求后在此查看响应</div></pre>
+      </div>
+    </div>
+
+    <!-- 3 变量池 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="idx">3</span>变量池</div>
+        <div class="hint" style="margin-left:4px">示例参数里的 <code>{{name}}</code> 会被这里的值替换；登录 / 加地址 / 加购 / 下单成功后自动回填真实 ID。</div>
+        <div class="spacer grow"></div>
+        <button class="btn" id="btnResetVars">重置</button>
+      </div>
+      <div class="card-body">
+        <div class="vars" id="vars"></div>
+      </div>
+    </div>
+
+    <!-- 4 全链路 -->
+    <div class="card" id="scenarioCard">
+      <div class="card-head">
+        <div class="card-title"><span class="idx">4</span>全链路自测</div>
+        <div class="hint" style="margin-left:4px">登录 → 地址 → 加购 → 下单 → 支付 → 发货 → 收货，逐步真实调用后端。</div>
+        <div class="spacer grow"></div>
+        <span class="meta" id="scenarioMeta"></span>
+        <button class="btn primary" id="btnRunScenario">开始执行</button>
+      </div>
+      <div class="card-body">
+        <div class="steps" id="steps"><div class="empty">点击「开始执行」跑一遍完整交易闭环</div></div>
+      </div>
+    </div>
+
+    <!-- 5 历史 -->
+    <div class="card">
+      <div class="card-head">
+        <div class="card-title"><span class="idx">5</span>请求历史</div>
+        <div class="spacer grow"></div>
+        <span class="meta" id="historyMeta">0 条</span>
+        <button class="btn" id="btnClearHistory">清空</button>
+      </div>
+      <div class="card-body">
+        <div class="history" id="history"><div class="empty">暂无请求</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* =========================================================================
+ * 莱克商城后端 · 接口调试台
+ * 纯静态单文件，由 server/index.js 托管在 /debug
+ * 点位清单与示例参数均从 GET /api/routes 实时拉取 —— 后端加了新点位，这里自动出现
+ * ========================================================================= */
+(function () {
+  'use strict';
+
+  var API = location.origin;
+  var LS_TOKEN = 'lexy_debug_token';
+  var LS_VARS = 'lexy_debug_vars';
+
+  /* 变量池默认值：用种子数据里的真实商品与 SKU，保证首次打开就能直接发请求 */
+  var VAR_DEFAULTS = {
+    goodsId: 'g1001',
+    skuId: 'g1001-01',
+    cartItemId: '',
+    addressId: '',
+    orderId: '',
+    orderNo: '',
+    couponId: '',
+    // 以下给后台控制台（/api/admin/*）用，多数能在发过列表请求后自动回填
+    userId: '',
+    templateId: 'ct_500_300',
+    commentId: '',
+    categoryId: 'c101',
+    mediaName: '',
+    versionId: '',
+    // 装修台「新建页面」的自定义页标识（page/rename、page/delete 用）
+    pageKey: ''
+  };
+
+  var state = {
+    routes: [],
+    current: null,
+    token: localStorage.getItem(LS_TOKEN) || '',
+    vars: Object.assign({}, VAR_DEFAULTS, safeParse(localStorage.getItem(LS_VARS))),
+    history: [],
+    lastResp: null,
+    lastReq: null,
+    filter: ''
+  };
+
+  /* ----------------------------- 小工具 ----------------------------- */
+  function $(id) { return document.getElementById(id); }
+  function el(tag, cls, html) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (html != null) n.innerHTML = html;
+    return n;
+  }
+  function safeParse(s) { try { return JSON.parse(s); } catch (e) { return {}; } }
+  function esc(s) {
+    return String(s).replace(/[&<>]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c];
+    });
+  }
+  function msgHtml(m) { return esc(m == null ? '' : m); }
+
+  /** JSON 语法高亮（先转义实体，再按 token 着色） */
+  function hl(json) {
+    return esc(json)
+      .replace(/"([^"\\]*(?:\\.[^"\\]*)*)"(\s*:)/g, '<span class="k">"$1"</span>$2')
+      .replace(/:\s*"([^"\\]*(?:\\.[^"\\]*)*)"/g, ': <span class="s">"$1"</span>')
+      .replace(/\b(true|false|null)\b/g, '<span class="b">$1</span>')
+      .replace(/(^|[\s,[:])(-?\d+(?:\.\d+)?)(?=[\s,\]}])/g, '$1<span class="n">$2</span>');
+  }
+
+  function timeStr() {
+    var d = new Date(), p = function (v) { return String(v).padStart(2, '0'); };
+    return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+  }
+
+  /* ----------------------------- 变量替换 ----------------------------- */
+  function applyVars(v) {
+    if (typeof v === 'string') {
+      return v.replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, function (m, name) {
+        var val = state.vars[name];
+        return (val === undefined || val === null || val === '') ? m : String(val);
+      });
+    }
+    if (Array.isArray(v)) return v.map(applyVars);
+    if (v && typeof v === 'object') {
+      var o = {};
+      Object.keys(v).forEach(function (k) { o[k] = applyVars(v[k]); });
+      return o;
+    }
+    return v;
+  }
+
+  /** 从响应里自动提取常用 ID 到变量池（第一个出现的生效） */
+  function captureVars(data) {
+    if (!data || typeof data !== 'object') return [];
+    var picked = [];
+    (function walk(o, depth) {
+      if (!o || typeof o !== 'object' || depth > 6) return;
+      Object.keys(o).forEach(function (k) {
+        var v = o[k];
+        if (v && typeof v === 'object') { walk(v, depth + 1); return; }
+        if (typeof v !== 'string' && typeof v !== 'number') return;
+        if (k === 'token' && typeof v === 'string' && v.length > 20) {
+          state.token = v;
+          localStorage.setItem(LS_TOKEN, v);
+          picked.push('token');
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(VAR_DEFAULTS, k) && !isBlank(state.vars[k])) {
+          // 已有人工确认过的值时不覆盖，避免被列表里的首条数据冲掉
+          return;
+        }
+        if (Object.prototype.hasOwnProperty.call(VAR_DEFAULTS, k)) {
+          state.vars[k] = String(v);
+          picked.push(k);
+        }
+      });
+    })(data, 0);
+    if (picked.length) persistVars();
+    return picked;
+  }
+  function isBlank(v) { return v === undefined || v === null || v === ''; }
+  function persistVars() { localStorage.setItem(LS_VARS, JSON.stringify(state.vars)); }
+
+  /* ----------------------------- 请求 ----------------------------- */
+  function api(method, path, opt) {
+    opt = opt || {};
+    var url = API + path;
+    var qp = opt.query || {};
+    var qs = new URLSearchParams();
+    Object.keys(qp).forEach(function (k) {
+      var v = qp[k];
+      if (v === undefined || v === null || v === '') return;
+      qs.append(k, typeof v === 'object' ? JSON.stringify(v) : String(v));
+    });
+    var useQuery = method === 'GET' || method === 'DELETE';
+    if (useQuery && qs.toString()) url += '?' + qs.toString();
+
+    var headers = {};
+    var body;
+    if (method !== 'GET' && opt.body !== undefined && opt.body !== null) {
+      headers['Content-Type'] = 'application/json';
+      body = JSON.stringify(opt.body);
+    }
+    if (opt.auth !== false && state.token) headers.Authorization = 'Bearer ' + state.token;
+
+    var t0 = performance.now();
+    return fetch(url, { method: method, headers: headers, body: body })
+      .then(function (res) { return res.text().then(function (text) { return { res: res, text: text }; }); })
+      .then(function (r) {
+        var ms = Math.round(performance.now() - t0);
+        var json = null;
+        try { json = JSON.parse(r.text); } catch (e) { /* 非 JSON */ }
+        return {
+          method: method, path: path, url: url,
+          httpStatus: r.res.status, ms: ms, bytes: r.text.length,
+          json: json, text: r.text
+        };
+      });
+  }
+
+  /* ----------------------------- 分组 ----------------------------- */
+  var GROUPS = [
+    { prefix: '/api/health', name: '运维' },
+    { prefix: '/api/routes', name: '运维' },
+    { prefix: '/api/auth', name: '鉴权与用户' },
+    { prefix: '/api/user', name: '鉴权与用户' },
+    { prefix: '/api/home', name: '首页与商品' },
+    { prefix: '/api/goods', name: '首页与商品' },
+    { prefix: '/api/cart', name: '购物车' },
+    { prefix: '/api/order', name: '交易' },
+    { prefix: '/api/pay', name: '支付' },
+    { prefix: '/api/address', name: '用户资产 · 地址' },
+    { prefix: '/api/coupon', name: '用户资产 · 优惠券' },
+    { prefix: '/api/favorite', name: '用户资产 · 收藏与足迹' },
+    { prefix: '/api/footprint', name: '用户资产 · 收藏与足迹' }
+  ];
+  function groupOf(p) {
+    for (var i = 0; i < GROUPS.length; i++) {
+      if (p === GROUPS[i].prefix || p.indexOf(GROUPS[i].prefix + '/') === 0) return GROUPS[i].name;
+    }
+    return '其他';
+  }
+
+  /* ----------------------------- 渲染：点位列表 ----------------------------- */
+  function renderRoutes() {
+    var host = $('routes');
+    host.innerHTML = '';
+    var kw = state.filter.trim().toLowerCase();
+    var groups = {};
+    var order = [];
+    state.routes.forEach(function (r) {
+      if (kw && (r.path + ' ' + r.desc).toLowerCase().indexOf(kw) === -1) return;
+      var g = groupOf(r.path);
+      if (!groups[g]) { groups[g] = []; order.push(g); }
+      groups[g].push(r);
+    });
+    if (!order.length) {
+      host.appendChild(el('div', 'empty', '没有匹配的接口'));
+      return;
+    }
+    order.forEach(function (g) {
+      var wrap = el('div', 'grp');
+      wrap.appendChild(el('div', 'grp-title', msgHtml(g) + '<span>' + groups[g].length + '</span>'));
+      groups[g].forEach(function (r) {
+        var item = el('div', 'r');
+        if (state.current && state.current.method === r.method && state.current.path === r.path) item.className += ' active';
+        item.innerHTML =
+          '<span class="m ' + r.method + '">' + r.method + '</span>' +
+          '<span class="p">' + esc(r.path.replace('/api', '')) + '</span>' +
+          (r.dev ? '<span class="pin">联调</span>' : '') +
+          (r.auth ? '<span class="lock">🔒</span>' : '');
+        item.title = r.desc;
+        item.onclick = function () { selectRoute(r); };
+        wrap.appendChild(item);
+      });
+      host.appendChild(wrap);
+    });
+  }
+
+  /* ----------------------------- 渲染：参数区 ----------------------------- */
+  function selectRoute(r) {
+    state.current = r;
+    $('method').value = r.method;
+    $('path').value = r.path;
+    $('useAuth').checked = !!r.auth;
+
+    var note = r.note ? '<b>说明：</b>' + msgHtml(r.note) : '';
+    var authTip = r.auth ? ' <span class="pill warn">需登录</span>' : ' <span class="pill info">免登录</span>';
+    $('routeInfo').innerHTML = '<b>' + esc(r.desc || r.path) + '</b>' + authTip +
+      (note ? '<br>' + note : '') +
+      (r.auth && !state.token ? '<br><b style="color:#b3271e">当前未登录，请先调用 POST /api/auth/login 获取 token。</b>' : '');
+
+    var q = r.sample ? r.sample.query : null;
+    var b = r.sample ? r.sample.body : null;
+    $('queryWrap').style.display = q ? '' : 'none';
+    $('bodyWrap').style.display = b ? '' : 'none';
+    renderQuery(q || {});
+    $('body').value = b ? JSON.stringify(b, null, 2) : '';
+    $('body').className = 'editor';
+    $('bodyHint').textContent = b ? '' : '';
+    markBodyDirty();
+    renderRoutes();
+  }
+
+  function renderQuery(obj) {
+    var host = $('queryRows');
+    host.innerHTML = '';
+    var keys = Object.keys(obj || {});
+    if (!keys.length) addQueryRow('', '');
+    keys.forEach(function (k) {
+      addQueryRow(k, typeof obj[k] === 'object' ? JSON.stringify(obj[k]) : obj[k]);
+    });
+  }
+  function addQueryRow(k, v) {
+    var row = el('div', 'kv');
+    var a = el('input', 'k'); a.value = k == null ? '' : k; a.placeholder = '参数名';
+    var b = el('input', 'v'); b.value = v == null ? '' : v; b.placeholder = '参数值（支持 {{变量}}）';
+    var x = el('button', 'x', '×');
+    x.onclick = function () { row.remove(); };
+    row.appendChild(a); row.appendChild(b); row.appendChild(x);
+    $('queryRows').appendChild(row);
+  }
+  function readQuery() {
+    var out = {};
+    [].slice.call($('queryRows').querySelectorAll('.kv')).forEach(function (row) {
+      var k = row.querySelector('.k').value.trim();
+      var v = row.querySelector('.v').value;
+      if (!k) return;
+      out[k] = v === '' ? '' : v;
+    });
+    return out;
+  }
+
+  function markBodyDirty() {
+    var ta = $('body');
+    if (!ta.value.trim()) { ta.className = 'editor'; $('bodyHint').textContent = ''; return; }
+    var ok = true;
+    try { JSON.parse(ta.value); } catch (e) { ok = false; }
+    ta.className = 'editor' + (ok ? '' : ' bad');
+    $('bodyHint').textContent = ok ? 'JSON 合法' : 'JSON 格式有误：' + '';
+    $('bodyHint').style.color = ok ? '#0b7a44' : '#b3271e';
+  }
+
+  /* ----------------------------- 渲染：变量池 ----------------------------- */
+  function renderVars() {
+    var host = $('vars');
+    host.innerHTML = '';
+    Object.keys(VAR_DEFAULTS).forEach(function (k) {
+      var chip = el('div', 'varchip');
+      if (!isBlank(state.vars[k])) chip.className += ' ok';
+      chip.appendChild(el('span', null, k));
+      var inp = document.createElement('input');
+      inp.value = state.vars[k] || '';
+      inp.placeholder = '未设置';
+      inp.oninput = function () {
+        state.vars[k] = inp.value;
+        chip.className = 'varchip' + (inp.value ? ' ok' : '');
+        persistVars();
+        updateTokenStat();
+      };
+      chip.appendChild(inp);
+      host.appendChild(chip);
+    });
+  }
+  function updateTokenStat() {
+    var t = state.vars.token || state.token;
+    $('statToken').textContent = t ? (String(state.token).slice(0, 10) + '…') : '未登录';
+  }
+
+  /* ----------------------------- 发送 ----------------------------- */
+  function readRequest() {
+    var method = $('method').value;
+    var path = $('path').value.trim();
+    var query = readQuery();
+    var body = null;
+    if ($('bodyWrap').style.display !== 'none' && $('body').value.trim()) {
+      try { body = JSON.parse($('body').value); }
+      catch (e) { return { error: 'Body 不是合法 JSON，请先修正（可点「格式化」查看问题）' }; }
+    }
+    return { method: method, path: path, query: query, body: body };
+  }
+
+  function send(silent) {
+    var req = readRequest();
+    if (req.error) { alert(req.error); return Promise.resolve(null); }
+    if (!req.path) { alert('请先填写接口路径'); return Promise.resolve(null); }
+
+    var method = req.method;
+    var payload = {
+      query: applyVars(req.query),
+      body: applyVars(req.body)
+    };
+    var useAuth = $('useAuth').checked;
+
+    var btn = $('btnSend');
+    btn.disabled = true; btn.textContent = '请求中…';
+    if (!silent) $('respOut').innerHTML = '<div class="empty">请求中…</div>';
+
+    return api(method, req.path, { query: payload.query, body: payload.body, auth: useAuth })
+      .then(function (r) {
+        state.lastResp = r;
+        state.lastReq = { method: method, path: req.path, query: payload.query, body: payload.body, auth: useAuth };
+        var captured = r.json && r.json.data ? captureVars(r.json.data) : [];
+        pushHistory(r);
+        if (!silent) renderResponse(r, captured);
+        return r;
+      })
+      .catch(function (e) {
+        var fake = { method: method, path: req.path, httpStatus: 'ERR', ms: 0, bytes: 0, json: null, text: String(e && e.message || e), error: true };
+        state.lastResp = fake;
+        pushHistory(fake);
+        if (!silent) renderResponse(fake, []);
+        return fake;
+      })
+      .then(function (r) {
+        btn.disabled = false; btn.textContent = '发送（Ctrl+Enter）';
+        return r;
+      });
+  }
+
+  function renderResponse(r, captured) {
+    var okBiz = r.json && r.json.code === 0;
+    var st = $('respStatus');
+    var cls = r.error ? 'bad' : (r.httpStatus === 200 && okBiz ? 'ok' : 'bad');
+    var bizCls = okBiz ? 'ok' : 'bad';
+    st.innerHTML =
+      '<span class="pill ' + cls + '">HTTP ' + esc(r.httpStatus) + '</span>' +
+      '<span class="pill ' + bizCls + '">code ' + esc(r.json ? r.json.code : '-') + '</span>' +
+      (r.json && r.json.msg && r.json.msg !== 'ok' ? '<span class="pill warn">' + msgHtml(r.json.msg) + '</span>' : '') +
+      '<span class="meta">' + r.ms + ' ms</span>' +
+      '<span class="meta">' + r.bytes + ' B</span>' +
+      (captured && captured.length ? '<span class="meta">已写入变量：' + captured.join(' / ') + '</span>' : '');
+
+    if (r.json) {
+      $('respOut').innerHTML = hl(JSON.stringify(r.json, null, 2));
+    } else {
+      $('respOut').innerHTML = '<span style="color:#b3271e">' + esc(r.text || '无响应体') + '</span>';
+    }
+    updateTokenStat();
+  }
+
+  /* ----------------------------- 历史 ----------------------------- */
+  function pushHistory(r) {
+    state.history.unshift({
+      at: timeStr(), method: r.method, path: r.path,
+      httpStatus: r.httpStatus, code: r.json ? r.json.code : '-',
+      ms: r.ms, query: state.lastReq ? state.lastReq.query : {}, body: state.lastReq ? state.lastReq.body : null
+    });
+    if (state.history.length > 40) state.history.length = 40;
+    renderHistory();
+  }
+  function renderHistory() {
+    var host = $('history');
+    $('historyMeta').textContent = state.history.length + ' 条';
+    if (!state.history.length) { host.innerHTML = '<div class="empty">暂无请求</div>'; return; }
+    host.innerHTML = '';
+    state.history.forEach(function (h) {
+      var row = el('div', 'hrow');
+      var ok = h.httpStatus === 200 && h.code === 0;
+      row.innerHTML =
+        '<span class="hm ' + h.method + '">' + h.method + '</span>' +
+        '<span class="hp">' + esc(h.path) + '</span>' +
+        '<span class="hc">' + h.at + '</span>' +
+        '<span class="pill ' + (ok ? 'ok' : 'bad') + '" style="font-size:10.5px">' + esc(h.code) + '</span>' +
+        '<span class="hc">' + h.ms + 'ms</span>';
+      row.onclick = function () {
+        $('method').value = h.method;
+        $('path').value = h.path;
+        $('queryWrap').style.display = 'none';
+        $('bodyWrap').style.display = 'none';
+        if (h.query && Object.keys(h.query).length) {
+          $('queryWrap').style.display = '';
+          renderQuery(h.query);
+        }
+        if (h.body) {
+          $('bodyWrap').style.display = '';
+          $('body').value = JSON.stringify(h.body, null, 2);
+        }
+        markBodyDirty();
+      };
+      host.appendChild(row);
+    });
+  }
+
+  /* ----------------------------- cURL ----------------------------- */
+  function toCurl() {
+    var req = state.lastReq || readRequest();
+    if (!req || !req.path) return '';
+    var qp = req.query || {};
+    var pairs = Object.keys(qp).filter(function (k) { return !isBlank(qp[k]); })
+      .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(typeof qp[k] === 'object' ? JSON.stringify(qp[k]) : qp[k]); });
+    var url = API + req.path + ((req.method === 'GET' || req.method === 'DELETE') && pairs.length ? '?' + pairs.join('&') : '');
+    var lines = ["curl -X " + req.method + " '" + url + "'"];
+    if (req.method !== 'GET' && req.body) {
+      lines.push("  -H 'Content-Type: application/json'");
+      lines.push("  -d '" + JSON.stringify(req.body) + "'");
+    }
+    if (req.auth !== false && state.token) lines.push("  -H 'Authorization: Bearer " + state.token + "'");
+    return lines.join(' \\\n');
+  }
+
+  function copy(text) {
+    if (!text) { alert('暂无可复制内容'); return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { toast('已复制'); }, function () { fallbackCopy(text); });
+    } else { fallbackCopy(text); }
+  }
+  function fallbackCopy(text) {
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('已复制'); } catch (e) { alert(text); }
+    ta.remove();
+  }
+  function toast(msg) {
+    var t = el('div', null, msg);
+    t.style.cssText = 'position:fixed;left:50%;bottom:34px;transform:translateX(-50%);background:#1f2329;color:#fff;' +
+      'padding:8px 18px;border-radius:8px;font-size:12.5px;z-index:99;box-shadow:0 6px 20px rgba(0,0,0,.22)';
+    document.body.appendChild(t);
+    setTimeout(function () { t.remove(); }, 1500);
+  }
+
+  /* ----------------------------- 全链路场景 ----------------------------- */
+  var SCENARIO = [
+    { label: '登录换取 token', method: 'POST', path: '/api/auth/login',
+      body: function () { return { code: 'debug_' + Date.now() }; } },
+    { label: '新增收货地址（第一条自动为默认）', method: 'POST', path: '/api/address/save',
+      body: function () {
+        return { name: '张三', phone: '13800000000', province: '江苏省', city: '苏州市',
+          district: '姑苏区', detail: '示例路 1 号 101 室', isDefault: true };
+      } },
+    { label: '加入购物车', method: 'POST', path: '/api/cart/add',
+      body: function () { return { goodsId: '{{goodsId}}', skuId: '{{skuId}}', quantity: 1 }; } },
+    { label: '勾选购物车商品', method: 'PUT', path: '/api/cart/update',
+      body: function () { return { cartItemId: '{{cartItemId}}', quantity: 2, selected: true }; } },
+    { label: '结算下单（金额服务端重算）', method: 'POST', path: '/api/order/precreate',
+      body: function () { return { fromCart: true, addressId: '{{addressId}}', remark: '一键全链路调试' }; } },
+    { label: '模拟支付成功（走真实回调同路径）', method: 'POST', path: '/api/pay/mock-success',
+      body: function () { return { orderId: '{{orderId}}' }; } },
+    { label: '查询订单详情', method: 'GET', path: '/api/order/detail',
+      query: function () { return { orderId: '{{orderId}}' }; } },
+    { label: '发货', method: 'POST', path: '/api/order/ship',
+      body: function () { return { orderId: '{{orderId}}', company: '顺丰速运', no: 'SF' + Date.now() }; } },
+    { label: '确认收货', method: 'POST', path: '/api/order/confirm',
+      body: function () { return { orderId: '{{orderId}}' }; } }
+  ];
+
+  function renderSteps(results) {
+    var host = $('steps');
+    host.innerHTML = '';
+    SCENARIO.forEach(function (s, i) {
+      var r = results[i];
+      var step = el('div', 'step' + (r ? ' ' + r.state : ''));
+      step.id = 'step' + i;
+      step.innerHTML =
+        '<div class="no">' + (r && r.state === 'pass' ? '✓' : r && r.state === 'fail' ? '✕' : (i + 1)) + '</div>' +
+        '<div class="body">' +
+          '<div class="t">' +
+            '<span class="m ' + s.method + '">' + s.method + '</span>' +
+            '<span class="p">' + esc(s.path) + '</span>' +
+            '<span class="r">' + (r ? (r.text || '') : '待执行') + '</span>' +
+            '<span class="desc">' + esc(s.label) + '</span>' +
+          '</div>' +
+          '<div class="resp"></div>' +
+        '</div>';
+      if (r && r.json) {
+        step.querySelector('.resp').innerHTML = '<pre class="out" style="max-height:200px">' +
+          hl(JSON.stringify(r.json, null, 2)) + '</pre>';
+      }
+      step.onclick = function () { step.classList.toggle('open'); };
+      host.appendChild(step);
+    });
+  }
+
+  function runScenario() {
+    var t0 = performance.now();
+    var results = new Array(SCENARIO.length);
+    // 重置上一轮的链路变量，避免跨账号串数据（回到 VAR_DEFAULTS 的初始值）
+    Object.keys(VAR_DEFAULTS).forEach(function (k) { state.vars[k] = VAR_DEFAULTS[k]; });
+    persistVars(); renderVars();
+    renderSteps(results);
+    $('scenarioMeta').textContent = '执行中…';
+    var btn = $('btnRunScenario');
+    btn.disabled = true;
+
+    var chain = Promise.resolve();
+    SCENARIO.forEach(function (s, i) {
+      chain = chain.then(function () {
+        results[i] = { state: 'run', text: '请求中…' };
+        renderSteps(results);
+        var q = applyVars(s.query ? s.query() : {});
+        var b = applyVars(s.body ? s.body() : null);
+        return api(s.method, s.path, { query: q, body: b, auth: true }).then(function (r) {
+          var ok = r.httpStatus === 200 && r.json && r.json.code === 0;
+          if (r.json && r.json.data) captureVars(r.json.data);
+          results[i] = {
+            state: ok ? 'pass' : 'fail',
+            text: 'HTTP ' + r.httpStatus + ' / code ' + (r.json ? r.json.code : '-') + ' · ' + r.ms + 'ms' +
+              (ok ? '' : ' · ' + (r.json ? r.json.msg : r.text)),
+            json: r.json
+          };
+          // 同步到请求历史与响应面板
+          state.lastReq = { method: s.method, path: s.path, query: q, body: b, auth: true };
+          pushHistory(r);
+          renderSteps(results);
+          if (!ok) throw new Error('链路在第 ' + (i + 1) + ' 步中断：' + (r.json ? r.json.msg : '请求失败'));
+        });
+      });
+    });
+
+    chain.then(function () {
+      $('scenarioMeta').textContent = '全部通过 · 共 ' + Math.round(performance.now() - t0) + 'ms';
+      btn.disabled = false;
+      updateTokenStat(); renderVars();
+      toast('全链路 9 步全部通过');
+    }).catch(function (e) {
+      $('scenarioMeta').textContent = '中断：' + e.message;
+      btn.disabled = false;
+      updateTokenStat(); renderVars();
+    });
+  }
+
+  /* ----------------------------- 健康状态 ----------------------------- */
+  function refreshHealth() {
+    return api('GET', '/api/health', { auth: false }).then(function (r) {
+      var d = r.json && r.json.data;
+      var dot = $('dotHealth');
+      if (!d) {
+        dot.className = 'dot down';
+        $('healthText').textContent = '服务未响应';
+        return;
+      }
+      dot.className = 'dot up';
+      $('healthText').textContent = '服务运行中 · ' + d.uptime + 's';
+      $('statRoutes').textContent = d.routes;
+      $('statLogin').textContent = d.wechat.login === 'real' ? '真实接口' : '本地模拟';
+      $('statPay').textContent = d.wechat.pay === 'real' ? '真实接口' : '本地模拟';
+      if (d.jwtSecret !== 'custom') {
+        $('healthText').textContent += ' · JWT 为开发默认密钥';
+      }
+    }).catch(function () {
+      $('dotHealth').className = 'dot down';
+      $('healthText').textContent = '无法连接后端';
+    });
+  }
+
+  function loadRoutes() {
+    return api('GET', '/api/routes', { auth: false }).then(function (r) {
+      state.routes = (r.json && r.json.data && r.json.data.list) || [];
+      renderRoutes();
+      return state.routes.length;
+    });
+  }
+
+  /* ----------------------------- 事件绑定 ----------------------------- */
+  $('baseUrl').textContent = API;
+  $('search').oninput = function () { state.filter = this.value; renderRoutes(); };
+  $('btnReload').onclick = function () {
+    loadRoutes().then(function (n) { refreshHealth(); toast('已刷新 ' + n + ' 个点位'); });
+  };
+  $('btnSend').onclick = function () { send(false); };
+  $('btnScenario').onclick = function () {
+    $('scenarioCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    runScenario();
+  };
+  $('btnRunScenario').onclick = runScenario;
+  $('btnAddQuery').onclick = function () { addQueryRow('', ''); };
+  $('btnClearBody').onclick = function () { $('body').value = ''; markBodyDirty(); };
+  $('btnFormat').onclick = function () {
+    try {
+      $('body').value = JSON.stringify(JSON.parse($('body').value), null, 2);
+      markBodyDirty(); toast('已格式化');
+    } catch (e) { alert('JSON 格式有误，无法格式化'); }
+  };
+  $('body').oninput = markBodyDirty;
+  $('btnCopyCurl').onclick = function () { copy(toCurl()); };
+  $('btnCopyResp').onclick = function () {
+    var r = state.lastResp;
+    if (!r) { alert('还没有响应'); return; }
+    copy(r.json ? JSON.stringify(r.json, null, 2) : r.text);
+  };
+  $('btnClearToken').onclick = function () {
+    state.token = ''; localStorage.removeItem(LS_TOKEN);
+    updateTokenStat(); toast('已清除登录态');
+  };
+  $('btnResetVars').onclick = function () {
+    state.vars = Object.assign({}, VAR_DEFAULTS);
+    state.vars.token = state.token;
+    persistVars(); renderVars(); toast('变量池已重置');
+  };
+  $('btnClearHistory').onclick = function () { state.history = []; renderHistory(); };
+  $('method').onchange = function () {
+    var m = this.value;
+    $('bodyWrap').style.display = m === 'GET' ? 'none' : '';
+    $('queryWrap').style.display = m === 'GET' || m === 'DELETE' ? '' : '';
+  };
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); send(false); }
+  });
+
+  /* ----------------------------- 启动 ----------------------------- */
+  function boot() {
+    renderVars();
+    updateTokenStat();
+    renderSteps([]);
+    refreshHealth();
+    loadRoutes().then(function (n) {
+      // 默认选中首页聚合，打开即可点「发送」验证连通
+      var first = state.routes.filter(function (r) { return r.path === '/api/home'; })[0] || state.routes[0];
+      if (first) selectRoute(first);
+      console.log('[调试台] 已加载 ' + n + ' 个点位');
+    });
+    setInterval(refreshHealth, 30000);
+  }
+  boot();
+
+  // 便于在控制台里直接调用
+  window.__debug = { state: state, api: api, send: send, runScenario: runScenario, selectRoute: selectRoute };
+})();
+</script>
+</body>
+</html>

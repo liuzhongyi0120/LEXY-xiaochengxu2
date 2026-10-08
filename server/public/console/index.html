@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>莱克商城 · 后台控制台</title>
+<!-- 资源一律用「绝对路径」：页面路由 /console 没有尾斜杠，
+     ./console.core.js 会被解析成 /console.core.js（404）。
+     装修台 /admin 用的就是 /admin/xxx 绝对路径，所以一直正常。 -->
+<link rel="stylesheet" href="/console/console.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <b>LEXY 商城后台</b>
+      <span>莱克电气 · 企业商城小程序</span>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="side-foot">
+      <div>装修台 <a href="/admin" style="color:#fff">/admin</a></div>
+      <div style="margin-top:3px">调试台 <a href="/debug" style="color:#fff">/debug</a></div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <header class="top">
+      <h1 id="pgTitle">数据概览</h1>
+      <span class="crumb" id="pgCrumb"></span>
+      <div class="grow"></div>
+      <span class="meta" id="topMeta"></span>
+      <button class="btn sm" id="btnReload" title="重新拉取当前页面数据">⟳ 刷新</button>
+    </header>
+    <main class="body" id="body"></main>
+  </div>
+</div>
+
+<div id="layer"></div>
+
+<script src="/console/console.core.js"></script>
+<script src="/console/console.modules.js"></script>
+<script>boot();</script>
+</body>
+</html>

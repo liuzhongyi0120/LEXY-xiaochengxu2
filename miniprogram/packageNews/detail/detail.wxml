@@ -1,0 +1,174 @@
+<view class="pg" wx:if="{{page}}">
+  <!-- 页头 -->
+  <view class="hd" wx:if="{{page.subtitle}}">
+    <text class="hd-t">{{page.title}}</text>
+    <text class="hd-s">{{page.subtitle}}</text>
+  </view>
+
+  <!-- 二级栏目（横向滚动 + 吸顶） -->
+  <scroll-view
+    wx:if="{{page.tabs.length}}"
+    class="tabs"
+    scroll-x
+    enable-flex
+    scroll-with-animation
+    scroll-into-view="tab{{tabIndex}}"
+  >
+    <view class="tabs-in">
+      <view
+        wx:for="{{page.tabs}}"
+        wx:key="n"
+        id="tab{{index}}"
+        class="tab {{tabIndex === index ? 'tab-on' : ''}}"
+        data-i="{{index}}"
+        bindtap="onTab"
+      >
+        <text class="tab-t">{{item.n}}</text>
+        <view class="tab-bar" wx:if="{{tabIndex === index}}"></view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 内容 -->
+  <view class="bd">
+    <block wx:for="{{blocks}}" wx:key="idx" wx:for-item="b">
+      <!-- 单图 / 整宽长图 -->
+      <view
+        wx:if="{{b.t === 'img'}}"
+        id="blk{{index}}"
+        class="blk blk-img"
+        hover-class="{{b.lk ? 'blk-hover' : ''}}"
+        data-src="{{b.s}}"
+        data-title="{{b.cap}}"
+        data-lk="{{b.lk}}"
+        data-lv="{{b.lv}}"
+        bindtap="onTapBlock"
+      >
+        <image class="pic" src="{{b.s}}" mode="widthFix" lazy-load />
+        <view class="cap-row" wx:if="{{b.cap || b.lk}}">
+          <text class="cap">{{b.cap}}</text>
+          <text class="lk" wx:if="{{b.lk === 'note'}}">笔记</text>
+          <text class="lk lk-go" wx:elif="{{b.lk}}">查看详情 ›</text>
+        </view>
+      </view>
+
+      <!-- 一组整宽图（纵向排列） -->
+      <view wx:elif="{{b.t === 'imgs'}}" id="blk{{index}}" class="blk">
+        <image
+          wx:for="{{b.a}}"
+          wx:for-item="x"
+          wx:key="index"
+          class="pic"
+          src="{{x.s}}"
+          mode="widthFix"
+          lazy-load
+          data-src="{{x.s}}"
+          bindtap="onTapImage"
+        />
+      </view>
+
+      <!-- 宫格（源页面 cube 组件：按格定位，单元格为正方形） -->
+      <view wx:elif="{{b.t === 'cube'}}" id="blk{{index}}" class="blk cube" style="padding-bottom: {{100 * b.rows / b.cols}}%">
+        <view
+          wx:for="{{b.a}}"
+          wx:for-item="x"
+          wx:key="index"
+          class="cube-i"
+          style="left: {{x.x * 100 / b.cols}}%; top: {{x.y * 100 / b.rows}}%; width: {{x.w * 100 / b.cols}}%; height: {{x.h * 100 / b.rows}}%"
+        >
+          <image class="cube-pic" src="{{x.s}}" mode="aspectFill" lazy-load data-src="{{x.s}}" bindtap="onTapImage" />
+        </view>
+      </view>
+
+      <!-- 两列图文卡片 -->
+      <view wx:elif="{{b.t === 'cards'}}" id="blk{{index}}" class="blk cards">
+        <view
+          wx:for="{{b.a}}"
+          wx:for-item="x"
+          wx:key="index"
+          class="card"
+          hover-class="card-hover"
+          data-src="{{x.s}}"
+          data-title="{{x.t}}"
+          data-lk="{{x.lk}}"
+          data-lv="{{x.lv}}"
+          bindtap="onTapCard"
+        >
+          <view class="card-pic" style="padding-bottom: {{100 / b.ar}}%">
+            <image class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
+            <text class="card-tag" wx:if="{{x.lk === 'note'}}">笔记</text>
+          </view>
+          <text class="card-t" wx:if="{{x.t}}">{{x.t}}</text>
+        </view>
+      </view>
+
+      <!-- 店铺笔记列表（源站需登录，此处展示封面与标题） -->
+      <view wx:elif="{{b.t === 'notes'}}" id="blk{{index}}" class="blk cards">
+        <view
+          wx:for="{{b.a}}"
+          wx:for-item="x"
+          wx:key="index"
+          class="card"
+          hover-class="card-hover"
+          data-src="{{x.s}}"
+          data-title="{{x.t}}"
+          data-lk="note"
+          bindtap="onTapCard"
+        >
+          <view class="card-pic" style="padding-bottom: 75%">
+            <image class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
+            <text class="card-tag">笔记</text>
+          </view>
+          <text class="card-t" wx:if="{{x.t}}">{{x.t}}</text>
+        </view>
+      </view>
+
+      <!-- 小标题 -->
+      <view wx:elif="{{b.t === 'title'}}" id="blk{{index}}" class="blk sec">
+        <view class="sec-bar"></view>
+        <text class="sec-t">{{b.x}}</text>
+        <text class="sec-d" wx:if="{{b.d}}">{{b.d}}</text>
+      </view>
+
+      <!-- 视频 -->
+      <view wx:elif="{{b.t === 'video'}}" id="blk{{index}}" class="blk">
+        <video
+          class="video"
+          src="{{b.s}}"
+          poster="{{b.p}}"
+          object-fit="contain"
+          show-center-play-btn
+          enable-progress-gesture
+        ></video>
+        <text class="cap" wx:if="{{b.n}}">{{b.n}}</text>
+      </view>
+
+      <!-- 电梯导航（点击定位到对应板块） -->
+      <view wx:elif="{{b.t === 'anchor'}}" class="anchor">
+        <view
+          wx:for="{{b.a}}"
+          wx:for-item="x"
+          wx:key="index"
+          class="anchor-i"
+          hover-class="anchor-hover"
+          data-i="{{index}}"
+          bindtap="onAnchor"
+        >
+          <text>{{x}}</text>
+        </view>
+      </view>
+
+      <!-- 间隔 -->
+      <view wx:elif="{{b.t === 'space'}}" class="blk" style="height: {{b.h}}px"></view>
+    </block>
+
+    <view class="foot" wx:if="{{hasNote}}">
+      <text>标注「笔记」的条目在源站为店铺笔记，需登录后查看原文，此处展示其封面与标题。</text>
+    </view>
+    <view class="gap"></view>
+  </view>
+</view>
+
+<view class="empty" wx:else>
+  <text>内容加载中…</text>
+</view>
