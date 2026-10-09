@@ -900,6 +900,18 @@ function makeMp4Fixture(opt) {
 }
 
 const MP4_FIXTURE = makeMp4Fixture();
+/**
+ * 视频类断言的**基线**。
+ *
+ * ⚠️ 这里踩过一次：早期断言写死 `list.length === 1` / `kinds.video === 1` / 回收后 `=== 0`，
+ *    隐含假设「素材库里本来没有视频」。2026-10-09 把首页 4 个装修视频 + 资讯页 1 个视频
+ *    转存到本地素材库后，这 3 条断言集体变红 —— 而功能其实完全正常。
+ *    断言应当验证「自检自己那条视频的行为 + 自检是净零的」，
+ *    而不是「全库里只有我这一条」。
+ */
+const mvBase = await call('GET', '/api/media/list', { auth: false, query: { kind: 'video' }, silent: true });
+const videosBefore = (mvBase.data && mvBase.data.kinds && mvBase.data.kinds.video) || 0;
+
 const fdVideo = new FormData();
 fdVideo.append('file', new Blob([MP4_FIXTURE], { type: 'video/mp4' }), 'selfcheck-clip.mp4');
 const mvUp = await call('POST', '/api/media/upload', { form: fdVideo, auth: false });
@@ -934,15 +946,20 @@ const mvKindV = await call('GET', '/api/media/list', { auth: false, query: { kin
 const mvKindI = await call('GET', '/api/media/list', { auth: false, query: { kind: 'image' }, silent: true });
 assert('kind=video 只返回视频、kind=image 只返回图片（顶栏分档靠它）',
   mvKindV.ok && mvKindI.ok &&
-    (mvKindV.data.list || []).length === 1 && (mvKindV.data.list[0].name === mvItem.name) &&
+    // 验的是「分档过滤对不对」，不是「全库只有自检这一条视频」：
+    // video 档每条都是视频且**含**自检那条；image 档每条都是图片且**不含**自检那条。
+    (mvKindV.data.list || []).length >= 1 &&
+    (mvKindV.data.list || []).every((x) => x.kind === 'video') &&
+    (mvKindV.data.list || []).some((x) => x.name === mvItem.name) &&
+    (mvKindI.data.list || []).length >= 1 &&
     (mvKindI.data.list || []).every((x) => x.kind === 'image') &&
-    (mvKindI.data.list || []).length >= 1,
+    !(mvKindI.data.list || []).some((x) => x.name === mvItem.name),
   `video=${mvKindV.data && mvKindV.data.total} image=${mvKindI.data && mvKindI.data.total}`);
 
 assert('列表统计区分图片 / 视频上限（图片 5MB、视频 50MB）',
   mvKindV.ok && mvKindV.data.stat.maxBytes === 5 * 1024 * 1024 && mvKindV.data.stat.maxVideoBytes === 50 * 1024 * 1024 &&
-    (mvKindV.data.kinds || {}).video === 1,
-  mvKindV.data ? JSON.stringify({ img: mvKindV.data.stat.maxBytes, vid: mvKindV.data.stat.maxVideoBytes, kinds: mvKindV.data.kinds }) : '-');
+    (mvKindV.data.kinds || {}).video === videosBefore + 1,
+  mvKindV.data ? JSON.stringify({ img: mvKindV.data.stat.maxBytes, vid: mvKindV.data.stat.maxVideoBytes, kinds: mvKindV.data.kinds, before: videosBefore }) : '-');
 
 const fdFakeMp4 = new FormData();
 fdFakeMp4.append('file', new Blob([Buffer.from('这只是文本，不是视频流', 'utf8')], { type: 'video/mp4' }), 'fake.mp4');
@@ -954,8 +971,10 @@ assert('伪装成 mp4 的文本同样被拒（视频也是按魔数判定）',
 await call('POST', '/api/media/delete', { auth: false, body: { name: mvItem && mvItem.name, force: 1 }, silent: true });
 const mvEnd = await call('GET', '/api/media/list', { auth: false, query: { kind: 'video' }, silent: true });
 assert('视频自检素材已回收（未留下测试视频）',
-  mvEnd.ok && (mvEnd.data.list || []).length === 0 && (mvEnd.data.kinds || {}).video === 0,
-  `剩余视频 ${mvEnd.data && mvEnd.data.kinds && mvEnd.data.kinds.video}`);
+  mvEnd.ok &&
+    !(mvEnd.data.list || []).some((x) => x.name === (mvItem && mvItem.name)) &&
+    (mvEnd.data.kinds || {}).video === videosBefore,
+  `剩余视频 ${mvEnd.data && mvEnd.data.kinds && mvEnd.data.kinds.video}（自检前 ${videosBefore}）`);
 
 /* 15.7 小程序配置文件静态校验（抓「只有开发者工具才会报」的配置错误） */
 const MP_ROOT = join(__dirname, '..', '..', 'miniprogram');
