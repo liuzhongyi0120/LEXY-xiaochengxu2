@@ -13,7 +13,7 @@
  *    接入真实商品库后，把 onTapGoods 的预览逻辑替换为商品详情跳转即可。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-09 12:59:40（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-09 13:44:36（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -336,21 +336,21 @@ const PRODUCT_BRANDS = [
             id: "lexy-1-2",
             model: "S9 Max",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/12/FpnR4wiWr7c6rwCtbKQOcJ3iKFlp.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524125208_wq8k",
             yzId: "2oe54t9wriqjqah"
           },
           {
             id: "lexy-1-3",
             model: "S8",
             image: "https://img01.yzcdn.cn/upload_files/2025/09/15/Flq7-V_UQ9S6PJtXtihYZfQ789v0.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524127132_x80v",
             yzId: "3npcxabk2u3zaxj"
           },
           {
             id: "lexy-1-4",
             model: "H5",
             image: "https://img01.yzcdn.cn/upload_files/2026/03/31/FjfKOnDS9ccssxtsBluom43LsUXp.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524128415_kzuh",
             yzId: "1y7tschyv4mcmzv"
           }
         ]
@@ -364,21 +364,21 @@ const PRODUCT_BRANDS = [
             id: "lexy-2-1",
             model: "U7",
             image: "https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524129404_76qp",
             yzId: "1yaatujlfrwomum"
           },
           {
             id: "lexy-2-2",
             model: "U5",
             image: "https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524129404_76qp",
             yzId: "1yaatujlfrwomum"
           },
           {
             id: "lexy-2-3",
             model: "U3",
             image: "https://img01.yzcdn.cn/upload_files/2024/10/23/FmwdANScv22qOUTxw7Q3jGA1EnaU.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524129404_76qp",
             yzId: "1yaatujlfrwomum"
           }
         ]
@@ -392,28 +392,28 @@ const PRODUCT_BRANDS = [
             id: "lexy-3-1",
             model: "F701",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FojMRjEyLfK2bvq_Xs0SB2NdIyxo.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524130973_p3ef",
             yzId: "3epcncg0n3b0m13"
           },
           {
             id: "lexy-3-2",
             model: "F503",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FpBGxe1IUNELPWyViS4rqmdV9iUE.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524132427_2qfp",
             yzId: "2fxvf26rje8hi1f"
           },
           {
             id: "lexy-3-3",
             model: "F402",
             image: "https://img01.yzcdn.cn/upload_files/2024/09/02/FmqUYSralGqTctMVG0wH7X6O3c2j.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524133315_td5e",
             yzId: "2xgl1uupfs9aeqy"
           },
           {
             id: "lexy-3-4",
             model: "F305",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FvJdPFKBFGs9g4z90unm1IdyFsh2.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524134837_8p5n",
             yzId: "3eo4b4f5qiw5yl0"
           }
         ]
@@ -427,28 +427,28 @@ const PRODUCT_BRANDS = [
             id: "lexy-4-1",
             model: "DH650",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/FnnBw93sMhFR4aDDxYI_-juXhqTL.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524135926_wlaa",
             yzId: "1y7ub3q71cnzq"
           },
           {
             id: "lexy-4-2",
             model: "DH350",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fg2vaP3wOk-0TSj3HN-4OPZ99ubk.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524137197_hkrw",
             yzId: "2xlilvs4t5n4m"
           },
           {
             id: "lexy-4-3",
             model: "DH200",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fmjt9H5C1Mpl40uBiTZ2jL5N6wVh.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524138043_aoax",
             yzId: "3nj7didd0fsee"
           },
           {
             id: "lexy-4-4",
             model: "DH180",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/FtkqbdSYdPcurK28-u_lejPooyIz.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524139121_ncpv",
             yzId: "3f0f873ufjq3q"
           }
         ]
@@ -462,28 +462,28 @@ const PRODUCT_BRANDS = [
             id: "lexy-5-1",
             model: "K9Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/FnlRhVhmau19DCuj4GmJaobKU_cE.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524140352_i4vk",
             yzId: "2fp90b5eqvybqla"
           },
           {
             id: "lexy-5-2",
             model: "K8Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fm-cxiBjfRZX1KsmAd9KIjQAOVos.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524141704_f4t7",
             yzId: "2xj1eajjazpeezo"
           },
           {
             id: "lexy-5-3",
             model: "K6Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fukc0GQ_e7u7hMRItEPMv0R1IzI5.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524142815_7yl4",
             yzId: "1y6lsfdfxgfzqci"
           },
           {
             id: "lexy-5-4",
             model: "K5Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fljryg1yz5a5CCWaUo9i2k7np-bi.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524144256_yrms",
             yzId: "3nrswwqbhdmrqik"
           }
         ]
@@ -497,14 +497,14 @@ const PRODUCT_BRANDS = [
             id: "lexy-6-1",
             model: "F8",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FjdlbJMsJF-zgEk2f0zy7sOgjJHK.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524145595_a9bk",
             yzId: "2x96thdtxt1c6"
           },
           {
             id: "lexy-6-2",
             model: "F6",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FgVnlHGKtX0Y9gesfAAaeUhemmg8.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524146881_26zx",
             yzId: "36ctiksl11k7a40"
           }
         ]
@@ -518,21 +518,21 @@ const PRODUCT_BRANDS = [
             id: "lexy-7-1",
             model: "M9",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FtkTuoukoSuOUR80HRKnAgnGFe21.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524148642_qnms",
             yzId: "3nvhrwex6ltaegb"
           },
           {
             id: "lexy-7-2",
             model: "M7",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/24/Fl1eE8P3zPUmYL0YxRUBp2uCEFWc.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524150427_1dge",
             yzId: "276ki4fm3ko2un5"
           },
           {
             id: "lexy-7-3",
             model: "C80",
             image: "https://img01.yzcdn.cn/upload_files/2026/08/11/Flw2f4bTOm_9aOLFZtwmpirhGBLs.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524151699_5edx",
             yzId: "2flkhpukjiyae76"
           }
         ]
@@ -546,28 +546,28 @@ const PRODUCT_BRANDS = [
             id: "lexy-8-1",
             model: "N7 Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524153433_n1ds",
             yzId: "2fmtd0hkillditm"
           },
           {
             id: "lexy-8-2",
             model: "N7",
             image: "https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524155048_ogys",
             yzId: "2g0cmc0u5p7vac9"
           },
           {
             id: "lexy-8-3",
             model: "N5 Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524155625_dtkq",
             yzId: "3nlmuhxzp61c647"
           },
           {
             id: "lexy-8-4",
             model: "N5",
             image: "https://img01.yzcdn.cn/upload_files/2023/05/30/FnOdMW3Ess2C2URoMXJ-JwVuMkhe.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524156197_qowf",
             yzId: "2oo0r7i1gm77a4l"
           }
         ]
@@ -581,21 +581,21 @@ const PRODUCT_BRANDS = [
             id: "lexy-9-1",
             model: "HU801",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fh-AqUmxQO31VRmDNjqnslzkcKz9.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524159269_1bb0",
             yzId: "3647gdeeixxcmlc"
           },
           {
             id: "lexy-9-2",
             model: "HU701",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fh898PuKTYwwOEmE6m_Qan2d0__p.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524160227_a92h",
             yzId: "2xlhe5qd0w12u"
           },
           {
             id: "lexy-9-3",
             model: "HU301",
             image: "https://img01.yzcdn.cn/upload_files/2023/10/13/Fva-SHmiuHq0BXrOBDX0eyn8RH3R.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524161202_op43",
             yzId: "36acb4s5z2v5i"
           }
         ]
@@ -615,28 +615,28 @@ const PRODUCT_BRANDS = [
             id: "biquan-1-1",
             model: "RT801",
             image: "https://img01.yzcdn.cn/upload_files/2024/12/20/FiwvJA9VYKmwpeVPUcuUHiWmsGH_.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524603243_sdtu",
             yzId: "27bi1z8sivotywt"
           },
           {
             id: "biquan-1-2",
             model: "RT702",
             image: "https://img01.yzcdn.cn/upload_files/2025/07/09/FlJeBswRNWd2j7EAGQyZqlZqYle7.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524604590_5gfg",
             yzId: "26xyfxxmbm79iog"
           },
           {
             id: "biquan-1-3",
             model: "T5 系列",
             image: "https://img01.yzcdn.cn/upload_files/2025/09/18/FpBoSUJzf7Hwx63f5fsw7LLP7rhQ.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524605600_4j67",
             yzId: "3eo67kl483wzabp"
           },
           {
             id: "biquan-1-4",
             model: "T5Max",
             image: "https://img01.yzcdn.cn/upload_files/2025/12/18/FghNaldM1oL1pkUn01jPcPbn85Fh.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524606775_fenp",
             yzId: "2orpm779cb2li7t"
           }
         ]
@@ -650,42 +650,42 @@ const PRODUCT_BRANDS = [
             id: "biquan-2-1",
             model: "R803",
             image: "https://img01.yzcdn.cn/upload_files/2024/09/03/Fp9zYV7cHr9YOh5DzOcO0NsK1oZA.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524608116_wqip",
             yzId: "3ne8fptryrxs6ct"
           },
           {
             id: "biquan-2-2",
             model: "G5",
             image: "https://img01.yzcdn.cn/upload_files/2025/07/09/FmWIa6Ce1PAXEhtEsmKVJllpBapQ.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524609541_iy4o",
             yzId: "2oqf0o1bwyfxi4e"
           },
           {
             id: "biquan-2-3",
             model: "R702",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/06/FjWf-30PhfYy-7ELe3Z9pnYrgv1I.jpg!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524610978_cgbx",
             yzId: "3epd604zka6ue"
           },
           {
             id: "biquan-2-4",
             model: "C5Pro",
             image: "https://img01.yzcdn.cn/upload_files/2025/08/19/Fr2BbQUJEi-0l_C6-TwDZR78vmCy.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524613616_h0om",
             yzId: "3ervf5nngwc4mhh"
           },
           {
             id: "biquan-2-5",
             model: "C5Plus",
             image: "https://img01.yzcdn.cn/upload_files/2025/05/14/Fk4qV94T1OvQmyBNtnB7t5pO0yXc.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524615445_sfdd",
             yzId: "2oqhg6tay37bacx"
           },
           {
             id: "biquan-2-6",
             model: "V6",
             image: "https://img01.yzcdn.cn/upload_files/2026/05/08/FmeQKzMYsEMqIshiWBj2a9dZ9IGn.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524617189_d46y",
             yzId: "2xfbui4wmrw46zs"
           }
         ]
@@ -699,14 +699,14 @@ const PRODUCT_BRANDS = [
             id: "biquan-3-1",
             model: "JSC-RL801",
             image: "https://img01.yzcdn.cn/upload_files/2025/05/21/FloS49Lts6XXDfq1Z52JyGBIuQw2.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524619964_isv4",
             yzId: "36csneaizinba9x"
           },
           {
             id: "biquan-3-2",
             model: "JSC-UL301",
             image: "https://img01.yzcdn.cn/upload_files/2025/05/20/FmDm01gQoG9HiR2Fzn6-DXUprtNW.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524621509_zpqe",
             yzId: "35z8p4t1tdsdisu"
           }
         ]
@@ -726,28 +726,28 @@ const PRODUCT_BRANDS = [
             id: "jimi-1-1",
             model: "M7Ultra",
             image: "https://img01.yzcdn.cn/upload_files/2025/02/11/FkRcNDJuKJIxOSXPsyCd24Rbbe2m.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524623060_z6sb",
             yzId: "275bt36ex22eefz"
           },
           {
             id: "jimi-1-2",
             model: "M7 Pro",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/02/FklZ_76ViIQOyRqecTvbrWMyRhFE.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524624571_zeay",
             yzId: "26u75fftdaswmz0"
           },
           {
             id: "jimi-1-3",
             model: "B6 Pro",
             image: "https://img01.yzcdn.cn/upload_files/2024/09/03/FqdkUaI0hmZ6m-UhJFeT3CtV3yUq.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524625909_jbbs",
             yzId: "1y5dshb9ha2tyjc"
           },
           {
             id: "jimi-1-4",
             model: "M5",
             image: "https://img01.yzcdn.cn/upload_files/2023/06/02/Fi60unEUKxU9vReKZ7Q4mdxMHaid.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524626874_vd4p",
             yzId: "2ou6b2yrk4qyeu7"
           }
         ]
@@ -767,28 +767,28 @@ const PRODUCT_BRANDS = [
             id: "kaboshi-1-1",
             model: "Grace 200",
             image: "https://img01.yzcdn.cn/upload_files/2025/03/28/FmyWJnn9YEgPQi4tQ5r1BT6Jrl7S.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524628569_nvh7",
             yzId: "2xk7o01k7ai2unp"
           },
           {
             id: "kaboshi-1-2",
             model: "H1S",
             image: "https://img01.yzcdn.cn/upload_files/2026/08/28/FoJQki6IQ5g6qvip3qPtvfSKaF-y.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524629713_aa7s",
             yzId: "2x7xfmk0rsh9ixi"
           },
           {
             id: "kaboshi-1-3",
             model: "HOT 300",
             image: "https://img01.yzcdn.cn/upload_files/2025/05/22/Fj46kBroh4ddNy83IetSSjcD-ToD.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524631618_c674",
             yzId: "2x49ftbv6d5zqni"
           },
           {
             id: "kaboshi-1-4",
             model: "HOT 100",
             image: "https://img01.yzcdn.cn/upload_files/2025/03/07/FpFW0m03x6w69n_tek9KMqNCqVSj.png!middle.webp",
-            link: "",
+            link: "/packageGoods/detail/detail?id=g_1791524632667_du0l",
             yzId: "2fvf2qvnoqujqdj"
           }
         ]
