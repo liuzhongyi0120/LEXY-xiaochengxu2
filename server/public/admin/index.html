@@ -8,7 +8,9 @@
 </head>
 <body>
 
-<!-- ============================ 顶栏（对标有赞：退出编辑器 / 正在装修 / 预览 · 存至草稿 · 立即发布） ============================ -->
+<!-- ============================ 顶栏（对标有赞：退出编辑器 / 正在装修 / 预览 · 存至草稿 · 生成代码） ============================ -->
+<!-- ⚠️ 按钮叫「生成代码」而不是「立即发布」：它写回的是代码包里的 replica.js，
+     已发布的小程序不会因此立刻更新，还需要在微信开发者工具上传并发布新版本。 -->
 <header class="topbar mode-list" id="topbar">
   <div class="tb-left">
     <span class="tb-brand">LEXY 店铺装修台</span>
@@ -22,13 +24,17 @@
     <span class="tb-tag tb-edit-only" id="edPageTag">内置页</span>
   </div>
   <div class="tb-right">
+    <!-- 管理员身份：未登录时所有 /api/decorate/*、/api/media/* 都会 401 -->
+    <span class="tb-tag" id="tbWho">未登录</span>
+    <button class="tb-btn" id="btnWho" title="使用管理员口令或长期令牌登录">登录</button>
     <span class="tb-dirty tb-edit-only" id="edDirty">无未保存改动</span>
     <button class="tb-btn tb-edit-only" id="btnKeys" title="键盘快捷键（Ctrl / ⌘ + K）">?</button>
     <button class="tb-btn tb-edit-only" id="btnDiff">查看变更</button>
     <button class="tb-btn tb-edit-only" id="btnVersions">版本</button>
     <button class="tb-btn tb-edit-only" id="btnDiscard">丢弃草稿</button>
     <button class="tb-btn tb-edit-only" id="btnSave">存至草稿</button>
-    <button class="tb-btn primary tb-edit-only" id="btnPublish">立即发布</button>
+    <button class="tb-btn primary tb-edit-only" id="btnPublish"
+      title="把当前编辑内容写回 miniprogram/config/replica.js（生成小程序代码）。之后还需在微信开发者工具「上传」并在公众平台发布新版本，真机才会更新。">生成代码</button>
   </div>
 </header>
 
@@ -37,7 +43,7 @@
   <div class="list-top">
     <div class="lt-title">
       <b>店铺页面</b>
-      <span class="muted">共 <b id="pageCount">0</b> 个页面 · 装修后点「发布」写回小程序</span>
+      <span class="muted">共 <b id="pageCount">0</b> 个页面 · 改完点「生成代码」写回源码，再上传发布小程序新版本才生效</span>
     </div>
     <div class="spacer"></div>
     <div class="stat" id="statTarget">目标文件：—</div>
@@ -45,7 +51,8 @@
     <div class="stat" id="statCustom">自定义页 — / —</div>
     <nav class="topnav">
       <a href="/debug" target="_blank">接口调试台</a>
-      <a href="/" target="_blank">线上预览</a>
+      <!-- 「线上预览」这个名字不成立：/ 是本机后端渲染出来的本地效果，与已发布的小程序不是一回事 -->
+      <a href="/preview" target="_blank">本地效果预览（非线上）</a>
     </nav>
     <button class="btn" id="btnReload" title="重新拉取页面列表">刷新</button>
   </div>

@@ -11,6 +11,7 @@
  */
 
 const crypto = require('node:crypto');
+const { BizError, ERR } = require('./http');
 
 const WX_APPID = process.env.WX_APPID || '';
 const WX_SECRET = process.env.WX_SECRET || '';
@@ -25,7 +26,7 @@ const HAS_WX_PAY = !!(WX_APPID && WX_MCH_ID && WX_PAY_KEY);
  * @returns {Promise<{openid:string, sessionKey:string, mock:boolean}>}
  */
 async function code2Session(code) {
-  if (!code) throw new Error('缺少登录凭证 code');
+  if (!code) throw new BizError('缺少登录凭证 code', ERR.PARAM);
 
   if (!HAS_WX_LOGIN) {
     // 本地模拟：同一个 code 稳定映射到同一个 openid，便于重复登录拿到同一账号

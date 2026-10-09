@@ -23,9 +23,10 @@ const fs = require('node:fs');
 const nodePath = require('node:path');
 const atomic = require('./atomicFile');
 const { BizError, ERR } = require('./http');
+const dataDir = require('./dataDir');
 
 /** 素材根目录（与数据同处 server/data，运维时一个目录备份即可） */
-const ROOT = nodePath.join(__dirname, '..', 'data', 'uploads');
+const ROOT = nodePath.join(dataDir.ROOT, 'uploads');
 const INDEX_FILE = nodePath.join(ROOT, 'index.json');
 
 /** 对外访问前缀（与 index.js 的静态服务一致） */
@@ -619,9 +620,9 @@ function list(opt) {
 function refs(name) {
   const url = URL_PREFIX + '/' + name;
   const files = [
-    { label: '商品库', file: nodePath.join(__dirname, '..', 'data', 'catalog.json') },
+    { label: '商品库', file: nodePath.join(dataDir.ROOT, 'catalog.json') },
     { label: '已发布', file: nodePath.join(__dirname, '..', '..', 'miniprogram', 'config', 'replica.js') },
-    { label: '草稿', file: nodePath.join(__dirname, '..', 'data', 'decorate', 'state.json') }
+    { label: '草稿', file: nodePath.join(dataDir.ROOT, 'decorate', 'state.json') }
   ];
   const out = [];
   files.forEach((f) => {

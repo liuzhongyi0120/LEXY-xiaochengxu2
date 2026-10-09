@@ -49,7 +49,7 @@
       <text>{{item.label}}</text>
       <text class="sort-arrow" wx:if="{{item.key === 'price'}}">{{sort === 'price' ? (priceAsc ? '↑' : '↓') : '↕'}}</text>
     </view>
-    <text class="sort-count" wx:if="{{!loading}}">共 {{list.length}} 件</text>
+    <text class="sort-count" wx:if="{{!loading}}">共 {{total}} 件</text>
   </view>
 
   <!-- ---------- 列表内容 ---------- -->
@@ -69,6 +69,14 @@
         <goods-card goods="{{item}}" bind:tap="onTapGoods" />
       </view>
     </view>
+
+    <!-- 加载失败：必须与「没有找到相关商品」分开，否则断网会被显示成「搜不到」 -->
+    <empty-state
+      wx:elif="{{loadFailed}}"
+      text="加载失败，请检查网络后重试"
+      buttonText="重新加载"
+      bind:action="onRetryLoad"
+    />
 
     <!-- 空状态 -->
     <empty-state

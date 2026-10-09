@@ -13,6 +13,7 @@ const assetRoutes = require('./asset');
 const decorateRoutes = require('./decorate');
 const mediaRoutes = require('./media');
 const adminRoutes = require('./admin');
+const adminAuth = require('../lib/adminAuth');
 const SAMPLES = require('./samples');
 
 const all = [].concat(
@@ -49,10 +50,20 @@ function match(method, path) {
  */
 function withSample(r) {
   const s = SAMPLES[`${r.method.toUpperCase()} ${r.path}`] || {};
+  /*
+   * 管理点位（/api/admin、/api/decorate、/api/media）的保护方式与普通点位不同：
+   * 它们走的是**管理员令牌 + 角色**，而不是小程序用户登录态。
+   * 所以这里单独给出 `admin`（是否需要令牌）与 `adminRole`（最低角色），
+   * 调试台与自检据此选择正确的凭证 —— 否则会拿用户 token 去调管理接口，
+   * 拿到 403 之后误判成「点位坏了」。
+   */
+  const isAdmin = adminAuth.isAdminApiPath(r.path) && r.path !== adminAuth.ADMIN_LOGIN_PATH;
   return {
     method: r.method,
     path: r.path,
     auth: !!r.auth,
+    admin: isAdmin,
+    adminRole: isAdmin ? adminAuth.minRoleFor(r.method, r.path) : '',
     dev: !!r.dev,
     raw: !!r.raw, // 按原始流读取（文件上传类点位，调试台不套 JSON 头）
     desc: r.desc || '',

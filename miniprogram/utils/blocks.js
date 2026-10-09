@@ -11,7 +11,7 @@
  *   历史坑：height 曾被当成 375 基准 px 再 ×2，导致首屏图被放大一倍后裁切。
  */
 
-const { resolveAssets } = require('./asset');
+const { resolveAssets, assetUrl } = require('./asset');
 const { px2rpx, heightRpx } = require('./units');
 const goodsSvc = require('../services/goods');
 
@@ -101,6 +101,8 @@ function normalizeBlock(b, index) {
     o.cellW = Math.floor(100 / cols * 100) / 100;
     o.limit = Number(o.limit) || 4;
     o.goods = [];
+    // 「没有商品」与「接口失败」是两件事，模板要能分开说，不能一律显示「暂无商品」
+    o.goodsFailed = false;
   } else if (kind === 'rich_text') {
     // 「全屏显示」= 内容占满整宽，此时忽略页面边距（与有赞一致）
     o.marginRpx = o.full === '0' ? px2rpx(o.pageMargin) : 0;
@@ -184,39 +186,105 @@ function applyShopAvatar(blocks, shopAvatar) {
   return blocks;
 }
 
+/** 商品卡片渲染字段（区块模板只认这四个键；goodsId 为空会导致点击无效） */
+function toCard(g) {
+  if (!g) return null;
+  return {
+    goodsId: g.goodsId || g.id || '',
+    name: g.name || '',
+    image: assetUrl(g.image || g.cover || (g.images && g.images[0]) || ''),
+    priceText: g.priceText || ((Number(g.price) || 0) / 100).toFixed(2)
+  };
+}
+
 /**
  * 「商品」区块需要实时数据（装修时存的是快照，价格库存会过期），统一拉一次后分发。
+ *
+ * 两个优化，都是为了「同一个商品被多处引用」时不重复打接口：
+ *   - 指定商品模式：先把所有区块要的 ID **去重**，再按固定并发（SIMPLE_CONCURRENCY）
+ *     逐个取详情，最后分发回各区块 —— 同一商品被两个区块引用只请求一次；
+ *   - 默认列表模式：按 `limit` 分组，同一 limit 只请求一次。
+ *
+ * 失败**不再静默吞掉成空列表**：记一条日志（真机上翻 console 就能看出是「接口挂了」
+ * 还是「确实没商品」），同时该区块的 goods 留空由模板显示占位文案。
  *
  * @param {Array} blocks 已 normalize 的区块数组
  * @returns {Promise<object|null>} 供 setData 的补丁，如 { 'blocks[0].goods': [...] }；没有商品区块时返回 null
  */
+const GOODS_CONCURRENCY = 4;
+
+/** 限并发执行（保持结果顺序） */
+function mapLimit(items, limit, fn) {
+  const out = new Array(items.length);
+  let cursor = 0;
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(() => (async () => {
+    for (;;) {
+      const i = cursor++;
+      if (i >= items.length) return;
+      out[i] = await fn(items[i], i);
+    }
+  })());
+  return Promise.all(workers).then(() => out);
+}
+
 function loadGoodsData(blocks) {
   const idxs = [];
   (blocks || []).forEach((b, i) => { if (b.type === 'goods') idxs.push(i); });
   if (!idxs.length) return Promise.resolve(null);
 
-  const jobs = idxs.map((i) => {
+  const idBlocks = [];
+  const listGroups = {}; // limit → [区块下标]
+  idxs.forEach((i) => {
     const b = blocks[i];
-    const p = { page: 1, size: b.limit };
     if (b.mode === 'ids' && b.ids) {
-      // 指定商品：逐个取详情（商品量少，这里串行合并）
       const ids = String(b.ids).split(/[,，\s]+/).filter(Boolean).slice(0, b.limit);
-      return Promise.all(ids.map((id) => goodsSvc.fetchDetail(id).catch(() => null)))
-        .then((list) => (list || []).filter(Boolean))
-        .then((list) => ({ i, list }));
+      idBlocks.push({ i, ids });
+    } else {
+      const key = String(b.limit);
+      (listGroups[key] = listGroups[key] || []).push(i);
     }
-    return goodsSvc.fetchList(p).then((d) => ({ i, list: (d && d.list) || [] })).catch(() => ({ i, list: [] }));
   });
 
-  return Promise.all(jobs).then((results) => {
+  // 所有区块要的指定商品 ID 去重
+  const allIds = [];
+  idBlocks.forEach((b) => b.ids.forEach((id) => { if (allIds.indexOf(id) < 0) allIds.push(id); }));
+
+  const idJob = allIds.length
+    ? mapLimit(allIds, GOODS_CONCURRENCY, (id) => goodsSvc.fetchDetail(id).catch((err) => {
+      console.warn('[blocks] 指定商品加载失败 id=' + id, err && err.message);
+      return null;
+    })).then((list) => {
+      const byId = {};
+      let okCount = 0;
+      list.forEach((g) => { if (g) { byId[g.goodsId || g.id] = g; okCount++; } });
+      return { byId, okCount };
+    })
+    : Promise.resolve({ byId: {}, okCount: 0 });
+
+  const listJob = mapLimit(Object.keys(listGroups), GOODS_CONCURRENCY, (limit) =>
+    goodsSvc.fetchList({ page: 1, size: Number(limit) || 4 })
+      .then((d) => ({ limit, list: (d && d.list) || [], failed: false }))
+      .catch((err) => {
+        console.warn('[blocks] 商品列表加载失败 limit=' + limit, err && err.message);
+        return { limit, list: [], failed: true };
+      })).then((rows) => {
+    const byLimit = {};
+    rows.forEach((r) => { byLimit[r.limit] = r; });
+    return byLimit;
+  });
+
+  return Promise.all([idJob, listJob]).then(([idRes, byLimit]) => {
     const next = {};
-    results.forEach((r) => {
-      next['blocks[' + r.i + '].goods'] = (r.list || []).map((g) => ({
-        goodsId: g.goodsId,
-        name: g.name,
-        image: g.image || (g.images && g.images[0]) || '',
-        priceText: g.priceText || ((g.price || 0) / 100).toFixed(2)
-      }));
+    idBlocks.forEach((b) => {
+      next['blocks[' + b.i + '].goods'] = b.ids.map((id) => toCard(idRes.byId[id])).filter(Boolean);
+      // 一个都没取到才判为失败：部分商品被删除/下架属于正常，不该报「加载失败」
+      next['blocks[' + b.i + '].goodsFailed'] = b.ids.length > 0 && idRes.okCount === 0;
+    });
+    idxs.forEach((i) => {
+      if (idBlocks.some((b) => b.i === i)) return;
+      const r = byLimit[String(blocks[i].limit)];
+      next['blocks[' + i + '].goods'] = r ? r.list.map(toCard).filter(Boolean) : [];
+      next['blocks[' + i + '].goodsFailed'] = !!(r && r.failed);
     });
     return next;
   });

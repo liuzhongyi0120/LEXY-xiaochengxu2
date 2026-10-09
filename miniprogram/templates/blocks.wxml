@@ -303,7 +303,7 @@
         </view>
       </view>
     </view>
-    <view wx:if="{{!block.goods.length}}" class="cg-empty">暂无商品数据（请确认已启动后端服务）</view>
+    <view wx:if="{{!block.goods.length}}" class="cg-empty" bindtap="onRetryGoods" hover-class="hover-lite">{{block.goodsFailed ? '商品加载失败，点此重试' : '暂无商品'}}</view>
   </view>
 
   <!-- ============ 富文本 ============ -->

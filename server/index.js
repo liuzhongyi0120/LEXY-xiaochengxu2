@@ -19,6 +19,7 @@ const { URL } = require('node:url');
 
 const { parseBody, parseQuery, ok, fail, preflight, BizError, ERR } = require('./lib/http');
 const authLib = require('./lib/auth');
+const adminAuth = require('./lib/adminAuth');
 const store = require('./lib/store');
 const router = require('./routes');
 const wechat = require('./lib/wechat');
@@ -46,10 +47,38 @@ if (!flags.isKnownDebugPageValue(process.env.DEBUG_PAGE)) {
   console.warn(`[warn] DEBUG_PAGE 取值无法识别（${JSON.stringify(process.env.DEBUG_PAGE)}），` +
     '已按「关闭管理页面与运营接口」处理；可用值：1/on/true/yes 开启，0/off/false/no 关闭');
 }
+
+/**
+ * 运营后台页面开关（`/admin` 装修台 与 `/console` 控制台）。
+ *
+ * 与 DEBUG_PAGE 分开：DEBUG_PAGE 管的是**开发用具**（`/debug` 接口调试台、`/preview` 前端预览、
+ * `/mp-src` 源码只读），ADMIN_PAGE 管的是**运营日常要用的后台**。
+ * 一个总开关做不到「关掉调试台、留下后台」，也做不到「后台也要正式鉴权」。
+ * 未设置时回落 DEBUG_PAGE，保证历史上线脚本的行为不变。
+ */
+const ADMIN_PAGE = flags.resolveAdminPage(process.env.ADMIN_PAGE, DEBUG_PAGE);
+if (!flags.isKnownFlagValue(process.env.ADMIN_PAGE)) {
+  console.warn(`[warn] ADMIN_PAGE 取值无法识别（${JSON.stringify(process.env.ADMIN_PAGE)}），` +
+    '已按「关闭运营后台」处理；可用值：1/on/true/yes 开启，0/off/false/no 关闭');
+}
 const PUBLIC_DIR = nodePath.join(__dirname, 'public');
 
-/** 运营管理接口前缀：受 DEBUG_PAGE 开关约束（关闭页面时必须一并关闭） */
-const MANAGE_API_PREFIXES = ['/api/admin/', '/api/decorate/', '/api/media/'];
+/**
+ * 运营管理接口前缀：受 ADMIN_PAGE 开关约束，**且必须携带管理员令牌**。
+ *
+ * ⚠️ 「关掉页面」不等于「关掉接口」：只把 /admin、/console 403 掉，
+ *    这 40 多个点位照样能被匿名调用（删商品、改店铺配置、写文件）。
+ *    所以这里两道门：开关一道（页面级），身份与角色一道（请求级）。
+ *    前缀清单由 lib/adminAuth 单点维护（路由清单也要用它标注）。
+ */
+const ADMIN_LOGIN_PATH = adminAuth.ADMIN_LOGIN_PATH;
+const isAdminApiPath = adminAuth.isAdminApiPath;
+
+/** 运营后台页面（与调试台分开控制） */
+const ADMIN_PAGES = ['/admin', '/admin/', '/console', '/console/'];
+const ADMIN_STATIC_DIRS = ['/admin/', '/console/'];
+/** 两边共用：装修台与前端预览页都要加载它 */
+const SHARED_DIR = '/shared/';
 
 /** 页面入口路由 → public 下的文件 */
 const STATIC_PAGES = {
@@ -243,7 +272,11 @@ function tryUploads(path, req, res) {
 
 /**
  * 静态资源处理：命中返回 true（响应已发出），未命中返回 false
- * 开启开关：调试台与装修后台都只在开发环境开放，线上设 DEBUG_PAGE=off 一并关闭
+ *
+ * 开关分两档：
+ *   - 运营后台（`/admin`、`/console`）→ ADMIN_PAGE
+ *   - 开发用具（`/debug` 调试台、`/preview` 预览）→ DEBUG_PAGE
+ *   - `/shared/` 两边共用（装修台与预览页都要加载 pv-render.js）→ 任一开启即可
  */
 function tryStatic(path, res) {
   let rel = null;
@@ -261,8 +294,13 @@ function tryStatic(path, res) {
   }
   if (!rel) return false;
 
-  if (!DEBUG_PAGE) {
-    fail(res, '管理页面已关闭（设置 DEBUG_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
+  const isAdmin = ADMIN_PAGES.indexOf(path) > -1 || ADMIN_STATIC_DIRS.some((p) => path.indexOf(p) === 0);
+  const isShared = path.indexOf(SHARED_DIR) === 0;
+  const allowed = isShared ? (ADMIN_PAGE || DEBUG_PAGE) : (isAdmin ? ADMIN_PAGE : DEBUG_PAGE);
+  if (!allowed) {
+    fail(res, isAdmin
+      ? '运营后台已关闭（设置 ADMIN_PAGE=1 可临时开启）'
+      : '调试页面已关闭（设置 DEBUG_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
     return true;
   }
 
@@ -329,16 +367,25 @@ const server = http.createServer(async (req, res) => {
   }
 
   /*
-   * 运营管理点位同样受管理页面开关约束。
+   * 运营管理点位：两道门，缺一不可。
    *
-   * ⚠️ 只关页面不管接口是**假关闭**：`/admin` 打不开了，但
-   *    `POST /api/admin/goods/delete`、`/api/admin/settings/save`、`/api/media/upload`
-   *    仍可被任何人匿名调用（改商品、改店铺配置、往服务器写文件）。
-   *    因此这三个前缀在开关关闭时一并返回 403，与页面同进同退。
-   *    （`/uploads/…` 静态图片不在此列——那是小程序线上内容，必须始终可访问。）
+   * 第一道 —— 页面开关（ADMIN_PAGE）：关闭时与页面同进同退，返回 403。
+   *   只关页面不管接口是**假关闭**：`/admin` 打不开了，但
+   *   `POST /api/admin/goods/delete`、`/api/admin/settings/save`、`/api/media/upload`
+   *   仍可被任何人匿名调用（改商品、改店铺配置、往服务器写文件）。
+   *   （`/uploads/…` 静态图片不在此列——那是小程序线上内容，必须始终可访问。）
+   *
+   * 第二道 —— 管理员身份与角色（lib/adminAuth）：
+   *   页面开着不等于谁都能改。每个请求都要带管理员令牌，并按「点位所需最低角色」校验。
+   *   管理员令牌与小程序用户令牌**互不通用**：普通用户 token 到这里一律 401/403。
    */
-  if (!DEBUG_PAGE && MANAGE_API_PREFIXES.some((p) => path.indexOf(p) === 0)) {
-    return fail(res, '管理接口已关闭（设置 DEBUG_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
+  const isAdminApi = isAdminApiPath(path);
+  if (isAdminApi && !ADMIN_PAGE) {
+    return fail(res, '管理接口已关闭（设置 ADMIN_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
+  }
+  if (isAdminApi && path !== ADMIN_LOGIN_PATH) {
+    const gate = adminAuth.guard(req, method, path);
+    if (!gate.ok) return fail(res, gate.msg, gate.code, gate.status);
   }
 
   /* 健康检查 */
@@ -351,7 +398,15 @@ const server = http.createServer(async (req, res) => {
       routes: router.describe().length + 2, // 业务点位 + health / routes 两个运维点位
       wechat: { login: wechat.HAS_WX_LOGIN ? 'real' : 'mock', pay: wechat.HAS_WX_PAY ? 'real' : 'mock' },
       jwtSecret: authLib.IS_DEFAULT_SECRET ? 'default(dev-only)' : 'custom',
-      debugPage: DEBUG_PAGE ? 'on' : 'off'
+      debugPage: DEBUG_PAGE ? 'on' : 'off',
+      adminPage: ADMIN_PAGE ? 'on' : 'off',
+      // 管理接口至少要看清三件事：有没有配凭证、能不能写、是不是在用开发默认口令
+      adminAuth: {
+        credentials: adminAuth.configured() ? 'on' : 'off',
+        tokens: adminAuth.tokenCount(),
+        writable: adminAuth.hasWritableCredential() ? 'yes' : 'no',
+        password: adminAuth.usingDevPassword() ? 'dev-default' : (adminAuth.configured() ? 'custom' : 'unset')
+      }
     });
   }
 
@@ -438,6 +493,26 @@ if (process.env.NODE_ENV === 'production' && authLib.IS_DEFAULT_SECRET) {
   process.exit(1);
 }
 
+/*
+ * 生产环境硬校验：既要开运营后台，又没有配置任何管理员凭证 → 拒绝启动。
+ *
+ * 「后台开着但谁都能进」比「后台关着」危险得多：运维会以为已经有人管着了。
+ * 同样不能让这一步只依赖日志警告。
+ */
+if (process.env.NODE_ENV === 'production' && ADMIN_PAGE && !adminAuth.configured()) {
+  console.error('[fatal] NODE_ENV=production 且 ADMIN_PAGE 开启，但未配置任何管理员凭证，拒绝启动。');
+  console.error('        请至少设置其中一项：');
+  console.error('        ADMIN_PASSWORD=\'你的强口令\'                     # 口令登录（换取超级管理员会话）');
+  console.error('        ADMIN_TOKENS=\'{"tok_long_enough":{"role":"operator","name":"运营A"}}\'  # 分角色长期令牌');
+  console.error('        或直接设置 ADMIN_PAGE=off 关闭运营后台。');
+  process.exit(1);
+}
+if (process.env.NODE_ENV === 'production' && ADMIN_PAGE && adminAuth.usingDevPassword()) {
+  console.error('[fatal] NODE_ENV=production 下不允许使用开发默认管理员口令，拒绝启动。');
+  console.error('        请设置 ADMIN_PASSWORD。');
+  process.exit(1);
+}
+
 server.listen(PORT, HOST, () => {
   const routes = router.describe();
   const authed = routes.filter((r) => r.auth).length;
@@ -445,10 +520,17 @@ server.listen(PORT, HOST, () => {
   log('莱克企业商城小程序 · 自建后端已启动');
   log(`监听地址   http://127.0.0.1:${PORT}`);
   log(`接口调试台 http://127.0.0.1:${PORT}/debug  ${DEBUG_PAGE ? '（已开放，线上请设 DEBUG_PAGE=off）' : '（已关闭）'}`);
-  log(`店铺装修台 http://127.0.0.1:${PORT}/admin  ${DEBUG_PAGE ? '（逐个页面改前端，发布写回 replica.js）' : '（已关闭）'}`);
+  log(`店铺装修台 http://127.0.0.1:${PORT}/admin  ${ADMIN_PAGE ? '（逐个页面改前端，发布写回 replica.js）' : '（已关闭）'}`);
   log(`前端预览   http://127.0.0.1:${PORT}/preview  ${DEBUG_PAGE ? '（发布后看线上效果，直接编译真机 WXML+WXSS）' : '（已关闭）'}`);
-  log(`后台控制台 http://127.0.0.1:${PORT}/console  ${DEBUG_PAGE ? '（商品/订单/客户/营销/设置）' : '（已关闭）'}`);
-  log(`管理接口   ${DEBUG_PAGE ? '（41 个 admin/decorate/media 点位随页面一同开放）' : '（已随页面一同关闭，返回 403）'}`);
+  log(`后台控制台 http://127.0.0.1:${PORT}/console  ${ADMIN_PAGE ? '（商品/订单/客户/营销/设置）' : '（已关闭）'}`);
+  log(`管理接口   ${ADMIN_PAGE
+    ? '（全部要求管理员令牌；只读=viewer、日常运营=operator、删素材/发布/删除商品=owner）'
+    : '（已随页面一同关闭，返回 403）'}`);
+  log(`管理员凭证 ${!adminAuth.configured()
+    ? '⚠️  未配置，登录不可用（ADMIN_PASSWORD 或 ADMIN_TOKENS 至少设置一项）'
+    : (adminAuth.usingDevPassword()
+      ? `⚠️  正在使用开发默认口令（${ADMIN_PAGE ? '请立刻设置' : ''} ADMIN_PASSWORD），仅限本机联调`
+      : `已配置（长期令牌 ${adminAuth.tokenCount()} 条）`)}`);
   log(`点位总数   ${routes.length + 2} 个（业务 ${routes.length} + 运维 2，需登录 ${authed} 个）`);
   log(`数据文件   ${store.DB_FILE}`);
   media.ensureDir(media.ROOT);

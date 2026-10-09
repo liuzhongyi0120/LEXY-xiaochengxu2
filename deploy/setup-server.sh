@@ -15,8 +15,11 @@
 #
 # 安全默认值（为什么这么设，见 server/README.md「上线前必做」）：
 #   NODE_ENV=production  → 强制要求 JWT_SECRET，否则进程直接拒绝启动；
-#                          同时关闭 /admin /console /debug 三个页面与 44 个运营接口
+#                          同时关闭 /admin /console /debug 三个页面与 49 个管理接口
 #   DEBUG_PAGE=off       → 显式再关一次（双保险，防止有人误改 NODE_ENV）
+#   ADMIN_PAGE           → 未设置时**回落 DEBUG_PAGE**（这里=关）。
+#                          想开远程运营后台要显式 ADMIN_PAGE=1，**且必须先配 ADMIN_PASSWORD 或 ADMIN_TOKENS**，
+#                          否则进程拒绝启动（故意如此：宁可起不来，也不要「后台开着但谁都能进」）
 #   ALLOW_MOCK_PAY=1     → 测试期保留「模拟支付」，否则下单后无法完成付款链路
 #                          （正式接入微信支付后，把这一行删掉即可）
 #
@@ -86,9 +89,39 @@ DEBUG_PAGE=off
 ALLOW_MOCK_PAY=1
 PORT=3000
 HOST=0.0.0.0
+
+# ---------------------------------------------------------------
+# 管理端鉴权（整改报告 08）：/admin /console 与 49 个管理接口都要管理员令牌。
+# 目前 ADMIN_PAGE 未设置 → 回落 DEBUG_PAGE=off → 管理页面与接口全部 403，
+# 与加鉴权之前的行为完全一致（安全，但不是"可用"）。
+#
+# 要启用远程运营后台，取消注释下面三行并改成自己的强口令，然后重启：
+#   ADMIN_PASSWORD='改成你的强口令'      # 换到「超级管理员」会话（12 小时）
+#   ADMIN_PAGE=1                        # 打开 /admin 与 /console
+#
+# 也可以只发分角色长期令牌（JSON，适合脚本 / 不同的人）：
+#   ADMIN_TOKENS='{"至少8位的令牌":{"role":"operator","name":"运营A"}}'
+#   角色：viewer 只读 / operator 日常运营 / owner 高危（删素材、生成代码、改店铺设置）
+#
+# ⚠️ ADMIN_PAGE=1 而没配 ADMIN_PASSWORD / ADMIN_TOKENS 时，进程会**拒绝启动**（有意为之）。
+# ⚠️ 打开 ADMIN_PAGE 等于把后台开到公网，请同时在 nginx 层限制来源 IP。
+# ---------------------------------------------------------------
 EOF
   chmod 600 "$ENV_FILE"
   log "已生成 $ENV_FILE（JWT_SECRET 随机 32 字节，已 chmod 600）"
+fi
+
+# 管理端鉴权自检（报告 08）：只提示，不改配置。
+# 分两种情形说清楚，避免运维看到「后台打不开」就以为部署失败。
+if ! grep -qE '^(ADMIN_PASSWORD|ADMIN_TOKENS)=' "$ENV_FILE"; then
+  if grep -qE '^ADMIN_PAGE=(1|on|true|yes)$' "$ENV_FILE"; then
+    log "❌ $ENV_FILE 开了 ADMIN_PAGE 但没配管理员凭证 —— 服务会拒绝启动。"
+    log "   请加 ADMIN_PASSWORD='你的强口令'（或 ADMIN_TOKENS），再重新执行本脚本。"
+    exit 1
+  fi
+  log "提示：未配置管理员凭证，且管理后台保持关闭（DEBUG_PAGE=off）"
+  log "      → /admin、/console 与 49 个管理接口一律 403，属预期行为，不是部署失败。"
+  log "      需要远程运营后台时，见 .env 里的「管理端鉴权」注释块。"
 fi
 
 # -------------------------------------------------------------- 3. systemd

@@ -9,6 +9,10 @@ Page({
   data: {
     id: '',
     loading: true,
+    /** 首屏加载失败：goods 为 null 且 loading 为 false 时页面原本什么都不渲染（整页空白），必须单独给状态 */
+    loadFailed: false,
+    /** 失败原因是否为「商品已下架 / 不存在」（确定的业务结论，与网络异常提示不同） */
+    gone: false,
     goods: null,
 
     priceParts: { int: '0', dec: '.00' },
@@ -46,9 +50,9 @@ Page({
   /* ----------------------- 数据 ----------------------- */
 
   loadDetail() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadFailed: false });
 
-    fetchDetail(this.data.id)
+    return fetchDetail(this.data.id)
       .then((goods) => {
         // 给图文详情块补 key，便于 wx:for 渲染
         const detailBlocks = (goods.detailBlocks || []).map((block, index) => ({
@@ -67,17 +71,29 @@ Page({
           priceMaxText: hasRange ? ` - ${money(goods.priceMax)}` : '',
           salesText: shortNumber(goods.sales),
           currentImage: 0,
-          loading: false
+          loading: false,
+          loadFailed: false
         });
 
         wx.setNavigationBarTitle({ title: goods.name.slice(0, 12) });
       })
       .catch((err) => {
         console.error('[detail] 商品详情加载失败', err);
-        this.setData({ loading: false });
-        wx.showToast({ title: err.message || '加载失败', icon: 'none' });
+        // 「商品已下架/不存在」是确定的业务结论，与网络异常区分提示
+        const gone = err && (err.code === 404 || /不存在|已下架/.test(err.message || ''));
+        this.setData({ loading: false, loadFailed: true, gone });
       })
       .then(() => wx.stopPullDownRefresh());
+  },
+
+  /** 加载失败后原地重试（不需要退出小程序） */
+  onRetryLoad() {
+    return this.loadDetail();
+  },
+
+  /** 商品已下架/不存在 → 回商品列表，避免用户停在死页面 */
+  onBackToList() {
+    wx.redirectTo({ url: ROUTES.GOODS_LIST, fail: () => wx.navigateBack() });
   },
 
   refreshCartBadge() {
@@ -97,11 +113,11 @@ Page({
 
   onPreviewImage(e) {
     const { index } = e.currentTarget.dataset;
-    const { images } = this.data.goods;
-    if (!images || !images.length) return;
+    const goods = this.data.goods;
+    if (!goods || !goods.images || !goods.images.length) return;
     wx.previewImage({
-      current: images[index],
-      urls: images
+      current: goods.images[index],
+      urls: goods.images
     });
   },
 

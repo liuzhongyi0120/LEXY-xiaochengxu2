@@ -133,6 +133,7 @@ App.views.goods = {
     }));
     body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
       const id = b.getAttribute('data-del');
+      if (!needRole('owner', '删除商品')) return;
       if (!(await confirmBox('删除商品 <b>' + esc(id) + '</b>？<br><span class="sub">有订单记录的商品不能删除，只能下架。</span>', '删除'))) return;
       try {
         await API.post('/api/admin/goods/delete', { id });
@@ -379,6 +380,7 @@ App.views.categories = {
       editor({ title: '重命名分类', id: row.id, name: row.name });
     }));
     body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!needRole('owner', '删除分类')) return;
       if (!(await confirmBox('删除分类 <b>' + esc(b.getAttribute('data-name')) + '</b>？', '删除'))) return;
       try {
         await API.post('/api/admin/category/delete', { id: b.getAttribute('data-del') });
@@ -754,6 +756,7 @@ App.views.marketing = {
           status: f('status')
         };
         if (!payload.name) return toast('请填写券名称', true);
+        if (!needRole('owner', '保存优惠券')) return;
         try {
           await API.post('/api/admin/coupon/save', payload);
           m.close();
@@ -768,6 +771,7 @@ App.views.marketing = {
       editor(d.list.find((x) => x.templateId === b.getAttribute('data-edit')));
     }));
     body.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', async () => {
+      if (!needRole('owner', '启停优惠券')) return;
       try {
         await API.post('/api/admin/coupon/status', { templateId: b.getAttribute('data-toggle'), status: b.getAttribute('data-to') });
         toast('状态已更新');
@@ -775,6 +779,7 @@ App.views.marketing = {
       } catch (e) { toast(e.message, true); }
     }));
     body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!needRole('owner', '删除优惠券')) return;
       if (!(await confirmBox('删除该优惠券？<br><span class="sub">已被客户领取过的券不能删除，只能暂停。</span>', '删除'))) return;
       try {
         await API.post('/api/admin/coupon/delete', { templateId: b.getAttribute('data-del') });
@@ -1043,6 +1048,7 @@ App.views.media = {
     /* ---- 删除一张素材（网格的 ✕ 与预览层里的删除共用同一套确认逻辑） ----
      * 抽成函数是因为它在两处被调用：只有一份「引用检查 → 强制确认」才不会两边走偏。 */
     const deleteMedia = async (p) => {
+      if (!needRole('owner', '删除素材')) return false;
       if (!(await confirmBox('删除该素材？<br><span class="sub">若图片正被页面或商品引用，需要再次确认强制删除。</span>', '删除'))) return false;
       try {
         await API.post('/api/media/delete', { name: p });
@@ -1092,6 +1098,7 @@ App.views.media = {
 
     /* ---- 文件夹：新建 / 重命名 / 删除 ---- */
     body.querySelector('[data-newfolder]').addEventListener('click', async () => {
+      if (!needRole('owner', '新建素材文件夹')) return;
       const name = await promptBox('新建文件夹', '', '例如：首页、莱克、双十一素材');
       if (!name) return;
       try {
@@ -1103,6 +1110,7 @@ App.views.media = {
 
     body.querySelectorAll('[data-rnf]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
+      if (!needRole('owner', '重命名素材文件夹')) return;
       const from = b.getAttribute('data-rnf');
       const to = await promptBox('重命名文件夹', from, '新的文件夹名');
       if (!to || to === from) return;
@@ -1117,6 +1125,7 @@ App.views.media = {
 
     body.querySelectorAll('[data-df]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
+      if (!needRole('owner', '删除素材文件夹')) return;
       const name = b.getAttribute('data-df');
       const sure = await confirmBox(
         '删除文件夹「' + esc(name) + '」？<br><span class="sub">只删除这个分类，里面的素材会回到「未分组」，<b>不会删除图片本身</b>。</span>',
@@ -1163,6 +1172,7 @@ App.views.media = {
 
     /* ---- 批量移动到文件夹 ---- */
     body.querySelector('[data-moveto]').addEventListener('change', async (e) => {
+      if (!needRole('owner', '移动素材')) { e.target.value = ''; return; }
       const v = e.target.value;
       e.target.value = '';
       if (!v) return;

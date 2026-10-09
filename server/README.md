@@ -34,7 +34,23 @@ PORT=8080 node server/index.js
 
 ### 前端预览（/preview）
 
-装修台点「立即发布」后，**不用开微信开发者工具**就能在这里看线上效果：`http://127.0.0.1:3000/preview`
+> ## ⚠️ 先看清「发布」到底发布了什么
+>
+> 本项目的装修「生成代码」**只写回 `miniprogram/config/replica.js`**，也就是小程序**代码包内**的配置文件。
+> 它**不是**「线上实时生效」：
+>
+> | 你想验证的 | 该看哪里 | 是否代表线上 |
+> |---|---|---|
+> | 这次装修改成什么样 | 装修台手机预览 / `/preview` | ❌ 本机渲染 |
+> | 真机（开发者工具）上的效果 | 微信开发者工具点「编译」 | ❌ 只是你本机能看见 |
+> | 用户手机上的效果 | 开发者工具「上传」→ 公众平台「发布新版本」→ 用户更新到新版本 | ✅ |
+>
+> 也就是说：**已发布的小程序用户端，在没有更新到新版本之前，看到的仍是旧内容。**
+> 后台所有相关文案都按这个口径写 —— 不要把它描述成「线上立即生效」。
+> 如果业务上确实需要「运营改完即时生效」，那要另做一条**只读的已发布配置接口**（带版本号、缓存与
+> 最后可用版本兜底，且不得泄露草稿），属于二期方案，当前没有实现。
+
+装修台点「生成代码」后，**不用开微信开发者工具**就能在这里看本机渲染效果：`http://127.0.0.1:3000/preview`
 
 - **左栏**：内置 5 页 + 装修台新建的自定义页，标注内容块数量与「有未发布草稿」
 - **右侧**：手机壳里渲染出**已发布**的页面（不是草稿），顶部一条状态条写明「最近发布时间」
@@ -49,7 +65,9 @@ PORT=8080 node server/index.js
 > `xxx.wxml` 编译成 HTML → `app.wxss` + 页面 wxss + 组件 wxss 编译成 CSS（`1rpx = 0.5px`，
 > `100vh` 按手机屏可视区高换算）。所以「预览里看到什么，真机上就是什么」。
 >
-> 数据源就是 `miniprogram/config/replica.js` —— 而装修台「立即发布」正是写回它，所以内容天然等于线上内容。
+> 数据源就是 `miniprogram/config/replica.js` —— 而装修台「生成代码」正是写回它，
+> 所以这里的渲染结果 = **那份源码**渲染出来的样子。但它**不等于「线上已经更新」**：
+> replica.js 在代码包里，要等小程序上传并发布新版本，用户端才会拿到这份内容。
 >
 > ⚠️ **不要在这里再写一份手抄 HTML。** 早期版本就是这么干的，结果产品页抄成 3 列（真机 2 列）、
 > 左栏选中态抄成红字白底（真机黑底白字）、左栏 88px（真机 196rpx = 98px）。
@@ -118,8 +136,8 @@ PORT=8080 node server/index.js
 - **页面名称**：必填、≤30 字、同店铺内不可重名
 - **页面标识**：选填（留空自动生成 `p1`、`p2`…）；2~24 位小写字母 / 数字 / 连字符，字母开头；与内置页重名会被拒绝
 - **初始内容**：空白页 / 复制首页（复制的是当前已发布的首页区块，改副本不影响首页）
-- **先不写 replica.js**：新建只建后台条目，装修完点「立即发布」才下发到小程序 —— 防止手滑建个空页面就把线上覆盖
-- 改「页面标识」会连带迁移草稿、版本快照与 `replica.CUSTOM_PAGES` 的键名（旧访问地址随即失效）
+- **先不写 replica.js**：新建只建后台条目，装修完点「生成代码」才写进代码包 —— 防止手滑建个空页面就把源码改坏
+- 改「页面标识」会连带迁移草稿、版本快照与 `replica.CUSTOM_PAGES` 的键名，**并保留「旧标识 → 新标识」的别名**（见下方「页面标识改名」）
 - 删除会连带清理草稿与版本记录，并**立即重新生成 `replica.js`** 去掉该页 —— 否则小程序端还会按旧 key 打开一个「幽灵页」
 
 #### 店铺导航（底部导航栏，对标有赞独立入口 `retail-shopnav-config`）
@@ -237,7 +255,8 @@ PORT=8080 node server/index.js
 #### 草稿 - 发布模型
 
 - 编辑只改草稿（存 `server/data/decorate/state.json`），**绝不触碰正在运行的小程序**
-- 点「立即发布」才写回 `miniprogram/config/replica.js`：发布前自动备份（保留 20 份）、`vm.Script` 语法校验 + 回读校验双重兜底，任一失败自动回滚原文件
+- 点「生成代码」才写回 `miniprogram/config/replica.js`：生成前自动备份（保留 20 份）、`vm.Script` 语法校验 + 回读校验双重兜底，任一失败自动回滚原文件
+- **「生成代码」不等于「线上生效」**：replica.js 在小程序代码包里，还需要在微信开发者工具「上传」并在公众平台发布新版本，用户端才会更新
 - 「查看变更」逐字段 diff（新增 / 删除 / 修改）；「版本历史」最近 20 个版本，可恢复为草稿或恢复并发布
 
 #### 两个已修复的真实缺陷（均有回归测试锁定）
@@ -280,7 +299,7 @@ PORT=8080 node server/index.js
 | `.tooling/check-admin-nav.mjs` | 店铺导航的**浏览器验收**（18 项，需 Chrome + CDP 代理）：装修台列表卡片 / 进编辑器隐藏组件库 / 点区块树高亮跟随 / 改文案实时 5 字截断 / 图标样式切换真的生效 / `/preview` 切页高亮跟随。补「静态自检覆盖不到、只能真浏览器验」的那一段；只新开标签页用完即关，不碰已有标签页 |
 | `.tooling/probe-deployed.mjs` | **已部署服务器**的端到端冒烟（30 项，默认打 `https://14.103.50.137/mall-api`）：连通与 88 点位 / **管理页面与 44 个运营接口在公网确实被拒**（代理路径 403 + 站点根 410 两处都查，防「只是 nginx 顺手挡了」的假安全）/ 登录 / 首页 / 商品 / 分类 / **加购 → 下单 → 核对库存扣减 → 取消 → 核对库存回滚** / 图片静态资源。会真实写数据，但结尾自动取消订单；用于每次部署后确认「线上真的能用」，而不是只在本机自检通过 |
 
-**装修相关点位（14 个，`/api/decorate/*`）**：页面列表 / 组件库清单 / 页面详情 / 保存草稿 / 丢弃草稿 / 查看变更 / 发布 / 回滚 / 统计 / 可选跳转目标清单 / 模板与配额 / 新建自定义页 / 改页面信息 / 删自定义页。这些点位未开启 JWT 鉴权（当前无管理端账号体系），**正式环境请在网关层加访问控制**；设置 `DEBUG_PAGE=off` 也能把它们连同页面一起关掉（但网关层鉴权仍是首选，因为那个开关是「全开或全关」，做不到按角色细分）。
+**装修相关点位（14 个，`/api/decorate/*`）**：页面列表 / 组件库清单 / 页面详情 / 保存草稿 / 丢弃草稿 / 查看变更 / **生成代码** / 回滚 / 统计 / 可选跳转目标清单 / 模板与配额 / 新建自定义页 / 改页面信息 / 删自定义页。这些点位**全部要求管理员身份**（`Authorization: Bearer <令牌>`）：读用 `viewer`、保存草稿用 `operator`、**生成代码 / 回滚 / 新建改名删除页面**要求 `owner`。`DEBUG_PAGE=off` 是另一道（页面级总开关），两者叠加而不是互相替代。
 
 **后台控制台点位（28 个，`/api/admin/*`）**：数据概览 / 商品 6 / 分类 3 / 订单 6 / 客户 3 / 优惠券 5 / 评价 2 / 店铺设置 2。同样免登录，**上线必须加访问控制**（见「上线前必做」）。
 
@@ -409,7 +428,9 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 - 把本地图片**直接拖到图片缩略图上**即可上传并替换
 - 预览区的轮播指示点可点击翻页，用来确认刚加进去的图在第几张
 
-> **上线前必须处理**：`/api/media/upload` 是文件写入接口，当前无鉴权。正式环境务必在网关层加访问控制（或独立域名 + 签名），否则任何人都能往服务器写文件、占满磁盘。
+> **上线前必须处理**：`/api/media/upload` 是文件写入接口。它已要求管理员身份（`operator` 及以上），
+> 但仍建议在网关层再加一道（限制来源 IP / 独立域名 + 签名）：登录态能挡住匿名，挡不住「拿到运营凭证的人」
+> 往磁盘里灌大文件。删除素材这类不可逆动作已收紧到 `owner`。
 
 小程序端把 `miniprogram/utils/constants.js` 的 `ENV` 设为 `local` 即可联调（已默认设为 `local`）。
 
@@ -426,13 +447,32 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 |---|---|---|
 | `PORT` | 监听端口 | `3000` |
 | `HOST` | 监听地址 | `0.0.0.0` |
-| `JWT_SECRET` | JWT 签名密钥（**上线必配**） | 开发默认值，启动日志会告警 |
-| `JWT_TTL` | token 有效期（秒） | `604800`（7 天） |
+| `JWT_SECRET` | 登录态签名密钥 | 开发期有默认值；**`NODE_ENV=production` 且未设置时进程直接拒绝启动**（默认密钥是公开的，会让任何人伪造登录态） |
+| `JWT_TTL` | 用户 token 有效期（秒） | `604800`（7 天） |
 | `WX_APPID` / `WX_SECRET` | 小程序 AppID / Secret | 登录、手机号走**本地模拟** |
 | `WX_MCH_ID` / `WX_PAY_KEY` | 微信支付商户号 / API 密钥 | 支付走**沙箱参数** |
 | `ALLOW_MOCK_PAY` | 是否开放模拟支付点位 | 非 production 且未配商户号时默认开启 |
-| `DEBUG_PAGE` | 管理后台总开关：`/debug` `/admin` `/console` `/preview` 四个页面 **+ `/api/admin/*` `/api/decorate/*` `/api/media/*` 三类管理接口** 一起开或关 | 未设置时跟随环境：非 production 开、production 关；`0`/`off`/`false`/`no` 关，其它值一律按关处理 |
-| `JWT_SECRET` | 登录态签名密钥 | 开发期有默认值；**`NODE_ENV=production` 且未设置时进程直接拒绝启动**（默认密钥是公开的，会让任何人伪造登录态） |
+| `DEBUG_PAGE` | 管理后台总开关：`/debug` `/admin` `/console` `/preview` 四个页面 **+ `/api/admin/*` `/api/decorate/*` `/api/media/*` 三类管理接口** 一起开或关 | 未设置时跟随环境：非 production 开、production 关；只有明确属于「开」的取值（`1`/`on`/`true`/`yes`）才开，**其余一律按关处理**（含拼错的值，并打警告） |
+| `ADMIN_PASSWORD` | 管理员登录口令（`POST /api/admin/login` 用）。**上线必配** | 非 production 时默认 `admin`（启动日志会标成 `dev-default`）；`NODE_ENV=production` 且未配置任何管理员凭证时**进程拒绝启动** |
+| `ADMIN_TOKENS` | 长期令牌（JSON）：`{"<令牌>":{"role":"operator","name":"运营A"}}`，角色 `viewer`/`operator`/`owner`。适合给不同的人 / 脚本发不同角色的凭证 | 空。单条配置不合法只跳过那一条并告警，不会废掉整组 |
+| `ADMIN_TTL` | 管理员会话有效期（秒） | `43200`（12 小时，比用户登录态短得多） |
+| `MALL_DATA_DIR` | 数据目录改道（`db.json` / `catalog.json` / `uploads/` / `decorate/` 都跟着走） | `server/data`。**测试用它隔离，不动真实数据** |
+| `MALL_REPLICA_FILE` | 装修「生成代码」的产物落点 | `miniprogram/config/replica.js` |
+
+**管理端鉴权**（整改报告 08）：`/api/admin/*`、`/api/decorate/*`、`/api/media/*` 共 40+ 个点位
+**一律要求管理员令牌**（`Authorization: Bearer <token>`），并按点位要求三级角色：
+
+| 角色 | 能做什么 |
+|---|---|
+| `viewer` 只读 | 全部 `GET`（看板、列表、详情） |
+| `operator` 运营 | 上一级 + 改商品/分类/库存/订单/券、上传素材、存草稿 |
+| `owner` 超级管理员 | 上一级 + **高危**：删素材/素材夹/移动素材、生成代码/回滚、新建/改名/删页面、删商品/分类/券模板、改店铺设置 |
+
+> 「生成代码」等**不可逆**动作统一走 `owner`；其余写操作 `operator` 即可。
+> 判定规则集中在 `server/lib/adminAuth.js` 的 `OWNER_RULES`，`GET /api/routes` 会标注每个点位的最低角色。
+>
+> ⚠️ `DEBUG_PAGE` 只是**页面/接口的开关**，不是权限。两者必须同时正确：
+> 开关关掉 → 整个后台 403；开关打开 → 仍然必须登录。任一处缺失都不算安全。
 
 **双模式设计**：未配置微信参数时，`code2Session` 与支付下单走本地模拟实现，
 保证开发期「每个点位都能联络通畅」，无需等待商户号与证书审批；配置后自动切换真实接口。
@@ -519,39 +559,50 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 
 ### 店铺装修（14）
 
-| 方法 | 路径 | 鉴权 | 说明 |
+> 全部需要管理员令牌；下表「鉴权」列为该点位要求的**最低角色**。
+> `publish` 的语义是「把草稿写回 `miniprogram/config/replica.js`（生成代码）」，
+> **不等于线上生效** —— 还要在微信开发者工具里上传并发布新版本。
+
+| 方法 | 路径 | 最低角色 | 说明 |
 |---|---|---|---|
-| GET | `/api/decorate/pages` | 否 | 页面列表（含组件库清单、自定义页配额与新建模板） |
-| GET | `/api/decorate/templates` | 否 | 新建模板清单 + 自定义页配额（已用 / 上限 20） |
-| POST | `/api/decorate/page/create` | 否 | 新建自定义页面（只建后台条目，发布后才下发小程序） |
-| POST | `/api/decorate/page/rename` | 否 | 改自定义页名称 / 备注 / 标识（标识变更会迁移草稿、版本与 replica 键名） |
-| POST | `/api/decorate/page/delete` | 否 | 删除自定义页面（清草稿与版本，并重新生成 `replica.js`） |
-| GET | `/api/decorate/lib` | 否 | 组件库清单（常用 / 基础 / 高级三 tab，含 SVG 图标；基础组件另带 `groups` 真实分组、每项 `ok` 是否已接入与 `why` 未接入原因） |
-| GET | `/api/decorate/page` | 否 | 单页详情（schema + 已发布 + 草稿 + 版本） |
-| POST | `/api/decorate/draft` | 否 | 保存草稿 |
-| POST | `/api/decorate/discard` | 否 | 丢弃草稿 |
-| GET | `/api/decorate/diff` | 否 | 草稿 vs 已发布变更清单 |
-| POST | `/api/decorate/publish` | 否 | 发布（写回 `replica.js`，双重校验 + 失败回滚） |
-| POST | `/api/decorate/rollback` | 否 | 回滚历史版本（`mode=publish` 可直接发布） |
-| GET | `/api/decorate/stats` | 否 | 装修数据统计 |
-| GET | `/api/decorate/link-options` | 否 | 可选跳转目标清单（小程序页面 / 商品 / 资讯栏目），供装修台「选择链接」弹层使用 |
+| GET | `/api/decorate/pages` | viewer | 页面列表（含组件库清单、自定义页配额与新建模板） |
+| GET | `/api/decorate/templates` | viewer | 新建模板清单 + 自定义页配额（已用 / 上限 20） |
+| POST | `/api/decorate/page/create` | **owner** | 新建自定义页面（只建后台条目，生成代码后才下发小程序） |
+| POST | `/api/decorate/page/rename` | **owner** | 改自定义页名称 / 备注 / 标识（标识变更会迁移草稿、版本、别名与 replica 键名） |
+| POST | `/api/decorate/page/delete` | **owner** | 删除自定义页面（清草稿与版本，并重新生成 `replica.js`） |
+| GET | `/api/decorate/lib` | viewer | 组件库清单（常用 / 基础 / 高级三 tab，含 SVG 图标；基础组件另带 `groups` 真实分组、每项 `ok` 是否已接入与 `why` 未接入原因） |
+| GET | `/api/decorate/page` | viewer | 单页详情（schema + 已发布 + 草稿 + 版本） |
+| POST | `/api/decorate/draft` | operator | 保存草稿 |
+| POST | `/api/decorate/discard` | operator | 丢弃草稿 |
+| GET | `/api/decorate/diff` | viewer | 草稿 vs 已发布变更清单 |
+| POST | `/api/decorate/publish` | **owner** | **生成代码**（写回 `replica.js`，双重校验 + 失败回滚） |
+| POST | `/api/decorate/rollback` | **owner** | 回滚历史版本（`mode=publish` 可直接生成代码） |
+| GET | `/api/decorate/stats` | viewer | 装修数据统计 |
+| GET | `/api/decorate/link-options` | viewer | 可选跳转目标清单（小程序页面 / 商品 / 资讯栏目），供装修台「选择链接」弹层使用 |
 
 ### 素材库（5）
 
-| 方法 | 路径 | 鉴权 | 说明 |
+> 全部需要管理员令牌。**删除 / 文件夹增删改名 / 移动**是不可逆动作，统一要求 `owner`。
+
+| 方法 | 路径 | 最低角色 | 说明 |
 |---|---|---|---|
-| POST | `/api/media/upload` | 否 | 上传图片（multipart 多张 / JSON base64），返回相对路径与尺寸 |
-| GET | `/api/media/list` | 否 | 素材列表：`q` / `sort` / `page` / `size` + 用量统计 |
-| POST | `/api/media/delete` | 否 | 删除素材（被页面引用时需 `force=1`） |
-| POST | `/api/media/folder` | 否 | 文件夹增删改名（逻辑分类，不动磁盘文件） |
-| POST | `/api/media/move` | 否 | 批量移动素材到文件夹 |
+| POST | `/api/media/upload` | operator | 上传图片或视频（multipart 多张 / JSON base64），返回相对路径与尺寸；按**文件头魔数**判类型，SVG 一律拒收 |
+| GET | `/api/media/list` | viewer | 素材列表：`q` / `sort` / `kind` / `folder` / `page` / `size` + 用量统计 |
+| POST | `/api/media/delete` | **owner** | 删除素材（被页面 / 商品 / 草稿引用时需 `force=1`） |
+| POST | `/api/media/folder` | **owner** | 文件夹增删改名（逻辑分类，不动磁盘文件） |
+| POST | `/api/media/move` | **owner** | 批量移动素材到文件夹 |
 
-### 后台控制台（28）
+### 后台控制台（30）
 
-供后台控制台 `server/public/console` 使用，全部免登录（`auth: false`）。
+供后台控制台 `server/public/console` 使用。**全部要求管理员令牌**：`GET` 需 `viewer`，
+普通写操作需 `operator`，删除类（删商品 / 分类 / 券模板）与改店铺设置需 `owner`。
+两个例外：`POST /api/admin/login`（用口令换会话，本身不要求令牌）与
+`GET /api/admin/session`（回显当前身份，需令牌）。
 
 | 分组 | 方法 · 路径 | 说明 |
 |---|---|---|
+| 会话 | POST `/api/admin/login` | 口令换管理员会话令牌（60 秒内错 5 次退避 1 分钟） |
+| | GET `/api/admin/session` | 回显当前身份（角色 / 名称 / 来源）；前端启动时用它把「只有令牌没有身份」的缓存补齐 |
 | 概览 | GET `/api/admin/dashboard` | 今日 / 近 7 日 / 近 30 日 / 累计 GMV、待办、状态计数、趋势、Top 商品、库存预警、最近订单 |
 | 商品 | GET `/api/admin/goods/list` | 全量商品（含下架）：关键词 / 分类 / 状态 / 库存预警 / 排序 / 分页 |
 | | GET `/api/admin/goods/detail` | 编辑态商品（含下架）+ 分类选项 |
@@ -581,7 +632,9 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 | 设置 | GET `/api/admin/settings` | 店铺设置当前值 + 默认值 + 资产数量 |
 | | POST `/api/admin/settings/save` | 保存店铺设置 |
 
-> 装修 14 个 + 素材 3 个 + 后台 28 个免登录点位均属运营管理功能，**上线必须在网关层加访问控制**（见「上线前必做」）。设置 `DEBUG_PAGE=off` 可把它们连同三个管理页面一起关掉（返回 403），但那是「全有或全无」，替代不了按角色的登录态鉴权。
+> 装修 14 个 + 素材 5 个 + 后台 30 个点位均属运营管理功能，**全部要求管理员令牌**（见「二、环境变量 → 管理端鉴权」）。
+> `DEBUG_PAGE=off` 是另一道防线：它会把这些接口连同四个管理页面一起 403 掉。
+> 两者**不是替代关系** —— 开关是「全开或全关」，权限是「按角色细分」，上线时两个都要正确。
 
 ---
 
@@ -637,15 +690,26 @@ GET /uploads/<yyyyMM>/<文件名>                            ← 对外访问（
 
 ### 鉴权
 
-```
-Authorization: Bearer <token>
-```
+两个**互不通用**的体系，各自一个请求头，都走 `Authorization: Bearer <token>`：
 
-JWT（HS256），默认 7 天。token 失效时返回 HTTP 401 + `code: 401`，前端清 token 后重新静默登录。
+| 体系 | 覆盖点位 | 令牌来源 | 失效表现 |
+|---|---|---|---|
+| 小程序用户 | `/api/cart/*`、`/api/order/*`、`/api/address/*`、`/api/coupon/*`、`/api/user/*` 等 | `POST /api/auth/login`（微信 code） | HTTP 401 + `code: 401`，前端清 token 后重新静默登录 |
+| 管理员 | `/api/admin/*`、`/api/decorate/*`、`/api/media/*` | `POST /api/admin/login`（口令）或环境变量 `ADMIN_TOKENS` | 无令牌 → HTTP 401 + `code: 401`；角色不足 → **HTTP 403 + `code: 403`** |
+
+两者刻意不能混用（`server/lib/adminAuth.js`）：
+
+- 管理员令牌的 payload 只有 `admin: true`，**没有 `userId`** → 走用户链路拿不到任何用户身份；
+- 用户令牌没有 `admin` 标记 → 管理链路一律拒绝，**不会因为「有 token」就放行**。
+
+JWT 默认有效期：用户 7 天（`JWT_TTL`），管理员 12 小时（`ADMIN_TTL`）。
+管理员口令登录 60 秒内错 5 次退避 1 分钟（单进程内存计数，目标是挡在线爆破）。
 
 ### 安全红线
 
-- `AppSecret` / 商户密钥 / JWT 密钥**只从环境变量读**，代码与文档零明文
+- `AppSecret` / 商户密钥 / JWT 密钥 / 管理员口令与令牌**只从环境变量读**，代码与文档零明文
+- 管理接口**按角色细分**：`GET` 要 `viewer`、日常写要 `operator`、不可逆动作要 `owner`
+- 「关掉管理页面」不等于「关掉管理接口」：两者同受 `DEBUG_PAGE` 约束，且管理接口**另有一道身份门**
 - 下单金额一律由服务端重新计算，前端传值仅作展示
 - 下单即锁库存，取消 / 超时释放
 - 支付回调验签 + 幂等（同一 `transactionId` 只处理一次）
@@ -745,20 +809,75 @@ node server/tools/check-all.mjs
 
 输出：控制台表格 + `server/CONNECTIVITY.md` 报告。
 
+> 报告落点可用 `CHECK_ALL_REPORT=<路径>` 改道。`test-inject-server-error.mjs` 这类
+> 「故意把接口跑坏」的实验必须改道，否则那份注定带 ❌ 的报告会盖掉真实报告，
+> 让后来的人以为自检真的有十几个失败。
+
+### 判定口径（整改报告 15）
+
+「预期失败」的用例**不是**「业务码非 0 就算拦住」。判定集中在 `server/tools/expect.mjs`（纯函数，被单测直接喂输入断言），必须同时满足：
+
+1. 请求必须真的完成（网络层 `errMsg` 即失败）；
+2. **HTTP 状态 + 业务码都要等于期望值**（如「未登录」必须 `401 / 401`，「未注册路径」必须 `404 / 404`）；
+3. 服务端异常一律判失败：`code 5000` 或 HTTP 5xx **永远不能算「已拦住」**——那正是本轮整改要堵的洞；
+4. 写操作还要额外断言**数据没有被改动**。
+
+`check-all.mjs` 另有两道自保：汇总口径在最后**现算**（不会漏报本节之后的断言），
+以及 `uncaughtException` / `unhandledRejection` 钩子（自检自己崩了也要先输出报告）。
+
+### 可独立执行的非交易测试入口
+
+装修 / 素材 / 鉴权 / 契约这些「非交易」回归**不依赖下单链路**，可以单独跑（整改报告 15 的交付要求）：
+
+```bash
+node .tooling/test-nontrade.mjs        # 88 项：MALL_DATA_DIR + MALL_REPLICA_FILE 指向临时目录，
+                                       # 末节自断言「server/data 与 replica.js 未被改动」
+node .tooling/test-admin-auth.mjs      # 62 项：三级角色矩阵 / 用户令牌不能进管理接口 / 口令退避
+node .tooling/test-media.mjs           # 48 项：素材库全链路（含安全用例）
+node .tooling/test-inject-server-error.mjs  # 故意注入 500，验证「服务端异常必须被判成失败」
+node .tooling/probe-custom.cjs         # 40 项：自定义页 lib 层
+node .tooling/probe-custom-http.cjs    # 36 项：自定义页 HTTP 层
+node .tooling/probe-resilience.cjs     # 18 项：持久化韧性（篡改数据文件后应备份重建）
+node .tooling/clean-fixtures.mjs       # 清掉测试夹具残留（配额触顶时降级为「搬离」并提示）
+```
+
+浏览器侧（需先起服务；素材库 UI 用 jsdom，`NODE_PATH` 指向本机 node 工作区）：
+
+```bash
+NODE_PATH=<node工作区>/node_modules node .tooling/test-media-ui.mjs   # 81 项：jsdom 真点击
+node .tooling/test-page-occlusion.mjs                                 # 44 项：真 Chrome 查整页遮挡
+node .tooling/test-media-layout.mjs                                   # 21 项：真 Chrome 量卡片像素
+node .tooling/check-admin-nav.mjs                                     # 18 项：CDP 实测装修台导航与 /preview
+```
+
+> 浏览器侧脚本都会自己换一个管理员会话（`ADMIN_TOKEN` → `ADMIN_PASSWORD` → 非生产默认 `admin`），
+> 并断言「页面不是停在登录层上」——否则它们会对着登录遮罩量出一片「干净」。
+
 ---
 
 ## 七、上线前必做
 
 1. **设置 `JWT_SECRET`**：`NODE_ENV=production` 且未设置时服务会**拒绝启动**（不是只打一行警告）。开发默认密钥 `dev-only-secret-change-me` 是公开的，带它上线等于所有人可伪造任意用户登录态。生成方式：`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`
 2. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，并补微信支付 v3 证书签名（`lib/wechat.js` 的 `unifiedOrder` 已标注接入点）
-3. 关闭模拟支付：`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`（同时会关闭三个管理页面与三类管理接口）
-4. **装修后台 + 素材库 + 后台控制台加访问控制**：`/api/decorate/*`（14 个）、`/api/media/*`（5 个）、`/api/admin/*`（28 个）均未做鉴权。风险最高的是 `/api/media/upload`（文件写入，无鉴权时任何人都能往服务器写文件占满磁盘）、`/api/admin/goods/*` 与 `/api/admin/settings/save`（可直接改商品与店铺配置）。**兜底手段**：设 `DEBUG_PAGE=off`（或 `NODE_ENV=production`），三个管理页面与这三类接口会一起返回 403 —— 已由自检的「安全开关」断言锁定，不会再出现「页面关了、接口还开着」的假关闭。**但这只是兜底**：它是全开/全关，无法按角色区分，正式环境仍应在网关层限制来源 / 加登录态。
-5. **素材目录纳入备份与容量监控**：`server/data/uploads/`（与 `db.json`、`catalog.json` 同处 `server/data`，一个目录即可整体备份；建议加磁盘水位告警，并考虑后续迁移到对象存储 / CDN）
-6. 域名备案 + HTTPS 证书，小程序后台配置 `request` 合法域名（**同时要把上传图片的域名加进 `downloadFile` 合法域名**，否则小程序端显示不出素材库的图）
-7. 存储切到 MySQL / Redis（`lib/store.js` 业务数据 + `lib/catalogStore.js` 运营资产）
-8. 支付回调地址在小程序后台配置为 `https://<域名>/api/pay/notify`
-9. 商品数据接入真实商品库：`catalog.json` 首次由 `lib/seed.js` 迁移生成，接入 ERP / 商品中心后替换该迁移源即可（后台已在用它，切换时不需改路由）
-10. 登录接口加频次限制：`/api/auth/login` 目前无失败次数 / 速率限制，可被无限尝试；建议在网关层或 `lib/auth.js` 加滑动窗口限流
+3. 关闭模拟支付：`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`
+4. **配置管理员凭证**（整改报告 08 已完成鉴权，缺的是**上线配置**）：设置 `ADMIN_PASSWORD`
+   （或 `ADMIN_TOKENS` 给不同的人发不同角色）。`NODE_ENV=production` 且两样都没有时服务**拒绝启动** ——
+   开发期的默认口令 `admin` 只在非 production 生效。
+   - `/api/admin/*`（30 个）、`/api/decorate/*`（14 个）、`/api/media/*`（5 个）**已全部要求管理员令牌**，
+     并按 `viewer` / `operator` / `owner` 三级角色细分，删除与生成代码这类不可逆动作收紧到 `owner`；
+   - **网关层仍建议再加一道**（限制来源 IP / VPN）：登录态挡得住匿名，挡不住「凭证泄漏」；
+   - **兜底开关**：设 `DEBUG_PAGE=off`（或 `NODE_ENV=production`）可把四个管理页面与这三类接口一起 403。
+     自检已锁定「页面与接口同受一个开关约束」，不会再出现「页面关了、接口还开着」的假关闭。
+5. **管理员登录接口的频次限制**：`/api/admin/login` 已内置 60 秒 / 5 次的单进程退避，
+   但多实例部署时各进程各算一份，正式环境建议在网关层再加一层全局限流。
+6. **素材目录纳入备份与容量监控**：`server/data/uploads/`（与 `db.json`、`catalog.json` 同处 `server/data`，一个目录即可整体备份；建议加磁盘水位告警，并考虑后续迁移到对象存储 / CDN）
+7. 域名备案 + HTTPS 证书，小程序后台配置 `request` 合法域名（**同时要把上传图片的域名加进 `downloadFile` 合法域名**，否则小程序端显示不出素材库的图）
+8. 存储切到 MySQL / Redis（`lib/store.js` 业务数据 + `lib/catalogStore.js` 运营资产）
+9. 支付回调地址在小程序后台配置为 `https://<域名>/api/pay/notify`
+10. 商品数据接入真实商品库：`catalog.json` 首次由 `lib/seed.js` 迁移生成，接入 ERP / 商品中心后替换该迁移源即可（后台已在用它，切换时不需改路由）
+11. 小程序端「生成代码」后的发布流程：装修台的「生成代码」只写 `miniprogram/config/replica.js`，
+    **必须再上传并发布小程序新版本**才在真机生效（详见「九、已知边界与整改说明」）
+12. 登录接口加频次限制：`/api/auth/login` 目前无失败次数 / 速率限制，可被无限尝试；建议在网关层或 `lib/auth.js` 加滑动窗口限流
 
 ---
 
@@ -846,8 +965,85 @@ WX_CODE=<真实 code> node .tooling/probe-deployed.mjs
 
 ### 当前仍在生效的取舍
 
-- `DEBUG_PAGE=off` + `NODE_ENV=production` → `/admin`、`/console`、`/debug`、`/preview` 与 44 个运营接口在公网**全部 403**（已实测）。**因此装修台继续在本机用**（它的「发布」要写 `miniprogram/config/replica.js`）。想远程装修就设 `DEBUG_PAGE=1`，但那等于把管理后台开到公网，**必须先加鉴权**。
+- `DEBUG_PAGE=off` + `NODE_ENV=production` → `/admin`、`/console`、`/debug`、`/preview` 与 44 个运营接口在公网**全部 403**（已实测）。
+- **线上实例现在跑的还是「只有开关、没有登录态」的旧版本**：管理接口在公网被 403 只是因为 `DEBUG_PAGE=off`。
+  重新部署本仓库代码后，管理接口会**同时**要求管理员令牌 —— 届时若 `ADMIN_PASSWORD` / `ADMIN_TOKENS` 都没配，
+  `NODE_ENV=production` 下服务会直接拒绝启动（这是有意为之：宁可不启动，也不裸奔）。
+- **装修台的「生成代码」继续建议在本机用**：它要写 `miniprogram/config/replica.js`（代码包内文件），
+  服务器上写没有意义（线上生效靠小程序发版，不靠服务端改文件）。
+  想远程装修就设 `DEBUG_PAGE=1` + 配好 `ADMIN_PASSWORD`，但那等于把管理后台开到公网，请配合网关限来源。
 - `ALLOW_MOCK_PAY=1` → 保留模拟支付，方便手机端跑完下单链路；接真实微信支付后删掉这一行。
 - 未配 `WX_APPID` / `WX_SECRET` → 登录走 mock，**同一个 code 稳定映射同一 openid，但每个新 code 都是新账号**（`md5(code)` 派生）。小程序端是「有 token 就不重登」，所以单台设备账号能保持；一旦 token 过期或清缓存就会变成新用户，购物车/订单不连续。要彻底解决就填上 `WX_APPID` + `WX_SECRET`。
 - 仍是 **IP + HTTPS，没有域名**：开发者工具需勾「不校验合法域名」，真机/体验版需在胶囊菜单里打开「开发调试」。正式提审必须换成已备案域名（微信不接受 IP）。
+
+---
+
+## 九、已知边界与整改说明
+
+本仓库按《小程序商城非交易功能整改报告》（15 条，明确**不含**结算 / 订单交易 / 支付收款与退款）
+做过一轮完整整改。这里只记录**边界、取舍与需要产品决策的事**，逐条的处理结果见交付说明。
+
+### 9.1 「生成代码」≠ 线上生效（报告 09）
+
+装修台把草稿写进 `miniprogram/config/replica.js`，而在**已发布的小程序**里，
+`replica.js` 是代码包内的文件 —— 改服务器上的这份文件不会影响任何已发布版本。
+
+- 因此界面上所有「发布」字样统一改成**「生成代码」**，并在成功提示里写明
+  「还需在微信开发者工具里上传并发布新版本才在真机生效」。
+- 「页面列表 / 装修台」另有一处易误解的地方：**草稿是后台数据，生成代码才是前端数据**，
+  两者不是同一份东西。
+- **待产品决策**：是否需要「实时生效」的发布方式（改为服务端下发 JSON、小程序端启动时拉取）。
+  本次**未采用**，因为那会把「内容」从代码包里搬到网络请求上，需要额外的缓存 / 降级 / 审核策略。
+
+### 9.2 店铺设置的数据源（报告 10）
+
+`SHOP`（店铺名 / Logo / 客服电话 / 公告…）的真源是 `replica.js` 里的装修数据，
+后台控制台的「店铺设置」读写的是 `catalog.json`。两者若不打通，就会出现
+「后台改了设置、小程序没变」。
+
+- 现状：`/api/admin/settings/save` **对 `SHOP` 覆盖的字段直接拒绝**（`code 1001`），
+  提示去装修台改 —— 宁可「改不了并说清楚」，也不要「改了但没效果」。
+- **待产品决策**：把店铺设置也纳入装修数据流（装修台里已有对应字段），
+  还是把 `SHOP` 迁到 `catalog.json` 并由装修数据引用。
+
+### 9.3 自定义页改标识后旧链接（报告 11）
+
+自定义页标识（`key`）变更会连带迁移草稿、版本快照与 `replica.CUSTOM_PAGES` 的键名。
+已经分享出去的旧链接（`pages/custom/index?key=旧标识`）会失效。
+
+- 现状：发布时写入 `replica.CUSTOM_PAGE_ALIASES`（旧标识 → 新标识），
+  小程序端命中旧标识时 `redirectTo` 到新标识，旧链接继续可用。
+- 边界：别名只保留**一层**（A→B→C 只认最近一次），且不做无限累积。
+
+### 9.4 「我的」页面的登录与工具入口（报告 12）
+
+未登录时「我的」页展示登录按钮（`open-type="getUserInfo"` 已不推荐，改用
+`wx.getUserProfile` / 手机号快速验证的落地位已预留），
+非交易工具入口（客服 / 意见反馈 / 常见问题 / 关于我们）已接入；
+**需要真实 AppID 与客服消息配置**的入口在本地 mock 下是「可点但提示未配置」，不会假装可用。
+
+### 9.5 加载失败不能表现成「空白」（报告 13）
+
+所有列表 / 详情页区分三种状态并各自有文案与重试入口：
+**加载中** / **加载失败（含原因 + 重试按钮）** / **空数据（含筛选条件说明）**。
+历史上最坑的一种是「请求失败 → 列表为空 → 页面显示『暂无商品』」，
+让人以为商品下架了。现在失败态一律带红色的原因文案与「重试」。
+
+### 9.6 请求体解析不猜类型（报告 14）
+
+`parseBody` 对 **JSON 请求体不做任何类型猜测**：
+`detail: "010010"` 读回仍是字符串（曾经被当成数字，前导零丢失）；
+`null` / `123` / `"abc"` / `[1,2]` 这些「合法 JSON 但不是对象」的体一律
+`HTTP 400 + code 1001`，且**数据不变**。
+只有 `application/x-www-form-urlencoded` 才对白名单键做数字归一。
+容错只捕「确知的那一种失败」（`JSON.parse`），其余异常向上抛。
+
+### 9.7 本机开发的两个环境限制
+
+- **批量删除配额**：开发环境对单进程的删除次数有限制（50 次 / 进程），触顶后
+  `POST /api/media/delete` 会返回 `code 2000`（消息里带 `[safe-delete]`）。
+  这不是产品缺陷 —— 重启服务进程即可恢复；`.tooling/clean-fixtures.mjs` 会在触顶时
+  自动降级为「把文件搬出 `uploads/`」，并在配额恢复后真删。
+- **自检会写 `replica.js` 与 `server/CONNECTIVITY.md`**：`server/data/` 与 `.tooling/`
+  都已 gitignore，这两个文件的变动属于预期噪音。
 

@@ -29,6 +29,9 @@
       <span class="crumb" id="pgCrumb"></span>
       <div class="grow"></div>
       <span class="meta" id="topMeta"></span>
+      <!-- 管理员身份：登录前所有 /api/admin/* 都会 401，点这里用口令或长期令牌登录 -->
+      <span class="tag ghost" id="whoTag">未登录管理员</span>
+      <button class="btn sm" id="btnWho" title="使用管理员口令或长期令牌登录">登录</button>
       <button class="btn sm" id="btnReload" title="重新拉取当前页面数据">⟳ 刷新</button>
     </header>
     <main class="body" id="body"></main>

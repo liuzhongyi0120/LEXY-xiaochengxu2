@@ -13,6 +13,51 @@
 
 完整部署步骤、机器信息、端口/证书链路、回滚方式见 `../server/README.md` 的「八、已部署实例（腾讯云 CVM）」。
 
+> ⚠️ **重新部署前必读：管理端鉴权（整改报告 08）**
+>
+> 新版本给 `/api/admin/*`、`/api/decorate/*`、`/api/media/*` 共 49 个运营点位加了**管理员令牌校验**。
+> 生产环境的 `.env` 里**没有** `ADMIN_PASSWORD` / `ADMIN_TOKENS`，所以：
+>
+> | 场景 | 结果 |
+> |---|---|
+> | `DEBUG_PAGE=off`（当前线上配置） | `ADMIN_PAGE` 回落为关 → 四个管理页面与 49 个管理接口**一律 403**，服务正常启动。**线上行为与现在完全一样，不会有任何变化** |
+> | `ADMIN_PAGE=1` 但没配 `ADMIN_PASSWORD` | **服务拒绝启动**（`[fatal] ... 未配置任何管理员凭证`）。这是有意为之：宁可起不来，也不要「后台开着但谁都能进」 |
+> | `ADMIN_PAGE=1` 且 `NODE_ENV=production` 且用的是默认口令 `admin` | 同样**拒绝启动** |
+>
+> 结论：**只要不动 `DEBUG_PAGE`，重新部署是安全的**。想启用远程运营后台，先按下面「配置管理员登录」加凭证，再开 `ADMIN_PAGE=1`。
+> 部署后跑一次 `node .tooling/probe-deployed.mjs` 确认「管理页面与接口在公网确实被拒」。
+
+## 配置管理员登录（ADMIN_PASSWORD / ADMIN_TOKENS）
+
+`/admin`、`/console` 与 49 个管理接口需要的管理员身份，来源是下面两项之一（可同时配）：
+
+```bash
+ENV=/opt/lexy-mall/.env
+cp -a "$ENV" "$ENV.bak.$(date +%Y%m%d-%H%M%S)"
+
+# ① 口令登录：换到的是「超级管理员」会话（12 小时有效）
+printf 'ADMIN_PASSWORD=%s\n' "$(openssl rand -base64 18)" >> "$ENV"     # 或用你记得住的强口令
+
+# ② 分角色长期令牌（JSON）：给脚本 / 不同的人发不同权限，可只读
+printf 'ADMIN_TOKENS=%s\n' '{"<至少8位的令牌>":{"role":"operator","name":"运营A"}}' >> "$ENV"
+
+chmod 600 "$ENV"
+systemctl restart lexy-mall
+tail -8 /var/log/lexy-mall.log     # 应出现「管理员凭证 已配置（长期令牌 N 条）」
+```
+
+角色三级：`viewer` 只读 / `operator` 日常运营 / `owner` 高危（删素材、生成代码、删商品分类券、改店铺设置）。
+
+启用远程后台（**想清楚再做**）：
+
+```bash
+printf 'ADMIN_PAGE=1\n' >> "$ENV" && chmod 600 "$ENV" && systemctl restart lexy-mall
+```
+
+> 打开 `ADMIN_PAGE=1` 等于把管理后台开到公网。**至少**要配合 nginx 限制来源 IP / VPN，
+> 登录态只挡得住匿名，挡不住凭证泄漏。另外装修台的「生成代码」写的是服务器上的
+> `miniprogram/config/replica.js`，**对线上小程序没有任何影响** —— 线上生效仍然靠发新版本。
+
 ## 配置真实微信登录（WX_APPID / WX_SECRET）
 
 `setup-server.sh` 生成的 `.env` 里**没有**微信密钥，此时后端走本地模拟登录：

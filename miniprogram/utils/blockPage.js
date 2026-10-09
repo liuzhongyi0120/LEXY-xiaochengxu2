@@ -12,11 +12,34 @@
  */
 
 const { openLink } = require('./link');
+const { loadGoodsData } = require('./blocks');
 
 const GOODS_LIST = '/packageGoods/list/list';
 const GOODS_DETAIL = '/packageGoods/detail/detail';
 
 const blockPageBehavior = {
+  /**
+   * 商品区块的实时数据（装修里存的是快照，价格库存会过期）。
+   * 首页与自定义页共用这一份实现 —— 两边各写一遍的话，改了一处漏一处就会出现
+   * 「首页商品点得动、活动页点不动」这类只在某个页面复现的问题。
+   */
+  loadGoodsBlocks() {
+    return loadGoodsData(this.data.blocks || []).then((next) => {
+      if (next && Object.keys(next).length) this.setData(next);
+      return next;
+    });
+  },
+
+  /**
+   * 点商品区块的失败占位重试。
+   * 之所以做成点击重试而不是只提示「加载失败」：小程序 tab 页切走再回来走的是 onShow，
+   * onLoad 不会重跑，「重进页面」其实恢复不了。
+   */
+  onRetryGoods() {
+    wx.showLoading({ title: '重新加载中', mask: true });
+    return this.loadGoodsBlocks().then(() => wx.hideLoading(), () => wx.hideLoading());
+  },
+
   /** 图片加载失败兜底，避免出现破图 */
   onImgError(e) {
     const { index } = e.currentTarget.dataset;

@@ -7,11 +7,23 @@
  * 与首页的区块完全同构，所以渲染逻辑直接复用 utils/blocks.js。
  *
  * 打开方式：/pages/custom/index?key=页面标识
+ *
+ * 旧标识兼容：运营在装修台改过标识的页面，旧地址（已经分享到聊天/朋友圈、印在二维码里、
+ * 被其他页面链接引用）会落在 replica.CUSTOM_PAGE_ALIASES 里，这里查到就转到新标识。
+ * 不这么做的话，运营改个名字就会让一批已经发出去的链接变成空白页。
  */
 
 const replica = require('../../config/replica');
-const { normalizeBlocks, loadGoodsData, applyShopAvatar } = require('../../utils/blocks');
+const { resolveAssets } = require('../../utils/asset');
+const { normalizeBlocks, applyShopAvatar } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
+
+/** 店铺头像可能是后台上传的 /uploads/… 相对路径，必须过一遍素材地址解析（首页同理） */
+const SHOP = resolveAssets(replica.SHOP || {});
+
+const CUSTOM_PAGES = replica.CUSTOM_PAGES || {};
+/** 旧标识 → 新标识（装修台改标识时登记，随发布写进 replica） */
+const ALIASES = replica.CUSTOM_PAGE_ALIASES || {};
 
 Page(Object.assign({}, blockPageBehavior, {
   data: {
@@ -23,27 +35,34 @@ Page(Object.assign({}, blockPageBehavior, {
   },
 
   onLoad(query) {
-    const key = (query && query.key) || '';
-    const page = (replica.CUSTOM_PAGES || {})[key];
+    const asked = (query && query.key) || '';
+    // r=1 表示这是别名跳转过来的第二次进入：再找不到就只能认「页面不存在」，避免来回跳
+    const redirected = !!(query && query._r);
 
-    // 找不到页面：多半是运营建了页面但还没点「发布」，或标识填错了
+    // 旧标识：转到新标识（redirectTo 换掉页面栈里的地址，分享出去的就是新地址）
+    if (!CUSTOM_PAGES[asked] && ALIASES[asked] && !redirected) {
+      wx.redirectTo({ url: '/pages/custom/index?key=' + ALIASES[asked] + '&_r=1' });
+      return;
+    }
+
+    const page = CUSTOM_PAGES[asked];
+
+    // 找不到页面：多半是运营建了页面但还没点「生成代码」，或标识填错了
     if (!page) {
-      this.setData({ key: key, missing: true, title: '页面不存在' });
+      this.setData({ key: asked, missing: true, title: '页面不存在' });
       wx.setNavigationBarTitle({ title: '页面不存在' });
       return;
     }
 
-    const blocks = applyShopAvatar(normalizeBlocks(page.blocks || []), (replica.SHOP && replica.SHOP.avatar) || '');
+    const blocks = applyShopAvatar(normalizeBlocks(page.blocks || []), SHOP.avatar || '');
     this.setData({
-      key: key,
+      key: asked,
       title: page.name || '活动页',
       meta: page.meta || { bg: '#F5F6F8' },
       blocks: blocks
     }, () => {
-      // 商品区块要实时数据，装修时存的是快照
-      loadGoodsData(blocks).then((next) => {
-        if (next && Object.keys(next).length) this.setData(next);
-      });
+      // 商品区块要实时数据，装修时存的是快照（与首页共用同一份实现）
+      this.loadGoodsBlocks();
     });
 
     wx.setNavigationBarTitle({ title: page.name || '活动页' });

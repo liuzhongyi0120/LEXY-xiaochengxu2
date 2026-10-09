@@ -47,4 +47,30 @@ function resolveDebugPage(raw, nodeEnv) {
   return false;
 }
 
-module.exports = { resolveDebugPage, isKnownDebugPageValue, TRUTHY, FALSY, normalize };
+/**
+ * 是否开放**运营后台页面**（`/admin` 装修台 与 `/console` 控制台）。
+ *
+ * 为什么单独一个开关：
+ *   「调试入口」和「正式运营后台」是两件事 —— 前者（`/debug`、`/preview`、`/mp-src`）
+ *   是开发用具，越少开越好；后者是运营日常要用的。
+ *   一个总开关要么把两者一起关死（运营没法干活），要么一起打开（把调试台也敞出去）。
+ *
+ * 取值规则与 DEBUG_PAGE 完全一致（同一套「失败往安全侧倒」的判定）：
+ *   - 未设置 → **回落 DEBUG_PAGE**（保持历史上线脚本的兼容，不会因为新增开关就把后台关掉）
+ *   - 1/on/true/yes 开、0/off/false/no 关、其它值一律关
+ */
+function resolveAdminPage(raw, debugPage) {
+  const v = normalize(raw);
+  if (v === '') return !!debugPage;
+  if (TRUTHY.indexOf(v) > -1) return true;
+  if (FALSY.indexOf(v) > -1) return false;
+  return false;
+}
+
+/** 该取值是否被识别（未设置也算识别） */
+function isKnownFlagValue(raw) {
+  const v = normalize(raw);
+  return v === '' || TRUTHY.indexOf(v) > -1 || FALSY.indexOf(v) > -1;
+}
+
+module.exports = { resolveDebugPage, resolveAdminPage, isKnownDebugPageValue, isKnownFlagValue, TRUTHY, FALSY, normalize };

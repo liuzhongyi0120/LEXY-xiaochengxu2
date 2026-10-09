@@ -1,0 +1,4277 @@
+{
+ "at": "2026-10-08T06:24:42.777Z",
+ "items": {
+  "标题文本": {
+   "name": "标题文本",
+   "type": "title_text,title,text",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FjAs6eTmbK_4lQRI3GYXu97Fj_B_.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效",
+     "传统样式",
+     "微信图文样式",
+     "标题内容",
+     "⟨input 提示=请输入标题⟩",
+     "描述内容",
+     "⟨textarea:textarea 提示=请输入要说明的文字，最多 500 字⟩",
+     "显示位置",
+     "居左显示",
+     "标题大小",
+     "大 (16号)",
+     "描述大小",
+     "小 (12号)",
+     "标题粗细",
+     "加粗体",
+     "描述粗细",
+     "常规体",
+     "标题颜色",
+     "#323233",
+     "重置",
+     "描述颜色",
+     "#969799",
+     "重置",
+     "背景颜色",
+     "透明色",
+     "重置",
+     "底部分割线",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "查看更多",
+     "不显示",
+     "⟨input:checkbox ☐⟩"
+    ],
+    "text": "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效 | 传统样式 | 微信图文样式 | 标题内容 | ⟨input 提示=请输入标题⟩ | 描述内容 | ⟨textarea:textarea 提示=请输入要说明的文字，最多 500 字⟩ | 显示位置 | 居左显示 | 标题大小 | 大 (16号) | 描述大小 | 小 (12号) | 标题粗细 | 加粗体 | 描述粗细 | 常规体 | 标题颜色 | #323233 | 重置 | 描述颜色 | #969799 | 重置 | 背景颜色 | 透明色 | 重置 | 底部分割线 | 不显示 | ⟨input:checkbox ☐⟩ | 查看更多 | 不显示 | ⟨input:checkbox ☐⟩",
+    "ctrlCount": 4,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "请输入标题",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "TEXTAREA",
+      "ty": "textarea",
+      "ph": "请输入要说明的文字，最多 500 字",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "富文本": {
+   "name": "富文本",
+   "type": "rich_text_weapp,rich_text",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FloUI22mSkzU6U70Ayuvf3hayCwH.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "小程序富文本展示以实际效果为准，左侧预览仅供参考",
+     "背景颜色",
+     "重置",
+     "全屏显示",
+     "⟨input:radio ○⟩",
+     "显示",
+     "⟨input:radio ◉⟩",
+     "隐藏",
+     "段落",
+     "字号",
+     "字数统计"
+    ],
+    "text": "小程序富文本展示以实际效果为准，左侧预览仅供参考 | 背景颜色 | 重置 | 全屏显示 | ⟨input:radio ○⟩ | 显示 | ⟨input:radio ◉⟩ | 隐藏 | 段落 | 字号 | 字数统计",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "辅助分割": {
+   "name": "辅助分割",
+   "type": "white,line,white_line",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FutbH839K4gGvY6azrrtJHYDxVqK.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "分割类型",
+     "辅助空白",
+     "空白高度",
+     "⟨input 值=30⟩"
+    ],
+    "text": "分割类型 | 辅助空白 | 空白高度 | ⟨input 值=30⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "30",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "图片广告": {
+   "name": "图片广告",
+   "type": "new_image_ad",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fgyd5N9R29QGAJXE7daGUWFpdv5z.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "轮播海报新功能：支持调整切换速度；支持分热区跳转。",
+     "一行一个",
+     "轮播海报",
+     "双层轮播",
+     "横向滑动",
+     "添加图片",
+     "尺寸推荐",
+     "添加图片",
+     "链接设置",
+     "⟨input 提示=图片提示信息（非必填）⟩",
+     "⟨input:radio ◉⟩",
+     "整体跳转",
+     "⟨input:radio ○⟩",
+     "分热区跳转",
+     "更多设置",
+     "图片样式",
+     "常规",
+     "投影",
+     "边角样式",
+     "方角",
+     "圆角",
+     "页面边距",
+     "⟨input 值=0⟩",
+     "图片间距",
+     "⟨input 值=8⟩",
+     "重叠高度",
+     "⟨input 值=0⟩"
+    ],
+    "text": "轮播海报新功能：支持调整切换速度；支持分热区跳转。 | 一行一个 | 轮播海报 | 双层轮播 | 横向滑动 | 添加图片 | 尺寸推荐 | 添加图片 | 链接设置 | ⟨input 提示=图片提示信息（非必填）⟩ | ⟨input:radio ◉⟩ | 整体跳转 | ⟨input:radio ○⟩ | 分热区跳转 | 更多设置 | 图片样式 | 常规 | 投影 | 边角样式 | 方角 | 圆角 | 页面边距 | ⟨input 值=0⟩ | 图片间距 | ⟨input 值=8⟩ | 重叠高度 | ⟨input 值=0⟩",
+    "ctrlCount": 6,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "图片提示信息（非必填）",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "热区切图": {
+   "name": "热区切图",
+   "type": "image_ad_hot_area",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/08/23/FjF_xZXI5pgtWQ2E7Q_ytLVNLmmk.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "添加图片",
+     "尺寸推荐",
+     "添加图片",
+     "链接设置",
+     "⟨input 提示=图片提示信息（非必填）⟩",
+     "添加热区",
+     "更多设置",
+     "图片样式",
+     "常规",
+     "投影",
+     "边角样式",
+     "方角",
+     "圆角",
+     "页面边距",
+     "⟨input 值=0⟩",
+     "图片间距",
+     "⟨input 值=0⟩",
+     "重叠高度",
+     "⟨input 值=0⟩"
+    ],
+    "text": "添加图片 | 尺寸推荐 | 添加图片 | 链接设置 | ⟨input 提示=图片提示信息（非必填）⟩ | 添加热区 | 更多设置 | 图片样式 | 常规 | 投影 | 边角样式 | 方角 | 圆角 | 页面边距 | ⟨input 值=0⟩ | 图片间距 | ⟨input 值=0⟩ | 重叠高度 | ⟨input 值=0⟩",
+    "ctrlCount": 4,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "图片提示信息（非必填）",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "魔方": {
+   "name": "魔方",
+   "type": "cube_v3",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fn3OcZ_ZjGc1yOGLHWQq6s3x8br5.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效",
+     "选择模板",
+     "魔方布局",
+     "选定布局区域，在下方添加图片，建议添加比例一致的图片",
+     "宽度375像素",
+     "添加图片",
+     "链接",
+     "更多设置",
+     "图片间隙",
+     "⟨input 值=0⟩",
+     "页面间距",
+     "⟨input 值=0⟩"
+    ],
+    "text": "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效 | 选择模板 | 魔方布局 | 选定布局区域，在下方添加图片，建议添加比例一致的图片 | 宽度375像素 | 添加图片 | 链接 | 更多设置 | 图片间隙 | ⟨input 值=0⟩ | 页面间距 | ⟨input 值=0⟩",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "商品搜索": {
+   "name": "商品搜索",
+   "type": "search",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FsW9Sbp2UH3-1suib4UB-RwyaR3y.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "去配置",
+     "搜索图标、方形圆角样式已升级，微商城小程序需升级到V2.219.1及以上，零售小程序需升级到V3.174.1及以上版本",
+     "显示位置",
+     "正常模式",
+     "框体样式",
+     "方形",
+     "文本位置",
+     "居左",
+     "框体高度",
+     "⟨input 值=36⟩",
+     "扫一扫",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "注：仅支持扫含有条码的商品，小程序升级至 3.29 版本后可用。",
+     "背景颜色",
+     "重置",
+     "框体颜色",
+     "重置",
+     "文本颜色",
+     "重置"
+    ],
+    "text": "去配置 | 搜索图标、方形圆角样式已升级，微商城小程序需升级到V2.219.1及以上，零售小程序需升级到V3.174.1及以上版本 | 显示位置 | 正常模式 | 框体样式 | 方形 | 文本位置 | 居左 | 框体高度 | ⟨input 值=36⟩ | 扫一扫 | 不显示 | ⟨input:checkbox ☐⟩ | 注：仅支持扫含有条码的商品，小程序升级至 3.29 版本后可用。 | 背景颜色 | 重置 | 框体颜色 | 重置 | 文本颜色 | 重置",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "36",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "图文导航": {
+   "name": "图文导航",
+   "type": "image_text_nav",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FnCMmkIRcBPKq5oeY8kX7lq_7hk4.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "图片导航样式已升级，微商城小程序需升级至V2.219.1，零售小程序需升级至V3.174.1及以上版本。小程序需升级到版",
+     "最多添加 10 个导航，拖动选中的导航可对其排序",
+     "添加图片",
+     "标题",
+     "⟨input 值=导航一⟩",
+     "链接",
+     "添加图片",
+     "标题",
+     "⟨input 值=导航二⟩",
+     "链接",
+     "添加图片",
+     "标题",
+     "⟨input 值=导航三⟩",
+     "链接",
+     "添加图片",
+     "标题",
+     "⟨input 值=导航四⟩",
+     "链接",
+     "添加图文导航",
+     "选择模板",
+     "⟨input:radio ◉⟩",
+     "图片导航",
+     "⟨input:radio ○⟩",
+     "文字导航",
+     "图片样式",
+     "⟨input:radio ◉⟩",
+     "固定",
+     "⟨input:radio ○⟩",
+     "横向滑动",
+     "背景颜色",
+     "透明色",
+     "重置",
+     "文字颜色",
+     "重置"
+    ],
+    "text": "图片导航样式已升级，微商城小程序需升级至V2.219.1，零售小程序需升级至V3.174.1及以上版本。小程序需升级到版 | 最多添加 10 个导航，拖动选中的导航可对其排序 | 添加图片 | 标题 | ⟨input 值=导航一⟩ | 链接 | 添加图片 | 标题 | ⟨input 值=导航二⟩ | 链接 | 添加图片 | 标题 | ⟨input 值=导航三⟩ | 链接 | 添加图片 | 标题 | ⟨input 值=导航四⟩ | 链接 | 添加图文导航 | 选择模板 | ⟨input:radio ◉⟩ | 图片导航 | ⟨input:radio ○⟩ | 文字导航 | 图片样式 | ⟨input:radio ◉⟩ | 固定 | ⟨input:radio ○⟩ | 横向滑动 | 背景颜色 | 透明色 | 重置 | 文字颜色 | 重置",
+    "ctrlCount": 8,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航一",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航二",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航三",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航四",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "电梯导航": {
+   "name": "电梯导航",
+   "type": "elevator_navigation",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fpy_YxZ69hGiYl-SUDkDn7Sz2sNH.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "只能选择当前组件下方的组件进行定位",
+     "选择模板",
+     "文字型",
+     "最多添加20个标签，鼠标拖拽调整标签顺序。图片建议尺寸100*100像素",
+     "标签：",
+     "⟨input 值=导航一⟩",
+     "定位：",
+     "请选择定位组件",
+     "标签：",
+     "⟨input 值=导航二⟩",
+     "定位：",
+     "请选择定位组件",
+     "标签：",
+     "⟨input 值=导航三⟩",
+     "定位：",
+     "请选择定位组件",
+     "标签：",
+     "⟨input 值=导航四⟩",
+     "定位：",
+     "请选择定位组件",
+     "添加标签（ 4 / 20）",
+     "标签样式",
+     "⟨input:radio ◉⟩",
+     "全店风格",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "展示方式",
+     "下拉展示",
+     "横向滚动",
+     "标签风格",
+     "背景模式",
+     "圆框",
+     "方框",
+     "下划线"
+    ],
+    "text": "只能选择当前组件下方的组件进行定位 | 选择模板 | 文字型 | 最多添加20个标签，鼠标拖拽调整标签顺序。图片建议尺寸100*100像素 | 标签： | ⟨input 值=导航一⟩ | 定位： | 请选择定位组件 | 标签： | ⟨input 值=导航二⟩ | 定位： | 请选择定位组件 | 标签： | ⟨input 值=导航三⟩ | 定位： | 请选择定位组件 | 标签： | ⟨input 值=导航四⟩ | 定位： | 请选择定位组件 | 添加标签（ 4 / 20） | 标签样式 | ⟨input:radio ◉⟩ | 全店风格 | ⟨input:radio ○⟩ | 自定义 | 展示方式 | 下拉展示 | 横向滚动 | 标签风格 | 背景模式 | 圆框 | 方框 | 下划线",
+    "ctrlCount": 6,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航一",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航二",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航三",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "导航四",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "视频": {
+   "name": "视频",
+   "type": "video",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FpyONVTUzVGqkAwqoh-RQeclXPo5.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "自动播放仅小程序v2.86.7及以上版本生效，其他部分功能优化（竖版视频、隐藏进度条等）支持H5和v2.86.7及以上版",
+     "视频:",
+     "选择视频",
+     "视频地址",
+     "建议上传清晰度在720P以上的视频",
+     "封面:",
+     "默认",
+     "选择图片",
+     "进度条",
+     "不显示",
+     "自动播放",
+     "视频声音",
+     "点击跳转",
+     "视频倒角:",
+     "圆角",
+     "直角",
+     "页面边距:",
+     "⟨input 值=0⟩",
+     "声音按钮:",
+     "左上",
+     "右上",
+     "左下",
+     "右下"
+    ],
+    "text": "自动播放仅小程序v2.86.7及以上版本生效，其他部分功能优化（竖版视频、隐藏进度条等）支持H5和v2.86.7及以上版 | 视频: | 选择视频 | 视频地址 | 建议上传清晰度在720P以上的视频 | 封面: | 默认 | 选择图片 | 进度条 | 不显示 | 自动播放 | 视频声音 | 点击跳转 | 视频倒角: | 圆角 | 直角 | 页面边距: | ⟨input 值=0⟩ | 声音按钮: | 左上 | 右上 | 左下 | 右下",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "店铺信息": {
+   "name": "店铺信息",
+   "type": "shop_banner_weapp,offline_shop_info",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FqZDUVBo1kNfJsQ06mureerfsFuU.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "店铺信息",
+     "线下门店",
+     "背景图片",
+     "建议尺寸：750x370 像素，尺寸不匹配时，图片将被压缩或拉伸以铺满画面",
+     "更换图片",
+     "显示样式",
+     "样式一",
+     "Logo背景色",
+     "开启",
+     "关闭"
+    ],
+    "text": "店铺信息 | 线下门店 | 背景图片 | 建议尺寸：750x370 像素，尺寸不匹配时，图片将被压缩或拉伸以铺满画面 | 更换图片 | 显示样式 | 样式一 | Logo背景色 | 开启 | 关闭",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "进入店铺": {
+   "name": "进入店铺",
+   "type": "store",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fi8Zam5inptsK9I4E2TDKsFoZCNq.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "文案",
+     "⟨input 值=进入店铺⟩"
+    ],
+    "text": "文案 | ⟨input 值=进入店铺⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "进入店铺",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "公告": {
+   "name": "公告",
+   "type": "notice_weapp,notice",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FlcvwSqlns7YVxDk8Zi2yAG6oEji.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "微商城小程序需升级到V2.143.3及以上，零售小程序需升级到V3.98.3及以上，公告自定义样式设置才能生效",
+     "⟨input 提示=请填写公告内容⟩",
+     "卡片颜色",
+     "#ffffff",
+     "重置",
+     "图标颜色",
+     "跟随全局",
+     "自定义",
+     "重置",
+     "文字颜色",
+     "#333333",
+     "重置",
+     "背景颜色",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "上下边距",
+     "无边",
+     "有边",
+     "页面边距",
+     "⟨input 值=0⟩"
+    ],
+    "text": "微商城小程序需升级到V2.143.3及以上，零售小程序需升级到V3.98.3及以上，公告自定义样式设置才能生效 | ⟨input 提示=请填写公告内容⟩ | 卡片颜色 | #ffffff | 重置 | 图标颜色 | 跟随全局 | 自定义 | 重置 | 文字颜色 | #333333 | 重置 | 背景颜色 | 透明色 | 重置 | 卡片倒角 | 直角 | 圆角 | 上下边距 | 无边 | 有边 | 页面边距 | ⟨input 值=0⟩",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "请填写公告内容",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "语音": {
+   "name": "语音",
+   "type": "audio",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FtBDARdIWohV1o7zyyazHH9x23vN.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "选择音频",
+     "选择样式",
+     "微信对话框样式",
+     "头像:",
+     "更换图片",
+     "建议尺寸80x80像素, 若不设置, 默认使用店铺logo",
+     "使用店铺logo",
+     "气泡位置",
+     "居左",
+     "播放:",
+     "⟨input:radio ◉⟩",
+     "暂停后再恢复播放时，从头开始",
+     "⟨input:radio ○⟩",
+     "暂停后再恢复播放时，从暂停位置开始"
+    ],
+    "text": "选择音频 | 选择样式 | 微信对话框样式 | 头像: | 更换图片 | 建议尺寸80x80像素, 若不设置, 默认使用店铺logo | 使用店铺logo | 气泡位置 | 居左 | 播放: | ⟨input:radio ◉⟩ | 暂停后再恢复播放时，从头开始 | ⟨input:radio ○⟩ | 暂停后再恢复播放时，从暂停位置开始",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "自定义模块": {
+   "name": "自定义模块",
+   "type": "component",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FjaLy3pshPbj0_NHZhqkxOfmMuwl.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "自定义页面模块:",
+     "添加"
+    ],
+    "text": "自定义页面模块: | 添加",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "涨粉": {
+   "name": "涨粉",
+   "type": "social_fans,official_account",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FlJyWljAYHcSZReoPTWYzrZIU4Me.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "微商城小程序需升级到V2.199.1及以上，零售小程序需升级到V3.154.1及以上，按钮倒角才能生效",
+     "是否展示二维码",
+     "展示",
+     "不展示",
+     "样式一",
+     "样式二",
+     "样式三",
+     "二维码类型",
+     "⟨input:radio ◉⟩",
+     "微信群/个人微信号",
+     "⟨input:radio ○⟩",
+     "公众号",
+     "⟨input:radio ○⟩",
+     "其他（小红书、抖音）",
+     "添加二维码：",
+     "⟨input:radio ◉⟩",
+     "活码",
+     "⟨input:radio ○⟩",
+     "图片",
+     "选择活码",
+     "*",
+     "⟨input 提示=最多 10 个字⟩",
+     "请填写描述",
+     "样式设置",
+     "卡片颜色",
+     "#FFFFFF",
+     "重置",
+     "背景颜色",
+     "透明色",
+     "重置",
+     "文字颜色",
+     "#666666",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "按钮倒角",
+     "直角",
+     "小圆角",
+     "大圆角",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "微商城小程序需升级到V2.199.1及以上，零售小程序需升级到V3.154.1及以上，按钮倒角才能生效 | 是否展示二维码 | 展示 | 不展示 | 样式一 | 样式二 | 样式三 | 二维码类型 | ⟨input:radio ◉⟩ | 微信群/个人微信号 | ⟨input:radio ○⟩ | 公众号 | ⟨input:radio ○⟩ | 其他（小红书、抖音） | 添加二维码： | ⟨input:radio ◉⟩ | 活码 | ⟨input:radio ○⟩ | 图片 | 选择活码 | * | ⟨input 提示=最多 10 个字⟩ | 请填写描述 | 样式设置 | 卡片颜色 | #FFFFFF | 重置 | 背景颜色 | 透明色 | 重置 | 文字颜色 | #666666 | 重置 | 卡片倒角 | 直角 | 圆角 | 按钮倒角 | 直角 | 小圆角 | 大圆角 | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 7,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多 10 个字",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "内容卡片": {
+   "name": "内容卡片",
+   "type": "note_card",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FqELAirekHzEliMh75G8JG5yQzGD.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "新版内容卡片，新增支持展示公众号文章；新增支持最多添加50篇",
+     "添加方式：",
+     "⟨input:radio ◉⟩",
+     "手动添加",
+     "⟨input:radio ○⟩",
+     "自动添加",
+     "最多添加50篇，按照添加顺序排列",
+     "专题名称",
+     "⟨input 提示=请输入不超过8个字专题名称 值=这里显示专题名称⟩",
+     "查看更多",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "列表样式",
+     "瀑布流",
+     "卡片样式",
+     "卡片投影",
+     "无边白底",
+     "无边透明底",
+     "卡片倒角",
+     "圆角",
+     "文本样式",
+     "加粗体",
+     "笔记标签",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "阅读数",
+     "⟨input:checkbox ☐⟩",
+     "点赞数",
+     "⟨input:checkbox ☐⟩",
+     "查看更多",
+     "不显示",
+     "⟨input:checkbox ☐⟩"
+    ],
+    "text": "新版内容卡片，新增支持展示公众号文章；新增支持最多添加50篇 | 添加方式： | ⟨input:radio ◉⟩ | 手动添加 | ⟨input:radio ○⟩ | 自动添加 | 最多添加50篇，按照添加顺序排列 | 专题名称 | ⟨input 提示=请输入不超过8个字专题名称 值=这里显示专题名称⟩ | 查看更多 | 显示 | ⟨input:checkbox ☑⟩ | 列表样式 | 瀑布流 | 卡片样式 | 卡片投影 | 无边白底 | 无边透明底 | 卡片倒角 | 圆角 | 文本样式 | 加粗体 | 笔记标签 | 显示 | ⟨input:checkbox ☑⟩ | 阅读数 | ⟨input:checkbox ☐⟩ | 点赞数 | ⟨input:checkbox ☐⟩ | 查看更多 | 不显示 | ⟨input:checkbox ☐⟩",
+    "ctrlCount": 8,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "请输入不超过8个字专题名称",
+      "val": "这里显示专题名称",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "在线客服": {
+   "name": "在线客服",
+   "type": "contact_us",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FjApEeTEeT_KkEXSz8FmBfgB_I3I.png",
+   "draggable": "true",
+   "group": "页面装修",
+   "added": true,
+   "panel": {
+    "seq": [
+     "文案:",
+     "⟨input 值=在线咨询⟩",
+     "文案建议4个字"
+    ],
+    "text": "文案: | ⟨input 值=在线咨询⟩ | 文案建议4个字",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "在线咨询",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "商品": {
+   "name": "商品",
+   "type": "goods_weapp,goods,goods_new",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FirnSShEAotLWTHOsk21GdYa-SdX.png",
+   "draggable": "true",
+   "group": "商品",
+   "added": true,
+   "panel": {
+    "seq": [
+     "商品管理",
+     "（0/100）",
+     "已选商品 0 个",
+     "暂未选择商品",
+     "商品排序:",
+     "智能排序（高转换）",
+     "商品的显示\\隐藏、时段规则和排序功能 小程序端在v3.129.3生效",
+     "样式设置",
+     "列表样式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "促销",
+     "瀑布流",
+     "购买按钮样式"
+    ],
+    "text": "商品管理 | （0/100） | 已选商品 0 个 | 暂未选择商品 | 商品排序: | 智能排序（高转换） | 商品的显示\\隐藏、时段规则和排序功能 小程序端在v3.129.3生效 | 样式设置 | 列表样式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 促销 | 瀑布流 | 购买按钮样式",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "商品分组": {
+   "name": "商品分组",
+   "type": "tag_list_top,tag_list_left,goods_group,goods_group_new",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/07/05/FnfDDgNB4IRkqwpBCeTglfKmO547.png",
+   "draggable": "true",
+   "group": "商品",
+   "added": true,
+   "panel": {
+    "seq": [
+     "微商城小程序需升级到V2.199.1及以上，零售小程序需升级到V3.154.1及以上，菜单样式（样式四），标题大小才能生",
+     "样式管理",
+     "商品管理",
+     "菜单样式",
+     "菜单吸顶",
+     "吸顶",
+     "不吸顶",
+     "显示全部分组",
+     "显示",
+     "不显示",
+     "菜单样式",
+     "样式一",
+     "样式设置",
+     "列表样式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "促销",
+     "瀑布流",
+     "购买按钮样式"
+    ],
+    "text": "微商城小程序需升级到V2.199.1及以上，零售小程序需升级到V3.154.1及以上，菜单样式（样式四），标题大小才能生 | 样式管理 | 商品管理 | 菜单样式 | 菜单吸顶 | 吸顶 | 不吸顶 | 显示全部分组 | 显示 | 不显示 | 菜单样式 | 样式一 | 样式设置 | 列表样式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 促销 | 瀑布流 | 购买按钮样式",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "购买按钮": {
+   "name": "购买按钮",
+   "type": "buy_button",
+   "icon": "https://img01.yzcdn.cn/upload_files/2023/11/28/FlnoifOzW0SdgcOWvANzAFhaTaFN.png",
+   "draggable": "true",
+   "group": "商品",
+   "added": true,
+   "panel": {
+    "seq": [
+     "购买按钮固定吸底,一个页面仅支持添加1个,如需添加多个直接下单商品,可使用图片广告分热区跳转。",
+     "居中对齐",
+     "右对齐",
+     "商品设置",
+     "选择商品",
+     "设置点击后需要下单的商品",
+     "按钮样式",
+     "按钮文案",
+     "⟨input 提示=最多输入10个字 值=立即下单⟩",
+     "文案字号",
+     "⟨input 值=16⟩",
+     "按钮配色",
+     "跟随店铺风格",
+     "自定义",
+     "左右边距",
+     "⟨input 值=16⟩",
+     "底边距",
+     "⟨input 值=14⟩",
+     "按钮高度",
+     "⟨input 值=48⟩",
+     "按钮角度",
+     "⟨input 值=4⟩",
+     "背景设置",
+     "背景",
+     "启用",
+     "关闭",
+     "背景颜色",
+     "#FFFFFF",
+     "重置",
+     "背景高度",
+     "⟨input 值=76⟩",
+     "背景角度",
+     "⟨input 值=0⟩"
+    ],
+    "text": "购买按钮固定吸底,一个页面仅支持添加1个,如需添加多个直接下单商品,可使用图片广告分热区跳转。 | 居中对齐 | 右对齐 | 商品设置 | 选择商品 | 设置点击后需要下单的商品 | 按钮样式 | 按钮文案 | ⟨input 提示=最多输入10个字 值=立即下单⟩ | 文案字号 | ⟨input 值=16⟩ | 按钮配色 | 跟随店铺风格 | 自定义 | 左右边距 | ⟨input 值=16⟩ | 底边距 | ⟨input 值=14⟩ | 按钮高度 | ⟨input 值=48⟩ | 按钮角度 | ⟨input 值=4⟩ | 背景设置 | 背景 | 启用 | 关闭 | 背景颜色 | #FFFFFF | 重置 | 背景高度 | ⟨input 值=76⟩ | 背景角度 | ⟨input 值=0⟩",
+    "ctrlCount": 8,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多输入10个字",
+      "val": "立即下单",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "14",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "48",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "4",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "76",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "点单卡片": {
+   "name": "点单卡片",
+   "type": "shelf_order",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/diandankapian.png",
+   "draggable": "true",
+   "group": "新零售",
+   "added": true,
+   "panel": {
+    "seq": [
+     "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。",
+     "微商城小程序需升级到V2.145.1及以上，零售小程序需升级到V3.100.1及以上，点单卡片样式设置才能生效",
+     "是否展示",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "选择模板",
+     "一行一个",
+     "卡片风格",
+     "⟨input:radio ◉⟩",
+     "图文模式",
+     "⟨input:radio ○⟩",
+     "图片模式",
+     "标题",
+     "描述文案",
+     "标题",
+     "描述文案",
+     "标题",
+     "描述文案",
+     "是否显示:",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "链接:",
+     "标题:",
+     "⟨input 提示=最多6个字⟩",
+     "描述:",
+     "⟨input 提示=最多10个字⟩",
+     "图片:",
+     "添加图片",
+     "建议尺寸 160*160 像素",
+     "卡片样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "背景颜色",
+     "#ffffff",
+     "重置",
+     "卡片背景",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "圆角",
+     "文本对齐",
+     "左对齐",
+     "图片对齐",
+     "右对齐",
+     "卡片边距",
+     "⟨input 值=10⟩",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。 | 微商城小程序需升级到V2.145.1及以上，零售小程序需升级到V3.100.1及以上，点单卡片样式设置才能生效 | 是否展示 | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | 选择模板 | 一行一个 | 卡片风格 | ⟨input:radio ◉⟩ | 图文模式 | ⟨input:radio ○⟩ | 图片模式 | 标题 | 描述文案 | 标题 | 描述文案 | 标题 | 描述文案 | 是否显示: | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | 链接: | 标题: | ⟨input 提示=最多6个字⟩ | 描述: | ⟨input 提示=最多10个字⟩ | 图片: | 添加图片 | 建议尺寸 160*160 像素 | 卡片样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 背景颜色 | #ffffff | 重置 | 卡片背景 | 透明色 | 重置 | 卡片倒角 | 圆角 | 文本对齐 | 左对齐 | 图片对齐 | 右对齐 | 卡片边距 | ⟨input 值=10⟩ | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 10,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多6个字",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多10个字",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "客户资产": {
+   "name": "客户资产",
+   "type": "shelf_asset",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/zichan.png",
+   "draggable": "true",
+   "group": "新零售",
+   "added": true,
+   "panel": {
+    "seq": [
+     "模板选择",
+     "模板一",
+     "客户信息",
+     "微信头像",
+     "会员码",
+     "资产信息",
+     "积分",
+     "优惠券",
+     "余额",
+     "集点卡",
+     "权益卡",
+     "入口图片",
+     "图片布局",
+     "热区自由布局",
+     "添加图片",
+     "链接设置",
+     "⟨input:radio ◉⟩",
+     "整体跳转",
+     "⟨input:radio ○⟩",
+     "分热区跳转",
+     "链接",
+     "卡片样式",
+     "无边白底",
+     "数字颜色",
+     "#000000",
+     "重置",
+     "文字颜色",
+     "#333333",
+     "重置",
+     "卡片背景",
+     "透明色",
+     "重置",
+     "背景颜色",
+     "#ffffff",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "页面边距",
+     "⟨input 值=16⟩",
+     "卡片边距",
+     "⟨input 值=12⟩"
+    ],
+    "text": "模板选择 | 模板一 | 客户信息 | 微信头像 | 会员码 | 资产信息 | 积分 | 优惠券 | 余额 | 集点卡 | 权益卡 | 入口图片 | 图片布局 | 热区自由布局 | 添加图片 | 链接设置 | ⟨input:radio ◉⟩ | 整体跳转 | ⟨input:radio ○⟩ | 分热区跳转 | 链接 | 卡片样式 | 无边白底 | 数字颜色 | #000000 | 重置 | 文字颜色 | #333333 | 重置 | 卡片背景 | 透明色 | 重置 | 背景颜色 | #ffffff | 重置 | 卡片倒角 | 直角 | 圆角 | 页面边距 | ⟨input 值=16⟩ | 卡片边距 | ⟨input 值=12⟩",
+    "ctrlCount": 4,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "12",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "附近门店": {
+   "name": "附近门店",
+   "type": "shelf_nearby_store",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/fujinmendian.png",
+   "draggable": "true",
+   "group": "新零售",
+   "added": true,
+   "panel": {
+    "seq": [
+     "该组件当前仅支持微信小程序（需要体验版v3.51.1版本及以上），预览或在其他渠道打开，该组件将不可见；未配置店铺情况下",
+     "附近门店列表不支持进店逻辑，列表内容及样式请到店铺设置修改",
+     "去配置",
+     "标题",
+     "⟨input 提示=请输入标题，最多输入 8 个字 值=附近门店⟩",
+     "列表入口",
+     "⟨input 提示=请输入列表入口，最多输入 10 个字 值=查看所有门店⟩",
+     "店铺照片",
+     "背景颜色",
+     "#ffffff",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "卡片样式",
+     "无边白底",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "该组件当前仅支持微信小程序（需要体验版v3.51.1版本及以上），预览或在其他渠道打开，该组件将不可见；未配置店铺情况下 | 附近门店列表不支持进店逻辑，列表内容及样式请到店铺设置修改 | 去配置 | 标题 | ⟨input 提示=请输入标题，最多输入 8 个字 值=附近门店⟩ | 列表入口 | ⟨input 提示=请输入列表入口，最多输入 10 个字 值=查看所有门店⟩ | 店铺照片 | 背景颜色 | #ffffff | 重置 | 卡片倒角 | 直角 | 圆角 | 卡片样式 | 无边白底 | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 3,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "请输入标题，最多输入 8 个字",
+      "val": "附近门店",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "请输入列表入口，最多输入 10 个字",
+      "val": "查看所有门店",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "好友拼单": {
+   "name": "好友拼单",
+   "type": "shelf_order_pool",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/haoyoupindan.png",
+   "draggable": "true",
+   "group": "新零售",
+   "added": true,
+   "panel": {
+    "seq": [
+     "零售小程序需升级到V3.154.1及以上，按钮倒角才能生效",
+     "⟨input 提示=最多12个字 值=好友拼单⟩",
+     "⟨input 提示=最多12个字 值=好友拼单更实惠⟩",
+     "选择跳转到的页面",
+     "图标样式",
+     "更换图标",
+     "建议尺寸：48*48 像素",
+     "背景颜色",
+     "#ffffff",
+     "重置",
+     "卡片背景",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "小圆角",
+     "按钮倒角",
+     "直角",
+     "小圆角",
+     "大圆角",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "零售小程序需升级到V3.154.1及以上，按钮倒角才能生效 | ⟨input 提示=最多12个字 值=好友拼单⟩ | ⟨input 提示=最多12个字 值=好友拼单更实惠⟩ | 选择跳转到的页面 | 图标样式 | 更换图标 | 建议尺寸：48*48 像素 | 背景颜色 | #ffffff | 重置 | 卡片背景 | 透明色 | 重置 | 卡片倒角 | 直角 | 小圆角 | 按钮倒角 | 直角 | 小圆角 | 大圆角 | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 3,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多12个字",
+      "val": "好友拼单",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多12个字",
+      "val": "好友拼单更实惠",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "在途订单": {
+   "name": "在途订单",
+   "type": "on_way_order",
+   "icon": "https://img01.yzcdn.cn/upload_files/2024/12/31/FsT5HkBGyzTKqeJIAkKfYP7ccH-7.png",
+   "draggable": "true",
+   "group": "新零售",
+   "added": true,
+   "panel": {
+    "seq": [
+     "该组件添加后，当消费者在当前店铺有进行中订单时才会展示，存在多笔在途订单可滑动查看。",
+     "样式设置",
+     "文字颜色",
+     "重置",
+     "卡片背景",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "轮播提示",
+     "样式一"
+    ],
+    "text": "该组件添加后，当消费者在当前店铺有进行中订单时才会展示，存在多笔在途订单可滑动查看。 | 样式设置 | 文字颜色 | 重置 | 卡片背景 | 透明色 | 重置 | 卡片倒角 | 直角 | 圆角 | 轮播提示 | 样式一",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "优惠券": {
+   "name": "优惠券",
+   "type": "coupon_weapp,coupon",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FupnImjncvDfovyPfalWjuTCEklH.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "添加优惠券",
+     "⟨input:radio ◉⟩",
+     "手动添加",
+     "⟨input:radio ○⟩",
+     "排列样式",
+     "横向滑动",
+     "卡片样式",
+     "样式三",
+     "颜色",
+     "红色",
+     "隐藏已抢完及失效的券",
+     "隐藏",
+     "⟨input:checkbox ☑⟩",
+     "当页面无可显示的优惠券时，优惠券区块将隐藏"
+    ],
+    "text": "添加优惠券 | ⟨input:radio ◉⟩ | 手动添加 | ⟨input:radio ○⟩ | 排列样式 | 横向滑动 | 卡片样式 | 样式三 | 颜色 | 红色 | 隐藏已抢完及失效的券 | 隐藏 | ⟨input:checkbox ☑⟩ | 当页面无可显示的优惠券时，优惠券区块将隐藏",
+    "ctrlCount": 3,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     }
+    ]
+   }
+  },
+  "限时折扣": {
+   "name": "限时折扣",
+   "type": "ump_limitdiscount",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FgyWTrOrrqeaOmdcHbi7q9vkyj0U.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "添加限时折扣活动",
+     "列表样式",
+     "详细列表",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "1:1",
+     "图片填充",
+     "填充",
+     "文本样式",
+     "常规体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=15⟩",
+     "商品间距",
+     "⟨input 值=10⟩",
+     "商品名称",
+     "显示",
+     "不显示",
+     "商品描述",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "此处显示商品的 ”分享描述“ 内容。",
+     "商品价格",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "商品销量",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "购买按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ○⟩",
+     "样式1",
+     "⟨input:radio ○⟩",
+     "样式2",
+     "⟨input:radio ○⟩",
+     "样式3",
+     "⟨input:radio ○⟩",
+     "样式4",
+     "⟨input:radio ○⟩",
+     "样式5",
+     "⟨input:radio ○⟩",
+     "样式6",
+     "⟨input:radio ○⟩",
+     "样式7",
+     "⟨input:radio ◉⟩",
+     "样式8",
+     "⟨input 值=立即抢购⟩",
+     "商品原价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "剩余库存",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "抢购倒计时",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "抢购进度条",
+     "显示",
+     "⟨input:checkbox ☑⟩"
+    ],
+    "text": "添加限时折扣活动 | 列表样式 | 详细列表 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片比例 | 1:1 | 图片填充 | 填充 | 文本样式 | 常规体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=15⟩ | 商品间距 | ⟨input 值=10⟩ | 商品名称 | 显示 | 不显示 | 商品描述 | 显示 | ⟨input:checkbox ☑⟩ | 此处显示商品的 ”分享描述“ 内容。 | 商品价格 | 显示 | ⟨input:checkbox ☑⟩ | 商品销量 | 不显示 | ⟨input:checkbox ☐⟩ | 购买按钮 | 显示 | ⟨input:checkbox ☑⟩ | ⟨input:radio ○⟩ | 样式1 | ⟨input:radio ○⟩ | 样式2 | ⟨input:radio ○⟩ | 样式3 | ⟨input:radio ○⟩ | 样式4 | ⟨input:radio ○⟩ | 样式5 | ⟨input:radio ○⟩ | 样式6 | ⟨input:radio ○⟩ | 样式7 | ⟨input:radio ◉⟩ | 样式8 | ⟨input 值=立即抢购⟩ | 商品原价 | 显示 | ⟨input:checkbox ☑⟩ | 剩余库存 | 不显示 | ⟨input:checkbox ☐⟩ | 抢购倒计时 | 显示 | ⟨input:checkbox ☑⟩ | 抢购进度条 | 显示 | ⟨input:checkbox ☑⟩",
+    "ctrlCount": 19,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "15",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "立即抢购",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     }
+    ]
+   }
+  },
+  "秒杀": {
+   "name": "秒杀",
+   "type": "ump_seckill",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FkPfLM3qzVp8hCSgTgYMQY8n7Uw1.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "列表样式",
+     "大图模式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "3:2",
+     "图片填充",
+     "周边留白",
+     "文本样式",
+     "常规体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=8⟩",
+     "商品间距",
+     "⟨input 值=8⟩",
+     "商品名称",
+     "显示",
+     "不显示",
+     "商品描述",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "此处显示商品的 ”分享描述“ 内容。",
+     "商品价格",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "购买按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ○⟩",
+     "样式1",
+     "⟨input:radio ○⟩",
+     "样式2",
+     "⟨input:radio ○⟩",
+     "样式3",
+     "⟨input:radio ○⟩",
+     "样式4",
+     "⟨input:radio ○⟩",
+     "样式5",
+     "⟨input:radio ◉⟩",
+     "样式6",
+     "⟨input:radio ○⟩",
+     "样式7",
+     "⟨input:radio ○⟩",
+     "样式8",
+     "商品原价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "抢购倒计时",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "剩余库存",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "更多设置",
+     "隐藏已售罄商品",
+     "隐藏",
+     "⟨input:checkbox ☑⟩",
+     "隐藏活动结束商品",
+     "隐藏",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ◉⟩",
+     "24小时后隐藏",
+     "⟨input:radio ○⟩",
+     "立即隐藏"
+    ],
+    "text": "列表样式 | 大图模式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片比例 | 3:2 | 图片填充 | 周边留白 | 文本样式 | 常规体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=8⟩ | 商品间距 | ⟨input 值=8⟩ | 商品名称 | 显示 | 不显示 | 商品描述 | 显示 | ⟨input:checkbox ☑⟩ | 此处显示商品的 ”分享描述“ 内容。 | 商品价格 | 显示 | ⟨input:checkbox ☑⟩ | 购买按钮 | 显示 | ⟨input:checkbox ☑⟩ | ⟨input:radio ○⟩ | 样式1 | ⟨input:radio ○⟩ | 样式2 | ⟨input:radio ○⟩ | 样式3 | ⟨input:radio ○⟩ | 样式4 | ⟨input:radio ○⟩ | 样式5 | ⟨input:radio ◉⟩ | 样式6 | ⟨input:radio ○⟩ | 样式7 | ⟨input:radio ○⟩ | 样式8 | 商品原价 | 显示 | ⟨input:checkbox ☑⟩ | 抢购倒计时 | 显示 | ⟨input:checkbox ☑⟩ | 剩余库存 | 显示 | ⟨input:checkbox ☑⟩ | 更多设置 | 隐藏已售罄商品 | 隐藏 | ⟨input:checkbox ☑⟩ | 隐藏活动结束商品 | 隐藏 | ⟨input:checkbox ☑⟩ | ⟨input:radio ◉⟩ | 24小时后隐藏 | ⟨input:radio ○⟩ | 立即隐藏",
+    "ctrlCount": 20,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "砍价": {
+   "name": "砍价",
+   "type": "bargain",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FupzQk_sabcG7qyy03gyCzDNsmMU.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "升级链接地址",
+     "查看公告详情",
+     "添加方式:",
+     "⟨input:radio ◉⟩",
+     "手动添加",
+     "⟨input:radio ○⟩",
+     "自动获取",
+     "最多添加 30 个商品",
+     "请选择商品",
+     "列表样式",
+     "大图模式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "3:2",
+     "图片填充",
+     "填充",
+     "文本样式",
+     "常规体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=8⟩",
+     "商品间距",
+     "⟨input 值=8⟩",
+     "商品名称",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "商品现价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "商品原价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "购买按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ○⟩",
+     "样式1",
+     "⟨input:radio ○⟩",
+     "样式2",
+     "⟨input:radio ○⟩",
+     "样式3",
+     "⟨input:radio ○⟩",
+     "样式4",
+     "⟨input:radio ○⟩",
+     "样式5",
+     "⟨input:radio ◉⟩",
+     "样式6",
+     "⟨input:radio ○⟩",
+     "样式7",
+     "⟨input:radio ○⟩",
+     "样式8",
+     "商品销量",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "倒计时",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "剩余库存",
+     "不显示",
+     "⟨input:checkbox ☐⟩"
+    ],
+    "text": "升级链接地址 | 查看公告详情 | 添加方式: | ⟨input:radio ◉⟩ | 手动添加 | ⟨input:radio ○⟩ | 自动获取 | 最多添加 30 个商品 | 请选择商品 | 列表样式 | 大图模式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片比例 | 3:2 | 图片填充 | 填充 | 文本样式 | 常规体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=8⟩ | 商品间距 | ⟨input 值=8⟩ | 商品名称 | 显示 | ⟨input:checkbox ☑⟩ | 商品现价 | 显示 | ⟨input:checkbox ☑⟩ | 商品原价 | 显示 | ⟨input:checkbox ☑⟩ | 购买按钮 | 显示 | ⟨input:checkbox ☑⟩ | ⟨input:radio ○⟩ | 样式1 | ⟨input:radio ○⟩ | 样式2 | ⟨input:radio ○⟩ | 样式3 | ⟨input:radio ○⟩ | 样式4 | ⟨input:radio ○⟩ | 样式5 | ⟨input:radio ◉⟩ | 样式6 | ⟨input:radio ○⟩ | 样式7 | ⟨input:radio ○⟩ | 样式8 | 商品销量 | 不显示 | ⟨input:checkbox ☐⟩ | 倒计时 | 不显示 | ⟨input:checkbox ☐⟩ | 剩余库存 | 不显示 | ⟨input:checkbox ☐⟩",
+    "ctrlCount": 19,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "新人专区": {
+   "name": "新人专区",
+   "type": "new_zone",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fu3mqY15ITS_cGHY8nsCz8f9BJg-.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "展示新客专区活动，仅限店铺新客可见。小程序端仅支持微信小程序，需升级至3.40.7或以上版本可用。",
+     "标题名称",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题设置",
+     "⟨input:radio ◉⟩",
+     "默认图",
+     "⟨input:radio ○⟩",
+     "自定义图片",
+     "⟨input 值=新人专享福利⟩",
+     "背景颜色",
+     "#E74C2C",
+     "重置",
+     "新人专享券设置",
+     "去创建",
+     "添加优惠券",
+     "⟨input:radio ◉⟩",
+     "⟨input:radio ○⟩",
+     "手动添加",
+     "无有效新人券时，新人专区将隐藏。",
+     "卡片样式",
+     "样式八",
+     "颜色",
+     "红色",
+     "适用商品",
+     "仅展示新人券适用商品，个性化排列"
+    ],
+    "text": "展示新客专区活动，仅限店铺新客可见。小程序端仅支持微信小程序，需升级至3.40.7或以上版本可用。 | 标题名称 | 显示 | ⟨input:checkbox ☑⟩ | 标题设置 | ⟨input:radio ◉⟩ | 默认图 | ⟨input:radio ○⟩ | 自定义图片 | ⟨input 值=新人专享福利⟩ | 背景颜色 | #E74C2C | 重置 | 新人专享券设置 | 去创建 | 添加优惠券 | ⟨input:radio ◉⟩ | ⟨input:radio ○⟩ | 手动添加 | 无有效新人券时，新人专区将隐藏。 | 卡片样式 | 样式八 | 颜色 | 红色 | 适用商品 | 仅展示新人券适用商品，个性化排列",
+    "ctrlCount": 6,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "新人专享福利",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "拼团": {
+   "name": "拼团",
+   "type": "groupon_weapp,groupon",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FhmptIs1hEqVIeDKM_KMrUx0vigs.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "查看公告详情",
+     "多人拼团组件升级，此前创建的多人拼团活动（普通拼团和老带新）默认在升级后的“普通拼团”分组下，此后创建的拼团活动会按照“",
+     "拼团类型",
+     "⟨input:radio ◉⟩",
+     "普通拼团",
+     "⟨input:radio ○⟩",
+     "老带新拼团",
+     "⟨input:radio ○⟩",
+     "阶梯拼团",
+     "⟨input:radio ○⟩",
+     "抽奖拼团",
+     "添加方式",
+     "⟨input:radio ○⟩",
+     "手动添加",
+     "⟨input:radio ◉⟩",
+     "显示个数",
+     "最多显示 30 个",
+     "⟨input 值=20⟩",
+     "全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "查看示例",
+     "排序规则",
+     "销量越高越靠前",
+     "列表样式",
+     "大图模式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "3:2",
+     "图片填充",
+     "填充",
+     "文本样式",
+     "常规体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=15⟩",
+     "商品间距",
+     "⟨input 值=10⟩",
+     "商品名称",
+     "显示",
+     "不显示",
+     "商品描述",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "此处显示商品的 ”分享描述“ 内容。",
+     "商品销量",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "购买按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ○⟩",
+     "样式1",
+     "⟨input:radio ○⟩",
+     "样式2",
+     "⟨input:radio ○⟩",
+     "样式3",
+     "⟨input:radio ○⟩",
+     "样式4",
+     "⟨input:radio ○⟩",
+     "样式5",
+     "⟨input:radio ○⟩",
+     "样式6",
+     "⟨input:radio ○⟩",
+     "样式7",
+     "⟨input:radio ◉⟩",
+     "样式8",
+     "⟨input 值=去开团⟩",
+     "拼团价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "单买价",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "抢购倒计时",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "已团人数",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "已售罄拼团商品",
+     "不隐藏",
+     "⟨input:checkbox ☐⟩"
+    ],
+    "text": "查看公告详情 | 多人拼团组件升级，此前创建的多人拼团活动（普通拼团和老带新）默认在升级后的“普通拼团”分组下，此后创建的拼团活动会按照“ | 拼团类型 | ⟨input:radio ◉⟩ | 普通拼团 | ⟨input:radio ○⟩ | 老带新拼团 | ⟨input:radio ○⟩ | 阶梯拼团 | ⟨input:radio ○⟩ | 抽奖拼团 | 添加方式 | ⟨input:radio ○⟩ | 手动添加 | ⟨input:radio ◉⟩ | 显示个数 | 最多显示 30 个 | ⟨input 值=20⟩ | 全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 查看示例 | 排序规则 | 销量越高越靠前 | 列表样式 | 大图模式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片比例 | 3:2 | 图片填充 | 填充 | 文本样式 | 常规体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=15⟩ | 商品间距 | ⟨input 值=10⟩ | 商品名称 | 显示 | 不显示 | 商品描述 | 显示 | ⟨input:checkbox ☑⟩ | 此处显示商品的 ”分享描述“ 内容。 | 商品销量 | 不显示 | ⟨input:checkbox ☐⟩ | 购买按钮 | 显示 | ⟨input:checkbox ☑⟩ | ⟨input:radio ○⟩ | 样式1 | ⟨input:radio ○⟩ | 样式2 | ⟨input:radio ○⟩ | 样式3 | ⟨input:radio ○⟩ | 样式4 | ⟨input:radio ○⟩ | 样式5 | ⟨input:radio ○⟩ | 样式6 | ⟨input:radio ○⟩ | 样式7 | ⟨input:radio ◉⟩ | 样式8 | ⟨input 值=去开团⟩ | 拼团价 | 显示 | ⟨input:checkbox ☑⟩ | 单买价 | 显示 | ⟨input:checkbox ☑⟩ | 抢购倒计时 | 显示 | ⟨input:checkbox ☑⟩ | 已团人数 | 显示 | ⟨input:checkbox ☑⟩ | 已售罄拼团商品 | 不隐藏 | ⟨input:checkbox ☐⟩",
+    "ctrlCount": 27,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "20",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "15",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "去开团",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "集点卡": {
+   "name": "集点卡",
+   "type": "reward_points",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/jidianka.png",
+   "draggable": "true",
+   "group": "营销活动",
+   "added": true,
+   "panel": {
+    "seq": [
+     "小程序需升级到V3.108.6及以上，集点卡样式设置才能生效",
+     "添加卡片",
+     "选择模板",
+     "样式一",
+     "样式二",
+     "样式设置",
+     "图标样式",
+     "请在集点卡活动设置中修改",
+     "卡片颜色",
+     "#ffffff",
+     "重置",
+     "背景颜色",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "小程序需升级到V3.108.6及以上，集点卡样式设置才能生效 | 添加卡片 | 选择模板 | 样式一 | 样式二 | 样式设置 | 图标样式 | 请在集点卡活动设置中修改 | 卡片颜色 | #ffffff | 重置 | 背景颜色 | 透明色 | 重置 | 卡片倒角 | 直角 | 圆角 | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "会员专享价": {
+   "name": "会员专享价",
+   "type": "member_goods",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FqmX_yhW6aw9e1hIQoUiwKKYJ3FG.png",
+   "draggable": "true",
+   "group": "会员",
+   "added": true,
+   "panel": {
+    "seq": [
+     "查看详情",
+     "⟨input:radio ◉⟩",
+     "手动添加",
+     "⟨input:radio ○⟩",
+     "如该商品参加了其他优惠活动（如限时折扣），将不会在微页面中进行展示",
+     "列表样式",
+     "大图模式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "3:2",
+     "图片填充",
+     "填充",
+     "文本样式",
+     "常规体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=15⟩",
+     "商品间距",
+     "⟨input 值=10⟩",
+     "商品名称",
+     "显示",
+     "不显示",
+     "商品原价",
+     "显示",
+     "⟨input:checkbox ☑⟩"
+    ],
+    "text": "查看详情 | ⟨input:radio ◉⟩ | 手动添加 | ⟨input:radio ○⟩ | 如该商品参加了其他优惠活动（如限时折扣），将不会在微页面中进行展示 | 列表样式 | 大图模式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片比例 | 3:2 | 图片填充 | 填充 | 文本样式 | 常规体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=15⟩ | 商品间距 | ⟨input 值=10⟩ | 商品名称 | 显示 | 不显示 | 商品原价 | 显示 | ⟨input:checkbox ☑⟩",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "15",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     }
+    ]
+   }
+  },
+  "会员储值": {
+   "name": "会员储值",
+   "type": "member_value",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Ftdo-HM4pGoGRAjZEnVooKrmwgOT.png",
+   "draggable": "true",
+   "group": "会员",
+   "added": true,
+   "panel": {
+    "seq": [
+     "最多添加5个充值金额，或5个在售礼品卡。",
+     "小程序需升级到版本3.68.2及以上，模板二设置即可生效",
+     "微商城小程序需升级到V2.145.1及以上，零售小程序需升级到V3.100.1及以上，会员储值样式设置才能生效",
+     "活动类型",
+     "⟨input:radio ◉⟩",
+     "充值活动",
+     "⟨input:radio ○⟩",
+     "售卡活动",
+     "模板一",
+     "模板二",
+     "选择充值规则",
+     "最多添加5个充值规则",
+     "卡片样式",
+     "图片填充",
+     "颜色填充",
+     "卡片颜色",
+     "#ffffff",
+     "重置",
+     "背景颜色",
+     "transparent",
+     "重置",
+     "余额与充值",
+     "白色",
+     "默认颜色",
+     "卡片倒角",
+     "直角",
+     "圆角",
+     "按钮倒角",
+     "直角",
+     "小圆角",
+     "大圆角",
+     "页面边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "最多添加5个充值金额，或5个在售礼品卡。 | 小程序需升级到版本3.68.2及以上，模板二设置即可生效 | 微商城小程序需升级到V2.145.1及以上，零售小程序需升级到V3.100.1及以上，会员储值样式设置才能生效 | 活动类型 | ⟨input:radio ◉⟩ | 充值活动 | ⟨input:radio ○⟩ | 售卡活动 | 模板一 | 模板二 | 选择充值规则 | 最多添加5个充值规则 | 卡片样式 | 图片填充 | 颜色填充 | 卡片颜色 | #ffffff | 重置 | 背景颜色 | transparent | 重置 | 余额与充值 | 白色 | 默认颜色 | 卡片倒角 | 直角 | 圆角 | 按钮倒角 | 直角 | 小圆角 | 大圆角 | 页面边距 | ⟨input 值=16⟩",
+    "ctrlCount": 3,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "办会员": {
+   "name": "办会员",
+   "type": "registration_guide",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/banhuiyuan.png",
+   "draggable": "true",
+   "group": "会员",
+   "added": true,
+   "panel": {
+    "seq": [
+     "仅对非会员客户展示，引导客户成为会员。（小程序 v2.83及以上版本支持展示办会员组件）",
+     "引导办理",
+     "⟨input:radio ◉⟩",
+     "免费会员",
+     "⟨input:radio ○⟩",
+     "付费会员",
+     "标题内容",
+     "⟨input 提示=12个字以内 值=立即入会，享会员特权⟩",
+     "副标题文字",
+     "⟨input:radio ◉⟩",
+     "自动匹配",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "⟨input:radio ○⟩",
+     "不展示",
+     "权益图标",
+     "不展示",
+     "⟨input:radio ○⟩",
+     "展示",
+     "⟨input:radio ◉⟩",
+     "不展示",
+     "礼包样式",
+     "不展示",
+     "⟨input:radio ○⟩",
+     "展示",
+     "⟨input:radio ◉⟩",
+     "不展示",
+     "背景样式",
+     "⟨input:radio ◉⟩",
+     "默认",
+     "⟨input:radio ○⟩",
+     "全店风格",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "主题色"
+    ],
+    "text": "仅对非会员客户展示，引导客户成为会员。（小程序 v2.83及以上版本支持展示办会员组件） | 引导办理 | ⟨input:radio ◉⟩ | 免费会员 | ⟨input:radio ○⟩ | 付费会员 | 标题内容 | ⟨input 提示=12个字以内 值=立即入会，享会员特权⟩ | 副标题文字 | ⟨input:radio ◉⟩ | 自动匹配 | ⟨input:radio ○⟩ | 自定义 | ⟨input:radio ○⟩ | 不展示 | 权益图标 | 不展示 | ⟨input:radio ○⟩ | 展示 | ⟨input:radio ◉⟩ | 不展示 | 礼包样式 | 不展示 | ⟨input:radio ○⟩ | 展示 | ⟨input:radio ◉⟩ | 不展示 | 背景样式 | ⟨input:radio ◉⟩ | 默认 | ⟨input:radio ○⟩ | 全店风格 | ⟨input:radio ○⟩ | 自定义 | 主题色",
+    "ctrlCount": 13,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "12个字以内",
+      "val": "立即入会，享会员特权",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "积分资产": {
+   "name": "积分资产",
+   "type": "point_asset",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/07/19/FhiCd-Kc-cmNacRWdFo-7fBczsk6.png",
+   "draggable": "true",
+   "group": "会员",
+   "added": true,
+   "panel": {
+    "seq": [
+     "背景设置",
+     "默认背景",
+     "自定义颜色",
+     "自定义图片",
+     "文本颜色",
+     "#111111",
+     "重置",
+     "图标设置",
+     "默认图标",
+     "自定义",
+     "积分规则链接",
+     "默认链接",
+     "自定义",
+     "即将过期积分",
+     "不显示",
+     "⟨input:checkbox ☐⟩"
+    ],
+    "text": "背景设置 | 默认背景 | 自定义颜色 | 自定义图片 | 文本颜色 | #111111 | 重置 | 图标设置 | 默认图标 | 自定义 | 积分规则链接 | 默认链接 | 自定义 | 即将过期积分 | 不显示 | ⟨input:checkbox ☐⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  },
+  "小程序直播": {
+   "name": "小程序直播",
+   "type": "weapp_live",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fo7mcJmA_UOA9Rr4-K1bOujAWs2P.png",
+   "draggable": "true",
+   "group": "直播",
+   "added": true,
+   "panel": {
+    "seq": [
+     "添加直播间：",
+     "*",
+     "微信小程序"
+    ],
+    "text": "添加直播间： | * | 微信小程序",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "视频号直播": {
+   "name": "视频号直播",
+   "type": "wxvideo_live",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FjJJrDJu3iTb1kz5HMmWnhnSlFnV.png",
+   "draggable": "true",
+   "group": "直播",
+   "added": true,
+   "panel": {
+    "seq": [
+     "查看示例",
+     "视频号名称",
+     "LEXY莱克",
+     "验证成功",
+     "预约直播",
+     "⟨input:checkbox ☑⟩",
+     "图片倒角",
+     "圆角",
+     "页面边距",
+     "⟨input 值=10⟩"
+    ],
+    "text": "查看示例 | 视频号名称 | LEXY莱克 | 验证成功 | 预约直播 | ⟨input:checkbox ☑⟩ | 图片倒角 | 圆角 | 页面边距 | ⟨input 值=10⟩",
+    "ctrlCount": 2,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "爱逛直播": {
+   "name": "爱逛直播",
+   "type": "guang_live",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fj5FLQYhRg2Xje8q5oC2I2KfWuCD.png",
+   "draggable": "true",
+   "group": "直播",
+   "added": true,
+   "panel": {
+    "seq": [
+     "前往配置",
+     "选择此组件应用的爱逛号",
+     "当选择的爱逛号有预告或直播场次时显示此组件，点击跳转到相应的场次预告或直播间，当爱逛号失效时请手动更换新的爱逛号。手动选",
+     "添加爱逛号"
+    ],
+    "text": "前往配置 | 选择此组件应用的爱逛号 | 当选择的爱逛号有预告或直播场次时显示此组件，点击跳转到相应的场次预告或直播间，当爱逛号失效时请手动更换新的爱逛号。手动选 | 添加爱逛号",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "个性化推荐": {
+   "name": "个性化推荐",
+   "type": "goods_recommend",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FovKVoMhKoiBNPB99r4sWIEYZnUv.png",
+   "draggable": "true",
+   "group": "智能运营",
+   "added": true,
+   "panel": {
+    "seq": [
+     "个性化推荐功能提高商品曝光，推荐商品会从已上架的商品中根据消费者的行为和偏好自动推荐。",
+     "标题名称",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "推荐位标题",
+     "⟨input 提示=最多输入8个字 值=猜你喜欢⟩",
+     "副标题",
+     "⟨input⟩",
+     "推荐规则",
+     "NEW",
+     "⟨input:radio ◉⟩",
+     "⟨input:radio ○⟩",
+     "显示位置",
+     "左对齐",
+     "背景颜色",
+     "#f9f9f9",
+     "重置",
+     "显示个数",
+     "⟨input:radio ○⟩",
+     "⟨input:radio ◉⟩",
+     "⟨input 值=6⟩",
+     "列表样式",
+     "一行两个",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "促销",
+     "瀑布流",
+     "商品倒角",
+     "直角",
+     "图片比例",
+     "3:2",
+     "图片填充",
+     "周边留白",
+     "文本样式",
+     "加粗体",
+     "文本大小",
+     "大号",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=12⟩",
+     "商品间距",
+     "⟨input 值=8⟩",
+     "一行",
+     "两行",
+     "不显示",
+     "商品描述",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "此处显示商品的 ”分享描述“ 内容。",
+     "商品价格",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "默认",
+     "跟随店铺主色",
+     "商品销量",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "购买按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "⟨input:radio ○⟩",
+     "样式1",
+     "⟨input:radio ○⟩",
+     "样式2",
+     "⟨input:radio ○⟩",
+     "样式3",
+     "⟨input:radio ○⟩",
+     "样式4",
+     "⟨input:radio ○⟩",
+     "样式5",
+     "⟨input:radio ◉⟩",
+     "样式6",
+     "⟨input:radio ○⟩",
+     "样式7",
+     "⟨input:radio ○⟩",
+     "样式8"
+    ],
+    "text": "个性化推荐功能提高商品曝光，推荐商品会从已上架的商品中根据消费者的行为和偏好自动推荐。 | 标题名称 | 显示 | ⟨input:checkbox ☑⟩ | 推荐位标题 | ⟨input 提示=最多输入8个字 值=猜你喜欢⟩ | 副标题 | ⟨input⟩ | 推荐规则 | NEW | ⟨input:radio ◉⟩ | ⟨input:radio ○⟩ | 显示位置 | 左对齐 | 背景颜色 | #f9f9f9 | 重置 | 显示个数 | ⟨input:radio ○⟩ | ⟨input:radio ◉⟩ | ⟨input 值=6⟩ | 列表样式 | 一行两个 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 促销 | 瀑布流 | 商品倒角 | 直角 | 图片比例 | 3:2 | 图片填充 | 周边留白 | 文本样式 | 加粗体 | 文本大小 | 大号 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=12⟩ | 商品间距 | ⟨input 值=8⟩ | 一行 | 两行 | 不显示 | 商品描述 | 显示 | ⟨input:checkbox ☑⟩ | 此处显示商品的 ”分享描述“ 内容。 | 商品价格 | 显示 | ⟨input:checkbox ☑⟩ | 默认 | 跟随店铺主色 | 商品销量 | 不显示 | ⟨input:checkbox ☐⟩ | 购买按钮 | 显示 | ⟨input:checkbox ☑⟩ | ⟨input:radio ○⟩ | 样式1 | ⟨input:radio ○⟩ | 样式2 | ⟨input:radio ○⟩ | 样式3 | ⟨input:radio ○⟩ | 样式4 | ⟨input:radio ○⟩ | 样式5 | ⟨input:radio ◉⟩ | 样式6 | ⟨input:radio ○⟩ | 样式7 | ⟨input:radio ○⟩ | 样式8",
+    "ctrlCount": 24,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多输入8个字",
+      "val": "猜你喜欢",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "6",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "12",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "8",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "人群运营": {
+   "name": "人群运营",
+   "type": "oriented_poster",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FoyMr6_9xl7g4UWIGcQHNOzHymh1.png",
+   "draggable": "true",
+   "group": "智能运营",
+   "added": true,
+   "panel": {
+    "seq": [
+     "客户运营-人群运营-加购未支付客户"
+    ],
+    "text": "客户运营-人群运营-加购未支付客户",
+    "ctrlCount": 0,
+    "ctrls": []
+   }
+  },
+  "人群图片": {
+   "name": "人群图片",
+   "type": "crowds_image_ad",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fgyd5N9R29QGAJXE7daGUWFpdv5z.png",
+   "draggable": "true",
+   "group": "智能运营",
+   "added": true,
+   "panel": {
+    "seq": [
+     "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效",
+     "选择模板",
+     "单图模式",
+     "添加图片",
+     "添加图片(0/5)",
+     "图片样式",
+     "常规",
+     "图片倒角",
+     "直角",
+     "页面边距",
+     "⟨input 值=0⟩"
+    ],
+    "text": "小程序需升级到版本 v3.34.3 后，24小时货架跳链即可生效 | 选择模板 | 单图模式 | 添加图片 | 添加图片(0/5) | 图片样式 | 常规 | 图片倒角 | 直角 | 页面边距 | ⟨input 值=0⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "0",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "店铺热搜": {
+   "name": "店铺热搜",
+   "type": "hot_words_reference",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FniHjw6papdwj8UGtt2YIQQmgSzN.png",
+   "draggable": "true",
+   "group": "智能运营",
+   "added": true,
+   "panel": {
+    "seq": [
+     "前往设置",
+     "模式选择",
+     "多行",
+     "单行",
+     "标题设置",
+     "⟨input 提示=最多输入6个字 值=大家都在搜⟩",
+     "热词角标",
+     "精选词颜色",
+     "全店风格",
+     "自定义",
+     "前往设置",
+     "样式选择",
+     "样式一",
+     "样式二"
+    ],
+    "text": "前往设置 | 模式选择 | 多行 | 单行 | 标题设置 | ⟨input 提示=最多输入6个字 值=大家都在搜⟩ | 热词角标 | 精选词颜色 | 全店风格 | 自定义 | 前往设置 | 样式选择 | 样式一 | 样式二",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多输入6个字",
+      "val": "大家都在搜",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "店铺榜单": {
+   "name": "店铺榜单",
+   "type": "shop_ranking_list",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FjfNE2vi1B5XU3TMZDlrDHCTTDym.png",
+   "draggable": "true",
+   "group": "智能运营",
+   "added": true,
+   "panel": {
+    "seq": [
+     "店铺榜单组件在小程序端仅v2.95及以上版本生效。榜单商品由系统根据算法自动展现，无需编辑。榜单数据会实时变化。当榜单商",
+     "组件倒角",
+     "圆角",
+     "直角",
+     "页边距",
+     "⟨input 值=15⟩"
+    ],
+    "text": "店铺榜单组件在小程序端仅v2.95及以上版本生效。榜单商品由系统根据算法自动展现，无需编辑。榜单数据会实时变化。当榜单商 | 组件倒角 | 圆角 | 直角 | 页边距 | ⟨input 值=15⟩",
+    "ctrlCount": 1,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "15",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "课程": {
+   "name": "课程",
+   "type": "knowledge-goods,edu-goods-group",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fo4bVxLblDdjtTjvk5KSxFrPkdTE.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "课程支持小程序v2.37.5及以上版本，课程分组支持小程序v2.42及以上版本",
+     "课程",
+     "课程分组",
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=课程 值=课程⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "课程来源",
+     "⟨input:radio ◉⟩",
+     "课程",
+     "⟨input:radio ○⟩",
+     "选择分组",
+     "课程类型",
+     "专栏",
+     "选择方式",
+     "⟨input:radio ◉⟩",
+     "⟨input 值=6⟩",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "列表样式",
+     "大图模式",
+     "商品样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "商品倒角",
+     "直角",
+     "图片填充",
+     "填充",
+     "文本样式",
+     "常规体",
+     "文本对齐",
+     "左对齐",
+     "页面边距",
+     "⟨input 值=15⟩",
+     "商品间距",
+     "⟨input 值=10⟩",
+     "专栏标题",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "专栏简介",
+     "不显示",
+     "⟨input:checkbox ☐⟩",
+     "已更新期数",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "价格",
+     "显示",
+     "⟨input:checkbox ☑⟩"
+    ],
+    "text": "课程支持小程序v2.37.5及以上版本，课程分组支持小程序v2.42及以上版本 | 课程 | 课程分组 | 标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=课程 值=课程⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 课程来源 | ⟨input:radio ◉⟩ | 课程 | ⟨input:radio ○⟩ | 选择分组 | 课程类型 | 专栏 | 选择方式 | ⟨input:radio ◉⟩ | ⟨input 值=6⟩ | ⟨input:radio ○⟩ | 自定义 | 列表样式 | 大图模式 | 商品样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 商品倒角 | 直角 | 图片填充 | 填充 | 文本样式 | 常规体 | 文本对齐 | 左对齐 | 页面边距 | ⟨input 值=15⟩ | 商品间距 | ⟨input 值=10⟩ | 专栏标题 | 显示 | ⟨input:checkbox ☑⟩ | 专栏简介 | 不显示 | ⟨input:checkbox ☐⟩ | 已更新期数 | 显示 | ⟨input:checkbox ☑⟩ | 价格 | 显示 | ⟨input:checkbox ☑⟩",
+    "ctrlCount": 14,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "课程",
+      "val": "课程",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "6",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "15",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "10",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     }
+    ]
+   }
+  },
+  "知识专栏": {
+   "name": "知识专栏",
+   "type": "paid_column",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fkcv7e8VqBw2YeFTRobKdye5s-Go.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=最新专栏 值=最新专栏⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "专栏来源:",
+     "⟨input:radio ◉⟩",
+     "展示最新的3篇专栏",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "最多添加10篇专栏，拖动选中的专栏可对其排序"
+    ],
+    "text": "标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=最新专栏 值=最新专栏⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 专栏来源: | ⟨input:radio ◉⟩ | 展示最新的3篇专栏 | ⟨input:radio ○⟩ | 自定义 | 最多添加10篇专栏，拖动选中的专栏可对其排序",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最新专栏",
+      "val": "最新专栏",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "知识内容": {
+   "name": "知识内容",
+   "type": "paid_content",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FpwZj4KKSVSDdc6XFvqegpHVm6dc.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=最新内容 值=最新内容⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "内容来源:",
+     "⟨input:radio ◉⟩",
+     "展示最新的6篇内容",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "最多添加10篇内容，拖动选中的内容可对其排序"
+    ],
+    "text": "标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=最新内容 值=最新内容⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 内容来源: | ⟨input:radio ◉⟩ | 展示最新的6篇内容 | ⟨input:radio ○⟩ | 自定义 | 最多添加10篇内容，拖动选中的内容可对其排序",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最新内容",
+      "val": "最新内容",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "知识直播": {
+   "name": "知识直播",
+   "type": "paid_live",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Foy3oy3NYUgr-XJKl1CQM-jmPm4F.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=最新直播 值=最新直播⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "直播来源:",
+     "⟨input:radio ◉⟩",
+     "展示最新的6个直播",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "最多添加10个直播，拖动选中的专栏可对其排序"
+    ],
+    "text": "标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=最新直播 值=最新直播⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 直播来源: | ⟨input:radio ◉⟩ | 展示最新的6个直播 | ⟨input:radio ○⟩ | 自定义 | 最多添加10个直播，拖动选中的专栏可对其排序",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最新直播",
+      "val": "最新直播",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "知识付费会员": {
+   "name": "知识付费会员",
+   "type": "paid_member",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/Fs51E0xpRlCTuTotJ77IW8doH5We.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=知识付费会员 值=知识付费会员⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "会员权益来源:",
+     "⟨input:radio ◉⟩",
+     "展示最新的3个会员权益",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "最多添加10个会员权益，拖动选中的会员权益可对其排序"
+    ],
+    "text": "标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=知识付费会员 值=知识付费会员⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 会员权益来源: | ⟨input:radio ◉⟩ | 展示最新的3个会员权益 | ⟨input:radio ○⟩ | 自定义 | 最多添加10个会员权益，拖动选中的会员权益可对其排序",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "知识付费会员",
+      "val": "知识付费会员",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "群打卡": {
+   "name": "群打卡",
+   "type": "punch",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/06/17/FiEfvHOUj52cTOfxrnWzVEec3amv.png",
+   "draggable": "true",
+   "group": "教育",
+   "added": true,
+   "panel": {
+    "seq": [
+     "群打卡暂时不支持小程序",
+     "标题栏",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "标题名称",
+     "⟨input 提示=最新打卡 值=最新打卡⟩",
+     "查看全部按钮",
+     "显示",
+     "⟨input:checkbox ☑⟩",
+     "群打卡来源:",
+     "⟨input:radio ◉⟩",
+     "展示最新的3个群打卡",
+     "⟨input:radio ○⟩",
+     "自定义",
+     "最多添加10个群打卡，拖动选中的群打卡可对其排序"
+    ],
+    "text": "群打卡暂时不支持小程序 | 标题栏 | 显示 | ⟨input:checkbox ☑⟩ | 标题名称 | ⟨input 提示=最新打卡 值=最新打卡⟩ | 查看全部按钮 | 显示 | ⟨input:checkbox ☑⟩ | 群打卡来源: | ⟨input:radio ◉⟩ | 展示最新的3个群打卡 | ⟨input:radio ○⟩ | 自定义 | 最多添加10个群打卡，拖动选中的群打卡可对其排序",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最新打卡",
+      "val": "最新打卡",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 1
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "积分兑换商品": {
+   "name": "积分兑换商品",
+   "type": "points_goods",
+   "icon": "https://img01.yzcdn.cn/upload_files/2022/07/19/FhHSGvx3gi5GFc_3qg1TK9t1zHRW.png",
+   "draggable": "true",
+   "group": "积分",
+   "added": true,
+   "panel": {
+    "seq": [
+     "模块标题",
+     "显示",
+     "隐藏",
+     "兑换商品管理",
+     "⟨input:radio ○⟩",
+     "手动添加",
+     "⟨input:radio ◉⟩",
+     "显示个数",
+     "⟨input:radio ◉⟩",
+     "全部积分商品",
+     "⟨input:radio ○⟩",
+     "自定义数量",
+     "排序规则",
+     "开始时间越晚越靠前",
+     "商品样式",
+     "列表样式",
+     "商品分类",
+     "显示",
+     "隐藏",
+     "图片填充",
+     "填充",
+     "周边留白",
+     "商品倒角",
+     "直角",
+     "圆角",
+     "兑换积分",
+     "显示",
+     "隐藏",
+     "购买按钮",
+     "显示",
+     "隐藏",
+     "剩余库存",
+     "显示",
+     "隐藏",
+     "售罄商品",
+     "显示",
+     "隐藏"
+    ],
+    "text": "模块标题 | 显示 | 隐藏 | 兑换商品管理 | ⟨input:radio ○⟩ | 手动添加 | ⟨input:radio ◉⟩ | 显示个数 | ⟨input:radio ◉⟩ | 全部积分商品 | ⟨input:radio ○⟩ | 自定义数量 | 排序规则 | 开始时间越晚越靠前 | 商品样式 | 列表样式 | 商品分类 | 显示 | 隐藏 | 图片填充 | 填充 | 周边留白 | 商品倒角 | 直角 | 圆角 | 兑换积分 | 显示 | 隐藏 | 购买按钮 | 显示 | 隐藏 | 剩余库存 | 显示 | 隐藏 | 售罄商品 | 显示 | 隐藏",
+    "ctrlCount": 4,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "会员卡片": {
+   "name": "会员卡片",
+   "type": "shelf_member",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/banhuiyuan.png",
+   "draggable": "true",
+   "group": "其他",
+   "added": true,
+   "panel": {
+    "seq": [
+     "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。",
+     "微商城小程序需升级到V2.147.1及以上，零售小程序需升级到V3.102.1及以上，会员卡片样式设置才能生效",
+     "客户 - 等级管理",
+     "是否展示",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "⟨input 提示=最多12个字 值=注册会员⟩",
+     "描述",
+     "⟨input 提示=最多12个字⟩",
+     "卡片背景",
+     "透明色",
+     "重置",
+     "卡片倒角",
+     "圆角",
+     "卡片边距",
+     "⟨input 值=16⟩"
+    ],
+    "text": "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。 | 微商城小程序需升级到V2.147.1及以上，零售小程序需升级到V3.102.1及以上，会员卡片样式设置才能生效 | 客户 - 等级管理 | 是否展示 | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | ⟨input 提示=最多12个字 值=注册会员⟩ | 描述 | ⟨input 提示=最多12个字⟩ | 卡片背景 | 透明色 | 重置 | 卡片倒角 | 圆角 | 卡片边距 | ⟨input 值=16⟩",
+    "ctrlCount": 5,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多12个字",
+      "val": "注册会员",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "最多12个字",
+      "val": "",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "",
+      "val": "16",
+      "ck": ""
+     }
+    ]
+   }
+  },
+  "店招信息": {
+   "name": "店招信息",
+   "type": "shelf_banner",
+   "icon": "https://b.yzcdn.cn/wsc-pc-decorate/dianzhao.png",
+   "draggable": "true",
+   "group": "其他",
+   "added": true,
+   "panel": {
+    "seq": [
+     "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。",
+     "是否展示",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "店招样式",
+     "居右",
+     "卡片样式",
+     "无边白底",
+     "卡片投影",
+     "描边白底",
+     "无边透明底",
+     "卡片倒角",
+     "圆角",
+     "背景图片",
+     "固定高度",
+     "固定尺寸：750x288 像素，尺寸不匹配时，图片将被压缩或拉伸以铺满。最多添加 4 张背景图片，拖动选中的图片可对其排",
+     "添加背景图",
+     "店铺公告",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "⟨input 提示=填写内容，如果过长，会在手机上滚动显示 值=公告⟩",
+     "店铺优惠",
+     "⟨input:radio ◉⟩",
+     "显示",
+     "⟨input:radio ○⟩",
+     "隐藏",
+     "优惠券",
+     "⟨input:radio ◉⟩",
+     "手动添加",
+     "⟨input:radio ○⟩",
+     "自动获取",
+     "添加优惠券",
+     "最多添加 10 张优惠券",
+     "隐藏已抢完券",
+     "不隐藏",
+     "⟨input:checkbox ☐⟩",
+     "当页面无可显示的优惠券时，优惠券区块将隐藏"
+    ],
+    "text": "该组件当前仅支持微信小程序（升级至v3.33.2 及以上版本卡片样式即可生效），预览或在其他渠道打开，该组件将不可见。 | 是否展示 | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | 店招样式 | 居右 | 卡片样式 | 无边白底 | 卡片投影 | 描边白底 | 无边透明底 | 卡片倒角 | 圆角 | 背景图片 | 固定高度 | 固定尺寸：750x288 像素，尺寸不匹配时，图片将被压缩或拉伸以铺满。最多添加 4 张背景图片，拖动选中的图片可对其排 | 添加背景图 | 店铺公告 | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | ⟨input 提示=填写内容，如果过长，会在手机上滚动显示 值=公告⟩ | 店铺优惠 | ⟨input:radio ◉⟩ | 显示 | ⟨input:radio ○⟩ | 隐藏 | 优惠券 | ⟨input:radio ◉⟩ | 手动添加 | ⟨input:radio ○⟩ | 自动获取 | 添加优惠券 | 最多添加 10 张优惠券 | 隐藏已抢完券 | 不隐藏 | ⟨input:checkbox ☐⟩ | 当页面无可显示的优惠券时，优惠券区块将隐藏",
+    "ctrlCount": 10,
+    "ctrls": [
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "text",
+      "ph": "填写内容，如果过长，会在手机上滚动显示",
+      "val": "公告",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "radio",
+      "ph": "",
+      "val": "on",
+      "ck": ""
+     },
+     {
+      "tag": "INPUT",
+      "ty": "checkbox",
+      "ph": "",
+      "val": "on",
+      "ck": 0
+     }
+    ]
+   }
+  }
+ }
+}

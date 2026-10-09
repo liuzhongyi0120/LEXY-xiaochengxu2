@@ -16,14 +16,22 @@ const fs = require('node:fs');
 const path = require('node:path');
 const util = require('./util');
 const atomic = require('./atomicFile');
+const dataDir = require('./dataDir');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = dataDir.ROOT;
 const FILE = path.join(DATA_DIR, 'catalog.json');
 
-/** 店铺默认设置（后台「店铺设置」读写） */
+/**
+ * 店铺默认设置（后台「店铺设置」读写）。
+ *
+ * ⚠️ `shopName` / `logo` 是**历史遗留的重复字段**：小程序端的店铺名称与头像
+ *    唯一真源是装修台维护的 `replica.SHOP`（name / avatar），这两个键没有任何消费方。
+ *    保留它们只为兼容旧文件（读出来不报错），`catalog.saveSettings()` 已明确拒绝对它们赋值 ——
+ *    见 catalog.js 的 SETTINGS_OWNED_BY_DECORATE。新增设置项请不要再用这两个键。
+ */
 const DEFAULT_SETTINGS = {
-  shopName: 'LEXY莱克官方旗舰店',
-  logo: '',
+  shopName: 'LEXY莱克官方旗舰店',   // 已废弃，真源 replica.SHOP.name
+  logo: '',                        // 已废弃，真源 replica.SHOP.avatar
   servicePhone: '400-800-0000',
   serviceHours: '9:00 - 21:00',
   notice: '正品保障 · 全国联保 · 7 天无理由退换',

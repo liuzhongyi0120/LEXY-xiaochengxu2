@@ -160,6 +160,12 @@ img.thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; ba
 .cell-main .tt b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
 .cell-main .tt span { display: block; color: var(--sub); font-size: 11.5px; }
 .sub { color: var(--sub); font-size: 11.5px; }
+/* 只读值（店铺设置里「由装修台维护」的字段）：看起来像输入框但明显不可编辑 */
+.ro {
+  display: inline-block; min-width: 120px; padding: 5px 10px;
+  background: #f5f6f8; border: 1px solid var(--line); border-radius: 6px;
+  font-size: 12.5px; color: var(--text);
+}
 .money { font-weight: 600; font-variant-numeric: tabular-nums; }
 .money.red { color: var(--primary); }
 
@@ -183,6 +189,8 @@ img.thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; ba
   height: 30px; padding: 0 12px; border-radius: 6px;
   border: 1px solid var(--line-strong); background: #fff; color: var(--text);
   cursor: pointer; font-size: 12.5px; white-space: nowrap; transition: .15s;
+  /* .btn 也用在 <a> 上（如「去装修台修改」），不写这句会带下划线 */
+  text-decoration: none;
 }
 .btn:hover { border-color: #b9c0cb; background: #fcfcfd; }
 .btn:active { transform: translateY(1px); }

@@ -9,6 +9,7 @@
  */
 
 const fs = require('node:fs');
+const { BizError, ERR } = require('../lib/http');
 
 /** 取出原文件的头部注释块（文件开头的第一段 block comment） */
 function headerOf(src) {
@@ -42,7 +43,10 @@ function emitReplica(data, opt = {}) {
   const need = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   const missing = need.filter((k) => data[k] === undefined);
   if (missing.length) {
-    throw new Error('装修数据缺少字段，拒绝生成：' + missing.join(', '));
+    // 这是「调用方漏传了必填字段」的内部不变量，属于服务端异常（5000），
+    // 但消息必须原样带出去 —— 否则线上只能看到「服务开小差了」，
+    // 而真正的原因（缺哪个字段）只留在服务器日志里。
+    throw new BizError('装修数据缺少字段，拒绝生成：' + missing.join(', '), ERR.SERVER, 500);
   }
 
   const L = [];
@@ -80,6 +84,18 @@ function emitReplica(data, opt = {}) {
     L.push('');
   }
 
+  /*
+   * 自定义页「旧标识 → 新标识」别名表。
+   * 页面改过标识后，历史分享链接与旧的站内跳转仍指向旧标识，
+   * 小程序端 pages/custom 查到别名后自动转到新标识 —— 不写进 replica 就等于旧链接直接失效。
+   */
+  const hasAlias = !!(data.CUSTOM_PAGE_ALIASES && Object.keys(data.CUSTOM_PAGE_ALIASES).length);
+  if (hasAlias) {
+    L.push('/** ---------------- 自定义页面旧标识别名（旧分享链接 → 新标识，装修台改标识时登记） ---------------- */');
+    L.push('const CUSTOM_PAGE_ALIASES = ' + jsExpr(data.CUSTOM_PAGE_ALIASES) + ';');
+    L.push('');
+  }
+
   if (data.PAGE_META !== undefined) {
     L.push('/** ---------------- 页面级设置（装修后台「页面设置」面板，key = 页面 key） ---------------- */');
     L.push('const PAGE_META = ' + jsExpr(data.PAGE_META) + ';');
@@ -108,6 +124,7 @@ function emitReplica(data, opt = {}) {
   /* 导出清单按实际写出的字段动态生成，杜绝「导出了不存在的变量」这种低级错误 */
   const fields = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   if (hasCustom) fields.push('CUSTOM_PAGES');
+  if (hasAlias) fields.push('CUSTOM_PAGE_ALIASES');
   if (data.PAGE_META !== undefined) fields.push('PAGE_META');
   if (data.TABBAR !== undefined) fields.push('TABBAR');
 

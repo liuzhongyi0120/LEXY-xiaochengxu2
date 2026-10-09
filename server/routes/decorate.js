@@ -13,12 +13,15 @@
  *
  *   ── 自定义页面（对标有赞「新建页面」，数据写入 replica.CUSTOM_PAGES）──
  *   GET  /api/decorate/templates          新建模板清单 + 配额
+ *   GET  /api/decorate/page/refs          站内引用清单（哪些页面的哪个字段跳到了这个自定义页）
  *   POST /api/decorate/page/create        新建自定义页面
- *   POST /api/decorate/page/rename        改名称 / 备注 / 页面标识
- *   POST /api/decorate/page/delete        删除自定义页面
+ *   POST /api/decorate/page/rename        改名称 / 备注 / 页面标识（改标识会登记旧标识别名）
+ *   POST /api/decorate/page/delete        删除自定义页面（被引用时须 force 才删）
  *
- * 说明：装修后台属于运营管理功能。本项目当前无管理端账号体系，
- * 故这些点位未开启 JWT 鉴权；正式环境请在网关层加访问控制（见 README「上线前必做」）。
+ * 说明：装修后台属于运营管理功能，**全部要求管理员身份与角色**：
+ *   - 由 `server/index.js` 统一拦截（见 lib/adminAuth.js），这里不再逐个标注；
+ *   - 读操作 viewer 即可；存草稿 / 改数据 operator；发布、回滚、新建/改名/删除页面属高危，须 owner。
+ *   - 页面开关另由 ADMIN_PAGE 控制（关掉时这些点位一律 403）。
  */
 
 const decorate = require('../decorate/store');
@@ -88,18 +91,40 @@ module.exports = [
     method: 'POST',
     path: '/api/decorate/page/create',
     auth: false,
-    desc: '新建自定义页面。只建后台条目（先不写 replica.js），装修完点「发布」才下发到小程序',
+    desc: '新建自定义页面。只建后台条目（先不写 replica.js），装修完点「生成代码」才下发到小程序',
     async handler(ctx) {
-      try {
-        return decorate.createCustomPage({
-          name: ctx.params.name,
-          key: ctx.params.key,
-          note: ctx.params.note,
-          template: ctx.params.template
-        });
-      } catch (e) {
-        throw new BizError(e.message, ERR.PARAM);
+      /*
+       * ⚠️ 这里刻意**不兜 try/catch 把异常统一转成业务失败**。
+       *    store / customPages 现在自己抛 BizError（参数类 1001、配额与重名类 2000、找不到 404），
+       *    再兜一层会把三类东西一起压成同一个码：
+       *      · 真正的服务端异常（生成 replica.js 失败、回读校验失败）→ 被伪装成「运营填错了」；
+       *      · 精确的业务码与提示 → 被覆盖成笼统的 1001；
+       *      · 自检的失败用例 → 拿到非零码就算「预期拦截成功」，等于把 bug 洗白。
+       */
+      return decorate.createCustomPage({
+        name: ctx.params.name,
+        key: ctx.params.key,
+        note: ctx.params.note,
+        template: ctx.params.template
+      });
+    }
+  },
+
+  {
+    method: 'GET',
+    path: '/api/decorate/page/refs',
+    auth: false,
+    desc: '站内引用清单：哪些页面 / 底部导航的哪个字段跳到了这个自定义页（改名与删除前先看它）',
+    async handler(ctx) {
+      const key = needKey(ctx.params);
+      const page = schema.get(key);
+      if (!page) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
+      if (!page.custom) {
+        // 内置页的地址是 app.json 里编译期固定的，不存在「被自定义地址引用」的问题
+        return { key: key, name: page.name, custom: false, refs: [], count: 0 };
       }
+      const refs = decorate.referencesOf(key);
+      return { key: key, name: page.name, custom: true, refs: refs, count: refs.length };
     }
   },
 
@@ -107,18 +132,15 @@ module.exports = [
     method: 'POST',
     path: '/api/decorate/page/rename',
     auth: false,
-    desc: '改自定义页面的名称 / 备注 / 页面标识；改标识会连带迁移草稿、版本快照与 replica 里的键名',
+    desc: '改自定义页面的名称 / 备注 / 页面标识；改标识会迁移草稿、版本快照与 replica 键名，并保留旧标识别名',
     async handler(ctx) {
       const key = needKey(ctx.params);
-      try {
-        return decorate.updateCustomPage(key, {
-          name: ctx.params.name,
-          note: ctx.params.note,
-          key: ctx.params.newKey
-        });
-      } catch (e) {
-        throw new BizError(e.message, ERR.PARAM);
-      }
+      // 同 page/create：不兜 catch，让 store 抛出的 BizError（含 5000 的服务端异常）如实上报
+      return decorate.updateCustomPage(key, {
+        name: ctx.params.name,
+        note: ctx.params.note,
+        key: ctx.params.newKey
+      });
     }
   },
 
@@ -126,14 +148,14 @@ module.exports = [
     method: 'POST',
     path: '/api/decorate/page/delete',
     auth: false,
-    desc: '删除自定义页面：连带清理草稿与版本记录，并重新生成 replica.js 去掉该页（内置页不可删）',
+    desc: '删除自定义页面：连带清理草稿与版本记录并重新生成 replica.js；被站内引用时须 force=1（内置页不可删）',
     async handler(ctx) {
       const key = needKey(ctx.params);
-      try {
-        return decorate.removeCustomPage(key);
-      } catch (e) {
-        throw new BizError(e.message, ERR.BIZ);
-      }
+      // 业务失败（内置页不可删 / 被引用需 force / 页面不存在）已由 store 抛成 BizError，
+      // 这里**不能再兜一个 try/catch 全量转成业务失败** ——
+      // 编译 replica.js 失败、回读校验失败这类真·服务端异常会被一起吞成 HTTP 200，
+      // 既丢掉了「已自动回滚」的真实原因，也让自检的失败被当成「预期拦截」。
+      return decorate.removeCustomPage(key, { force: ctx.params.force });
     }
   },
 
@@ -147,11 +169,8 @@ module.exports = [
       if (!ctx.params.data || typeof ctx.params.data !== 'object') {
         throw new BizError('缺少页面数据 data', ERR.PARAM);
       }
-      try {
-        return decorate.saveDraft(key, ctx.params.data);
-      } catch (e) {
-        throw new BizError(e.message, ERR.PARAM);
-      }
+      // 同 page/create：不兜 catch（「数据校验未通过」已是 1001，其余异常必须如实上报）
+      return decorate.saveDraft(key, ctx.params.data);
     }
   },
 
@@ -184,14 +203,14 @@ module.exports = [
     method: 'POST',
     path: '/api/decorate/publish',
     auth: false,
-    desc: '发布：写回 miniprogram/config/replica.js（发布前自动备份 + 语法与回读双重校验）',
+    // ⚠️ 名称按实际行为写：它只是「生成代码」，不是「上线」。详见 README「先看清发布到底发布了什么」。
+    desc: '生成代码：写回 miniprogram/config/replica.js（生成前自动备份 + 语法与回读双重校验）。不等于线上生效，仍需上传并发布小程序新版本',
     async handler(ctx) {
       const key = needKey(ctx.params);
-      try {
-        return decorate.publish(key, ctx.params.note);
-      } catch (e) {
-        throw new BizError(e.message, ERR.BIZ);
-      }
+      // 「没有草稿」是 2000，「数据校验未通过」是 1001；
+      // 生成/回读 replica.js 失败是真正的服务端异常（5000），不能被压成业务失败 ——
+      // 运营看到「服务开小差」才知道该找技术，而不是反复重试。
+      return decorate.publish(key, ctx.params.note);
     }
   },
 
@@ -203,11 +222,9 @@ module.exports = [
     async handler(ctx) {
       const key = needKey(ctx.params);
       if (!ctx.params.versionId) throw new BizError('缺少版本号 versionId', ERR.PARAM);
-      try {
-        return decorate.rollback(key, ctx.params.versionId, ctx.params.mode);
-      } catch (e) {
-        throw new BizError(e.message, ERR.BIZ);
-      }
+      // 版本不存在是 404（store 里已是 BizError），不要在这里降级成 2000；
+      // 也绝不把回滚过程中的服务端异常转成「业务失败」。
+      return decorate.rollback(key, ctx.params.versionId, ctx.params.mode);
     }
   },
 

@@ -12,8 +12,19 @@
 server/data/
 
 # ---- 内部工作目录 ----
-# 回归 / 冒烟 / 抓取脚本与临时产物
-.tooling/
+# .tooling/ 里**大件**不入库：截图（shots/ 17MB）、下载的抓取原图（assets-src/ 11MB）、
+# 数据备份（_backup/、_orphans-backup/）与本机临时产物。
+#
+# 但**测试脚本本身要入库** —— 整改报告 15 明确要求「单独提供可重复执行的非交易测试入口」，
+# 脚本不进仓库等于交付里没有这个入口，别人也没法复跑验证结论。
+# 所以这里改成「整体排除 + 逐个放行脚本与两份**真实抓取证据**」。
+.tooling/*
+!.tooling/*.mjs
+!.tooling/*.cjs
+# home.json       有赞真实页面抓取值（test-layout.mjs 用它做尺寸口径对账）
+# _yz-panels.json 有赞装修编辑器 54 个组件的中文面板字段原文（组件库对账的依据）
+!.tooling/home.json
+!.tooling/_yz-panels.json
 # AI 助手工作记忆（含内部上下文，不入公开仓库）
 .workbuddy/
 

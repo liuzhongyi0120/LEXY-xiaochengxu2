@@ -51,15 +51,104 @@ function withLiveStock(goods) {
   return Object.assign({}, goods, { skus, stock, lowStock: stock <= LOW_STOCK });
 }
 
-/** 把库存写入真源，并同步商品上的展示值 */
-function writeStock(skuId, stock) {
+/** 把库存写入真源，并同步商品上的展示值
+ *
+ *  ownerId：只同步「属于这个商品」的 SKU 展示值。
+ *  历史上这里是无条件全局同步 —— 一旦两个商品撞了同一个 skuId（见 saveGoods 的
+ *  默认 SKU 生成逻辑），改 A 的库存会把 B 的展示值也改掉，而两者共用同一个库存键，
+ *  等于两个商品的库存从此绑死。现在先按 owner 收窄，再由 saveGoods 保证标识唯一。
+ */
+function writeStock(skuId, stock, ownerId) {
   const database = db();
   database.stocks[skuId] = Math.max(0, toInt(stock));
   GOODS().forEach((g) => {
+    if (ownerId && g.id !== ownerId) return;
     (g.skus || []).forEach((s) => { if (s.skuId === skuId) s.stock = database.stocks[skuId]; });
   });
   db$.commit();
   catalogStore.commit();
+}
+
+/* ------------------------- SKU 标识唯一性 ------------------------- */
+
+/**
+ * 跨商品扫描重复的 SKU 标识。
+ *
+ * 库存真源是 `db.stocks[skuId]`（全局键），所以一旦两个商品用了同一个 skuId，
+ * 它们的库存就被绑成一份 —— 这是**静默的数据破坏**，用户不会看到任何报错。
+ * 后台新建商品时若未显式给 SKU 标识，早前会用 `g-01` / `g-02` 兜底，
+ * 而那时商品 ID 还没生成，于是第二件商品必然撞上第一件的标识。
+ *
+ * 返回 [{ skuId, goods: [{ goodsId, goodsName }] }]，供迁移前人工核对。
+ */
+function auditSkuConflicts() {
+  const map = {};
+  GOODS().forEach((g) => (g.skus || []).forEach((s) => {
+    if (!s || !s.skuId) return;
+    (map[s.skuId] = map[s.skuId] || []).push({ goodsId: g.id, goodsName: g.name });
+  }));
+  return Object.keys(map)
+    .filter((k) => map[k].length > 1)
+    .map((k) => ({ skuId: k, goods: map[k] }));
+}
+
+/** 生成不与现有商品冲突的商品 ID */
+function nextGoodsId() {
+  const list = GOODS();
+  let id = genId('g');
+  let guard = 0;
+  while (list.some((g) => g.id === id) && guard++ < 1000) id = genId('g');
+  return id;
+}
+
+/**
+ * 规格标识的校验与生成。
+ *
+ * 规则（缺一不可）：
+ *   1. 商品 ID 必须先确定，再据此生成 SKU 标识 —— 否则默认标识必然跨商品撞车；
+ *   2. 同一商品内不得重复；
+ *   3. 不得复用**其它商品**已有的 SKU 标识（否则两者共享同一份库存）。
+ * 编辑商品时允许保留自己原有的 SKU 标识（改价格、改库存不能丢失身份）。
+ */
+function resolveSkus(goodsId, skusIn, list) {
+  const seen = {};
+  return skusIn.map((s, i) => {
+    const price = toInt(s.price);
+    if (price <= 0) throw new BizError(`第 ${i + 1} 个规格的价格必须大于 0`, ERR.PARAM);
+
+    const given = s.skuId ? String(s.skuId).trim() : '';
+    let skuId = given;
+
+    if (skuId) {
+      if (seen[skuId]) {
+        throw new BizError(`第 ${i + 1} 个规格的标识与同商品内其他规格重复：${skuId}`, ERR.PARAM);
+      }
+      const owner = list.find((g) => g.id !== goodsId && (g.skus || []).some((x) => x.skuId === skuId));
+      if (owner) {
+        throw new BizError(
+          `规格标识 ${skuId} 已被商品「${owner.name}」占用，不能复用（否则两个商品会共享同一份库存）`,
+          ERR.PARAM
+        );
+      }
+    } else {
+      // 未指定 → 由服务端按「商品 ID + 序号」生成稳定唯一标识
+      let n = i + 1;
+      do {
+        skuId = `${goodsId}-${String(n).padStart(2, '0')}`;
+        n += 1;
+      } while (seen[skuId] || list.some((g) => g.id !== goodsId && (g.skus || []).some((x) => x.skuId === skuId)));
+    }
+
+    seen[skuId] = true;
+    return {
+      skuId,
+      specs: Array.isArray(s.specs) ? s.specs.map((x) => String(x)) : [],
+      price,
+      originalPrice: toInt(s.originalPrice) || price,
+      stock: toInt(s.stock),
+      image: s.image || ''
+    };
+  });
 }
 
 /* ------------------------------ 分类 ------------------------------ */
@@ -96,9 +185,18 @@ function findSku(goods, skuId) {
 
 /* ------------------------------ 列表 ------------------------------ */
 
-/** 列表筛选 + 排序（小程序侧：仅上架） */
-function filterGoods({ categoryId, keyword, sort, status }) {
-  let list = GOODS().filter((g) => (status ? g.status === status : g.status === 'on_sale'));
+/**
+ * 列表筛选（**只返回在售商品**）。
+ *
+ * ⚠️ 这里刻意不接受 status 参数。
+ *    早前的写法是 `status ? g.status === status : g.status === 'on_sale'`，
+ *    而 `/api/goods/list` 是**匿名接口**且把请求参数原样透传，
+ *    于是任何人加一个 `?status=off_sale` 就能把下架商品全部拉出来 ——
+ *    前端没有筛选按钮完全不算保护，参数是调用方直接构造的。
+ *    下架商品的浏览需求属于后台，走 adminListGoods（有管理权限校验）。
+ */
+function filterGoods({ categoryId, keyword }) {
+  let list = GOODS().filter((g) => g.status === 'on_sale');
 
   if (categoryId) {
     const ids = expandCategoryIds(CATEGORIES(), categoryId);
@@ -140,7 +238,10 @@ function sortGoods(list, sort) {
 }
 
 function listGoods(params) {
-  const result = paginate(sortGoods(filterGoods(params), params.sort), params.page, params.size);
+  const p = params || {};
+  // 只取筛选需要的字段：status 之类的参数在这里被**丢弃**，不是「忘了传」
+  const filtered = filterGoods({ categoryId: p.categoryId, keyword: p.keyword });
+  const result = paginate(sortGoods(filtered, p.sort), p.page, p.size);
   return Object.assign({}, result, {
     list: result.list.map((g) => toListItem(withLiveStock(g)))
   });
@@ -277,29 +378,26 @@ function saveGoods(payload) {
   const catIds = CATEGORIES().reduce((acc, c) => acc.concat([c.id], (c.children || []).map((x) => x.id)), []);
   if (catIds.indexOf(p.categoryId) < 0) throw new BizError('分类不存在', ERR.PARAM);
 
+  const list = GOODS();
+
+  /*
+   * ⚠️ 顺序不能反：**先确定商品 ID，再据此生成 SKU 标识**。
+   *    早前是先造 skus（用 `p.id || 'g'` 兜底 → 每件新商品的默认标识都是 g-01），
+   *    之后才生成商品 ID —— 于是第二件商品必然复用第一件的 g-01，
+   *    而库存又是以 skuId 为全局键，改一件商品的库存就把另一件也改了。
+   *    resolveSkus 同时会拦住「同商品内重复」和「跨商品复用」。
+   */
+  const goodsId = isNew ? nextGoodsId() : String(p.id);
+
   const skusIn = Array.isArray(p.skus) && p.skus.length ? p.skus : [{
     specs: [], price: toInt(p.basePrice), originalPrice: toInt(p.basePrice), stock: 0
   }];
+  const skus = resolveSkus(goodsId, skusIn, list);
 
-  const skus = skusIn.map((s, i) => {
-    const price = toInt(s.price);
-    if (price <= 0) throw new BizError(`第 ${i + 1} 个规格的价格必须大于 0`, ERR.PARAM);
-    const skuId = s.skuId || `${p.id || 'g'}-${String(i + 1).padStart(2, '0')}`;
-    return {
-      skuId,
-      specs: Array.isArray(s.specs) ? s.specs.map((x) => String(x)) : [],
-      price,
-      originalPrice: toInt(s.originalPrice) || price,
-      stock: toInt(s.stock),
-      image: s.image || ''
-    };
-  });
-
-  const list = GOODS();
   let goods;
   if (isNew) {
     goods = {
-      id: 'g' + String(1000 + list.length + 1) + String(now()).slice(-3),
+      id: goodsId,
       name,
       subtitle: String(p.subtitle || ''),
       categoryId: p.categoryId,
@@ -318,7 +416,12 @@ function saveGoods(payload) {
     };
     list.unshift(goods);
   } else {
-    goods = findAny(p.id);
+    goods = findAny(goodsId);
+    // 编辑时被删掉的规格，其库存键要一并清掉，避免 db.stocks 里长期堆积幽灵键
+    const kept = {};
+    skus.forEach((s) => { kept[s.skuId] = true; });
+    (goods.skus || []).forEach((s) => { if (!kept[s.skuId]) delete db().stocks[s.skuId]; });
+
     Object.assign(goods, {
       name,
       subtitle: String(p.subtitle || ''),
@@ -335,7 +438,7 @@ function saveGoods(payload) {
     });
   }
 
-  skus.forEach((s) => writeStock(s.skuId, s.stock));
+  skus.forEach((s) => writeStock(s.skuId, s.stock, goods.id));
   derive(goods);
   catalogStore.commit();
   return { id: goods.id, isNew, goods: withLiveStock(clone(goods)) };
@@ -440,24 +543,54 @@ function saveCategory(payload) {
   return { id, isNew: true };
 }
 
+/**
+ * 删除分类。
+ *
+ * ⚠️ 删除父分类会**连它的全部子分类一起去掉**（下面那个 splice），
+ *    所以关联检查必须覆盖整个范围。
+ *    早前只检查 `g.categoryId === id`（即父分类自身），子分类下的商品完全没查 ——
+ *    实测：父分类下 2 个子分类各挂 1 件商品时，删除照样成功，
+ *    结果是分类树空了、商品却还引用着已经不存在的子分类（幽灵分类）。
+ */
 function deleteCategory(id) {
   const list = CATEGORIES();
-  const used = GOODS().filter((g) => g.categoryId === id);
-  if (used.length) throw new BizError(`该分类下还有 ${used.length} 个商品，请先移出`, ERR.BIZ);
-  let removed = false;
-  list.forEach((c) => {
-    if (c.id === id) removed = true;
-    c.children = (c.children || []).filter((x) => {
-      if (x.id === id) { removed = true; return false; }
+
+  const parent = list.find((c) => c.id === id);
+  let node = parent;
+  let parentOf = null;
+  if (!node) {
+    list.some((c) => (c.children || []).some((x) => {
+      if (x.id !== id) return false;
+      node = x;
+      parentOf = c;
       return true;
-    });
-  });
-  if (!removed) throw new BizError('分类不存在', ERR.NOT_FOUND, 404);
-  // 连子分类一起去掉
-  const idx = list.findIndex((c) => c.id === id);
-  if (idx > -1) list.splice(idx, 1);
+    }));
+  }
+  if (!node) throw new BizError('分类不存在', ERR.NOT_FOUND, 404);
+
+  // 删除范围 = 该分类自身 + 其全部子分类
+  const children = node.children || [];
+  const scope = [node.id].concat(children.map((c) => c.id));
+
+  const used = GOODS().filter((g) => scope.indexOf(g.categoryId) > -1);
+  if (used.length) {
+    const hitChildren = children.filter((c) => used.some((g) => g.categoryId === c.id));
+    const where = hitChildren.length
+      ? `（其中 ${hitChildren.length} 个在子分类：${hitChildren.map((c) => c.name).join('、')}）`
+      : '';
+    throw new BizError(
+      `不能删除：该分类及其子分类下还有 ${used.length} 个商品${where}，请先移出或删除商品`,
+      ERR.BIZ
+    );
+  }
+
+  if (parentOf) {
+    parentOf.children = (parentOf.children || []).filter((x) => x.id !== id);
+  } else {
+    list.splice(list.indexOf(node), 1);
+  }
   catalogStore.commit();
-  return { deleted: true, id };
+  return { deleted: true, id, removedChildren: children.length };
 }
 
 /* ---------------------------- 券模板 ---------------------------- */
@@ -548,12 +681,33 @@ function activeCouponTemplates() {
 
 /* ---------------------------- 店铺设置 ---------------------------- */
 
+/**
+ * 由装修台（replica.SHOP）维护、**不接受**「店铺设置」覆盖的字段。
+ *
+ * 背景：控制台原本把店铺名称 / Logo 存进 catalog.settings，并在界面上写「用于『我的』页与分享卡片」，
+ * 但相关页面读的是 replica.SHOP.name / replica.SHOP.avatar —— 两个数据源，后台提示成功、
+ * 前端永远是旧值。这类「假成功」比报错更难查，所以直接拒绝而不是静默忽略。
+ */
+const SETTINGS_OWNED_BY_DECORATE = ['shopName', 'logo'];
+const SETTINGS_LABEL = { shopName: '店铺名称', logo: '店铺 Logo' };
+
 function settings() {
   return clone(cat().settings);
 }
 
 function saveSettings(patch) {
   const p = clone(patch || {});
+
+  const taken = SETTINGS_OWNED_BY_DECORATE.filter((k) => p[k] !== undefined);
+  if (taken.length) {
+    throw new BizError(
+      `${taken.map((k) => '「' + (SETTINGS_LABEL[k] || k) + '」').join('')}` +
+      '由装修台的「店铺信息」维护（唯一数据源是 replica.SHOP），本页不接受修改。' +
+      '请到装修台「店铺信息」修改并「生成代码」后，再上传发布小程序新版本。',
+      ERR.PARAM
+    );
+  }
+
   const s = cat().settings;
   Object.keys(catalogStore.DEFAULT_SETTINGS).forEach((k) => {
     if (p[k] === undefined) return;
@@ -593,6 +747,7 @@ module.exports = {
   // —— 后台管理 ——
   withLiveStock,
   skuStock,
+  auditSkuConflicts,
   adminListGoods,
   adminGoodsDetail,
   saveGoods,

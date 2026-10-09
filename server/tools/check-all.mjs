@@ -11,27 +11,64 @@
  *   - 覆盖异常分支：未登录 401、库存不足、参数缺失、重复回调幂等
  *   - 最后比对「已注册点位」与「已实测点位」，列出任何未覆盖的点位
  *   - 输出控制台表格 + 生成 server/CONNECTIVITY.md 报告
+ *
+ * 管理员身份（报告 08）：
+ *   `/api/admin/*`、`/api/decorate/*`、`/api/media/*` 现在**都要求管理员令牌**，
+ *   因此本脚本启动时会自己换一个管理员会话：
+ *     · ADMIN_TOKEN 环境变量   → 直接使用（对应服务端的 ADMIN_TOKENS 长期令牌）
+ *     · ADMIN_PASSWORD 环境变量 → POST /api/admin/login 换会话令牌
+ *     · 都没有 + 非生产环境     → 用开发默认口令 admin
+ *   换不到就**直接退出**并打印怎么配（否则后面几十条断言会集体 401，看不出真因）。
+ *
+ * 判定口径（报告 15）：
+ *   `expectFail` 不再等于「业务码非 0 就算过」——
+ *   服务端异常（HTTP 5xx / code 5000）**一律判失败**，无论用例写没写 expectFail；
+ *   需要精确拦截的用例再补 `expectHttp` / `expectCode` 做双断言。
+ *   判定实现抽在 tools/expect.mjs（纯函数，可被单测直接覆盖）。
  */
 
 import { writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
+import { judge } from './expect.mjs';
 
 const SELF_FILE = fileURLToPath(import.meta.url);
 const __dirname = dirname(SELF_FILE);
 const BASE = process.argv[2] || 'http://127.0.0.1:3000';
 
+/** 需要管理员令牌的接口前缀（与服务端 lib/adminAuth.js 的 ADMIN_API_PREFIXES 同口径） */
+const ADMIN_PREFIXES = ['/api/admin/', '/api/decorate/', '/api/media/'];
+const isAdminPath = (p) => ADMIN_PREFIXES.some((x) => String(p).indexOf(x) === 0);
+
 /* ----------------------------- 结果收集 ----------------------------- */
 
 const results = [];
 let token = '';
+let adminToken = '';
+let adminWho = null;
 let seq = 0;
 
 /** 发起请求：模拟小程序 wx.request 的行为（GET 走 query、其余走 JSON body）
- *  expectFail：预期业务失败，命中即记为「通畅」（用于验证风控/校验分支）
+ *
+ *  身份三选一（默认按路径自动选）：
+ *    auth    true=小程序用户令牌（默认）；false=不带用户令牌
+ *    admin   null=按路径自动（管理前缀带管理员令牌）；true=强制带；false=强制不带
+ *    bearer  直接指定令牌（用于「校验某个令牌是否有效」这类场景）
+ *
+ *  expectFail：预期被拦截（配合 expectHttp / expectCode 做精确双断言）
+ *  raw / contentType：原始请求体，用于「非法 JSON / 非对象 JSON」这类解析回归
  *  silent：不记录到结果列表（用于探针类请求）
+ *
+ *  通过与否的判定统一走 tools/expect.mjs —— 服务端异常（5xx / code 5000）永远判失败。
  */
-async function call(method, path, { query, body, auth = true, expectFail = '', silent = false, form = null } = {}) {
+async function call(method, path, opts = {}) {
+  const {
+    query, body, raw = null, contentType = '',
+    auth = true, admin = null, bearer = '',
+    expectFail = '', expectHttp = null, expectCode = null,
+    silent = false, form = null
+  } = opts;
+
   let url = BASE + path;
   if (query) {
     const qs = new URLSearchParams();
@@ -43,11 +80,18 @@ async function call(method, path, { query, body, auth = true, expectFail = '', s
   }
 
   const headers = {};
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
+  const useAdmin = admin === true || (admin === null && isAdminPath(path));
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  else if (useAdmin && adminToken) headers.Authorization = `Bearer ${adminToken}`;
+  else if (auth && token) headers.Authorization = `Bearer ${token}`;
+
   let payload;
   if (form) {
     // multipart 上传：不手写 Content-Type，交给 fetch 生成带 boundary 的头
     payload = form;
+  } else if (raw !== null) {
+    headers['Content-Type'] = contentType || 'application/json';
+    payload = raw;
   } else if (body !== undefined && method !== 'GET') {
     headers['Content-Type'] = 'application/json';
     payload = JSON.stringify(body);
@@ -69,28 +113,66 @@ async function call(method, path, { query, body, auth = true, expectFail = '', s
     errMsg = e.message;
   }
 
+  const verdict = judge({ httpStatus, json, errMsg, expectFail, expectHttp, expectCode });
+  const passed = verdict.passed;
   const businessFailed = !!(json && json.code !== 0);
-  let passed;
-  if (expectFail) {
-    // 期望失败：只要服务正常应答且业务码非 0（或 HTTP 4xx）即算通过
-    passed = !errMsg && (businessFailed || httpStatus === 401 || httpStatus === 404 || httpStatus === 403);
-  } else {
-    passed = !errMsg && httpStatus === 200 && json && json.code === 0;
-  }
 
   if (!silent) {
+    const notes = [];
+    if (expectFail) notes.push(`预期失败：${expectFail}`);
+    const want = [];
+    if (expectHttp !== null && expectHttp !== undefined) want.push(`HTTP ${expectHttp}`);
+    if (expectCode !== null && expectCode !== undefined) want.push(`code ${expectCode}`);
+    if (want.length) notes.push('要求 ' + want.join(' + '));
     results.push({
       no: ++seq,
       method,
       path,
       httpStatus: errMsg ? 'ERR' : httpStatus,
       code: json ? json.code : '-',
-      msg: errMsg || (json ? json.msg : ''),
+      msg: verdict.passed ? (errMsg || (json ? json.msg : '')) : verdict.reason,
       passed,
-      note: expectFail ? `预期失败：${expectFail}` : ''
+      note: notes.join('　')
     });
   }
-  return { ok: passed, businessFailed, httpStatus, json, data: json && json.data, errMsg };
+  return { ok: passed, reason: verdict.reason, businessFailed, httpStatus, json, data: json && json.data, errMsg };
+}
+
+/** 明确断言「一次请求确实被拦下了」，并在结果里带上实到状态码与业务码 */
+function assertBlocked(name, r, detail = '') {
+  return assert(name, r.ok, detail || `HTTP ${r.httpStatus} / code ${r.json && r.json.code} / ${(r.json && r.json.msg) || r.errMsg || ''}`);
+}
+
+/* ------------------------- 未预期异常也要出报告 -------------------------
+ * 这个脚本是两千多行的「边跑边断言」长流程。任何一步抛未预期异常
+ * （接口真崩了、返回体字段没了导致取属性炸了）都会在打印任何结果之前整段退出，
+ * 现场只剩一个 TypeError —— 已经跑完的 300 多条结果全看不到，排查等于从零开始。
+ * 所以挂上两个进程级钩子，异常也走同一个 emitReport()。 */
+let crash = null;
+function onCrash(e) {
+  if (crash) return;
+  crash = e instanceof Error ? e : new Error(String(e));
+  console.error(`\n ✗ 自检中断（未预期异常，不是业务失败）：${crash.message}`);
+  if (crash.stack) console.error(crash.stack.split('\n').slice(0, 5).join('\n'));
+  results.push({
+    no: ++seq,
+    method: '—',
+    path: '自检中断：未预期异常（不是「预期失败」，必须当 bug 查）',
+    httpStatus: 'ERR',
+    code: '-',
+    msg: crash.message,
+    passed: false,
+    note: '中断'
+  });
+  try { emitReport(); } catch (x) { console.error(' （报告生成失败：' + x.message + '）'); }
+  process.exit(1);
+}
+process.on('uncaughtException', onCrash);
+process.on('unhandledRejection', onCrash);
+
+/** 取一个可能还没初始化的值（崩溃可能发生在它被赋值之前） */
+function safe(fn, dflt) {
+  try { return fn(); } catch (e) { return dflt; }
 }
 
 /** 记录一条断言（不产生新点位，只做补充校验） */
@@ -129,6 +211,57 @@ if (!health.ok) {
 }
 console.log(` 服务状态   ${health.data.status}   点位 ${health.data.routes} 个   ` +
   `微信能力：登录=${health.data.wechat.login} 支付=${health.data.wechat.pay}`);
+
+/*
+ * 0.1 管理员会话（报告 08 的必然结果）
+ *
+ * `/api/admin/*`、`/api/decorate/*`、`/api/media/*` 共 40 多个点位现在都要求管理员令牌，
+ * 因此这里必须先换一个会话，否则后面几十条断言会集体 401 —— 那时看到的是
+ * 「点位不通」，而不是「你没给管理员凭证」，排查方向会被彻底带偏。
+ *
+ * 凭证来源优先级：
+ *   1) ADMIN_TOKEN   环境变量（对应服务端 ADMIN_TOKENS 里的长期令牌）
+ *   2) ADMIN_PASSWORD 环境变量（口令换会话令牌）
+ *   3) 非生产环境 → 开发默认口令 admin
+ * 三者都拿不到就**直接退出**，并把 health 里自述的凭证状态打出来。
+ */
+async function verifyAdmin(t) {
+  const r = await call('GET', '/api/admin/session', { auth: false, admin: false, bearer: t, silent: true });
+  return r.ok ? (r.data || {}) : null;
+}
+
+const envAdminToken = String(process.env.ADMIN_TOKEN || '').trim();
+if (envAdminToken) {
+  const me = await verifyAdmin(envAdminToken);
+  if (me) { adminToken = envAdminToken; adminWho = me; }
+  else console.log(' ⚠ ADMIN_TOKEN 无效（服务端未认这个令牌），改用口令登录');
+}
+if (!adminToken) {
+  const pwds = [process.env.ADMIN_PASSWORD, process.env.NODE_ENV === 'production' ? '' : 'admin']
+    .filter(Boolean);
+  for (const pw of pwds) {
+    const r = await call('POST', '/api/admin/login', {
+      auth: false, admin: false, body: { password: pw }, silent: true
+    });
+    if (r.ok && r.data && r.data.token) {
+      adminToken = r.data.token;
+      const me = await verifyAdmin(adminToken);
+      adminWho = me || { role: r.data.role, name: r.data.roleLabel || '管理员' };
+      break;
+    }
+  }
+}
+if (!adminToken) {
+  const ah = (health.data && health.data.adminAuth) || {};
+  console.error('\n ✗ 无法取得管理员会话，管理类点位无法自检。');
+  console.error(`   服务端自述：管理页面=${(health.data && health.data.adminPage) || '-'}　` +
+    `凭证=${ah.credentials || '-'}　长期令牌=${ah.tokens === undefined ? '-' : ah.tokens} 条　口令=${ah.password || '-'}`);
+  console.error('   请任选一种方式后重跑：');
+  console.error('     ADMIN_PASSWORD=你的口令 node server/tools/check-all.mjs');
+  console.error('     ADMIN_TOKEN=服务端ADMIN_TOKENS里的令牌 node server/tools/check-all.mjs');
+  process.exit(1);
+}
+console.log(` 管理员身份 ${adminWho.name}（${adminWho.role}）/ 令牌来源 ${adminWho.source || 'session'}`);
 
 /* 0.5 库存水位兜底
  * check-all 会真实下单，且「支付 → 发货 → 收货」这条主链路的订单不会取消，
@@ -175,7 +308,7 @@ const bizTotal = routeList.data.bizTotal !== undefined ? routeList.data.bizTotal
 console.log(` 已注册点位 ${registered.length} 个（业务 ${bizTotal} + 运维 ${registered.length - bizTotal}）\n`);
 
 /* 2. 未登录访问受保护点位 → 应 401 */
-const unauth = await call('GET', '/api/user/profile', { auth: false, expectFail: '未登录 401' });
+const unauth = await call('GET', '/api/user/profile', { auth: false, expectFail: '未登录 401', expectHttp: 401, expectCode: 401 });
 assert('未登录访问受保护点位返回 401',
   unauth.httpStatus === 401 && unauth.json.code === 401,
   `实际 HTTP ${unauth.httpStatus} / code ${unauth.json && unauth.json.code}`);
@@ -251,7 +384,7 @@ await call('POST', '/api/cart/selectAll', { body: { selected: true } });
 /* 8. 优惠券可用性 + 领券 */
 await call('GET', '/api/coupon/available', { query: { goodsAmount: 249900, categoryIds: JSON.stringify(['c101']) } });
 await call('POST', '/api/coupon/receive', { body: { templateId: 'ct_500_300' } });
-await call('POST', '/api/coupon/receive', { body: { templateId: 'ct_500_300' }, expectFail: '重复领券被拦截' });
+await call('POST', '/api/coupon/receive', { body: { templateId: 'ct_500_300' }, expectFail: '重复领券被拦截', expectHttp: 200, expectCode: 2000 });
 
 /* 9. 下单（购物车结算）+ 支付链路 */
 const couponList = await call('GET', '/api/coupon/list', { query: { status: 'available' } });
@@ -294,7 +427,7 @@ if (order2.ok) {
   await call('POST', '/api/order/cancel', { body: { orderId: order2.data.orderId } });
   const s2 = await probeStock(goodsId, sku.skuId);
   assert('取消订单后库存回滚', s2 === s0, `剩余 ${s1} → ${s2}`);
-  await call('POST', '/api/order/cancel', { body: { orderId: order2.data.orderId }, expectFail: '重复取消被拦截' });
+  await call('POST', '/api/order/cancel', { body: { orderId: order2.data.orderId }, expectFail: '重复取消被拦截', expectHttp: 200, expectCode: 2000 });
 }
 
 /* 11. 支付回调点位（独立下单后触发） */
@@ -322,17 +455,17 @@ await call('GET', '/api/footprint/list', { query: { page: 1, size: 10 } });
 
 /* 13. 异常分支：库存不足 / 参数缺失 / 商品不存在 / 未注册路径 */
 const bigQty = await call('POST', '/api/cart/add', {
-  body: { goodsId, skuId: sku.skuId, quantity: 999999 }, expectFail: '超量加购被拦截'
+  body: { goodsId, skuId: sku.skuId, quantity: 999999 }, expectFail: '超量加购被拦截', expectHttp: 200, expectCode: 2000
 });
 assert('超量加购返回业务码 2000', bigQty.json.code === 2000,
   `code=${bigQty.json.code} msg=${bigQty.json.msg}`);
 
 const badParam = await call('GET', '/api/goods/detail', {
-  auth: false, query: { id: 'not_exist_id' }, expectFail: '商品不存在'
+  auth: false, query: { id: 'not_exist_id' }, expectFail: '商品不存在', expectHttp: 404, expectCode: 404
 });
 assert('不存在的商品返回业务码 404', badParam.json.code === 404, `code=${badParam.json.code}`);
 
-const notFound = await call('GET', '/api/not/exist', { auth: false, expectFail: '未注册路径' });
+const notFound = await call('GET', '/api/not/exist', { auth: false, expectFail: '未注册路径', expectHttp: 404, expectCode: 404 });
 assert('未注册路径返回 HTTP 404', notFound.httpStatus === 404, `HTTP ${notFound.httpStatus}`);
 
 /* 14. 清理类点位 */
@@ -342,7 +475,7 @@ await call('POST', '/api/address/delete', { body: { addressId } });
 
 /* 15. 删除地址后再下单 → 应被拦截（前置依赖校验） */
 const noAddr = await call('POST', '/api/order/precreate', {
-  body: { items: [{ goodsId, skuId: sku.skuId, quantity: 1 }] }, expectFail: '无收货地址'
+  body: { items: [{ goodsId, skuId: sku.skuId, quantity: 1 }] }, expectFail: '无收货地址', expectHttp: 200, expectCode: 2000
 });
 assert('无收货地址时下单被拦截', noAddr.json.code === 2000, `msg=${noAddr.json && noAddr.json.msg}`);
 
@@ -375,7 +508,7 @@ assert('装修首页详情：schema + 区块数据 + 已发布数据',
   decoHome.ok && !!decoHome.data.schema && Array.isArray(decoHome.data.data.blocks) && decoHome.data.data.blocks.length >= 11,
   `区块 ${decoHome.data ? decoHome.data.data.blocks.length : 0} 个（≥11 为合格，具体数量随运营内容变化）`);
 
-const decoUnknown = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'nope' }, expectFail: '未知页面 404' });
+const decoUnknown = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'nope' }, expectFail: '未知页面', expectHttp: 404, expectCode: 404 });
 assert('装修未知页面返回 404', decoUnknown.json.code === 404, `code=${decoUnknown.json.code}`);
 
 // 草稿往返：保存（内容与已发布一致）→ diff 应为 0 处差异 → 丢弃
@@ -388,8 +521,8 @@ assert('草稿与已发布一致时 diff 为 0', decoDiff.ok && decoDiff.data.to
 
 // 无草稿时发布 → 预期失败（不写文件，保证自检无副作用）
 await call('POST', '/api/decorate/discard', { body: { key: 'home' } });
-await call('POST', '/api/decorate/publish', { body: { key: 'home' }, expectFail: '无草稿发布被拦截' });
-await call('POST', '/api/decorate/rollback', { body: { key: 'home', versionId: 'v_not_exist' }, expectFail: '版本不存在' });
+await call('POST', '/api/decorate/publish', { body: { key: 'home' }, expectFail: '无草稿发布被拦截', expectHttp: 200, expectCode: 2000 });
+await call('POST', '/api/decorate/rollback', { body: { key: 'home', versionId: 'v_not_exist' }, expectFail: '版本不存在', expectHttp: 404, expectCode: 404 });
 
 const decoStats = await call('GET', '/api/decorate/stats', { auth: false });
 assert('装修统计返回目标文件路径', decoStats.ok && !!decoStats.data.replicaFile, `file=${decoStats.data && decoStats.data.replicaFile}`);
@@ -437,7 +570,7 @@ assert('自定义页的字段结构 = 页面区块 + 页面设置（与首页同
 
 const decoBadBlock = await call('POST', '/api/decorate/draft', {
   body: { key: CUSTOM_KEY, data: { blocks: [{ type: 'no-such-type', text: 'x' }] } },
-  expectFail: '自定义页沿用首页的区块校验'
+  expectFail: '自定义页沿用首页的区块校验', expectHttp: 200, expectCode: 1001
 });
 assert('自定义页沿用首页的区块校验规则', decoBadBlock.json.code !== 0, decoBadBlock.json.msg);
 
@@ -473,16 +606,16 @@ assert('改名后已发布内容不丢',
   decoReopen.ok && decoReopen.data.published.blocks[0].text === '自检标题',
   decoReopen.ok ? decoReopen.data.published.blocks[0].text : decoReopen.json.msg);
 
-const decoDelHome = await call('POST', '/api/decorate/page/delete', { body: { key: 'home' }, expectFail: '内置页不可删除' });
+const decoDelHome = await call('POST', '/api/decorate/page/delete', { body: { key: 'home' }, expectFail: '内置页不可删除', expectHttp: 200, expectCode: 2000 });
 assert('内置页面不可删除', /不可删除/.test(decoDelHome.json.msg || ''), decoDelHome.json.msg);
 
-const decoRenameHome = await call('POST', '/api/decorate/page/rename', { body: { key: 'home', name: 'X' }, expectFail: '内置页不可改名' });
+const decoRenameHome = await call('POST', '/api/decorate/page/rename', { body: { key: 'home', name: 'X' }, expectFail: '内置页不可改名', expectHttp: 200, expectCode: 2000 });
 assert('内置页面不可改名', /不支持改名/.test(decoRenameHome.json.msg || ''), decoRenameHome.json.msg);
 
-const decoReserved = await call('POST', '/api/decorate/page/create', { body: { name: '保留字测试', key: 'home' }, expectFail: '保留标识' });
+const decoReserved = await call('POST', '/api/decorate/page/create', { body: { name: '保留字测试', key: 'home' }, expectFail: '保留标识', expectHttp: 200, expectCode: 1001 });
 assert('与内置页重名的标识被拒绝', /保留字/.test(decoReserved.json.msg || ''), decoReserved.json.msg);
 
-const decoDup = await call('POST', '/api/decorate/page/create', { body: { name: '自检临时页改名' }, expectFail: '页面名称重复' });
+const decoDup = await call('POST', '/api/decorate/page/create', { body: { name: '自检临时页改名' }, expectFail: '页面名称重复', expectHttp: 200, expectCode: 2000 });
 assert('页面名称重复被拒绝', /已存在/.test(decoDup.json.msg || ''), decoDup.json.msg);
 
 const decoDel = await call('POST', '/api/decorate/page/delete', { body: { key: CUSTOM_NEW_KEY } });
@@ -534,9 +667,22 @@ assert('小程序端自定义页的区块渲染与首页同源（首页也已改
  * 曾经只扫后两处 —— 于是商品图在素材管理里显示「未引用」，运营一点删除就把在用的商品图删没了。
  */
 const mediaSrc = readFileSync(join(__dirname, '..', 'lib', 'media.js'), 'utf8');
+// 只断言「三个来源都在同一个 refs() 清单里」，不去断言路径是怎么拼的 ——
+// 之前写成 /'data',\s*'catalog\.json'/ 这种拼接细节，media.js 一改用 dataDir.ROOT
+// （为了支持 MALL_DATA_DIR 隔离）断言就失效了，而真正要防的「漏扫一个来源」并没有被验证。
+const refSources = [
+  ['商品库 catalog.json', /'catalog\.json'/],
+  ['已发布 replica.js', /'replica\.js'/],
+  ['装修草稿 state.json', /'state\.json'/]
+];
+const missingRefSrc = refSources.filter(([, re]) => !re.test(mediaSrc)).map(([n]) => n);
+const refsListBody = (/function refs\(name\)[\s\S]*?\n}/.exec(mediaSrc) || [''])[0];
 assert('素材引用检查同时覆盖 商品库 / 已发布页面 / 装修草稿（漏一处就会误删在用图）',
-  /'data',\s*'catalog\.json'/.test(mediaSrc) && /'config',\s*'replica\.js'/.test(mediaSrc) && /'decorate',\s*'state\.json'/.test(mediaSrc),
-  '缺失来源：' + [/catalog\.json/, /replica\.js/, /state\.json/].filter((r) => !r.test(mediaSrc)).map(String).join(', '));
+  missingRefSrc.length === 0 &&
+  /catalog\.json'[\s\S]{0,240}replica\.js'[\s\S]{0,240}state\.json'/.test(refsListBody),
+  missingRefSrc.length
+    ? '缺失来源：' + missingRefSrc.join('、')
+    : `refs() 里三个来源齐全（商品库 ${/'商品库'/.test(refsListBody)} · 已发布 ${/'已发布'/.test(refsListBody)} · 草稿 ${/'草稿'/.test(refsListBody)}）`);
 
 const catalogSrc = readFileSync(join(__dirname, '..', 'lib', 'catalog.js'), 'utf8');
 assert('商品图文详情按商品自身数据生成，占位内容仅作最后回落',
@@ -616,13 +762,13 @@ assert('素材库列表返回统计（张数 / 占用 / 单张上限）',
 // 伪装图片：文本改名 .png，校验的是文件头而非扩展名
 const fdFake = new FormData();
 fdFake.append('file', new Blob([Buffer.from('这不是图片，只是改名成了 png', 'utf8')], { type: 'image/png' }), 'fake.png');
-const mediaFake = await call('POST', '/api/media/upload', { form: fdFake, auth: false, expectFail: '伪装图片被拒' });
+const mediaFake = await call('POST', '/api/media/upload', { form: fdFake, auth: false, expectFail: '伪装图片被拒', expectHttp: 200, expectCode: 1001 });
 assert('伪装成 png 的文本被拒（按文件头校验）',
   mediaFake.json && mediaFake.json.code === 1001 && /不支持的素材格式/.test(mediaFake.json.msg || ''),
   mediaFake.json && mediaFake.json.msg);
 
 // 路径穿越：删除接口与静态服务两条路都要拦住
-const mediaTrav = await call('POST', '/api/media/delete', { body: { name: '../../server/index.js' }, auth: false, expectFail: '路径穿越被拦' });
+const mediaTrav = await call('POST', '/api/media/delete', { body: { name: '../../server/index.js' }, auth: false, expectFail: '路径穿越被拦', expectHttp: 200, expectCode: 1001 });
 assert('素材删除接口拦住 ../ 穿越', mediaTrav.json && mediaTrav.json.code === 1001, mediaTrav.json && mediaTrav.json.msg);
 
 const mediaDel = upOne
@@ -635,7 +781,7 @@ assert('素材删除成功（自检产生的文件已回收）', !!mediaDel && m
 const goodsUploads = (detail.data.images || []).filter((u) => /^\/uploads\//.test(u));
 if (goodsUploads.length) {
   const gname = goodsUploads[0].replace(/^\/uploads\//, '');
-  const guard = await call('POST', '/api/media/delete', { body: { name: gname }, auth: false, expectFail: '商品图删除被拒' });
+  const guard = await call('POST', '/api/media/delete', { body: { name: gname }, auth: false, expectFail: '商品图删除被拒', expectHttp: 200, expectCode: 2000 });
   assert('商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用',
     !!guard.json && guard.json.code === 2000 && /商品库/.test(guard.json.msg || ''),
     guard.json && guard.json.msg);
@@ -683,7 +829,7 @@ assert('批量移动素材到另一个文件夹（目标不存在时自动创建
   mfMv.json && JSON.stringify(mfMv.data.folders));
 
 const mfRnBad = await call('POST', '/api/media/folder', {
-  auth: false, body: { op: 'rename', from: FOLDER_B, to: FOLDER_A }, expectFail: '改名撞名被拒'
+  auth: false, body: { op: 'rename', from: FOLDER_B, to: FOLDER_A }, expectFail: '改名撞名被拒', expectHttp: 200, expectCode: 2000
 });
 assert('文件夹改名撞到已存在的名字时被拒绝（否则两个文件夹会被静默合并）',
   !!mfRnBad.json && mfRnBad.json.code !== 0, mfRnBad.json && mfRnBad.json.msg);
@@ -702,7 +848,7 @@ assert('删除文件夹只删分类：素材回到未分组而不是被删掉',
   mfRm.json && JSON.stringify({ moved: mfRm.data && mfRm.data.movedToUngrouped, ungrouped: mfRm.data && mfRm.data.ungrouped }));
 
 const mfBad = await call('POST', '/api/media/folder', {
-  auth: false, body: { op: 'create', name: 'a/b' }, expectFail: '非法文件夹名被拒'
+  auth: false, body: { op: 'create', name: 'a/b' }, expectFail: '非法文件夹名被拒', expectHttp: 200, expectCode: 1001
 });
 assert('文件夹名含斜杠 / .. 被拒（文件夹是逻辑分类，不产生真实目录）',
   mfBad.json && mfBad.json.code === 1001, mfBad.json && mfBad.json.msg);
@@ -800,7 +946,7 @@ assert('列表统计区分图片 / 视频上限（图片 5MB、视频 50MB）',
 
 const fdFakeMp4 = new FormData();
 fdFakeMp4.append('file', new Blob([Buffer.from('这只是文本，不是视频流', 'utf8')], { type: 'video/mp4' }), 'fake.mp4');
-const mvFake = await call('POST', '/api/media/upload', { form: fdFakeMp4, auth: false, expectFail: '伪装视频被拒' });
+const mvFake = await call('POST', '/api/media/upload', { form: fdFakeMp4, auth: false, expectFail: '伪装视频被拒', expectHttp: 200, expectCode: 1001 });
 assert('伪装成 mp4 的文本同样被拒（视频也是按魔数判定）',
   mvFake.json && mvFake.json.code === 1001 && /不支持的素材格式/.test(mvFake.json.msg || ''),
   mvFake.json && mvFake.json.msg);
@@ -1483,7 +1629,7 @@ assert('后台 · 商家备注可写可读，且自检结束时已还原',
 const adPaidOrder = adOrder0.data.list.find((o) => o.status && o.status !== 'pending_pay');
 const adCloseBad = adPaidOrder
   ? await call('POST', '/api/admin/order/close', {
-    auth: false, body: { orderId: adPaidOrder.orderId }, expectFail: '已支付订单不可关闭'
+    auth: false, body: { orderId: adPaidOrder.orderId }, expectFail: '已支付订单不可关闭', expectHttp: 200, expectCode: 2000
   })
   : null;
 assert('后台 · 关闭订单只允许未付款（已支付订单被拦下）',
@@ -1540,7 +1686,7 @@ assert('后台 · 单个优惠券模板详情可读',
   `「${adCouponDetail.data && adCouponDetail.data.name}」`);
 assert('后台 · 读取不存在的优惠券模板返回 404',
   (await call('GET', '/api/admin/coupon/detail', {
-    auth: false, query: { templateId: 'ct_not_exist' }, expectFail: '优惠券不存在'
+    auth: false, query: { templateId: 'ct_not_exist' }, expectFail: '优惠券不存在', expectHttp: 404, expectCode: 404
   })).businessFailed, 'ct_not_exist');
 
 const adSet0 = await call('GET', '/api/admin/settings', { auth: false });
@@ -1621,7 +1767,7 @@ const adCouponPause = await call('POST', '/api/admin/coupon/status', {
   auth: false, body: { templateId: adCid, status: 'paused' }
 });
 const adReceive = await call('POST', '/api/coupon/receive', {
-  body: { templateId: adCid }, expectFail: '券已停止发放'
+  body: { templateId: adCid }, expectFail: '券已停止发放', expectHttp: 200, expectCode: 2000
 });
 assert('后台 · 暂停券后小程序端不可再领取（状态穿透到 C 端）',
   adCouponPause.ok && adReceive.businessFailed,
@@ -1640,7 +1786,7 @@ const adCatDel = await call('POST', '/api/admin/category/delete', { auth: false,
 assert('后台 · 删除自检分类成功（分类下有商品时会被拒绝）', adCatDel.ok, `分类 id=${adCatId}`);
 
 const adDelBad = await call('POST', '/api/admin/goods/delete', {
-  auth: false, body: { id: 'g_not_exist' }, expectFail: '商品不存在'
+  auth: false, body: { id: 'g_not_exist' }, expectFail: '商品不存在', expectHttp: 404, expectCode: 404
 });
 assert('后台 · 删除不存在的商品返回 404', adDelBad.businessFailed, adDelBad.json && adDelBad.json.msg);
 
@@ -2122,18 +2268,23 @@ if (navDiff0.data && navDiff0.data.hasDraft) {
     true, '仅做只读校验，草稿原样保留');
 } else {
   const navBase = NAV_SCHEMA.tabbarDefault();
-  const navDraft = (data, expectFail) => call('POST', '/api/decorate/draft', { body: { key: 'nav', data }, expectFail });
+  // expectCode 也一并断言：这几条是「导航配错了必须在存草稿时拦住」的用例，
+  // 只判「业务码非 0」的话，未来任何一处 5000 都会让它们假通过。
+  const navDraft = (data, expectFail, expectCode) => call('POST', '/api/decorate/draft', {
+    body: { key: 'nav', data },
+    expectFail, expectHttp: expectFail ? 200 : null, expectCode: expectCode || null
+  });
 
   const navBadPath = await navDraft(Object.assign({}, navBase, { items: [
     { path: '/pages/product/product', text: '产品' }, { path: '/pages/custom/index', text: '自定义页' }
-  ] }), '跳转页面必须是 app.json 里声明过的 tabBar 页面');
+  ] }), '跳转页面必须是 app.json 里声明过的 tabBar 页面', 1001);
   assert('导航项挑了非 tabBar 页面时被拦（否则真机上点了没反应，而开发者工具不报错）',
     navBadPath.json.code !== 0 && /微信限制|不在小程序底部导航候选/.test(navBadPath.json.msg || ''),
     navBadPath.json.msg);
 
   const navFew = await navDraft(Object.assign({}, navBase, {
     items: [{ path: '/pages/index/index', text: '首页' }]
-  }), '底部导航至少 2 项');
+  }), '底部导航至少 2 项', 1001);
   assert('导航项只有 1 项时被拦（微信要求 2~5 项）',
     navFew.json.code !== 0 && /至少需要 2 项/.test(navFew.json.msg || ''), navFew.json.msg);
 
@@ -2141,14 +2292,14 @@ if (navDiff0.data && navDiff0.data.hasDraft) {
     { path: '/pages/index/index', text: '一' }, { path: '/pages/lexy/lexy', text: '二' },
     { path: '/pages/news/news', text: '三' }, { path: '/pages/product/product', text: '四' },
     { path: '/pages/mine/mine', text: '五' }, { path: '/pages/index/index', text: '六' }
-  ] }), '底部导航最多 5 项');
+  ] }), '底部导航最多 5 项', 1001);
   assert('导航项超过 5 项时被拦（微信要求 2~5 项）',
     navMany.json.code !== 0 && /最多 5 项/.test(navMany.json.msg || ''), navMany.json.msg);
 
   const navDup = await navDraft(Object.assign({}, navBase, { items: [
     { path: '/pages/index/index', text: '首页' }, { path: '/pages/lexy/lexy', text: '莱克' },
     { path: '/pages/news/news', text: '资讯' }, { path: '/pages/lexy/lexy', text: '莱克又一次' }
-  ] }), '同一个页面只能出现一次');
+  ] }), '同一个页面只能出现一次', 1001);
   assert('同一页面配两次被拦（否则运营配了 4 项、真机只显示 3 项，且两处指向同一页 —— 静默少一项最难查）',
     navDup.json.code !== 0 && /同一个页面只能出现一次/.test(navDup.json.msg || ''), navDup.json.msg);
 
@@ -2252,17 +2403,34 @@ assert('每个点位都带联调示例（调试台可一键填参）',
     ? `缺示例 ${noSample.length} 个：${noSample.slice(0, 8).map((r) => `${r.method} ${r.path}`).join(' | ')}${noSample.length > 8 ? ' …' : ''}`
     : `${registered.length} 个点位全部带示例`);
 
-/* 16. 覆盖度比对（只统计「已注册点位」的口径） */
+/* 16. 覆盖度与失败数的口径
+ *
+ * 统计口径单独抽成 stat()（并在最后与汇总处各算一次现算值），原因：
+ *   · 覆盖度必须在**所有**断言跑完之后才算 —— 18~20 节还会调用点位（page/refs 等），
+ *     早算会把它们报成「未覆盖」，运维据此去补一堆其实已测过的用例；
+ *   · 失败的汇总同理 —— 早算就是快照，后面新增断言的失败不会进总数（自检报喜不报忧）；
+ *   · 这个脚本是「边跑边崩」的长流程：任一步抛异常（例如接口真崩了）都要能打印
+ *     已收集到的结果，所以统计必须是「随时可现算」的，不能依赖某一时刻的闭包快照。 */
 const registeredKeys = new Set(registered.map((r) => `${r.method} ${r.path}`));
-const tested = new Set(
-  results
-    .filter((r) => r.method !== '—')
-    .map((r) => `${r.method} ${r.path}`)
-    .filter((k) => registeredKeys.has(k))
-);
 
-const missing = registered.filter((r) => !tested.has(`${r.method} ${r.path}`));
-const failed = results.filter((r) => !r.passed);
+/** 现算当前统计（registered 还没算出来时按空处理，保证崩溃路径也能出报告） */
+function stat() {
+  let reg = [];
+  try { reg = registered; } catch (e) { reg = []; }
+  const keys = new Set(reg.map((r) => `${r.method} ${r.path}`));
+  const tstd = new Set(
+    results
+      .filter((r) => r.method !== '—')
+      .map((r) => `${r.method} ${r.path}`)
+      .filter((k) => keys.has(k))
+  );
+  return {
+    reg,
+    tested: tstd,
+    missing: reg.filter((r) => !tstd.has(`${r.method} ${r.path}`)),
+    failed: results.filter((r) => !r.passed)
+  };
+}
 
 /* 17. 前端 services 层与后端点位一致性比对（抓「前端调了但后端没有」的断点） */
 const SVC_DIR = join(__dirname, '..', '..', 'miniprogram', 'services');
@@ -2326,12 +2494,22 @@ assert('安全开关 · 识别「未知取值」以便启动时告警（避免�
   flags.isKnownDebugPageValue(undefined) && !flags.isKnownDebugPageValue('offf'),
   'off/1/未设置=已知，offf=未知');
 
-// 管理接口必须在开关关闭时一并关闭（只关页面不管接口 = 假关闭）
+// 管理接口必须在开关关闭时一并关闭（只关页面不管接口 = 假关闭），
+// 且必须同时受管理员身份校验 —— 两者缺一，安全边界就是纸糊的。
 const indexSrc = readFileSync(join(__dirname, '..', 'index.js'), 'utf8');
-assert('安全开关 · 管理接口（admin/decorate/media）与页面同受一个开关约束',
-  /MANAGE_API_PREFIXES/.test(indexSrc) &&
-  /'\/api\/admin\/'/.test(indexSrc) && /'\/api\/decorate\/'/.test(indexSrc) && /'\/api\/media\/'/.test(indexSrc),
-  '已对 /api/admin/ · /api/decorate/ · /api/media/ 三个前缀做 403 拦截');
+const adminAuthSrc = readFileSync(join(__dirname, '..', 'lib', 'adminAuth.js'), 'utf8');
+const prefixList = (/ADMIN_API_PREFIXES\s*=\s*\[([\s\S]*?)\]/.exec(adminAuthSrc) || ['', ''])[1];
+assert('管理接口前缀（admin / decorate / media）单点维护，页面与接口同受一个开关约束',
+  /'\/api\/admin\/'/.test(prefixList) && /'\/api\/decorate\/'/.test(prefixList) &&
+  /'\/api\/media\/'/.test(prefixList) &&
+  /isAdminApiPath/.test(indexSrc) && /ADMIN_PAGE\s*\)\s*\{?/.test(indexSrc),
+  '前缀集中在 lib/adminAuth.js 的 ADMIN_API_PREFIXES；index.js 用 isAdminApiPath 判定，' +
+  '并同时受 ADMIN_PAGE 开关与角色 guard');
+
+assert('管理接口有两道门：先页面开关（关掉即 403），再管理员身份与角色',
+  /!ADMIN_PAGE/.test(indexSrc) && /adminAuth\.guard\(req, method, path\)/.test(indexSrc) &&
+  /ADMIN_LOGIN_PATH/.test(indexSrc),
+  'index.js：ADMIN_PAGE 关闭 → 403；否则 path 非登录点位一律过 adminAuth.guard');
 
 assert('安全开关 · 生产环境缺 JWT_SECRET 时拒绝启动（不靠人看日志）',
   /NODE_ENV === 'production' && authLib\.IS_DEFAULT_SECRET/.test(indexSrc) &&
@@ -2364,114 +2542,356 @@ assert('持久化兜底 · isPlainObject 对 null / 数组 / 数字 均判为「
   /function isPlainObject/.test(utilSrc),
   'isPlainObject 已收敛在 lib/util.js，三处共用同一实现');
 
+/* ---------------------------------------------------------------------------
+ * 20. 非交易功能契约回归（整改报告 01 / 04 / 07 / 08 / 10 / 11 / 14 / 15）
+ *
+ * 为什么单列一节：报告 15 要求「按预期 HTTP 状态、业务码和数据未变化断言」，
+ * 并补上 01~06 的回归。这里全部走**真实 HTTP**，每条被拒用例后面都补一句
+ * 「数据未变化」的核对 —— 「接口报错了」不等于「数据没被改」，
+ * 之前正是这个差别让「删了 15 个用户 / 36 个订单」这种事躲过了自检。
+ * ------------------------------------------------------------------------- */
+const repTag = `__契约${String(Date.now()).slice(-6)}`;
+
+/* —— 20.1（08）匿名 / 用户令牌都不得进入管理接口，且数据未被改动 —— */
+const cGoodsTotal = ((await call('GET', '/api/admin/goods/list', {
+  query: { page: 1, size: 1 }, silent: true
+})).data || {}).total;
+const cSetSnap0 = JSON.stringify(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings);
+
+const cAnonDash = await call('GET', '/api/admin/dashboard', {
+  auth: false, admin: false, expectFail: '匿名访问管理接口', expectHttp: 401, expectCode: 401
+});
+assertBlocked('08 · 匿名访问 /api/admin/dashboard 被拒（401 / code 401）', cAnonDash,
+  `HTTP ${cAnonDash.httpStatus} / code ${cAnonDash.json && cAnonDash.json.code} / ${(cAnonDash.json && cAnonDash.json.msg) || ''}`);
+
+const cAnonDel = await call('POST', '/api/admin/goods/delete', {
+  auth: false, admin: false, body: { id: 'g1001' },
+  expectFail: '匿名调用高危写点位', expectHttp: 401, expectCode: 401
+});
+assertBlocked('08 · 匿名调用高危写点位（删商品）被拒（401 / code 401）', cAnonDel,
+  `HTTP ${cAnonDel.httpStatus} / code ${cAnonDel.json && cAnonDel.json.code}`);
+
+const cUserDash = await call('GET', '/api/admin/dashboard', {
+  admin: false, expectFail: '小程序用户令牌不能当管理员令牌', expectHttp: 401, expectCode: 401
+});
+assertBlocked('08 · 小程序用户令牌不能冒充管理员令牌（401，而不是「有 token 就放行」）', cUserDash,
+  `HTTP ${cUserDash.httpStatus} / code ${cUserDash.json && cUserDash.json.code}`);
+
+const cGoodsTotal2 = ((await call('GET', '/api/admin/goods/list', {
+  query: { page: 1, size: 1 }, silent: true
+})).data || {}).total;
+const cSetSnap1 = JSON.stringify(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings);
+assert('08 · 匿名请求全部被拦之后，商品与店铺设置数据一处都没变（拒的是操作，不只是响应）',
+  cGoodsTotal === cGoodsTotal2 && cSetSnap0 === cSetSnap1,
+  `商品数 ${cGoodsTotal} → ${cGoodsTotal2}；店铺设置快照一致=${cSetSnap0 === cSetSnap1}`);
+
+/* —— 20.2（08）管理员会话与口令校验 —— */
+const cSession = await call('GET', '/api/admin/session');
+assert('08 · 管理员会话自述角色与名称（后台据此决定是否弹登录框）',
+  cSession.ok && !!cSession.data.role && !!cSession.data.name,
+  `role=${cSession.data && cSession.data.role} · name=${cSession.data && cSession.data.name} · source=${cSession.data && cSession.data.source}`);
+
+const cLoginBad = await call('POST', '/api/admin/login', {
+  auth: false, admin: false, body: { password: `wrong-${repTag}` },
+  expectFail: '管理员口令错误', expectHttp: 403, expectCode: 403
+});
+assertBlocked('08 · 管理员口令错误被拒（403 / code 403）', cLoginBad,
+  `HTTP ${cLoginBad.httpStatus} / code ${cLoginBad.json && cLoginBad.json.code}`);
+assert('08 · 口令错误时响应体不含任何令牌（不能靠错误信息拿到身份）',
+  !(cLoginBad.data && (cLoginBad.data.token || cLoginBad.data.role)),
+  `data=${JSON.stringify(cLoginBad.data)}`);
+// 口令登录有失败退避（5 次 / 60 秒）：这里只错 1 次，随后重新登录一次把计数清零，
+// 否则连跑几轮自检会把 IP 级别的登录锁掉，后面的自检全挂。
+const cLoginAgain = await call('POST', '/api/admin/login', {
+  auth: false, admin: false, silent: true,
+  body: { password: process.env.ADMIN_PASSWORD || 'admin' }
+});
+assert('08 · 口令错误 1 次后重新登录仍可用（退避阈值是 5 次，未误伤正常运营）',
+  cLoginAgain.ok || !!process.env.ADMIN_TOKEN,
+  cLoginAgain.ok ? '登录成功，退避计数已清零' : '使用了长期令牌，跳过');
+
+/* —— 20.3（01 / 07）商品摘要字段契约与素材地址 —— */
+const cList = await call('GET', '/api/goods/list', { auth: false, query: { page: 1, size: 10 } });
+const cItems = (cList.data && cList.data.list) || [];
+const cBadField = cItems.filter((g) => typeof g.id !== 'string' || !g.id || typeof g.cover !== 'string' || !g.cover);
+assert('01 · 公开商品列表每条都带 id + cover（装修「商品」区块读的就是这两个字段）',
+  cList.ok && cItems.length > 0 && cBadField.length === 0,
+  cBadField.length
+    ? `字段异常：${cBadField.map((g) => JSON.stringify({ id: g.id, cover: g.cover })).join(' ')}`
+    : `${cItems.length} 条全部带 id / cover`);
+
+const cBadUrl = cItems.filter((g) => !/^https?:\/\//.test(g.cover) && !/^\/uploads\//.test(g.cover));
+assert('07 · cover 是可用地址（http(s) 绝对地址或 /uploads/ 相对路径），没有裸文件名 / undefined / null',
+  cBadUrl.length === 0,
+  cBadUrl.length ? cBadUrl.map((g) => g.cover).join(' | ') : `示例：${cItems[0] && cItems[0].cover}`);
+
+const cFirstId = cItems[0] && cItems[0].id;
+const cDetailById = await call('GET', '/api/goods/detail', { auth: false, query: { id: cFirstId } });
+assert('01 · 列表给的 id 能被商品详情命中（区块存的 goodsId 与接口 id 是同一个口径）',
+  cDetailById.ok && cDetailById.data && cDetailById.data.id === cFirstId &&
+  Array.isArray(cDetailById.data.skus) && cDetailById.data.skus.length > 0,
+  `id=${cFirstId} → ${cDetailById.ok ? `${cDetailById.data.skus.length} 个 SKU` : (cDetailById.json && cDetailById.json.msg)}`);
+
+const goodsSvcSrc = readFileSync(join(__dirname, '..', '..', 'miniprogram', 'services', 'goods.js'), 'utf8');
+assert('01 / 07 · 装修字段名（goodsId / image）与接口字段名（id / cover）的适配只有 services/goods.js 一处，且统一过素材地址',
+  /goodsId/.test(goodsSvcSrc) && /cover/.test(goodsSvcSrc) && /resolveAssets/.test(goodsSvcSrc),
+  'services/goods.js：normGoods 同时提供 goodsId↔id、image↔cover，并统一走 resolveAssets');
+
+/* —— 20.4（11）自定义页引用清单点位可达 —— */
+const cRefs = await call('GET', '/api/decorate/page/refs', { query: { key: 'home' } });
+assert('11 · 页面引用清单点位可达（改标识 / 删除前先查「谁在引用我」）',
+  cRefs.ok && Array.isArray(cRefs.data.refs) && cRefs.data.custom === false && cRefs.data.count === 0,
+  cRefs.ok
+    ? `内置页 home：custom=${cRefs.data.custom} · 引用 ${cRefs.data.count} 处（内置页地址编译期固定，无引用一说）`
+    : (cRefs.json && cRefs.json.msg));
+const cRefsUnknown = await call('GET', '/api/decorate/page/refs', {
+  query: { key: 'nope_nope' }, expectFail: '未知页面', expectHttp: 404, expectCode: 404
+});
+assertBlocked('11 · 引用清单查不存在的页面返回 404（不静默返回空清单）', cRefsUnknown,
+  `HTTP ${cRefsUnknown.httpStatus} / code ${cRefsUnknown.json && cRefsUnknown.json.code}`);
+
+/* —— 20.5（10）店铺名称 / Logo 的单一数据源 —— */
+const cShopSnap0 = JSON.stringify(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings);
+const cSetShopName = await call('POST', '/api/admin/settings/save', {
+  body: { shopName: `${repTag}店铺` }, expectFail: '店铺名称由装修台维护', expectHttp: 200, expectCode: 1001
+});
+assertBlocked('10 · 通过店铺设置接口改「店铺名称」被明确拒绝（code 1001，不是静默忽略）', cSetShopName,
+  `HTTP ${cSetShopName.httpStatus} / code ${cSetShopName.json && cSetShopName.json.code} / ${(cSetShopName.json && cSetShopName.json.msg) || ''}`);
+
+const cSetLogo = await call('POST', '/api/admin/settings/save', {
+  body: { logo: 'https://example.com/not-real.png' }, expectFail: '店铺 Logo 由装修台维护', expectHttp: 200, expectCode: 1001
+});
+assertBlocked('10 · 通过店铺设置接口改「店铺 Logo」同样被拒（code 1001）', cSetLogo,
+  `HTTP ${cSetLogo.httpStatus} / code ${cSetLogo.json && cSetLogo.json.code}`);
+
+const cShopSnap1 = JSON.stringify(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings);
+assert('10 · 两次被拒之后店铺设置未发生任何变化（拒绝发生在写入之前）',
+  cShopSnap0 === cShopSnap1, '店铺设置快照一致=' + (cShopSnap0 === cShopSnap1));
+
+/* —— 20.6（14）请求体解析：非法 JSON / 非对象 JSON 必须 400；数字样文本不得被改写 —— */
+const cBadJson = await call('POST', '/api/address/save', {
+  raw: '{ "name": "契约自检", ', contentType: 'application/json',
+  expectFail: '非法 JSON 请求体', expectHttp: 400, expectCode: 1001
+});
+assertBlocked('14 · 非法 JSON 请求体返回 400 / code 1001（不再静默变成空对象）', cBadJson,
+  `HTTP ${cBadJson.httpStatus} / code ${cBadJson.json && cBadJson.json.code}`);
+
+const cArrJson = await call('POST', '/api/address/save', {
+  raw: '[1,2,3]', expectFail: '合法 JSON 但不是对象（数组）', expectHttp: 400, expectCode: 1001
+});
+assertBlocked('14 · 合法 JSON 但不是对象（数组）同样 400 / code 1001', cArrJson,
+  `HTTP ${cArrJson.httpStatus} / code ${cArrJson.json && cArrJson.json.code}`);
+
+const cNumJson = await call('POST', '/api/address/save', {
+  raw: '123', expectFail: '合法 JSON 但不是对象（数字）', expectHttp: 400, expectCode: 1001
+});
+assertBlocked('14 · 合法 JSON 但不是对象（数字）同样 400 / code 1001', cNumJson,
+  `HTTP ${cNumJson.httpStatus} / code ${cNumJson.json && cNumJson.json.code}`);
+
+const cAddrCount0 = (((await call('GET', '/api/address/list', { silent: true })).data || {}).list || []).length;
+const cAddrNew = await call('POST', '/api/address/save', {
+  body: {
+    name: '契约自检', phone: '13800138000', province: '江苏省', city: '苏州市',
+    district: '姑苏区', detail: '010010', isDefault: false
+  }
+});
+const cAddrId = (cAddrNew.data && cAddrNew.data.addressId) || '';
+const cAddrSaved = ((((await call('GET', '/api/address/list', { silent: true })).data || {}).list || [])
+  .find((a) => a.addressId === cAddrId)) || {};
+assert('14 · 形如数字的文本字段原样保留（detail=010010 读回仍是字符串，未变成 10010）',
+  cAddrNew.ok && cAddrSaved.detail === '010010' && typeof cAddrSaved.detail === 'string',
+  `回读 detail=${JSON.stringify(cAddrSaved.detail)}（类型 ${typeof cAddrSaved.detail}）`);
+
+if (cAddrId) await call('POST', '/api/address/delete', { body: { addressId: cAddrId }, silent: true });
+const cAddrCount2 = (((await call('GET', '/api/address/list', { silent: true })).data || {}).list || []).length;
+assert('14 · 三条被拒请求一条都没写进数据（地址数回到原值）',
+  cAddrCount2 === cAddrCount0, `地址数 ${cAddrCount0} → ${cAddrCount2}（中间新增 1 条已删除）`);
+
+/* —— 20.7（15）判定函数：服务端异常绝不算「预期拦截」 —— */
+const judgeCases = [
+  ['服务端异常 code 5000 必须判失败（不得算「预期拦截」）',
+    { httpStatus: 200, json: { code: 5000, msg: 'boom' }, expectFail: '任意拦截' }, false],
+  ['HTTP 500 必须判失败', { httpStatus: 500, json: { code: 5000 }, expectFail: '任意拦截' }, false],
+  ['参数错误 1001 算作预期拦截', { httpStatus: 200, json: { code: 1001 }, expectFail: 'x' }, true],
+  ['401 算作预期拦截', { httpStatus: 401, json: { code: 401 }, expectFail: 'x' }, true],
+  ['404 算作预期拦截', { httpStatus: 404, json: { code: 404 }, expectFail: 'x' }, true],
+  ['期望拦截但实际成功 → 失败', { httpStatus: 200, json: { code: 0 }, expectFail: 'x' }, false],
+  ['写了 expectHttp 就必须命中', { httpStatus: 200, json: { code: 1001 }, expectFail: 'x', expectHttp: 403 }, false],
+  ['写了 expectCode 就必须命中', { httpStatus: 403, json: { code: 1001 }, expectFail: 'x', expectCode: 2000 }, false],
+  ['HTTP + 业务码 + 确实被拦，三者同时命中才算过',
+    { httpStatus: 403, json: { code: 403 }, expectFail: 'x', expectHttp: 403, expectCode: 403 }, true],
+  ['请求没完成（连接被重置）判失败 —— 不能因为「有错误」就算拦截成功',
+    { httpStatus: 0, json: null, errMsg: 'ECONNRESET', expectFail: 'x' }, false],
+  ['正常请求：HTTP 200 + code 0 才算过', { httpStatus: 200, json: { code: 0 } }, true],
+  ['正常请求遇到 code 5000 也必须判失败', { httpStatus: 200, json: { code: 5000 } }, false]
+];
+const judgeBad = judgeCases.filter(([, input, want]) => judge(input).passed !== want);
+assert('15 · 判定函数：服务端异常（HTTP 5xx / code 5000）在任何情况下都不得被判为通过',
+  judgeBad.length === 0,
+  judgeBad.length
+    ? '不符：' + judgeBad.map(([n]) => n).join('；')
+    : `覆盖 ${judgeCases.length} 种组合（含 5000 / 5xx / 期望不符 / 请求未完成）`);
+
+/* ---------------------------------------------------------------------------
+ * 21. 汇总口径终值自检（16 节的 stat() 在这里取的就是终值）
+ *
+ * 只做一件事：证明汇总行说的是「全部断言跑完之后」的事实，而不是中途快照。
+ *   · 若本节之后才调用的点位被报成「未覆盖」，运维会去补一堆其实已经测过的用例；
+ *   · 若本节之后失败的断言不计入总数，自检明明红了却报全绿。
+ * ------------------------------------------------------------------------- */
+const finalStat = stat();
+assert('自检汇总口径 = 全部断言的终值（覆盖度与失败数均在最后现算，不漏报本节之后的断言）',
+  finalStat.failed.length === results.filter((r) => !r.passed).length &&
+  finalStat.tested.size === new Set(results.filter((r) => r.method !== '—')
+    .map((r) => `${r.method} ${r.path}`).filter((k) => registeredKeys.has(k))).size,
+  `实测点位 ${finalStat.tested.size}/${finalStat.reg.length} · 失败 ${finalStat.failed.length}/${results.length}`);
+
 /* ----------------------------- 输出 ----------------------------- */
 
-const pad = (s, n) => String(s).padEnd(n, ' ');
-const padL = (s, n) => String(s).padStart(n, ' ');
+/*
+ * 输出段包成函数的原因：这个脚本是一条两千多行的「边跑边断言」长流程，
+ * 任一步抛未预期异常（接口真崩了、接口返回的字段没了导致取属性炸了）都会在
+ * 打印任何结果之前整段退出 —— 现场只剩一个 TypeError，看不到已经跑完的 300 多条结果。
+ * 现在挂上 unhandledRejection / uncaughtException，异常也走同一个 emitReport()。
+ */
+function emitReport() {
+  const { reg, tested, missing, failed } = stat();
+  // 前置比对（17 节）可能还没跑到，崩溃路径上要能安全取值
+  const fe = safe(() => ({ n: fePaths.size, broken: brokenLinks, unused: notUsedByFe }),
+    { n: 0, broken: [], unused: [] });
+  const pad = (s, n) => String(s).padEnd(n, ' ');
+  const padL = (s, n) => String(s).padStart(n, ' ');
 
-console.log('\n' + '='.repeat(72));
-console.log(' 点位实测明细');
-console.log('='.repeat(72));
-console.log(' ' + pad('#', 4) + pad('方法', 7) + pad('路径 / 断言', 44) + pad('HTTP', 6) + pad('业务码', 8) + '结果');
-console.log('-'.repeat(72));
-results.forEach((r) => {
-  const flag = r.passed ? '✓' : '✗';
-  const tag = r.note ? `  [${r.note}]` : r.method === '—' ? '  [断言]' : '';
-  console.log(
-    ' ' + pad(r.no, 4) + pad(r.method, 7) +
-    pad(r.path.length > 42 ? r.path.slice(0, 40) + '…' : r.path, 44) +
-    pad(r.httpStatus, 6) + pad(r.code, 8) + flag + tag
-  );
-  if (!r.passed) console.log('      ↳ ' + r.msg);
-});
+  console.log('\n' + '='.repeat(72));
+  console.log(' 点位实测明细');
+  console.log('='.repeat(72));
+  console.log(' ' + pad('#', 4) + pad('方法', 7) + pad('路径 / 断言', 44) + pad('HTTP', 6) + pad('业务码', 8) + '结果');
+  console.log('-'.repeat(72));
+  results.forEach((r) => {
+    const flag = r.passed ? '✓' : '✗';
+    const tag = r.note ? `  [${r.note}]` : r.method === '—' ? '  [断言]' : '';
+    console.log(
+      ' ' + pad(r.no, 4) + pad(r.method, 7) +
+      pad(r.path.length > 42 ? r.path.slice(0, 40) + '…' : r.path, 44) +
+      pad(r.httpStatus, 6) + pad(r.code, 8) + flag + tag
+    );
+    if (!r.passed) console.log('      ↳ ' + r.msg);
+  });
 
-console.log('\n' + '='.repeat(72));
-console.log(' 汇总');
-console.log('='.repeat(72));
-console.log(` 已注册点位     ${registered.length} 个`);
-console.log(` 已实测点位     ${tested.size} 个`);
-console.log(` 未覆盖点位     ${missing.length} 个${missing.length ? ' → ' + missing.map((m) => `${m.method} ${m.path}`).join(', ') : ''}`);
-console.log(` 前端点位比对   引用 ${fePaths.size} 个，断链 ${brokenLinks.length} 个`);
-console.log(` 实测请求/断言  ${results.length} 条`);
-console.log(` 通过           ${results.length - failed.length} 条`);
-console.log(` 失败           ${failed.length} 条`);
+  console.log('\n' + '='.repeat(72));
+  console.log(' 汇总');
+  console.log('='.repeat(72));
+  console.log(` 已注册点位     ${reg.length} 个`);
+  console.log(` 已实测点位     ${tested.size} 个`);
+  console.log(` 未覆盖点位     ${missing.length} 个${missing.length ? ' → ' + missing.map((m) => `${m.method} ${m.path}`).join(', ') : ''}`);
+  console.log(` 前端点位比对   引用 ${fe.n} 个，断链 ${fe.broken.length} 个`);
+  console.log(` 实测请求/断言  ${results.length} 条`);
+  console.log(` 通过           ${results.length - failed.length} 条`);
+  console.log(` 失败           ${failed.length} 条`);
 
-/* 生成报告 */
-const lines = [];
-lines.push('# 后端点位连通性报告');
-lines.push('');
-lines.push(`> 生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}　｜　目标服务：\`${BASE}\``);
-lines.push(`> 生成方式：\`node server/tools/check-all.mjs\`（真实 HTTP 请求，非静态扫描）`);
-lines.push('');
-lines.push('## 一、总览');
-lines.push('');
-lines.push('| 指标 | 值 |');
-lines.push('|---|---|');
-lines.push(`| 已注册点位 | ${registered.length} |`);
-lines.push(`| 已实测点位 | ${tested.size} |`);
-lines.push(`| 未覆盖点位 | ${missing.length} |`);
-lines.push(`| 实测请求/断言 | ${results.length} |`);
-lines.push(`| 通过 | ${results.length - failed.length} |`);
-lines.push(`| 失败 | ${failed.length} |`);
-lines.push(`| 服务健康检查 | ${health.data.status} |`);
-lines.push(`| 微信能力模式 | 登录 ${health.data.wechat.login} / 支付 ${health.data.wechat.pay} |`);
-lines.push('');
-lines.push('## 二、点位明细');
-lines.push('');
-lines.push('| # | 方法 | 路径 / 断言 | HTTP | 业务码 | 结果 | 说明 |');
-lines.push('|---|---|---|---|---|---|---|');
-results.forEach((r) => {
-  lines.push(
-    `| ${r.no} | ${r.method} | \`${r.path}\` | ${r.httpStatus} | ${r.code} | ${r.passed ? '✅' : '❌'} | ${r.note || r.msg || ''} |`
-  );
-});
-lines.push('');
-if (missing.length) {
-  lines.push('## 三、未覆盖点位');
+  /* 生成报告 */
+  const h = safeHealth();
+  const lines = [];
+  lines.push('# 后端点位连通性报告');
   lines.push('');
-  missing.forEach((m) => lines.push(`- \`${m.method} ${m.path}\` ${m.desc || ''}`));
+  lines.push(`> 生成时间：${new Date().toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}　｜　目标服务：\`${BASE}\``);
+  lines.push(`> 生成方式：\`node server/tools/check-all.mjs\`（真实 HTTP 请求，非静态扫描）`);
   lines.push('');
-} else {
-  lines.push('## 三、覆盖结论');
+  lines.push('## 一、总览');
   lines.push('');
-  lines.push('**全部已注册点位均已被实测触达，无遗漏。**');
+  lines.push('| 指标 | 值 |');
+  lines.push('|---|---|');
+  lines.push(`| 已注册点位 | ${reg.length} |`);
+  lines.push(`| 已实测点位 | ${tested.size} |`);
+  lines.push(`| 未覆盖点位 | ${missing.length} |`);
+  lines.push(`| 实测请求/断言 | ${results.length} |`);
+  lines.push(`| 通过 | ${results.length - failed.length} |`);
+  lines.push(`| 失败 | ${failed.length} |`);
+  lines.push(`| 服务健康检查 | ${h.status} |`);
+  lines.push(`| 微信能力模式 | 登录 ${h.login} / 支付 ${h.pay} |`);
+  if (crash) lines.push(`| ⚠️ 自检中断 | ${crash.message} |`);
   lines.push('');
+  lines.push('## 二、点位明细');
+  lines.push('');
+  lines.push('| # | 方法 | 路径 / 断言 | HTTP | 业务码 | 结果 | 说明 |');
+  lines.push('|---|---|---|---|---|---|---|');
+  results.forEach((r) => {
+    lines.push(
+      `| ${r.no} | ${r.method} | \`${r.path}\` | ${r.httpStatus} | ${r.code} | ${r.passed ? '✅' : '❌'} | ${(r.note || r.msg || '').replace(/\|/g, '\\|').replace(/\n/g, ' ')} |`
+    );
+  });
+  lines.push('');
+  if (missing.length) {
+    lines.push('## 三、未覆盖点位');
+    lines.push('');
+    missing.forEach((m) => lines.push(`- \`${m.method} ${m.path}\` ${m.desc || ''}`));
+    lines.push('');
+  } else {
+    lines.push('## 三、覆盖结论');
+    lines.push('');
+    lines.push('**全部已注册点位均已被实测触达，无遗漏。**');
+    lines.push('');
+  }
+  if (failed.length) {
+    lines.push('## 四、失败明细');
+    lines.push('');
+    failed.forEach((r) => lines.push(`- \`${r.method} ${r.path}\` → HTTP ${r.httpStatus} / code ${r.code}：${r.msg}`));
+    lines.push('');
+  }
+
+  lines.push('## 五、前后端点位一致性');
+  lines.push('');
+  lines.push('| 指标 | 值 |');
+  lines.push('|---|---|');
+  lines.push(`| 前端 services 引用的点位 | ${fe.n} |`);
+  lines.push(`| 前端引用但后端未实现（断链） | ${fe.broken.length} |`);
+  lines.push(`| 后端已注册但前端未引用 | ${fe.unused.length} |`);
+  lines.push('');
+  if (fe.broken.length) {
+    lines.push('**断链点位（必须修复）**：');
+    lines.push('');
+    fe.broken.forEach((p) => lines.push(`- \`${p}\``));
+    lines.push('');
+  } else {
+    lines.push('前端 services 引用的全部点位均已在后端实现，无断链。');
+    lines.push('');
+  }
+  if (fe.unused.length) {
+    lines.push('后端已注册但前端 services 未引用（属后台 / 微信服务器侧点位，正常）：');
+    lines.push('');
+    fe.unused.forEach((r) => lines.push(`- \`${r.method} ${r.path}\` ${r.desc || ''}`));
+    lines.push('');
+  }
+
+  /*
+   * 报告落点可用 CHECK_ALL_REPORT 改道。
+   *
+   * 为什么需要：test-inject-server-error.mjs 会**故意**让 4 个点位返回 500，
+   * 再跑一遍本脚本验证「服务端异常必须被判成失败」。若那份（注定带 ❌ 的）
+   * 报告直接盖掉 server/CONNECTIVITY.md，仓库里留下的就成了「自检有 13 个失败」的假象，
+   * 下一次真实自检才刷新 —— 中间这段时间所有人看到的都是错的。
+   * 所以注入实验这类「故意跑坏」的场景必须把报告写到临时文件。
+   */
+  const outFile = process.env.CHECK_ALL_REPORT
+    ? resolve(process.env.CHECK_ALL_REPORT)
+    : join(__dirname, '..', 'CONNECTIVITY.md');
+  writeFileSync(outFile, lines.join('\n'), 'utf8');
+  console.log(`\n 报告已写入   ${outFile}`);
+
+  const allGreen = failed.length === 0 && missing.length === 0 && !crash;
+  console.log(allGreen ? '\n ✅ 每个点位均联络通畅\n' : '\n ⚠️ 存在异常，请查看上方明细\n');
+  return allGreen;
 }
-if (failed.length) {
-  lines.push('## 四、失败明细');
-  lines.push('');
-  failed.forEach((r) => lines.push(`- \`${r.method} ${r.path}\` → HTTP ${r.httpStatus} / code ${r.code}：${r.msg}`));
-  lines.push('');
+
+/** health 数据（崩溃路径上可能还没拿到，给个安全的空壳） */
+function safeHealth() {
+  try {
+    const w = (health.data && health.data.wechat) || {};
+    return { status: (health.data && health.data.status) || '-', login: w.login || '-', pay: w.pay || '-' };
+  } catch (e) {
+    return { status: '-', login: '-', pay: '-' };
+  }
 }
 
-lines.push('## 五、前后端点位一致性');
-lines.push('');
-lines.push('| 指标 | 值 |');
-lines.push('|---|---|');
-lines.push(`| 前端 services 引用的点位 | ${fePaths.size} |`);
-lines.push(`| 前端引用但后端未实现（断链） | ${brokenLinks.length} |`);
-lines.push(`| 后端已注册但前端未引用 | ${notUsedByFe.length} |`);
-lines.push('');
-if (brokenLinks.length) {
-  lines.push('**断链点位（必须修复）**：');
-  lines.push('');
-  brokenLinks.forEach((p) => lines.push(`- \`${p}\``));
-  lines.push('');
-} else {
-  lines.push('前端 services 引用的全部点位均已在后端实现，无断链。');
-  lines.push('');
-}
-if (notUsedByFe.length) {
-  lines.push('后端已注册但前端 services 未引用（属后台 / 微信服务器侧点位，正常）：');
-  lines.push('');
-  notUsedByFe.forEach((r) => lines.push(`- \`${r.method} ${r.path}\` ${r.desc || ''}`));
-  lines.push('');
-}
-
-const outFile = join(__dirname, '..', 'CONNECTIVITY.md');
-writeFileSync(outFile, lines.join('\n'), 'utf8');
-console.log(`\n 报告已写入   ${outFile}`);
-
-const allGreen = failed.length === 0 && missing.length === 0;
-console.log(allGreen ? '\n ✅ 每个点位均联络通畅\n' : '\n ⚠️ 存在异常，请查看上方明细\n');
+const allGreen = emitReport();
 process.exit(allGreen ? 0 : 1);

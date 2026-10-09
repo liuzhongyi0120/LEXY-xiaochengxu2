@@ -1,20 +1,53 @@
 /**
  * 后台管理路由（控制台 /console 专用）
  *
- * 分为：数据概览 / 商品 / 分类 / 订单 / 客户 / 营销 / 评价 / 店铺设置
+ * 分为：会话 / 数据概览 / 商品 / 分类 / 订单 / 客户 / 营销 / 评价 / 店铺设置
  *
- * ⚠️ 与装修、素材点位一样，本组点位**免登录**（联调期方便），
- *    上线必须在网关层统一加访问控制，见 README「上线前必做」。
+ * ⚠️ 本组点位**全部要求管理员令牌**，由 server/index.js 统一拦截
+ *    （见 lib/adminAuth.js 的角色规则）——
+ *    早前它们都是 auth:false，只靠 DEBUG_PAGE 总开关保护，等于「开关一开人人可改」。
+ *    这里不再逐个写 auth:true，因为管理员鉴权走的是独立通道（admin 标记的令牌），
+ *    与小程序用户登录态互不通用；集中拦截也能保证「新增点位默认受保护」。
+ *
+ * 角色：GET 只需 viewer；日常写操作 operator；
+ *      删商品 / 删分类 / 删券 / 改店铺设置 / 删素材与素材夹 / 发布或回滚装修 需 owner。
  */
 
 const admin = require('../lib/admin');
+const adminAuth = require('../lib/adminAuth');
 const catalog = require('../lib/catalog');
 const catalogStore = require('../lib/catalogStore');
+const decorate = require('../decorate/store');
 const { BizError, ERR } = require('../lib/http');
 
 const T = '后台管理';
 
 module.exports = [
+  /* ---------------------------- 会话 ---------------------------- */
+  {
+    method: 'POST',
+    path: '/api/admin/login',
+    auth: false,
+    desc: '管理员登录（口令换会话令牌；生产环境需先设置 ADMIN_PASSWORD）',
+    note: T,
+    async handler(ctx) {
+      const token = adminAuth.login(ctx.params.password);
+      return { token, role: 'owner', roleLabel: adminAuth.ROLE_LABEL.owner, ttl: adminAuth.ADMIN_TTL };
+    }
+  },
+  {
+    method: 'GET',
+    path: '/api/admin/session',
+    auth: false, // 已由 index.js 的管理员鉴权拦截，这里只做「我是谁」的回显
+    desc: '当前管理员会话（角色与名称；用于后台启动时判断是否需要登录）',
+    note: T,
+    async handler(ctx) {
+      const s = adminAuth.read(ctx.req);
+      if (!s) throw new BizError('未登录管理员', ERR.UNAUTHORIZED, 401);
+      return { role: s.role, roleLabel: adminAuth.ROLE_LABEL[s.role], name: s.name, source: s.source };
+    }
+  },
+
   /* ---------------------------- 数据概览 ---------------------------- */
   {
     method: 'GET',
@@ -314,12 +347,35 @@ module.exports = [
     method: 'GET',
     path: '/api/admin/settings',
     auth: false,
-    desc: '店铺设置（店铺名/Logo/客服电话/公告/运费/自动确认收货等）',
+    desc: '运营参数（客服电话/公告/运费/自动确认等，存 catalog.json）+ 小程序端展示信息（店铺名称/头像/标语，只读，真源为装修台 replica.SHOP）+ 资产数量',
     note: T,
     async handler() {
+      /*
+       * 店铺名称与 Logo 在这里**只读**。
+       *
+       * 历史上控制台把它们存进 catalog.settings 并提示「用于我的页与分享卡片」，
+       * 但小程序端读的是 replica.SHOP —— 两套数据源，后台说保存成功、前端永远是旧值。
+       * 现在统一口径：唯一真源是装修台「店铺信息」，本页只负责如实展示它，
+       * 顺便把「装修台里改了但还没生成代码」的差异也摆出来，避免又出现「以为改了」。
+       */
+      const R = decorate.readReplica();
+      const pub = R.SHOP || {};
+      const home = decorate.getPage('home');
+      const draftShop = (home && home.hasDraft && home.data && home.data.shop) || null;
+      const changed = draftShop
+        ? ['name', 'avatar', 'slogan'].some((k) => JSON.stringify(draftShop[k]) !== JSON.stringify(pub[k]))
+        : false;
+
       return {
         settings: catalog.settings(),
         defaults: catalogStore.DEFAULT_SETTINGS,
+        shop: {
+          source: '装修台「店铺信息」→ replica.SHOP',
+          published: { name: pub.name || '', avatar: pub.avatar || '', slogan: pub.slogan || '' },
+          draft: changed
+            ? { name: draftShop.name || '', avatar: draftShop.avatar || '', slogan: draftShop.slogan || '' }
+            : null
+        },
         goodsCount: catalogStore.get().goods.length,
         categoryCount: catalogStore.get().categories.length,
         couponCount: catalogStore.get().couponTemplates.length
@@ -330,7 +386,7 @@ module.exports = [
     method: 'POST',
     path: '/api/admin/settings/save',
     auth: false,
-    desc: '保存店铺设置',
+    desc: '保存运营参数（不含店铺名称/Logo —— 那两个字段的唯一数据源是装修台 replica.SHOP，传了会被明确拒绝）',
     note: T,
     async handler(ctx) {
       return catalog.saveSettings(ctx.params);

@@ -138,6 +138,144 @@
     mine: '/pages/mine/mine'
   };
 
+  /* ----------------------------- 管理员令牌 ----------------------------- */
+
+  /**
+   * 装修台的每个接口（`/api/decorate/*`、`/api/media/*`）在服务端都要求管理员令牌。
+   *
+   * 令牌与后台控制台（/console）共用同一个 localStorage 键：任一处登录，两边都生效。
+   * 角色分三级（只读 / 运营 / 超级管理员）：日常改装修与上传素材用「运营」即可，
+   * 「生成代码」「删除素材」「新建/改名/删除页面」需要「超级管理员」—— 服务端会拦，
+   * 前端这里只提前把提示说清楚。
+   */
+  var TOKEN_KEY = 'lexy_admin_token';
+  var ME_KEY = 'lexy_admin_me';
+  var ROLE_TEXT = { viewer: '只读', operator: '运营', owner: '超级管理员' };
+
+  function token() {
+    try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+  }
+  function me() {
+    try { return JSON.parse(localStorage.getItem(ME_KEY) || 'null'); } catch (e) { return null; }
+  }
+  function saveSession(tk, who) {
+    try {
+      if (tk) localStorage.setItem(TOKEN_KEY, tk); else localStorage.removeItem(TOKEN_KEY);
+      if (who) localStorage.setItem(ME_KEY, JSON.stringify(who)); else localStorage.removeItem(ME_KEY);
+    } catch (e) { /* 隐私模式下不可写：本次会话内仍可用 */ }
+    renderWho();
+  }
+  function clearSession() { saveSession('', null); }
+
+  /**
+   * 「只有令牌、没有身份」时补一次身份查询。
+   *
+   * 令牌与身份是两个 localStorage 键（`lexy_admin_token` / `lexy_admin_me`）。
+   * 令牌可能来自别处：另一个标签页、控制台（/console）登录、或运维预置。
+   * 这时 `me()` 为 null，界面会把**已登录**的用户当成「未登录」——
+   * 顶栏显示「未登录」，每个操作都走 openLogin 分支被拦下，表现是「点了没反应」。
+   * 所以启动时先拿令牌换一次 `/api/admin/session`，把身份补齐。
+   * 令牌已失效则清掉，让后续流程正常引导重新登录。
+   */
+  function hydrateSession() {
+    if (me() || !token()) return Promise.resolve(me());
+    return api('GET', '/api/admin/session').then(function (who) {
+      saveSession(token(), who);
+      return who;
+    })['catch'](function (e) {
+      // 401（api 内部已清凭据并拉起登录框）：令牌真的失效，属正常路径；
+      // 其他失败是 bug（接口写错、服务端异常），必须留痕，不能静默变成「未登录」。
+      if (!e || e.code !== 401) console.warn('[admin] 身份补齐失败：', e && e.message);
+      return null;
+    });
+  }
+
+  function renderWho() {
+    var t = $('tbWho');
+    var b = $('btnWho');
+    var who = me();
+    if (t) t.textContent = who
+      ? ((who.name || '管理员') + ' · ' + (who.roleLabel || ROLE_TEXT[who.role] || ''))
+      : '未登录';
+    if (b) {
+      b.textContent = who ? '退出' : '登录';
+      b.title = who ? '点击退出管理员登录' : '使用管理员口令或长期令牌登录';
+    }
+  }
+
+  /** 拉起管理员登录弹层；已有身份或弹层正开着就不重复打扰 */
+  function openLogin(opt) {
+    opt = opt || {};
+    if (me()) return;
+    if ($('modal').hidden === false) { toast(opt.reason || '该操作需要管理员身份', 'err'); return; }
+
+    var box = el('div');
+    box.innerHTML =
+      '<div style="line-height:1.7;color:#5b6472;font-size:13px">' +
+        esc(opt.reason || '装修台的接口需要管理员身份') + '</div>' +
+      '<div class="fld" style="margin-top:12px"><label>管理员口令</label>' +
+        '<input id="lgPw" type="password" placeholder="登录后获得超级管理员会话"></div>' +
+      '<div style="color:#8a919e;font-size:12px;margin-top:12px;line-height:1.6">' +
+        '也可以粘贴「长期令牌」（服务端 <code>ADMIN_TOKENS</code> 里的那一串）。</div>' +
+      '<div class="fld"><label>长期令牌</label>' +
+        '<input id="lgTk" type="text" placeholder="粘贴令牌（与口令二选一）"></div>';
+
+    var ok = el('button', 'btn primary', '登录');
+    var cancel = el('button', 'btn', '稍后');
+    cancel.onclick = closeModal;
+    ok.onclick = function () {
+      var pwEl = $('lgPw');
+      var tkEl = $('lgTk');
+      var pw = pwEl ? pwEl.value : '';
+      var tk = tkEl ? tkEl.value.trim() : '';
+      if (!pw && !tk) { toast('请填写管理员口令，或粘贴长期令牌', 'err'); return; }
+      ok.disabled = true;
+      ok.textContent = '验证中…';
+      var p;
+      if (tk) {
+        // 长期令牌没有专门的校验接口：先用它请求一次会话，确认令牌有效且角色能被识别
+        saveSession(tk, null);
+        p = api('GET', '/api/admin/session').then(function (who) { saveSession(tk, who); return who; });
+      } else {
+        p = api('POST', '/api/admin/login', { body: { password: pw } }).then(function (d) {
+          var who = { role: d.role, roleLabel: d.roleLabel, name: '超级管理员', source: 'session' };
+          saveSession(d.token, who);
+          return who;
+        });
+      }
+      p.then(function (who) {
+        toast('已登录：' + ((who && who.name) || '管理员'));
+        closeModal();
+        loadPages();
+      })['catch'](function (e) {
+        if (tk) clearSession();   // 令牌填错就把刚写进去的清掉，否则后续每个请求都 401
+        ok.disabled = false;
+        ok.textContent = '登录';
+        toast(e.message, 'err');
+      });
+    };
+    modal('管理员登录', box, [cancel, ok]);
+  }
+
+  function buttonWho() {
+    if (!me()) { openLogin({}); return; }
+    if (!confirm('退出管理员登录？退出后需重新输入口令或令牌。')) return;
+    clearSession();
+    toast('已退出管理员登录');
+    loadPages();
+  }
+
+  /** 某个动作需要的最低角色；不够就地给提示（真正的判定在服务端） */
+  function needRole(role, action) {
+    var who = me();
+    var rank = { viewer: 1, operator: 2, owner: 3 };
+    if (who && rank[who.role] >= rank[role]) return true;
+    if (!who) openLogin({ reason: '「' + (action || '该操作') + '」需要管理员身份' });
+    else toast('当前身份「' + (ROLE_TEXT[who.role] || '未知') + '」无权' + (action || '执行该操作') +
+      '（需要「' + (ROLE_TEXT[role] || role) + '」及以上）', 'err');
+    return false;
+  }
+
   /* ----------------------------- API ----------------------------- */
   function api(method, path, opt) {
     opt = opt || {};
@@ -149,6 +287,8 @@
     });
     if (qs.toString()) url += '?' + qs.toString();
     var headers = {};
+    var tk = token();
+    if (tk) headers['Authorization'] = 'Bearer ' + tk;
     var body;
     if (opt.body !== undefined && method !== 'GET') {
       headers['Content-Type'] = 'application/json';
@@ -159,7 +299,16 @@
         var json = null;
         try { json = JSON.parse(text); } catch (e) { /* ignore */ }
         if (!json) return Promise.reject(new Error('响应不是合法 JSON：' + text.slice(0, 120)));
-        if (json.code !== 0) return Promise.reject(new Error(json.msg || ('业务码 ' + json.code)));
+        if (json.code !== 0) {
+          // 401：未登录 / 会话过期 → 清掉旧凭据并拉起登录框（只弹一次，避免并发请求弹一摞）
+          if (json.code === 401) {
+            if (tk) clearSession();
+            openLogin({ reason: json.msg });
+          }
+          var err = new Error(json.msg || ('业务码 ' + json.code));
+          err.code = json.code;
+          return Promise.reject(err);
+        }
         return json.data;
       });
     });
@@ -169,7 +318,7 @@
   /**
    * 顶栏有两种形态（靠 .mode-list 切换，样式在 admin.css）：
    *   list —— 只看得到「LEXY 店铺装修台 / 店铺页面」，
-   *           隐藏「正在装修：—」「内置页」与编辑专属按钮（查看变更 / 版本 / 丢弃草稿 / 存至草稿 / 立即发布）。
+   *           隐藏「正在装修：—」「内置页」与编辑专属按钮（查看变更 / 版本 / 丢弃草稿 / 存至草稿 / 生成代码）。
    *           之前不区分视图，列表页顶栏会显示「正在装修：—」并挂着一排编辑按钮，语义错乱且容易误点发布。
    *   edit —— 完整编辑器工具栏。
    */
@@ -331,6 +480,18 @@
       // 9 列压成 5 列：类型 / 归属 / 内容量并进名称单元格，
       // 草稿时间并进状态单元格 —— 否则 1440 宽度下「操作」的 6 个按钮会换行（实测需求 354px / 实际 302px）
       var subParts = [p.path, p.belongs, p.blockCount + ' 项', p.fields + ' 字段'];
+      /*
+       * 状态列：自定义页要区分「已写进代码包」与「只在后台」——
+       * 刚新建、还没点「生成代码」的页面，小程序端其实打不开，
+       * 一律标「已发布」会让运营以为线上已经有了。
+       */
+      var statusHtml = (p.custom && p.generated === false)
+        ? '<span class="tag warn">未生成代码</span>'
+        : '<span class="tag ok">' + (p.custom ? '代码已生成' : '已发布') + '</span>';
+      var aliasHtml = (p.custom && (p.aliasFrom || []).length)
+        ? '<div class="psub" title="改过标识：旧地址仍可访问">旧标识 ' +
+          esc(p.aliasFrom.join(' / ')) + ' 仍可访问</div>'
+        : '';
       tr.innerHTML =
         '<td>' +
           '<div class="pname-row">' +
@@ -339,8 +500,7 @@
           '<div class="psub" title="' + attr(subParts.join(' · ')) + '">' +
             esc(subParts.join(' · ')) + '</div>' +
         '</td>' +
-        '<td>' +
-          '<span class="tag ok">已发布</span>' +
+        '<td>' + statusHtml + aliasHtml +
           (p.hasDraft ? '<div class="psub warn" title="草稿时间">草稿 ' + esc(p.draftAtText) + '</div>' : '') +
         '</td>' +
         '<td class="src-cell"><span class="src" title="' + attr(p.source) + '">' +
@@ -370,8 +530,10 @@
       (draftCount ? '，其中 <b>' + draftCount + '</b> 个有未发布草稿' : '') +
       '。<br><b>内置页</b>对应小程序的固定页面，不能删除；<b>自定义页</b>用右上角「+ 新建页面」创建，' +
       '发布后写入 <code>replica.CUSTOM_PAGES</code>，小程序端通过 <code>pages/custom/index?key=标识</code> 打开。' +
-      '编辑只改草稿；点「立即发布」才写回 <code>miniprogram/config/replica.js</code>，发布前自动备份到 ' +
-      '<code>server/data/decorate/backup/</code>，可随时回滚（保留最近 20 个版本）。' +
+      '编辑只改草稿；点「生成代码」才写回 <code>miniprogram/config/replica.js</code>（生成小程序代码包里的配置文件），' +
+      '生成前自动备份到 <code>server/data/decorate/backup/</code>，可随时回滚（保留最近 20 个版本）。' +
+      '<br><b>注意：</b>生成代码 ≠ 线上生效 —— 还需要在微信开发者工具「上传」并在公众平台发布新版本，' +
+      '已发布的小程序才会更新；本地 <code>/preview</code> 只是本机渲染效果。' +
       '<br><b>底部导航</b>是全局配置，不在上面的页面列表里 —— 点列表上方的「店铺导航」设置。';
   }
 
@@ -878,7 +1040,7 @@
       titleName = (isNavRoot ? '' : '页面设置 · ') + S.cur.meta.name;
       titleDesc = S.cur.meta.desc || '';
       tip = isNavRoot
-        ? '底部导航是小程序的全局配置：这里的改动发布后，5 个内置页面的底部导航会同时生效。'
+        ? '底部导航是小程序的全局配置：这里的改动「生成代码」后写回 replica.js，5 个内置页面的底部导航会同时更新；已发布的小程序需再上传发布新版本。'
         : '页面级设置作用于整页；页面内的区块请在左侧「页面布局」中增删排序。';
       splitFields(S.cur.schema.fields, fields, lists);
     } else if (loc.node.type === 'union') {
@@ -975,7 +1137,8 @@
           (desc ? '<div><b>组件说明：</b>' + esc(desc) + '</div>' : '') +
           (tip ? '<div style="margin-top:8px" class="tip">💡 ' + esc(tip) + '</div>' : '') +
           '<div style="margin-top:10px" class="hint">字段定义来自 <code>server/decorate/schema.js</code>，' +
-          '改完保存草稿 → 立即发布即写回 <code>miniprogram/config/replica.js</code>。</div>' +
+          '改完保存草稿 → 点「生成代码」即写回 <code>miniprogram/config/replica.js</code>' +
+          '（之后仍需上传并发布小程序新版本，真机才会更新）。</div>' +
           '</div>', [btnClose()]);
       };
     }
@@ -1746,6 +1909,9 @@
 
       var xhr = new XMLHttpRequest();
       xhr.open('POST', API + '/api/media/upload');
+      // 上传走的是 XHR（要拿真实进度），不带 fetch 那层封装 —— 令牌必须自己加
+      var tk = token();
+      if (tk) xhr.setRequestHeader('Authorization', 'Bearer ' + tk);
       xhr.upload.onprogress = function (e) {
         if (e.lengthComputable && onProgress) onProgress(Math.round((e.loaded / e.total) * 100));
       };
@@ -1753,7 +1919,11 @@
         var json = null;
         try { json = JSON.parse(xhr.responseText); } catch (e) { /* 下面统一报错 */ }
         if (!json) { reject(new Error('上传响应不是合法 JSON')); return; }
-        if (json.code !== 0) { reject(new Error(json.msg || ('业务码 ' + json.code))); return; }
+        if (json.code !== 0) {
+          if (json.code === 401) { if (tk) clearSession(); openLogin({ reason: json.msg }); }
+          reject(new Error(json.msg || ('业务码 ' + json.code)));
+          return;
+        }
         resolve(json.data);
       };
       xhr.onerror = function () { reject(new Error('网络异常，上传失败（后端是否已启动？）')); };
@@ -1972,6 +2142,8 @@
             it.querySelector('.pi-zoom').onclick = function (e) { e.stopPropagation(); previewImage(m.url); };
             it.querySelector('.pi-del').onclick = function (e) {
               e.stopPropagation();
+              // 删素材会直接影响线上图片（可能已被商品/装修引用）：服务端要求 owner
+              if (!needRole('owner', '删除素材')) return;
               // 先按普通删除试；被页面引用时后端拒绝，此时在卡片内给「仍然删除」，不再弹嵌套弹层
               api('POST', '/api/media/delete', { body: { name: m.name } })
                 .then(function () {
@@ -2254,17 +2426,29 @@
   }
 
   function publish() {
+    // 发布 = 全站前端内容整体替换（高危）：服务端要求 owner，这里提前把话说清楚
+    if (!needRole('owner', '发布装修')) return;
     var doIt = function () {
       api('POST', '/api/decorate/publish', { body: { key: S.cur.key, note: '后台发布' } })
         .then(function (d) {
-          toast('已发布 ' + d.versionId + '，写回 replica.js（' + d.bytes + ' 字节）', 'ok');
-          modal('发布成功',
+          toast('已生成代码 ' + d.versionId + '（写回 replica.js，' + d.bytes + ' 字节）', 'ok');
+          modal('已生成代码，尚未上线',
             '<div style="line-height:2">' +
             '版本号：<b>' + esc(d.versionId) + '</b><br>' +
-            '发布时间：' + esc(d.publishedAtText) + '<br>' +
+            '生成时间：' + esc(d.publishedAtText) + '<br>' +
             '写回文件：<code>miniprogram/config/replica.js</code><br>' +
             '发布前备份：<code>server/data/decorate/backup/' + esc(d.backup) + '</code>' +
-            '<div class="hint" style="margin-top:10px">小程序端无需改代码，重新编译或下拉刷新即可看到新内容。</div>' +
+            '</div>' +
+            // ⚠️ 这里以前写的是「重新编译或下拉刷新即可看到新内容」——对**已发布的**小程序不成立：
+            //    replica.js 在代码包里，只有重新上传并发布小程序版本，真机才会拿到新内容。
+            //    不能把「浏览器预览」（或开发者工具的热重载）说成「线上已生效」。
+            '<div class="tip" style="margin-top:12px;line-height:1.7">' +
+            '<b>接下来还需要两步才算上线：</b><br>' +
+            '1）在微信开发者工具点「编译」可立即看到本次改动（本机效果，用户看不到）；<br>' +
+            '2）要点「上传」并在微信公众平台发布新版本，已发布的小程序才会更新。' +
+            '<br><span class="hint" style="display:block;margin-top:6px">' +
+            '· 本地 <code>/preview</code> 与装修台手机壳都只是本机渲染，不代表线上已更新；<br>' +
+            '· 用户端在没有更新到新版本前，看到的仍是旧内容。</span>' +
             '</div>',
             [btnClose()]);
           S.dirty = false;
@@ -2387,9 +2571,11 @@
 
   /** 新建页面（对标有赞「店铺页面 → 新建页面」） */
   function createPageDialog() {
+    if (!needRole('owner', '新建页面')) return;
     var box = el('div');
     box.appendChild(el('div', 'hint',
-      '新建后只是后台多出一个页面，装修完点「立即发布」才下发到小程序；不会影响线上已有页面。'));
+      '新建后只是后台多出一个页面，装修完点「生成代码」才会写进小程序代码包（replica.js）；' +
+      '已发布的小程序要等下一次上传发布新版本才会出现这个页面。'));
 
     var nameInput = textInput('例如：2026 春季新品（最多 30 字）', '', 30);
     var keyInput = textInput('选填：小写字母 / 数字 / 连字符，如 spring2026', '', 24);
@@ -2445,21 +2631,74 @@
     nameInput.focus();
   }
 
-  /** 改名称 / 备注 / 页面标识 */
+  /**
+   * 改名称 / 备注 / 页面标识。
+   *
+   * 标识就是访问地址，已被分享出去的链接（聊天、朋友圈、二维码、其他页面的跳转）都指向它，
+   * 所以：
+   *   · 已写进代码包的页面，标识默认**锁住**，要改必须显式勾选解锁；
+   *   · 改标识会登记别名（旧链接仍可访问），并把仍指向旧标识的引用列出来给运营看。
+   */
   function renamePageDialog(key) {
+    if (!needRole('owner', '改名页面')) return;
     var p = S.pages.filter(function (x) { return x.key === key; })[0];
     if (!p) return;
 
     var box = el('div');
     box.appendChild(el('div', 'hint',
-      '改名不影响内容；改动「页面标识」会同步更新小程序路径与数据键名（旧地址随即失效），并重新生成 replica.js。'));
+      '改名称不影响内容，也不会影响访问地址。'));
 
     var nameInput = textInput('页面名称', p.name, 30);
     var keyInput = textInput('页面标识', p.key, 24);
     var noteInput = textInput('备注', p.note || '', 40);
+    var locked = !!(p.custom && p.generated !== false);
+    if (locked) keyInput.setAttribute('readonly', 'readonly');
+    keyInput.style.background = locked ? '#f5f6f8' : '#fff';
+
     box.appendChild(formRow('页面名称', nameInput));
-    box.appendChild(formRow('页面标识', keyInput, '小程序端路径：pages/custom/index?key=' + p.key));
+    var keyRow = formRow('页面标识', keyInput,
+      '小程序端路径：pages/custom/index?key=' + p.key +
+      (locked ? '。该页面已写进代码包，标识已锁住 —— 旧链接可能已经分享出去，改了会失效（系统会登记别名兜底）。' : ''));
+    box.appendChild(keyRow);
     box.appendChild(formRow('备注', noteInput));
+
+    if (locked) {
+      var unlock = el('label', 'hint', '');
+      unlock.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:2px;cursor:pointer';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.style.cssText = 'width:auto;margin:0';
+      cb.onchange = function () {
+        if (cb.checked) {
+          keyInput.removeAttribute('readonly');
+          keyInput.style.background = '#fff';
+          keyInput.focus();
+        } else {
+          keyInput.setAttribute('readonly', 'readonly');
+          keyInput.style.background = '#f5f6f8';
+          keyInput.value = p.key;
+        }
+      };
+      unlock.appendChild(cb);
+      unlock.appendChild(document.createTextNode('我确认要修改页面标识（旧链接会通过别名继续跳转，但建议尽快更新站内入口）'));
+      box.appendChild(unlock);
+    }
+
+    // 引用清单：页面标识被哪些地方链接引用（改名前后都值得看）
+    var refBox = el('div', 'hint', '正在检查站内引用…');
+    refBox.style.marginTop = '6px';
+    box.appendChild(refBox);
+    if (p.custom) {
+      api('GET', '/api/decorate/page/refs', { query: { key: key } })
+        .then(function (d) {
+          if (!d.count) { refBox.textContent = '站内引用：没有被其他页面链接引用。'; return; }
+          refBox.innerHTML = '站内引用（' + d.count + ' 处）：<br>' +
+            d.refs.map(function (r) { return '· ' + esc(r.label); }).join('<br>') +
+            '<br><span style="color:#8a919e">这些入口指向当前标识；改名后会自动跟到新标识（别名），' +
+            '但建议一并更新。</span>';
+        })
+        .catch(function () { refBox.textContent = ''; });
+    }
 
     var save = el('button', 'btn primary', '保存');
     save.onclick = function () {
@@ -2470,9 +2709,12 @@
         body: { key: key, name: name, newKey: keyInput.value.trim(), note: noteInput.value.trim() }
       }).then(function (d) {
         closeModal();
-        toast(d.renamedFrom
-          ? ('已改名为「' + d.page.name + '」，标识 ' + d.renamedFrom + ' → ' + d.page.key)
-          : '已保存');
+        if (d.renamedFrom) {
+          toast('已改名为「' + d.page.name + '」，标识 ' + d.renamedFrom + ' → ' + d.page.key +
+            '（旧标识仍可访问，另有 ' + (d.refCount || 0) + ' 处站内引用指向它）', 'ok');
+        } else {
+          toast('已保存');
+        }
         loadPages();
       }).catch(function (e) {
         save.disabled = false;
@@ -2484,19 +2726,52 @@
 
   /** 删除自定义页面（连带清草稿与版本，并重新生成 replica.js） */
   function deletePage(key) {
+    if (!needRole('owner', '删除页面')) return;
     var p = S.pages.filter(function (x) { return x.key === key; })[0];
     if (!p) return;
-    if (!confirm('确定删除「' + p.name + '」？\n\n' +
-      '· 该页面的草稿与历史版本会一并清除\n' +
-      '· 会立即重新生成 replica.js，小程序端将无法再打开这个页面\n' +
-      '· 删除前的 replica.js 已自动备份到 server/data/decorate/backup/，需要时可以找回\n\n' +
-      '此操作不可撤销。')) return;
 
-    api('POST', '/api/decorate/page/delete', { body: { key: key } }).then(function (d) {
-      toast('已删除「' + d.name + '」' +
-        (d.removedVersions ? '（清理 ' + d.removedVersions + ' 条版本记录）' : ''));
-      if (S.cur && S.cur.key === key) showList(); else loadPages();
-    }).catch(function (e) { toast('删除失败：' + e.message, 'err'); });
+    // 先拉引用清单：有别的页面/底部导航链接指着它，删除会让那些入口变成空白页，
+    // 必须让运营先看到清单再决定（后端也会再拦一次，两边都不放过）。
+    api('GET', '/api/decorate/page/refs', { query: { key: key } }).then(function (d) {
+      var refs = (d && d.refs) || [];
+      var box = el('div');
+      box.innerHTML =
+        '<div style="line-height:1.9">确定删除 <b>' + esc(p.name) + '</b>？</div>' +
+        '<div class="hint" style="margin-top:8px">' +
+        '· 该页面的草稿与历史版本会一并清除<br>' +
+        '· 会立即重新生成 replica.js，小程序端将无法再打开这个页面<br>' +
+        '· 删除前的 replica.js 已自动备份到 server/data/decorate/backup/，需要时可以找回' +
+        '</div>' +
+        (refs.length
+          ? '<div class="tip" style="margin-top:10px;background:#fff5f4;color:#b42318">' +
+            '<b>该页面被 ' + refs.length + ' 处引用，删除后这些入口会打不开：</b><br>' +
+            refs.map(function (r) { return '· ' + esc(r.label); }).join('<br>') +
+            '</div>'
+          : '<div class="hint" style="margin-top:10px">站内没有任何地方链接到这个页面。</div>');
+
+      var del = el('button', 'btn danger', refs.length ? '仍然删除' : '删除');
+      var cancel = el('button', 'btn', '取消');
+      cancel.onclick = closeModal;
+      del.onclick = function () {
+        del.disabled = true;
+        del.textContent = '删除中…';
+        api('POST', '/api/decorate/page/delete', { body: { key: key, force: refs.length ? 1 : undefined } })
+          .then(function (r) {
+            closeModal();
+            toast('已删除「' + r.name + '」' +
+              (r.removedVersions ? '（清理 ' + r.removedVersions + ' 条版本记录）' : ''));
+            if (S.cur && S.cur.key === key) showList(); else loadPages();
+          })
+          .catch(function (e) {
+            del.disabled = false;
+            del.textContent = refs.length ? '仍然删除' : '删除';
+            toast('删除失败：' + e.message, 'err');
+          });
+      };
+      modal('删除页面', box, [cancel, del]);
+    }).catch(function (e) {
+      toast('无法读取引用清单：' + e.message, 'err');
+    });
   }
 
   /** 「添加常用组件」（对标有赞组件库底部入口） */
@@ -2539,7 +2814,7 @@
   function keysDialog() {
     var rows = [
       ['Ctrl / ⌘ + S', '保存草稿'],
-      ['Ctrl / ⌘ + Enter', '立即发布（写回 replica.js）'],
+      ['Ctrl / ⌘ + Enter', '生成代码（写回 replica.js，不等于线上生效）'],
       ['Ctrl / ⌘ + K', '打开这个快捷键说明'],
       ['Esc', '关闭弹层 / 退出图片大图预览'],
       ['点击手机预览里的区块', '直接在预览中选中该组件'],
@@ -2608,6 +2883,7 @@
   $('modalClose').onclick = closeModal;
   $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
   $('imgPreview').onclick = function () { $('imgPreview').hidden = true; };
+  $('btnWho').onclick = buttonWho;
 
   document.addEventListener('keydown', function (e) {
     // Esc：关掉最上层的弹层与图片大图（任何时候都生效）
@@ -2635,7 +2911,11 @@
 
   /* ----------------------------- 启动 ----------------------------- */
   setTopbar('list');
-  loadPages();
+  // 只有令牌没有身份时先补齐，否则首屏会把已登录用户渲染成「未登录」
+  hydrateSession().then(function () {
+    renderWho();
+    loadPages();
+  });
 
   window.__admin = {
     S: S, openPage: openPage, saveDraft: saveDraft, publish: publish, loadPages: loadPages,
@@ -2643,6 +2923,7 @@
     createPageDialog: createPageDialog, renamePageDialog: renamePageDialog, deletePage: deletePage,
     linkPicker: linkPicker, linkLabel: linkLabel, loadLinkOptions: loadLinkOptions,
     linkOptions: function () { return LINK_OPTS; },
+    hydrateSession: hydrateSession, session: function () { return { token: token(), me: me() }; },
     renderInspector: renderInspector, write: write
   };
 })();

@@ -1,6 +1,6 @@
 <view class="page" style="background: {{pageBg}};">
-  <!-- 左侧品牌导航 -->
-  <scroll-view class="side" scroll-y>
+  <!-- 左侧品牌导航（无品牌配置时整栏隐藏，把宽度让给空状态） -->
+  <scroll-view class="side" scroll-y wx:if="{{!noBrands}}">
     <!-- 导航顶部固定 logo（源页面左栏顶部，669×414 横幅，按宽度自适应高度） -->
     <view class="side-top">
       <image class="side-top-logo" src="{{navLogo}}" mode="widthFix" />
@@ -73,7 +73,9 @@
       </view>
     </view>
 
-    <empty-state wx:if="{{!groups.length}}" text="该品牌暂无上架产品" />
+    <!-- 空配置也必须有确定行为：整个产品页没有配任何品牌时，不能是空左栏 + 空右栏 -->
+    <empty-state wx:if="{{noBrands}}" text="产品页暂未配置品牌内容，请在装修后台添加" />
+    <empty-state wx:elif="{{!groups.length}}" text="该品牌暂无上架产品" />
     <view class="main-bottom"></view>
   </scroll-view>
 </view>

@@ -8,11 +8,19 @@
  * 存储：server/data/decorate/custom-pages.json（与 drafts/versions 的 state.json 分开）
  *   {
  *     seq: 1,                         // 自增序号，用于生成默认 key（p1 / p2 …）
+ *     aliases: { oldKey: newKey },    // 改过标识的页面：旧标识 → 新标识（旧分享链接仍可访问）
  *     pages: [{
  *       key, name, note, belongs, path, template, createdAt, updatedAt,
  *       published: { blocks: [], meta: {} }   // 「已发布」数据，相当于内置页的 replica 字段
  *     }]
  *   }
+ *
+ * 为什么需要 aliases：
+ *   页面标识就是访问地址（`pages/custom/index?key=标识`），而地址会被**分享到聊天/朋友圈、
+ *   印在二维码里、被其他页面的跳转链接引用**。改了标识而不管这些引用，就会出现
+ *   「运营改了名字，用户点旧链接打不开」——而运营自己是发现不了的。
+ *   所以改名时登记别名，并由发布链路写进 replica.CUSTOM_PAGE_ALIASES，
+ *   小程序端查到别名后自动转到新标识。
  *
  * 自定义页面的草稿仍走 state.json 的 drafts[key]，与内置页完全一致，
  * 因此「存草稿 → 查看变更 → 发布 → 回滚」四个环节对两类页面是同一套代码。
@@ -25,8 +33,9 @@ const fs = require('node:fs');
 const nodePath = require('node:path');
 const util = require('../lib/util');
 const atomic = require('../lib/atomicFile');
+const { BizError, ERR } = require('../lib/http');
 
-const DATA_DIR = nodePath.join(__dirname, '..', 'data', 'decorate');
+const DATA_DIR = nodePath.join(require('../lib/dataDir').ROOT, 'decorate');
 const FILE = nodePath.join(DATA_DIR, 'custom-pages.json');
 
 /** 自定义页面上限（有赞免费版也是 10~20 个量级） */
@@ -54,7 +63,7 @@ let flushTimer = null;
 /* ----------------------------- 存取 ----------------------------- */
 
 function empty() {
-  return { seq: 0, pages: [] };
+  return { seq: 0, aliases: {}, pages: [] };
 }
 
 function ensureDir() {
@@ -83,6 +92,16 @@ function load() {
     Object.keys(base).forEach((k) => { if (cache[k] === undefined) cache[k] = base[k]; });
     if (!Array.isArray(cache.pages)) cache.pages = [];
     if (!Number.isFinite(cache.seq)) cache.seq = 0;
+    // aliases 也要验形态：被手工改成数组/字符串时，下面 aliases[key] 会读出诡异结果
+    if (!util.isPlainObject(cache.aliases)) { cache.aliases = {}; needFlush = true; }
+    // 别名键值都必须是合法标识，且不能指向自己（非法项直接剔掉，别让它污染「标识是否可用」的判断）
+    Object.keys(cache.aliases).forEach((k) => {
+      const v = cache.aliases[k];
+      if (typeof v !== 'string' || v === k || !KEY_RE.test(k) || !KEY_RE.test(v)) {
+        delete cache.aliases[k];
+        needFlush = true;
+      }
+    });
     // 数组里混进非对象（手工编辑 / 历史遗留）：剔掉并留日志，不让一条脏数据拖垮整个装修台
     const dirty = cache.pages.filter((p) => !util.isPlainObject(p));
     if (dirty.length) {
@@ -151,12 +170,17 @@ function keysOf() {
   return load().pages.map((p) => p.key);
 }
 
-/** 生成一个未被占用的默认标识（p1 / p2 …） */
+/** 旧标识 → 新标识 的别名表（深拷贝） */
+function aliases() {
+  return clone(load().aliases || {});
+}
+
+/** 生成一个未被占用的默认标识（p1 / p2 …）—— 也要避开历史别名，否则新页会顶掉旧分享链接 */
 function nextKey() {
   const data = load();
   let n = (data.seq || 0) + 1;
   // 避免与历史 key（含被删过又重建的）撞车
-  while (RESERVED.has('p' + n) || keysOf().indexOf('p' + n) >= 0) n++;
+  while (RESERVED.has('p' + n) || keysOf().indexOf('p' + n) >= 0 || (data.aliases || {})['p' + n]) n++;
   return 'p' + n;
 }
 
@@ -171,6 +195,13 @@ function checkKey(key, ignoreKey) {
   }
   if (RESERVED.has(key)) return `页面标识「${key}」是系统保留字，请换一个`;
   if (key !== ignoreKey && findByKey(key)) return `页面标识「${key}」已被占用`;
+  // 历史别名同样占用着地址：已被分享出去的旧链接还指望它跳到新页面，
+  // 让一个新页面顶上去，等于把旧链接指向了完全无关的内容。
+  const al = load().aliases || {};
+  if (key !== ignoreKey && al[key] && al[key] !== key) {
+    return `页面标识「${key}」曾被用作其他页面的旧标识（现指向「${al[key]}」），` +
+      '为避免旧分享链接跳到错误的页面，请换一个标识';
+  }
   return '';
 }
 
@@ -211,10 +242,25 @@ function stats() {
   const data = load();
   let size = 0;
   try { size = fs.statSync(FILE).size; } catch (_) { /* ignore */ }
-  return { count: data.pages.length, max: MAX_PAGES, bytes: size };
+  return {
+    count: data.pages.length,
+    max: MAX_PAGES,
+    bytes: size,
+    // 改过标识的页面数：旧分享链接还在靠它们跳转，后台要能看见
+    aliasCount: Object.keys(data.aliases || {}).length
+  };
 }
 
 /* ----------------------------- 对外：写 ----------------------------- */
+
+/*
+ * ⚠️ 这里的校验失败**必须抛 BizError**，不能抛普通 Error。
+ *    普通 Error 会被入口当成「未预期异常」→ HTTP 500 / code 5000 / 对外文案
+ *    「服务开小差了，请稍后重试」，于是：
+ *      · 运营在装修台只看到一句没有信息量的提示，不知道是标识重复还是标识保留；
+ *      · 日志里正常校验失败与真实代码 bug 混在一起，无法告警；
+ *      · 自检的「预期失败」用例会因为拿到 5000 而假通过（整改报告 15 点名的正是这条）。
+ */
 
 /**
  * 新建页面
@@ -225,19 +271,21 @@ function stats() {
 function create(input, initialData) {
   const opt = input || {};
   if (load().pages.length >= MAX_PAGES) {
-    throw new Error(`自定义页面最多 ${MAX_PAGES} 个，已达上限`);
+    throw new BizError(`自定义页面最多 ${MAX_PAGES} 个，已达上限`, ERR.BIZ);
   }
 
   const name = normName(opt.name) || '未命名页面';
   const nameErr = checkName(name);
-  if (nameErr) throw new Error(nameErr);
-  if (load().pages.some((p) => p.name === name)) throw new Error(`页面名称「${name}」已存在，请换一个`);
+  if (nameErr) throw new BizError(nameErr, ERR.PARAM);
+  if (load().pages.some((p) => p.name === name)) {
+    throw new BizError(`页面名称「${name}」已存在，请换一个`, ERR.BIZ);
+  }
 
   // 用户填了标识就用他的（先清洗再校验），没填自动生成
   const raw = slug(opt.key);
   const key = raw || nextKey();
   const keyErr = checkKey(key);
-  if (keyErr) throw new Error(keyErr);
+  if (keyErr) throw new BizError(keyErr, ERR.PARAM);
 
   const data = load();
   const tpl = ['blank', 'home'].indexOf(opt.template) >= 0 ? opt.template : 'blank';
@@ -266,15 +314,15 @@ function create(input, initialData) {
 /** 改名称 / 备注 / 标识（标识改动会连带更新 path，数据与草稿、版本记录一并迁移） */
 function update(key, patch) {
   const page = findByKey(key);
-  if (!page) throw new Error('页面不存在：' + key);
+  if (!page) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
   const opt = patch || {};
 
   if (opt.name !== undefined) {
     const name = normName(opt.name);
     const err = checkName(name);
-    if (err) throw new Error(err);
+    if (err) throw new BizError(err, ERR.PARAM);
     if (load().pages.some((p) => p.key !== key && p.name === name)) {
-      throw new Error(`页面名称「${name}」已存在，请换一个`);
+      throw new BizError(`页面名称「${name}」已存在，请换一个`, ERR.BIZ);
     }
     page.name = name;
   }
@@ -285,10 +333,24 @@ function update(key, patch) {
     const k = slug(opt.key);
     if (k !== key) {
       const err = checkKey(k, key);
-      if (err) throw new Error(err);
+      if (err) throw new BizError(err, ERR.PARAM);
+      const data = load();
+      if (!util.isPlainObject(data.aliases)) data.aliases = {};
       page.key = k;
       page.path = 'pages/custom/index?key=' + k;
       newKey = k;
+
+      /*
+       * 登记别名，并做两件收尾：
+       *   1）删掉指向新标识的别名（k 现在是真页面了，不该再被当别名）；
+       *   2）把「原本指向旧标识」的别名改指向新标识 —— 否则 a→b 之后再 b→c，
+       *      a 会停在 b 这个不存在的标识上，多改几次就断了。
+       */
+      delete data.aliases[k];
+      Object.keys(data.aliases).forEach((old) => {
+        if (data.aliases[old] === key) data.aliases[old] = k;
+      });
+      data.aliases[key] = k;
     }
   }
   page.updatedAt = stamp();
@@ -298,12 +360,21 @@ function update(key, patch) {
 
 /**
  * 删除页面（只删注册表条目；草稿、版本、replica.js 的清理由 store.js 编排）
+ *
+ * 连带清理别名：页面没了，指向它的别名就成了悬空指针
+ * （留着只会让旧链接跳到一个不存在的标识，不如直接失效，报「页面不存在」更诚实）。
  */
 function remove(key) {
   const data = load();
   const i = data.pages.findIndex((p) => p.key === key);
-  if (i < 0) throw new Error('页面不存在：' + key);
+  if (i < 0) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
   const [gone] = data.pages.splice(i, 1);
+  if (util.isPlainObject(data.aliases)) {
+    delete data.aliases[key];
+    Object.keys(data.aliases).forEach((old) => {
+      if (data.aliases[old] === key) delete data.aliases[old];
+    });
+  }
   commit();
   return clone(gone);
 }
@@ -311,7 +382,7 @@ function remove(key) {
 /** 发布成功后回写「已发布数据」 */
 function setPublished(key, data) {
   const page = findByKey(key);
-  if (!page) throw new Error('页面不存在：' + key);
+  if (!page) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
   page.published = {
     blocks: clone((data && data.blocks) || []),
     meta: Object.assign({}, BLANK_META, clone((data && data.meta) || {}))
@@ -333,6 +404,7 @@ module.exports = {
   has,
   count,
   keysOf,
+  aliases,
   templates,
   stats,
   create,

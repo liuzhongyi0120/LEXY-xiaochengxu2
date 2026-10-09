@@ -3,13 +3,27 @@ const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
 const { openLink } = require('../../utils/link');
 
-/** 深拷贝，避免运行时错误标记污染配置数据 */
-function clone(data) {
-  return JSON.parse(JSON.stringify(data));
-}
+/**
+ * 装修数据先整体做一次素材地址解析，后续切换品牌都从这里取。
+ *
+ * 这里不需要再对 groups 做深拷贝防污染：resolveAssets 本身就返回一份深拷贝，
+ * BRANDS 及其中每个 groups 都已经是游离对象，运行时标记（headerFailed 等）
+ * 写进去不会影响 replica 配置。
+ *
+ * ⚠️ 必须容忍「配置被清空」：装修后台允许把产品页的品牌全部删掉，
+ *    而早前这里直接读 BRANDS[0].groups —— 空数组时页面初始化就抛
+ *    `Cannot read properties of undefined (reading 'groups')`，整页白屏。
+ *    空配置不是异常数据，是运营的合法状态，页面必须显示空状态而不是崩掉。
+ */
+const BRANDS = (function () {
+  const raw = resolveAssets(replica.PRODUCT_BRANDS);
+  return Array.isArray(raw) ? raw.filter((b) => b && typeof b === 'object') : [];
+})();
 
-/** 装修数据先整体做一次素材地址解析，后续切换品牌都从这里取 */
-const BRANDS = resolveAssets(replica.PRODUCT_BRANDS);
+/** 取某品牌的右侧分组；品牌存在但没配分组时同样是空数组，不能是 undefined */
+function groupsOf(brand) {
+  return brand && Array.isArray(brand.groups) ? brand.groups : [];
+}
 
 Page({
   /** 切页时同步底部导航高亮（自定义 tabBar 的实例每页一份，必须由页面主动通知） */
@@ -22,11 +36,15 @@ Page({
     pageBg: (replica.PAGE_META && replica.PAGE_META.product && replica.PAGE_META.product.bg) || '#ffffff',
     /** 左侧导航顶部固定 logo */
     navLogo: resolveAssets(replica.PRODUCT_NAV_LOGO),
-    /** 6 个品牌，各自带 groups */
+    /** 品牌列表，各自带 groups（可能为空数组） */
     brands: BRANDS,
     activeBrand: 0,
     /** 当前品牌右侧展示的分组 */
-    groups: clone(BRANDS[0].groups),
+    groups: groupsOf(BRANDS[0]),
+    /** 当前品牌对象（左侧信息与分享用），空配置时为 undefined */
+    activeBrandName: (BRANDS[0] && BRANDS[0].name) || '',
+    /** 整页没有任何品牌 → 显示空状态，而不是左边的空栏 + 右边空白 */
+    noBrands: BRANDS.length === 0,
     /** 切换品牌后右侧回到顶部（scroll-top 需产生变化才生效） */
     scrollTop: 0
   },
@@ -41,7 +59,8 @@ Page({
 
     this.setData({
       activeBrand: index,
-      groups: clone(brand.groups),
+      activeBrandName: brand.name || '',
+      groups: groupsOf(brand),
       scrollTop: this.data.scrollTop === 0 ? 1 : 0
     });
   },

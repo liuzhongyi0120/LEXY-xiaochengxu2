@@ -1,7 +1,7 @@
 const { syncTabBar } = require('../../utils/tabbar');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
-const { normalizeBlocks, loadGoodsData, applyShopAvatar } = require('../../utils/blocks');
+const { normalizeBlocks, applyShopAvatar } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
 
 Page(Object.assign({}, blockPageBehavior, {
@@ -22,13 +22,6 @@ Page(Object.assign({}, blockPageBehavior, {
       (this.data.shop && this.data.shop.avatar) || ''
     );
     this.setData({ blocks }, () => this.loadGoodsBlocks());
-  },
-
-  /** 商品组件需要实时数据，统一拉一次后分发到各「商品」区块 */
-  loadGoodsBlocks() {
-    return loadGoodsData(this.data.blocks).then((next) => {
-      if (next && Object.keys(next).length) this.setData(next);
-    });
   },
 
   /** 离开页面时释放语音播放器（区块事件见 utils/blockPage.js） */

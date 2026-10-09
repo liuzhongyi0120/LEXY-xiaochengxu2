@@ -16,10 +16,20 @@ const schema = require('./schema');
 const emit = require('./emit');
 const customPages = require('./customPages');
 const atomic = require('../lib/atomicFile');
+const { BizError, ERR } = require('../lib/http');
 
 const ROOT = nodePath.join(__dirname, '..', '..');
-const REPLICA_FILE = nodePath.join(ROOT, 'miniprogram', 'config', 'replica.js');
-const DATA_DIR = nodePath.join(__dirname, '..', 'data', 'decorate');
+/**
+ * 发布产物（replica.js）的落点。
+ *
+ * 默认就是小程序源码里那份；`MALL_REPLICA_FILE` 可指向别处 ——
+ * 非交易回归测试要跑「草稿 → 发布」的全链路，但绝不能真的改写
+ * miniprogram/config/replica.js（那是线上前端唯一数据源）。
+ */
+const REPLICA_FILE = process.env.MALL_REPLICA_FILE
+  ? nodePath.resolve(process.env.MALL_REPLICA_FILE)
+  : nodePath.join(ROOT, 'miniprogram', 'config', 'replica.js');
+const DATA_DIR = nodePath.join(require('../lib/dataDir').ROOT, 'decorate');
 const STATE_FILE = nodePath.join(DATA_DIR, 'state.json');
 const BACKUP_DIR = nodePath.join(DATA_DIR, 'backup');
 const MAX_VERSIONS = 20;
@@ -111,8 +121,16 @@ function publishedOf(key) {
   return p.custom ? customPublished(key) : schema.clone(p.from(readReplica()));
 }
 
-/** 把各页面数据组装成 replica 的 6（+PAGE_META）个字段 */
-function assemble(pageDataMap) {
+/**
+ * 把各页面数据组装成 replica 的 6（+PAGE_META）个字段
+ *
+ * @param {object} pageDataMap
+ * @param {{dropAliasOf?:string}} [opt] 生成别名表时要**排除**的页面标识。
+ *   删除页面走的是「先写 replica、再删注册表」的顺序（写失败时页面数据才不会丢），
+ *   于是生成文件的那一刻注册表里那一页还在、指向它的别名也还在 ——
+ *   必须在这里就滤掉，否则 replica.js 会永久留着一条指向已删页面的别名。
+ */
+function assemble(pageDataMap, opt) {
   const out = {};
   schema.allPages().forEach((p) => {
     const d = pageDataMap[p.key];
@@ -135,7 +153,129 @@ function assemble(pageDataMap) {
     });
   }
 
+  /*
+   * 自定义页「旧标识 → 新标识」别名表。
+   *
+   * 它不属于任何单个页面（一个别名可能对应一个已被改名两次的页面），
+   * 所以在这里统一挂上去，而不是塞进某个页面的 adapter。
+   * 没有别名时保持 undefined —— emit 端会整段省略，老 replica.js 不受影响。
+   */
+  const al = customPages.aliases();
+  const drop = (opt && opt.dropAliasOf) || '';
+  if (drop) {
+    delete al[drop];
+    Object.keys(al).forEach((old) => { if (al[old] === drop) delete al[old]; });
+  }
+  if (Object.keys(al).length) out.CUSTOM_PAGE_ALIASES = al;
+
   return out;
+}
+
+/* ----------------------------- 站内引用扫描 ----------------------------- */
+
+/** 匹配自定义页地址：`/pages/custom/index?key=xxx`（也容忍不带前导斜杠、带其它参数） */
+const CUSTOM_URL_RE = /(?:^|\/)pages\/custom\/index\?([^"'#\s]*)/;
+
+/** 从一个地址里取出它指向的自定义页标识（不是自定义页地址则返回空串） */
+function customKeyOfUrl(url) {
+  const s = String(url === undefined || url === null ? '' : url);
+  const m = CUSTOM_URL_RE.exec(s);
+  if (!m) return '';
+  const km = /(?:^|&)key=([^&]*)/.exec(m[1]);
+  if (!km) return '';
+  try { return decodeURIComponent(km[1]); } catch (e) { return km[1]; }
+}
+
+/** 深度遍历任意数据，收集所有指向 target 的字符串（记录 JSON 路径） */
+function walkRefs(node, path, target, out) {
+  if (typeof node === 'string') {
+    if (customKeyOfUrl(node) === target) out.push({ path: path, value: node });
+    return;
+  }
+  if (Array.isArray(node)) {
+    node.forEach((v, i) => walkRefs(v, path + '.' + i, target, out));
+    return;
+  }
+  if (node && typeof node === 'object') {
+    Object.keys(node).forEach((k) => walkRefs(node[k], path ? path + '.' + k : k, target, out));
+  }
+}
+
+/** 字段名 → 中文说明，让引用清单能直接读（「首页 › 轮播 · 520px › 跳转链接」） */
+const FIELD_TEXT = {
+  link: '跳转链接', image: '图片', images: '轮播图', src: '图片 / 视频地址',
+  video: '视频', avatar: '头像', logo: 'Logo', bg: '背景图', url: '地址'
+};
+
+/**
+ * 扫描「站内引用」：哪些页面的哪个字段指向了这个自定义页标识。
+ *
+ * 为什么要扫：
+ *   页面标识就是访问地址。运营改名/删除时，如果别的页面还用旧地址跳它，
+ *   用户点过去就是空白页 —— 而后台不会提示任何异常。
+ *
+ * 扫描口径：**草稿优先**（草稿就是「生成代码」将要写出去的内容），
+ * 没草稿才用已发布数据；外加底部导航（它不是页面区块，单独一份）。
+ *
+ * @returns {Array<{pageKey, pageName, path, field, label, value}>}
+ */
+function referencesOf(key) {
+  const target = String(key || '');
+  const out = [];
+  if (!target) return out;
+
+  const state = loadState();
+  const drafts = state.drafts || {};
+  const published = publishedAll();
+
+  schema.allPages().forEach((p) => {
+    const d = drafts[p.key] ? drafts[p.key].data : published[p.key];
+    if (d === undefined || d === null) return;
+    const hits = [];
+    walkRefs(d, p.key, target, hits);
+    if (!hits.length) return;
+    const titles = {};
+    try { collectTitles(p.key, p.root, '', d, titles); } catch (e) { /* 标题只是锦上添花 */ }
+    hits.forEach((h) => out.push(decorateRef(p, h, titles, drafts[p.key] ? '草稿' : '已发布')));
+  });
+
+  // 底部导航：编辑态在 drafts.nav，否则取已发布 replica.TABBAR
+  const nav = drafts.nav ? drafts.nav.data : readReplica().TABBAR;
+  if (nav) {
+    const hits = [];
+    walkRefs(nav, 'TABBAR', target, hits);
+    hits.forEach((h) => out.push({
+      pageKey: 'nav',
+      pageName: '店铺导航（底部导航）',
+      path: h.path,
+      field: h.path.split('.').pop(),
+      label: '店铺导航 › ' + (FIELD_TEXT[h.path.split('.').pop()] || h.path),
+      state: drafts.nav ? '草稿' : '已发布',
+      value: h.value
+    }));
+  }
+
+  return out;
+}
+
+/** 把一条命中整理成可展示的引用记录 */
+function decorateRef(page, hit, titles, stateText) {
+  const field = hit.path.split('.').pop();
+  // blocks.3.link → titles['blocks'][3] 是「轮播 · 520px」这类区块标题
+  const m = /^([A-Za-z_][A-Za-z_0-9]*)\.(\d+)\./.exec(hit.path);
+  let where = '';
+  if (m && Array.isArray(titles[m[1]]) && titles[m[1]][Number(m[2])]) {
+    where = String(titles[m[1]][Number(m[2])]);
+  }
+  return {
+    pageKey: page.key,
+    pageName: page.name + (stateText === '草稿' ? '（草稿）' : ''),
+    path: hit.path,
+    field: field,
+    label: page.name + ' › ' + (where ? where + ' › ' : '') + (FIELD_TEXT[field] || field),
+    state: stateText,
+    value: hit.value
+  };
 }
 
 /* ----------------------------- 结构校验 ----------------------------- */
@@ -224,11 +364,30 @@ function validate(key, data) {
 function listPages() {
   const state = loadState();
   const published = publishedAll();
+  const R = readReplica();
+  const inReplica = R.CUSTOM_PAGES || {};
+  // 别名反查：哪些旧标识仍然指向这个页面（改过标识的页面，旧分享链接靠它继续可用）
+  const aliasFromOf = {};
+  const al = customPages.aliases();
+  Object.keys(al).forEach((old) => {
+    const to = al[old];
+    if (!aliasFromOf[to]) aliasFromOf[to] = [];
+    aliasFromOf[to].push(old);
+  });
+
   return schema.list().map((meta) => {
     const draft = state.drafts[meta.key];
     const pub = published[meta.key];
+    /*
+     * 「已发布」对自定义页是个容易被误读的说法：
+     * 注册表里的页面刚建好就有 published 字段（那是初始内容），但它**还没写进 replica.js**，
+     * 小程序端其实打不开。所以用 generated 明确区分「已写进代码包」与「只在后台」。
+     */
+    const generated = meta.custom ? !!inReplica[meta.key] : true;
     return Object.assign({}, meta, {
-      status: '已发布',
+      status: meta.custom ? (generated ? '代码已生成' : '未生成代码') : '已发布',
+      generated: generated,
+      aliasFrom: aliasFromOf[meta.key] || [],
       hasDraft: !!(draft && draft.data),
       draftAt: draft ? draft.at : null,
       draftAtText: draft ? stampOf(draft.at) : '',
@@ -347,9 +506,9 @@ function collectTitles(key, node, path, data, out) {
 
 function saveDraft(key, data) {
   const page = schema.get(key);
-  if (!page) throw new Error('未知页面：' + key);
+  if (!page) throw new BizError('未知页面：' + key, ERR.NOT_FOUND, 404);
   const err = validate(key, data);
-  if (err) throw new Error('数据校验未通过：' + err);
+  if (err) throw new BizError('数据校验未通过：' + err, ERR.PARAM);
 
   const state = loadState();
   state.drafts[key] = { data: schema.clone(data), at: now() };
@@ -372,17 +531,18 @@ function discardDraft(key) {
  * 任一步失败都自动回滚到原文件，绝不把工程留在「replica.js 是坏的」状态。
  * @param {object} pageData 全量页面数据（含本次要写入的页面）
  * @param {string} validateKey 回读时用哪个页面的规则校验（空串则不校验）
+ * @param {{dropAliasOf?:string}} [opt] 见 assemble()：删除页面时要把指向它的别名一并滤掉
  * @returns {{ code, bytes, backup, ts }}
  */
-function writeReplica(pageData, validateKey) {
+function writeReplica(pageData, validateKey, opt) {
   /* 1) 组装 + 生成源码 + 语法校验 */
-  const assembled = assemble(pageData);
+  const assembled = assemble(pageData, opt);
   const original = emit.readOriginal(REPLICA_FILE);
   const code = emit.emitReplica(assembled, { originalSrc: original, publishedAt: now() });
   try {
     new vm.Script(code, { filename: 'replica.js' });
   } catch (e) {
-    throw new Error('生成的 replica.js 语法不合法，已中止发布：' + e.message);
+    throw new BizError('生成的 replica.js 语法不合法，已中止发布：' + e.message, ERR.SERVER, 500);
   }
 
   /* 2) 备份当前文件（保留最近 20 份） */
@@ -402,14 +562,32 @@ function writeReplica(pageData, validateKey) {
   } catch (e) {
     // 回滚到备份，避免把工程搞坏
     if (original) atomic.writeFileAtomic(REPLICA_FILE, original);
-    throw new Error('写回后无法加载 replica.js，已自动回滚：' + e.message);
+    throw new BizError('写回后无法加载 replica.js，已自动回滚：' + e.message, ERR.SERVER, 500);
   }
   const page = validateKey ? schema.get(validateKey) : null;
   const check = page ? validate(validateKey, page.from(reread)) : '';
   if (check) {
     if (original) atomic.writeFileAtomic(REPLICA_FILE, original);
     readReplica();
-    throw new Error('回读校验失败，已自动回滚：' + check);
+    throw new BizError('回读校验失败，已自动回滚：' + check, ERR.SERVER, 500);
+  }
+
+  /*
+   * 别名表单独回读确认。
+   * 它不属于任何页面，上面的 validate 覆盖不到；而一旦写丢，现象是
+   * 「用户点旧分享链接打不开」——运营自己在后台完全看不出来。
+   * 所以宁可在生成阶段就失败并回滚。
+   *
+   * 期望值取自 assembled（而不是 registry）：删除页面时 registry 还没清，
+   * 拿它比对会把「本该滤掉的那条别名」算成必须存在。
+   */
+  const wantAlias = Object.keys(assembled.CUSTOM_PAGE_ALIASES || {}).length;
+  const gotAlias = Object.keys((reread && reread.CUSTOM_PAGE_ALIASES) || {}).length;
+  if (wantAlias !== gotAlias) {
+    if (original) atomic.writeFileAtomic(REPLICA_FILE, original);
+    readReplica();
+    throw new BizError(
+      `回读校验失败，已自动回滚：旧标识别名应写入 ${wantAlias} 条，实际 ${gotAlias} 条`, ERR.SERVER, 500);
   }
 
   return { code, bytes: Buffer.byteLength(code, 'utf8'), backup: backupName, ts };
@@ -437,14 +615,14 @@ function recordVersion(state, key, ts, note, pageData) {
  */
 function publish(key, note) {
   const page = schema.get(key);
-  if (!page) throw new Error('未知页面：' + key);
+  if (!page) throw new BizError('未知页面：' + key, ERR.NOT_FOUND, 404);
 
   const state = loadState();
   const draft = state.drafts[key];
-  if (!draft || !draft.data) throw new Error('当前页面没有草稿，无需发布');
+  if (!draft || !draft.data) throw new BizError('当前页面没有草稿，无需发布', ERR.BIZ);
 
   const err = validate(key, draft.data);
-  if (err) throw new Error('数据校验未通过：' + err);
+  if (err) throw new BizError('数据校验未通过：' + err, ERR.PARAM);
 
   /* 组装全量数据：该页面用草稿，其余页面用各自的已发布数据 */
   const pageData = publishedAll();
@@ -491,9 +669,9 @@ function trimBackups() {
 function rollback(pageKey, versionId, mode) {
   const state = loadState();
   const v = state.versions.filter((x) => x.pageKey === pageKey && x.id === versionId)[0];
-  if (!v) throw new Error('版本不存在：' + versionId);
+  if (!v) throw new BizError('版本不存在：' + versionId, ERR.NOT_FOUND, 404);
   const data = schema.clone(v.snapshot[pageKey]);
-  if (!data) throw new Error('该版本快照里没有 ' + pageKey + ' 的数据');
+  if (!data) throw new BizError('该版本快照里没有 ' + pageKey + ' 的数据', ERR.BIZ);
 
   state.drafts[pageKey] = { data, at: now(), rollbackFrom: versionId };
   saveState(state);
@@ -548,18 +726,24 @@ function createCustomPage(input) {
 /**
  * 改名称 / 备注 / 标识。
  *
- * 标识变了要连带搬家：草稿、版本快照、replica.js 里的 CUSTOM_PAGES 键名。
+ * 标识变了要连带搬家：草稿、版本快照、replica.js 里的 CUSTOM_PAGES 键名，
+ * **并把旧标识登记为别名**（写进 replica.CUSTOM_PAGE_ALIASES），
+ * 否则已经分享出去的旧链接会直接失效。
  * 少搬一处就会出现「页面还在但内容空了」或「旧 key 的幽灵页还留在小程序里」。
  */
 function updateCustomPage(key, patch) {
   // 先判内置页：否则「内置页」会先撞上注册表查不到，报出误导性的「页面不存在」
   const page = schema.get(key);
-  if (!page) throw new Error('页面不存在：' + key);
-  if (!page.custom) throw new Error('内置页面不支持改名，请直接改代码');
+  if (!page) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
+  if (!page.custom) throw new BizError('内置页面不支持改名，请直接改代码', ERR.BIZ);
 
   const res = customPages.update(key, patch || {});
   const newKey = res.page.key;
   const renamed = newKey !== key;
+
+  // 改名前后都扫一遍站内引用：改名前给运营看清单，改名后如实回报还有多少处仍指向旧标识
+  // （这些引用并不会失效 —— 别名会让它们跳到新标识，但运营仍应知道它们存在、便于改成新地址）
+  const refsBefore = renamed ? referencesOf(key) : [];
 
   if (renamed) {
     const state = loadState();
@@ -577,13 +761,18 @@ function updateCustomPage(key, patch) {
     });
     saveState(state);
 
-    // 重新生成 replica，让 CUSTOM_PAGES 的键名同步（新键的数据从注册表读，不会丢）
+    // 重新生成 replica，让 CUSTOM_PAGES / CUSTOM_PAGE_ALIASES 的键名同步
+    // （新键的数据从注册表读，不会丢；别名表已在上一步登记）
     writeReplica(publishedAll(), newKey);
   }
 
   return {
     page: customPages.get(newKey),
     renamedFrom: renamed ? key : '',
+    // 旧标识已登记为别名，旧链接继续可用；这里把引用清单如实带回给后台
+    aliasFrom: renamed ? key : '',
+    refs: refsBefore,
+    refCount: refsBefore.length,
     hasDraft: !!loadState().drafts[newKey]
   };
 }
@@ -596,15 +785,35 @@ function updateCustomPage(key, patch) {
  * （注册表已删、草稿与快照也没了）。同时 replica 是必须重建的，
  * 否则被删页面的数据会留在 CUSTOM_PAGES 里，小程序端按旧 key 还能打开一个「幽灵页」。
  */
-function removeCustomPage(key) {
+function removeCustomPage(key, opt) {
   // 先判内置页：否则「内置页」会先撞上注册表查不到，报出误导性的「页面不存在」
   const page = schema.get(key);
-  if (!page) throw new Error('页面不存在：' + key);
-  if (!page.custom) throw new Error('内置页面不可删除');
+  if (!page) throw new BizError('页面不存在：' + key, ERR.NOT_FOUND, 404);
+  if (!page.custom) throw new BizError('内置页面不可删除', ERR.BIZ);
+
+  /*
+   * 删除前必须展示引用清单（报告 11 的验收要求）。
+   * 页面被别的页面/底部导航用链接指着时，直接删掉会让那些入口变成空白页，
+   * 所以这里先算出来、报给调用方，只有显式 force 才继续。
+   */
+  const refs = referencesOf(key);
+  if (refs.length && !(opt && opt.force)) {
+    const e = new BizError(
+      `该页面被 ${refs.length} 处引用，删除后这些入口会打不开：\n` +
+      refs.map((r) => '· ' + r.label).join('\n') +
+      '\n确认要删除请带上 force=1',
+      ERR.BIZ
+    );
+    e.refs = refs;
+    e.hasRefs = true;
+    throw e;
+  }
 
   const pageData = publishedAll();
   delete pageData[key];
-  const res = writeReplica(pageData, '');
+  // 生成文件时就把指向这一页的别名滤掉：注册表要等写成功之后才删（写失败时页面数据不能丢），
+  // 不在这里滤的话，replica.js 会永久留下一条指向已删页面的别名。
+  const res = writeReplica(pageData, '', { dropAliasOf: key });
 
   const gone = customPages.remove(key);
 
@@ -619,7 +828,8 @@ function removeCustomPage(key) {
     name: gone.name,
     backup: res.backup,
     bytes: res.bytes,
-    removedVersions: before - state.versions.length
+    removedVersions: before - state.versions.length,
+    refs: refs
   };
 }
 
@@ -652,6 +862,8 @@ module.exports = {
   publishedAll,
   assemble,
   validate,
+  referencesOf,
+  customKeyOfUrl,
   templates,
   customStats,
   createCustomPage,

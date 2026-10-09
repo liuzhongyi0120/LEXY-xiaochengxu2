@@ -151,7 +151,17 @@ module.exports = {
     body: { names: ['{{mediaName}}'], folder: '首页' }
   },
 
-  /* ------------------- 后台控制台（/console 专用，全部免登录） ------------------- */
+  /* ---------------- 后台控制台 / 装修台（/console、/admin 专用） ----------------
+   * ⚠️ 除 /api/admin/login 外，本组点位**都要求管理员令牌**（见 lib/adminAuth.js）。
+   *    调试台里请先调用 login 拿到 token，再把它填到「请求头 → Authorization: Bearer <token>」。 */
+  'POST /api/admin/login': {
+    note: '管理员登录：口令换会话令牌。生产环境需先设置 ADMIN_PASSWORD；连续 5 次错误会退避 60 秒。返回 { token, role, roleLabel, ttl }',
+    body: { password: 'admin' }
+  },
+  'GET /api/admin/session': {
+    note: '当前管理员会话（我是谁）：返回 { role, roleLabel, name, source }；未带管理员令牌返回 401',
+    query: {}
+  },
   'GET /api/admin/dashboard': {
     note: '数据概览。days 控制趋势天数（默认 7）。返回今日/昨日/近7日/近30日/累计 GMV 与订单数、待办（待发货 / 待付款 / 库存预警）、各状态计数、Top 商品、库存预警榜、最近订单',
     query: { days: 7 }
@@ -326,12 +336,16 @@ module.exports = {
     note: '新建自定义页面。只建后台条目，不写 replica.js；装修完点「发布」才下发到小程序，小程序端路径 pages/custom/index?key=标识',
     body: { name: '2026 春季新品', key: 'spring2026', note: '投放落地页', template: 'blank' }
   },
+  'GET /api/decorate/page/refs': {
+    note: '站内引用清单：哪些页面 / 底部导航的哪个字段跳到了这个自定义页。改名或删除前先看它，别让入口变成空白页',
+    query: { key: '{{pageKey}}' }
+  },
   'POST /api/decorate/page/rename': {
-    note: '改自定义页面的名称 / 备注 / 页面标识。改标识会连带迁移草稿、版本快照与 replica 里的键名（旧访问地址随即失效）',
+    note: '改自定义页面的名称 / 备注 / 页面标识。改标识会迁移草稿、版本快照与 replica 键名，并把旧标识登记为别名（旧分享链接继续可用）；返回值里带回仍指向旧标识的引用清单',
     body: { key: '{{pageKey}}', name: '2026 春季新品（改版）', newKey: 'spring2026-v2', note: '' }
   },
   'POST /api/decorate/page/delete': {
-    note: '删除自定义页面：连带清理草稿与版本记录，并重新生成 replica.js 去掉该页（内置页不可删）',
+    note: '删除自定义页面：连带清理草稿与版本记录并重新生成 replica.js。页面被站内引用时会拒绝，须带 force=1 才删',
     body: { key: '{{pageKey}}' }
   },
 

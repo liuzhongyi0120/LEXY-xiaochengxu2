@@ -111,14 +111,18 @@ node server/index.js
 完整清单见 `server/README.md`。
 
 1. 设置 `JWT_SECRET`（生产未设置会拒绝启动）
-2. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，补微信支付 v3 证书签名
-3. 关闭模拟支付（`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`）
-4. **给运营管理接口加访问控制**：装修 13 个 + 素材 3 个 + 后台 28 个免登录点位。兜底手段是 `DEBUG_PAGE=off`（页面与三类接口会一起返回 403），但它是全开/全关，正式环境仍应在网关层限制来源或加登录态
+2. **配置管理员凭证 `ADMIN_PASSWORD`（或 `ADMIN_TOKENS`）**：`/api/admin/*` `/api/decorate/*` `/api/media/*`
+   共 49 个运营管理点位**已全部要求管理员令牌**，并按 `viewer` / `operator` / `owner` 三级角色细分
+   （删除与「生成代码」等不可逆动作收紧到 `owner`）。生产未配置任何管理员凭证时服务拒绝启动。
+   `DEBUG_PAGE=off` 是另一道防线（页面与接口一起 403），**不能替代登录态**；网关层限来源仍建议保留
+3. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，补微信支付 v3 证书签名
+4. 关闭模拟支付（`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`）
 5. `server/data/` 纳入备份与容量监控（素材建议后续迁对象存储 / CDN）
 6. 域名备案 + HTTPS，小程序后台配置 `request` 与 `downloadFile` 合法域名
 7. 存储切 MySQL / Redis
 8. 支付回调地址配为 `https://<域名>/api/pay/notify`
 9. 商品数据接入真实商品库（替换 `server/lib/seed.js` 迁移源即可）
+10. 装修台「生成代码」后**仍需上传并发布小程序新版本**才在真机生效
 10. 登录接口加频次限制
 
 ---

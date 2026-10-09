@@ -12,8 +12,10 @@
  *   miniprogram/pages/xxx/xxx.wxml ← 编译成 HTML（mp-wxml.js）
  *   miniprogram 下所有 wxss      ← 编译成 CSS（mp-wxss.js）
  *
- * 数据来源就是 replica.js —— 而装修台「立即发布」正是写回 replica.js，
- * 所以这里看到的内容天然等于线上内容，不需要另走接口。
+ * 数据来源就是 replica.js —— 而装修台「生成代码」正是写回 replica.js，
+ * 所以这里看到的内容 = 那份**源码**渲染出来的样子，不需要另走接口。
+ * ⚠️ 但它不代表「线上已更新」：replica.js 在小程序代码包里，
+ *    要等上传并发布小程序新版本，用户端才会拿到这份内容。
  * ========================================================================= */
 (function () {
   'use strict';
@@ -36,6 +38,25 @@
   var LAST_SIG = '';
 
   if (window.MpWxss) window.MpWxss.setViewport({ width: SCREEN.w, height: SCREEN.h });
+
+  /*
+   * 管理员身份（报告 08）：
+   *   本页要读 /api/decorate/pages（拿页面清单与已发布数据）才能编译真机源码，
+   *   而这些点位现在都要求管理员令牌。预览页与装修台**同源**，
+   *   直接复用装修台写进 localStorage 的令牌即可 —— 不需要给预览页开一个匿名后门。
+   *   没登录时不再「静静加载出一片空白」，而是明确告诉你先去装修台登录。
+   */
+  var TOKEN_KEY = 'lexy_admin_token';
+  function token() {
+    try { return localStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; }
+  }
+  function needsLogin() {
+    var note = $('pvNote');
+    if (!note) return;
+    note.innerHTML = '预览页需要管理员身份：请先打开 <a href="/admin/" target="_blank">装修台</a> 登录' +
+      '（本页与装修台同源，登录后回到这里点「重新编译」即可）。';
+    note.hidden = false;
+  }
 
   function toast(msg) {
     var t = $('pvToast');
@@ -65,8 +86,13 @@
         return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]);
       }).join('&');
     }
-    return fetch(path + qs, { headers: { Accept: 'application/json' } })
-      .then(function (r) { return r.json().catch(function () { return { code: r.status, msg: 'HTTP ' + r.status }; }); })
+    var headers = { Accept: 'application/json' };
+    if (token()) headers.Authorization = 'Bearer ' + token();
+    return fetch(path + qs, { headers: headers })
+      .then(function (r) {
+        if (r.status === 401 || r.status === 403) needsLogin();
+        return r.json().catch(function () { return { code: r.status, msg: 'HTTP ' + r.status }; });
+      })
       .then(function (j) {
         if (!j || j.code !== 0) throw new Error((j && j.msg) || '请求失败');
         return j.data;

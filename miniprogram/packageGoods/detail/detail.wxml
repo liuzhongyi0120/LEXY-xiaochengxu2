@@ -115,6 +115,25 @@
   <view class="skeleton sk-text short"></view>
 </view>
 
+<!-- ---------- 失败态 ----------
+     之前这里什么都没有：goods 为空 + loading 已置 false 时整页渲染空白，
+     用户看到的是「白屏」，分不清是网络问题还是商品没了。
+     「已下架/不存在」是确定的业务结论，给的是出口（去逛其他商品）；
+     其余（断网/500）给的是原地重试。 -->
+<empty-state
+  wx:elif="{{loadFailed && gone}}"
+  text="该商品已下架或不存在"
+  desc="可能是运营下架了这款，看看其他商品吧"
+  buttonText="去逛其他商品"
+  bind:action="onBackToList"
+/>
+<empty-state
+  wx:elif="{{loadFailed}}"
+  text="加载失败，请检查网络后重试"
+  buttonText="重新加载"
+  bind:action="onRetryLoad"
+/>
+
 <!-- ---------- SKU 弹层 ---------- -->
 <sku-selector
   visible="{{skuVisible}}"

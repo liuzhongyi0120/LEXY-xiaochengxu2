@@ -14,8 +14,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const util = require('./util');
 const atomic = require('./atomicFile');
+const dataDir = require('./dataDir');
 
-const DATA_DIR = path.join(__dirname, '..', 'data');
+const DATA_DIR = dataDir.ROOT;
 const DB_FILE = path.join(DATA_DIR, 'db.json');
 
 /** 用户产生的数据（商品等只读数据不放这里，见 seed.js） */

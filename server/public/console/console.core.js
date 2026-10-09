@@ -41,6 +41,82 @@ function fromNow(ts) {
   return Math.floor(diff / 86400000) + ' 天前';
 }
 
+/* ============================== 管理员会话 ============================== */
+
+/**
+ * 管理员令牌的本地存放处。
+ *
+ * ⚠️ 为什么必须做这一步（而不是「后台页面本身就是权限」）：
+ *   服务端已对 `/api/admin/*`、`/api/decorate/*`、`/api/media/*` 全部要求管理员令牌，
+ *   前端不带令牌的话每个请求都会 401 —— 页面能打开，但一行数据都拿不到。
+ *
+ * 令牌只存在 localStorage，且与「小程序用户令牌」是两个不同的键，
+ * 两者在服务端也互不通用（管理员令牌没有 userId，用户令牌没有 admin 标记）。
+ */
+const AdminSession = {
+  TOKEN_KEY: 'lexy_admin_token',
+  ME_KEY: 'lexy_admin_me',
+  _token: null,
+  _me: null,
+
+  token() {
+    if (this._token === null) {
+      try { this._token = localStorage.getItem(this.TOKEN_KEY) || ''; } catch (e) { this._token = ''; }
+    }
+    return this._token;
+  },
+
+  me() {
+    if (this._me === null) {
+      try { this._me = JSON.parse(localStorage.getItem(this.ME_KEY) || 'null'); } catch (e) { this._me = null; }
+    }
+    return this._me;
+  },
+
+  save(token, me) {
+    this._token = String(token || '');
+    this._me = me || null;
+    try {
+      if (this._token) localStorage.setItem(this.TOKEN_KEY, this._token);
+      else localStorage.removeItem(this.TOKEN_KEY);
+      if (this._me) localStorage.setItem(this.ME_KEY, JSON.stringify(this._me));
+      else localStorage.removeItem(this.ME_KEY);
+    } catch (e) { /* 隐私模式下 localStorage 不可写：本次会话内仍可用 */ }
+    renderWho();
+  },
+
+  clear() { this.save('', null); },
+
+  /**
+   * 补齐身份缓存。
+   *
+   * 令牌与「我是谁」是两条 localStorage 记录：只留下令牌时（换浏览器配置、
+   * 手工塞令牌、装修台登录后另一处清了缓存），me() 会是 null ——
+   * 于是接口能调通、界面却把每个按钮都当成「未登录」，点一下弹一次登录框。
+   * 这里在启动时用令牌向服务端换一次身份，两边保持一致。
+   */
+  async hydrate() {
+    if (this.me() || !this.token()) return this.me();
+    try {
+      // 注意签名：API.call(path, opts) —— path 在前，别写成 (method, path)
+      const who = await API.call('/api/admin/session');
+      this.save(this.token(), who);
+    } catch (e) {
+      // 401 = 令牌真的失效（下面流程会引导重新登录），其余情况是 bug，必须留痕，
+      // 否则「静默吞掉」会让界面一直是「未登录」，排查时无从下手。
+      if (e && e.code !== 401) console.warn('[admin] 身份补齐失败：', e && e.message);
+    }
+    return this.me();
+  },
+
+  /** 当前角色是否够用（前端只用来做按钮灰显，真正的拦截在服务端） */
+  atLeast(role) {
+    const rank = { viewer: 1, operator: 2, owner: 3 };
+    const me = this.me();
+    return !!me && rank[me.role] >= rank[role];
+  }
+};
+
 /* ============================== 请求层 ============================== */
 
 const API = {
@@ -54,6 +130,8 @@ const API = {
       if (qs) url += (url.indexOf('?') > -1 ? '&' : '?') + qs;
     }
     const opt = { method, headers: {} };
+    const tk = AdminSession.token();
+    if (tk) opt.headers['Authorization'] = 'Bearer ' + tk;
     if (body && method !== 'GET') {
       opt.headers['Content-Type'] = 'application/json';
       opt.body = JSON.stringify(body);
@@ -61,7 +139,17 @@ const API = {
     const res = await fetch(url, opt);
     let json = null;
     try { json = await res.json(); } catch (e) { throw new Error('服务端返回异常（HTTP ' + res.status + '）'); }
-    if (json.code !== 0) throw new Error(json.msg || '请求失败');
+    if (json.code !== 0) {
+      const err = new Error(json.msg || '请求失败');
+      err.code = json.code;
+      err.httpStatus = res.status;
+      // 401：没登录 / 令牌过期 —— 清掉旧令牌并拉起登录框（不弹 toast，避免刷屏）
+      if (json.code === 401) {
+        if (AdminSession.token()) AdminSession.clear();
+        openLogin({ reason: json.msg });
+      }
+      throw err;
+    }
     return json.data;
   },
   get: (path, query) => API.call(path, { query }),
@@ -151,6 +239,117 @@ function promptBox(title, defaultValue, placeholder) {
       if (e.target === m.root || e.target.hasAttribute('data-close')) done(null);
     });
   });
+}
+
+/* ============================== 管理员登录与身份 ============================== */
+
+const ROLE_TEXT = { viewer: '只读', operator: '运营', owner: '超级管理员' };
+
+/** 同步顶栏的「当前身份」显示 */
+function renderWho() {
+  const btn = $('#btnWho');
+  const tag = $('#whoTag');
+  const me = AdminSession.me();
+  if (btn) {
+    btn.textContent = me ? '退出' : '登录';
+    btn.title = me
+      ? '来源：' + (me.source === 'env' ? '长期令牌' : '口令登录会话') + '，点击退出'
+      : '点击使用管理员口令或长期令牌登录';
+  }
+  if (tag) {
+    // ⚠️ 不要用 hidden 属性切换 —— 「.tag」自带 display，会盖过 UA 的 [hidden]{display:none}
+    tag.textContent = me ? ((me.name || '管理员') + ' · ' + (me.roleLabel || ROLE_TEXT[me.role] || '')) : '未登录管理员';
+    tag.className = 'tag ' + (me ? 'on' : 'ghost');
+  }
+}
+
+/**
+ * 拉起管理员登录弹层。
+ *
+ * 触发时机：① 顶栏点「登录」；② 任意请求返回 401（未登录 / 会话过期）。
+ * 口令换会话令牌（owner），或直接粘贴 `ADMIN_TOKENS` 里的长期令牌（按配置的角色）。
+ */
+function openLogin(info) {
+  if (AdminSession.me()) return;         // 已有身份（别的标签页刚登录）就不再打扰
+  if ($('#layer .login-mask')) return;   // 已经弹着，避免并发 401 弹出一摞
+  const m = openModal({
+    title: '管理员登录',
+    width: 'narrow',
+    html:
+      '<div style="line-height:1.7;color:#5b6472;font-size:13px">' +
+        esc((info && info.reason) || '运营后台需要管理员身份') + '</div>' +
+      '<div class="field" style="margin-top:12px"><label>管理员口令</label>' +
+        '<input type="password" data-pw placeholder="登录后获得超级管理员会话" style="flex:1"></div>' +
+      '<div style="color:#8a919e;font-size:12px;margin-top:12px;line-height:1.6">' +
+        '也可以粘贴「长期令牌」（服务端 <code>ADMIN_TOKENS</code> 里的那一串），按它配置的角色获得权限：' +
+        '只读 / 运营 / 超级管理员。</div>' +
+      '<div class="field" style="margin-top:8px"><label>长期令牌</label>' +
+        '<input type="text" data-tk placeholder="粘贴令牌（与口令二选一）" style="flex:1"></div>',
+    footer: '<button class="btn" data-close>稍后</button><button class="btn primary" data-login>登录</button>'
+  });
+  m.root.classList.add('login-mask');
+
+  const pwEl = m.$('[data-pw]');
+  const tkEl = m.$('[data-tk]');
+  const btn = m.$('[data-login]');
+
+  const reset = () => { btn.disabled = false; btn.textContent = '登录'; };
+
+  const submit = async () => {
+    const pw = pwEl.value;
+    const tk = tkEl.value.trim();
+    if (!pw && !tk) { toast('请填写管理员口令，或粘贴长期令牌', true); return; }
+    btn.disabled = true;
+    btn.textContent = '验证中…';
+    try {
+      if (tk) {
+        // 长期令牌没有单独的回显接口：先用它请求一次会话，验证「令牌确实有效、角色被识别」
+        AdminSession.save(tk, null);
+        const me = await API.get('/api/admin/session');
+        AdminSession.save(tk, me);
+      } else {
+        const d = await API.post('/api/admin/login', { password: pw });
+        AdminSession.save(d.token, {
+          role: d.role, roleLabel: d.roleLabel, name: '超级管理员', source: 'session'
+        });
+      }
+      toast('已登录：' + ((AdminSession.me() || {}).name || '管理员'));
+      m.close();
+      boot(); // 带着身份重跑一次，把刚才 401 的页面补上
+    } catch (e) {
+      // 用长期令牌失败时要把刚写进去的坏令牌清掉，否则后续每个请求都 401
+      if (tk) AdminSession.clear();
+      toast(e.message, true);
+      reset();
+    }
+  };
+
+  btn.addEventListener('click', submit);
+  [pwEl, tkEl].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
+  setTimeout(() => pwEl.focus(), 30);
+  reset();
+}
+
+/** 顶栏身份按钮：未登录 → 弹登录；已登录 → 确认后退出 */
+async function onTapWho() {
+  if (!AdminSession.me()) return openLogin({});
+  if (await confirmBox('退出管理后台登录？退出后需重新输入口令或令牌。')) {
+    AdminSession.clear();
+    toast('已退出管理员登录');
+    boot();
+  }
+}
+
+/**
+ * 需要某个角色才能做的事，前端先拦一道（给出人话提示）。
+ * 真正的判定在服务端 —— 这里只是把「点了才报错」提前成「点之前就说清」。
+ */
+function needRole(role, action) {
+  if (AdminSession.atLeast(role)) return true;
+  if (!AdminSession.me()) openLogin({ reason: '该操作需要管理员身份' });
+  else toast('当前身份「' + (ROLE_TEXT[(AdminSession.me() || {}).role] || '未知') +
+    '」无权' + (action || '执行该操作') + '（需要「' + (ROLE_TEXT[role] || role) + '」及以上）', true);
+  return false;
 }
 
 /* ============================== 大图预览 ============================== */
@@ -820,21 +1019,60 @@ App.views.settings = {
   async render(body, state) {
     const d = await API.get('/api/admin/settings');
     const s = d.settings;
+    const shop = d.shop || { published: {} };
+    const pub = shop.published || {};
     const row = (label, tip, input) =>
       '<div class="form-row"><div class="lbl">' + esc(label) + '</div><div class="ctl">' + input +
       (tip ? '<div class="tip">' + tip + '</div>' : '') + '</div></div>';
+    const ro = (v) => '<span class="ro">' + (v ? esc(v) : '—') + '</span>';
+    /** 图片地址是相对路径，这里拼成本机可预览的绝对地址（不是线上地址） */
+    const imgUrl = (p) => (p ? (/^https?:/.test(p) ? p : location.origin + p) : '');
+    const draftNote = (key, label) => {
+      if (!shop.draft) return '';
+      if (String(shop.draft[key] || '') === String(pub[key] || '')) return '';
+      return '　<span class="tag warn">装修台已改为「' + esc(shop.draft[key] || '空') + '」，尚未生成代码</span>';
+    };
 
     body.innerHTML =
+      /*
+       * ⚠️ 这一张卡是「只读 + 指路」，刻意不提供编辑框。
+       *
+       * 店铺名称与头像在小程序端只有一份真源：装修台写回的 replica.SHOP（首页与「我的」页共用）。
+       * 之前这里可以编辑，但保存进的是 catalog.settings —— 没有任何小程序接口读它，
+       * 于是「后台提示保存成功、前端永远是旧值」。删掉编辑能力比留着假入口更安全。
+       */
+      '<div class="card"><div class="card-h"><h2>小程序端展示信息</h2><div class="grow"></div>' +
+        '<span class="hint">只读 · 唯一数据源：' + esc(shop.source || '装修台') + '</span></div>' +
+      '<div class="card-b">' +
+        '<div class="grid c2">' +
+          '<div>' + row('店铺名称', '', ro(pub.name) + draftNote('name', '店铺名称')) + '</div>' +
+          '<div>' + row('店铺标语', '', ro(pub.slogan) + draftNote('slogan', '店铺标语')) + '</div>' +
+        '</div>' +
+        row('店铺头像', '', (imgUrl(pub.avatar)
+          ? '<img src="' + esc(imgUrl(pub.avatar)) + '" alt="" style="width:56px;height:56px;border-radius:8px;object-fit:cover;border:1px solid #e6e8ec">'
+          : '<span class="ro">未设置</span>') + draftNote('avatar', '店铺头像')) +
+        '<div class="tip">这三项由<b>装修台「店铺信息」</b>维护（写回 <code>replica.SHOP</code>，首页与「我的」共用）。' +
+        '改完要在装修台点「生成代码」，并上传发布小程序新版本，用户端才会更新。' +
+        '</div>' +
+        '<div class="btn-group" style="margin-top:10px">' +
+          '<a class="btn primary" href="/admin" target="_blank">去装修台修改</a>' +
+        '</div>' +
+      '</div></div>' +
+
+      /*
+       * 运营参数：这是服务端自己的数据（catalog.json），不与前端展示字段重叠。
+       * 所以这里把「谁读它」写清楚 —— 不能再出现「保存后小程序端会读取新值」这种不成立的说明。
+       */
       '<div class="grid c2">' +
-        '<div class="card"><div class="card-h"><h2>基本信息</h2><div class="grow"></div><span class="hint">小程序端展示用</span></div><div class="card-b">' +
-          row('店铺名称', '', '<input type="text" class="w220" data-k="shopName" value="' + esc(s.shopName) + '">') +
-          row('店铺 Logo', '建议 200×200 PNG，用于「我的」页与分享卡片', '<input type="text" class="w220" data-k="logo" value="' + esc(s.logo) + '" placeholder="图片地址"><button class="btn" data-pick="logo">选图</button>') +
-          row('客服电话', '', '<input type="text" class="w160" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
-          row('客服时间', '', '<input type="text" class="w160" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
-          row('店铺公告', '', '<input type="text" class="w220" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
+        '<div class="card"><div class="card-h"><h2>服务参数</h2><div class="grow"></div>' +
+          '<span class="hint">存放于 server/data/catalog.json</span></div><div class="card-b">' +
+          row('客服电话', '服务端保存，供客服与后续接口使用', '<input type="text" class="w160" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
+          row('客服时间', '同上', '<input type="text" class="w160" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
+          row('店铺公告', '服务端保存；若要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" class="w220" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
         '</div></div>' +
 
-        '<div class="card"><div class="card-h"><h2>交易设置</h2></div><div class="card-b">' +
+        '<div class="card"><div class="card-h"><h2>交易设置</h2><div class="grow"></div>' +
+          '<span class="hint">服务端下单与结算参数</span></div><div class="card-b">' +
           row('包邮门槛', '全场满此金额免运费；填 0 表示不启用（单位：元）', '<input type="number" class="w90" data-k="freightFree" value="' + (s.freightFree / 100) + '"><span class="sub">元</span>') +
           row('默认运费', '未达包邮门槛时的运费（单位：元）', '<input type="number" class="w90" data-k="defaultFreight" value="' + (s.defaultFreight / 100) + '"><span class="sub">元</span>') +
           row('自动确认收货', '发货后多少天自动确认（0 = 不自动）', '<input type="number" class="w90" data-k="autoConfirmDays" value="' + s.autoConfirmDays + '"><span class="sub">天</span>') +
@@ -842,26 +1080,27 @@ App.views.settings = {
         '</div></div>' +
       '</div>' +
 
-      '<div class="card"><div class="card-h"><h2>数据资产</h2><div class="grow"></div><span class="hint">存放于 server/data/catalog.json，后台改完立刻生效</span></div>' +
+      '<div class="card"><div class="card-h"><h2>数据资产</h2><div class="grow"></div><span class="hint">存放于 server/data/catalog.json</span></div>' +
       '<div class="card-b"><div class="grid c3">' +
         '<div><div class="sub">商品</div><b>' + d.goodsCount + '</b> 个</div>' +
         '<div><div class="sub">分类</div><b>' + d.categoryCount + '</b> 个</div>' +
         '<div><div class="sub">优惠券模板</div><b>' + d.couponCount + '</b> 张</div>' +
-      '</div></div></div>' +
+      '</div>' +
+      '<div class="tip">商品 / 分类走接口，保存后<b>商品列表页与商品详情页</b>立即读到新值；' +
+      '但首页与自定义页里的「商品」区块读的是装修快照（replica.js），需要重新生成代码并发布小程序版本才会变。</div>' +
+      '</div></div>' +
 
       '<div class="btn-group"><button class="btn primary" data-save>保存设置</button>' +
       '<button class="btn" data-reset>恢复默认</button>' +
-      '<span class="sub" style="align-self:center">保存后小程序端「我的」页与下单页会读取新值</span></div>';
+      '<span class="sub" style="align-self:center">仅保存本页的运营参数；店铺名称与头像请到装修台修改</span></div>';
 
-    /** 收集表单：金额字段「元 → 分」 */
+    /** 收集表单：金额字段「元 → 分」；**不含** shopName / logo（真源在装修台，后端会拒收） */
     const collect = () => {
       const g = (k, def) => {
         const el = body.querySelector('[data-k="' + k + '"]');
         return el ? el.value : def;
       };
       return {
-        shopName: g('shopName'),
-        logo: g('logo'),
         servicePhone: g('servicePhone'),
         serviceHours: g('serviceHours'),
         notice: g('notice'),
@@ -872,20 +1111,22 @@ App.views.settings = {
       };
     };
 
-    body.querySelector('[data-pick]').addEventListener('click', async () => {
-      const r = await pickImage({ value: [body.querySelector('[data-k=logo]').value].filter(Boolean) });
-      if (r && r.length) body.querySelector('[data-k=logo]').value = r[0];
-    });
     body.querySelector('[data-save]').addEventListener('click', async () => {
+      if (!needRole('owner', '保存店铺设置')) return;
       try {
         await API.post('/api/admin/settings/save', collect());
         toast('设置已保存');
       } catch (e) { toast(e.message, true); }
     });
     body.querySelector('[data-reset]').addEventListener('click', async () => {
+      if (!needRole('owner', '恢复默认设置')) return;
       if (!(await confirmBox('恢复为默认设置？当前填写内容会丢失。'))) return;
       try {
-        await API.post('/api/admin/settings/save', d.defaults);
+        // 默认值里带着两个废弃键（shopName / logo），后端会拒收 —— 这里先摘掉再提交
+        const def = Object.assign({}, d.defaults);
+        delete def.shopName;
+        delete def.logo;
+        await API.post('/api/admin/settings/save', def);
         toast('已恢复默认');
         App.render();
       } catch (e) { toast(e.message, true); }
@@ -895,15 +1136,26 @@ App.views.settings = {
 
 /* ============================== 启动 ============================== */
 
-function boot() {
-  $('#btnReload').addEventListener('click', () => App.render());
+/** 事件只绑一次：登录成功后会再调一次 boot() 重跑数据，重复绑定会让「刷新」点一下跑两遍 */
+let booted = false;
+
+async function boot() {
+  if (!booted) {
+    booted = true;
+    $('#btnReload').addEventListener('click', () => App.render());
+    const who = $('#btnWho');
+    if (who) who.addEventListener('click', onTapWho);
+    window.addEventListener('hashchange', () => {
+      const v = (location.hash || '').replace('#', '');
+      if (App.views[v] && v !== App.view) { App.view = v; App.renderNav(); App.render(); }
+    });
+  }
+  // 先把身份缓存补齐（只有令牌没有身份时，按钮会全被当成「未登录」）
+  await AdminSession.hydrate();
+  renderWho();
   const hash = (location.hash || '').replace('#', '');
   App.view = App.views[hash] ? hash : 'dashboard';
   App.renderNav();
   App.render();
   App.refreshBadges();
-  window.addEventListener('hashchange', () => {
-    const v = (location.hash || '').replace('#', '');
-    if (App.views[v] && v !== App.view) { App.view = v; App.renderNav(); App.render(); }
-  });
 }
