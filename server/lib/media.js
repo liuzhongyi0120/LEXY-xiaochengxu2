@@ -9,7 +9,11 @@
  *     utils/constants.js 一处，历史数据里的图片地址全部自动跟着换。
  *   - 安全：按文件头魔数校验真实类型（不信 content-type）；仅放行
  *     png / jpg / webp / gif 四种位图，**拒收 SVG**（同源 HTML 里 SVG 可执行脚本 → 存储型 XSS）
- *   - 索引 server/data/uploads/index.json 记录原始文件名 / 尺寸 / 上传时间，便于素材库检索
+ *   - 索引 server/data/uploads/index.json 记录原始文件名 / 尺寸 / 上传时间 / **归属文件夹**，便于素材库检索
+ *   - **文件夹是逻辑分类，不是物理目录**：素材仍按 <yyyyMM>/ 落盘，
+ *     归类只写索引里的 folder 字段。原因是图片 URL（`/uploads/202610/xxx.png`）已经写进了
+ *     replica.js / catalog.json，**挪动物理文件就会让线上图全裂**；逻辑分类才能随便改。
+ *     这一点是本模块最重要的约束，改代码前先记住。
  */
 
 const fs = require('node:fs');
@@ -29,6 +33,33 @@ const MAX_BYTES = 5 * 1024 * 1024;
 /** 请求体上限：多图批量上传时留余量 */
 const MAX_BODY = 32 * 1024 * 1024;
 
+/* ----------------------------- 文件夹（逻辑分类） ----------------------------- */
+
+/**
+ * 文件夹用**哨兵值**而不是空字符串来表示「未分组」，原因：
+ * query 里 `folder=` 与「不传 folder」在有些解析路径下会变成同一个空值，
+ * 分不清「筛选未分组」和「不筛选」，于是会出现「点了未分组却显示全部」这种静默错误。
+ */
+const FOLDER_NONE = '__none__';
+/** 文件夹名长度上限（按字符数，中文一个字算一个） */
+const FOLDER_MAX = 30;
+/** 内置分组名，不允许用作真实文件夹名，避免与界面上的「全部 / 未分组」撞车 */
+const RESERVED_FOLDERS = ['全部', '未分组', FOLDER_NONE];
+
+/** 归一并校验文件夹名；空值返回 ''（= 未分组） */
+function normFolderName(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return '';
+  if (s.length > FOLDER_MAX) throw new BizError('文件夹名太长（最多 ' + FOLDER_MAX + ' 个字，当前 ' + s.length + '）', ERR.PARAM);
+  if (s.includes('/') || s.includes('\\') || s.includes('..')) {
+    throw new BizError('文件夹名不能包含斜杠或 ..（文件夹是逻辑分类，不产生真实目录）', ERR.PARAM);
+  }
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(s)) throw new BizError('文件夹名含非法控制字符', ERR.PARAM);
+  if (RESERVED_FOLDERS.includes(s)) throw new BizError('「' + s + '」是内置分组名，请换一个', ERR.PARAM);
+  return s;
+}
+
 /**
  * 放行的图片类型白名单
  *   sniff 用于二次校验：拿文件头魔数比对，防止把 .exe 改名成 .png 传上来
@@ -47,14 +78,35 @@ function ensureDir(dir) {
   fs.mkdirSync(dir, { recursive: true });
 }
 
+/**
+ * 读索引，返回 { items, folders }
+ *   - 兼容三种历史形态：`{items, folders}` / `{items}`（无 folder 概念时代）/ 裸数组
+ *   - **自愈**：素材里出现、但 folders 列表里没有的归属，自动补进列表。
+ *     手工改过索引、或从别处拷来素材时，不至于出现「有个文件夹里有图，但左侧列表里看不到」。
+ */
 function readIndex() {
+  let items = [];
+  let folders = [];
   try {
     const raw = fs.readFileSync(INDEX_FILE, 'utf8');
     const json = JSON.parse(raw);
-    return Array.isArray(json.items) ? json : { items: [] };
+    if (Array.isArray(json)) {
+      items = json; // 更早的格式：整个文件就是一个数组
+    } else if (Array.isArray(json.items)) {
+      items = json.items;
+      folders = Array.isArray(json.folders) ? json.folders.filter((x) => typeof x === 'string' && x.trim()) : [];
+    }
   } catch (e) {
-    return { items: [] }; // 首次运行 / 索引损坏都从空开始，磁盘上的文件仍可被 list 兜底扫到
+    // 首次运行 / 索引损坏都从空开始，磁盘上的文件仍可被 list 兜底扫到
   }
+
+  const seen = new Set(folders);
+  items = items.filter((it) => it && typeof it === 'object' && it.name);
+  items.forEach((it) => {
+    it.folder = typeof it.folder === 'string' ? it.folder : '';
+    if (it.folder && !seen.has(it.folder)) { seen.add(it.folder); folders.push(it.folder); }
+  });
+  return { items, folders };
 }
 
 function writeIndex(idx) {
@@ -244,8 +296,12 @@ function makeName(ext) {
   return { dir: `${d.getFullYear()}${p(d.getMonth() + 1)}`, base: `${day}-${rand}.${ext}` };
 }
 
-/** 保存单张图片（含魔数校验） */
-function saveOne(item) {
+/**
+ * 保存单张图片（含魔数校验）
+ * @param item   {data, orig, rel?, source?}  rel = 指定相对路径（导入工具用，保留可辨识的原文件名）
+ * @param folder 归属文件夹（'' = 未分组）
+ */
+function saveOne(item, folder) {
   const probed = probe(item.data);
   if (!probed) {
     throw new BizError(
@@ -259,15 +315,32 @@ function saveOne(item) {
   }
 
   const { dir, base } = makeName(probed.ext);
-  const absDir = nodePath.join(ROOT, dir);
-  ensureDir(absDir);
-  fs.writeFileSync(nodePath.join(absDir, base), item.data);
 
-  const rel = dir + '/' + base;
+  // 允许调用方指定相对路径（导入工具需要保留可辨识的原文件名）；
+  // 逐段过滤掉 . 与 ..，保证拼出来的绝对路径一定还在 ROOT 之内。
+  let rel = dir + '/' + base;
+  if (item.rel) {
+    const clean = String(item.rel)
+      .replace(/\\/g, '/')
+      .replace(/^\/+/, '')
+      .split('/')
+      .filter((s) => s && s !== '.' && s !== '..')
+      .join('/');
+    if (!clean) throw new BizError('指定的素材路径不合法', ERR.PARAM);
+    rel = clean;
+  }
+
+  const abs = nodePath.join(ROOT, rel);
+  ensureDir(nodePath.dirname(abs));
+  fs.writeFileSync(abs, item.data);
+
   return {
     name: rel,
     url: URL_PREFIX + '/' + rel,
     orig: String(item.orig || base).slice(0, 120),
+    // source 只在「从外部导入」时写入（原始外链地址），便于日后重新抓取或核对
+    source: item.source ? String(item.source).slice(0, 500) : undefined,
+    folder: folder || '',
     size: item.data.length,
     sizeText: humanSize(item.data.length),
     width: probed.width,
@@ -280,13 +353,15 @@ function saveOne(item) {
 /**
  * 上传入口：一次可传多张，返回成功列表与逐条失败原因
  * 单张失败不影响其它（前端可提示「3 张成功、1 张失败：原因」）
+ * @param folder 归属文件夹，会按需自动创建
  */
-function upload(items) {
+function upload(items, folder) {
+  const target = normFolderName(folder);
   const done = [];
   const failed = [];
   items.forEach((it) => {
     try {
-      done.push(saveOne(it));
+      done.push(saveOne(it, target));
     } catch (e) {
       failed.push({ name: it.orig || '未命名', reason: e.message });
     }
@@ -295,13 +370,21 @@ function upload(items) {
   if (done.length) {
     const idx = readIndex();
     idx.items = done.concat(idx.items);
+    if (target && idx.folders.indexOf(target) === -1) idx.folders.push(target);
     writeIndex(idx);
   }
   if (!done.length) {
     throw new BizError(failed.length ? failed[0].reason : '上传失败', ERR.PARAM);
   }
   done.forEach((d) => { d.sizeText = humanSize(d.size); });
-  return { list: done, success: done.length, failed: failed.length, failedList: failed, total: readIndex().items.length };
+  return {
+    list: done,
+    success: done.length,
+    failed: failed.length,
+    failedList: failed,
+    folder: target,
+    total: readIndex().items.length
+  };
 }
 
 /** 读一条索引（找不到返回 null） */
@@ -333,6 +416,9 @@ function list(opt) {
   const q = String(opt.q || '').trim().toLowerCase();
   if (q) rows = rows.filter((x) => (x.orig || '').toLowerCase().includes(q) || x.name.toLowerCase().includes(q));
   if (opt.type) rows = rows.filter((x) => (x.mime || '') === opt.type);
+  // folder 三态：不传 = 全部；FOLDER_NONE = 未分组；其它 = 该文件夹
+  if (opt.folder === FOLDER_NONE) rows = rows.filter((x) => !x.folder);
+  else if (opt.folder) rows = rows.filter((x) => x.folder === opt.folder);
 
   const sort = opt.sort || 'new';
   rows = rows.slice().sort((a, b) => {
@@ -347,6 +433,12 @@ function list(opt) {
   const start = (page - 1) * size;
   const slice = rows.slice(start, start + size);
 
+  // 各文件夹计数按「全部素材」统计（不是按当前筛选结果），否则左侧列表会越点越少
+  const counts = new Map();
+  alive.forEach((x) => { const f = x.folder || ''; counts.set(f, (counts.get(f) || 0) + 1); });
+  const folderRows = idx.folders.map((name) => ({ name: name, count: counts.get(name) || 0 }));
+  const ungrouped = counts.get('') || 0;
+
   return {
     list: slice,
     total: rows.length,
@@ -354,6 +446,8 @@ function list(opt) {
     page: page,
     size: size,
     pages: Math.max(1, Math.ceil(rows.length / size)),
+    folders: folderRows,
+    ungrouped: ungrouped,
     stat: {
       count: alive.length,
       bytes: alive.reduce((s, x) => s + (x.size || 0), 0),
@@ -432,20 +526,138 @@ function remove(name, force) {
   return { name: n, url: URL_PREFIX + '/' + n, deleted: true, fileMissing: missing, refs: r.total, total: idx.items.length };
 }
 
+/* ----------------------------- 文件夹操作 ----------------------------- */
+
+/** 文件夹清单：每个文件夹的素材数 + 未分组数量 + 总数 */
+function folders() {
+  const idx = readIndex();
+  const counts = new Map();
+  idx.items.forEach((it) => {
+    const f = it.folder || '';
+    counts.set(f, (counts.get(f) || 0) + 1);
+  });
+  return {
+    folders: idx.folders.map((name) => ({ name: name, count: counts.get(name) || 0 })),
+    ungrouped: counts.get('') || 0,
+    total: idx.items.length
+  };
+}
+
+/** 新建文件夹（空文件夹也要能建，所以文件夹是显式列表而非从素材汇总） */
+function folderCreate(name) {
+  const n = normFolderName(name);
+  if (!n) throw new BizError('缺少文件夹名', ERR.PARAM);
+  const idx = readIndex();
+  if (idx.folders.indexOf(n) > -1) throw new BizError('文件夹已存在：' + n, ERR.BIZ);
+  idx.folders.push(n);
+  writeIndex(idx);
+  const out = folders();
+  out.created = n;
+  return out;
+}
+
+/**
+ * 重命名文件夹（连带搬运素材）
+ * 改名必须同时改 idx.folders 与每条素材的 folder —— 少改一处就会出现
+ * 「文件夹还在、里面空了」或「素材指向一个列表里不存在的文件夹」。
+ */
+function folderRename(from, to) {
+  const f = normFolderName(from);
+  const t = normFolderName(to);
+  if (!f) throw new BizError('缺少原文件夹名 from', ERR.PARAM);
+  if (!t) throw new BizError('缺少新文件夹名 to', ERR.PARAM);
+  if (f === t) throw new BizError('新旧文件夹名相同，无需重命名', ERR.PARAM);
+
+  const idx = readIndex();
+  const i = idx.folders.indexOf(f);
+  if (i === -1) throw new BizError('文件夹不存在：' + from, ERR.NOT_FOUND, 404);
+  if (idx.folders.indexOf(t) > -1) throw new BizError('目标文件夹已存在：' + t, ERR.BIZ);
+
+  idx.folders[i] = t;
+  let moved = 0;
+  idx.items.forEach((it) => { if (it.folder === f) { it.folder = t; moved += 1; } });
+  writeIndex(idx);
+
+  const out = folders();
+  out.renamed = { from: f, to: t, moved: moved };
+  return out;
+}
+
+/**
+ * 删除文件夹 —— **只删分类，不删素材**：里面的素材回到「未分组」。
+ * 素材可能正被页面/商品引用，删掉会直接图裂，所以这里连 force 都不提供。
+ */
+function folderRemove(name) {
+  const f = normFolderName(name);
+  if (!f) throw new BizError('缺少文件夹名', ERR.PARAM);
+
+  const idx = readIndex();
+  const i = idx.folders.indexOf(f);
+  if (i === -1) throw new BizError('文件夹不存在：' + name, ERR.NOT_FOUND, 404);
+
+  idx.folders.splice(i, 1);
+  let moved = 0;
+  idx.items.forEach((it) => { if (it.folder === f) { it.folder = ''; moved += 1; } });
+  writeIndex(idx);
+
+  const out = folders();
+  out.removed = f;
+  out.movedToUngrouped = moved;
+  return out;
+}
+
+/**
+ * 批量移动素材到文件夹（folder 传空 = 移回未分组；目标不存在则自动创建）
+ * 用于「按页面归类」「批量整理」这类操作，比逐张改快，也不会产生中间态。
+ */
+function move(names, folder) {
+  const list = (Array.isArray(names) ? names : [names]).map((x) => String(x || '')).filter(Boolean);
+  if (!list.length) throw new BizError('缺少要移动的素材 names', ERR.PARAM);
+
+  const target = normFolderName(folder);
+  const idx = readIndex();
+  if (target && idx.folders.indexOf(target) === -1) idx.folders.push(target);
+
+  const hit = [];
+  const miss = [];
+  list.forEach((raw) => {
+    const n = raw.replace(/^\/?uploads\//, '');
+    const it = idx.items.find((x) => x.name === n);
+    if (!it) { miss.push(n); return; }
+    it.folder = target;
+    hit.push(n);
+  });
+  writeIndex(idx);
+
+  const out = folders();
+  out.moved = hit.length;
+  out.missing = miss;
+  out.folder = target;
+  return out;
+}
+
 module.exports = {
   ROOT,
   URL_PREFIX,
   MAX_BYTES,
   MAX_BODY,
+  FOLDER_NONE,
+  FOLDER_MAX,
   TYPES,
   EXT_TO_MIME,
   ensureDir,
   probe,
   humanSize,
+  normFolderName,
   collect,
   upload,
   list,
   find,
   refs,
-  remove
+  remove,
+  folders,
+  folderCreate,
+  folderRename,
+  folderRemove,
+  move
 };

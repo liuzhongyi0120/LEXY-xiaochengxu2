@@ -125,21 +125,30 @@ module.exports = {
   'POST /api/footprint/add': { note: '记录一条浏览，同一商品只保留最近一次', body: { goodsId: '{{goodsId}}' } },
   'DELETE /api/footprint/clear': { note: '清空当前用户的浏览记录', body: {} },
 
-  /* ----------------------------- 素材库（图片本地上传） ----------------------------- */
+  /* ----------------------------- 素材库（图片本地上传 + 文件夹分类） ----------------------------- */
   'POST /api/media/upload': {
-    note: '上传图片到本地素材库。后台装修页用 multipart 表单（可多选）；此处为 JSON + base64 的等价调用，示例是一张 2×2 的 PNG，直接发送即可落盘。落盘位置 server/data/uploads/，对外访问 /uploads/…。仅支持 PNG/JPG/WebP/GIF，单张上限 5MB，SVG 因安全原因拒收',
+    note: '上传图片到本地素材库。后台装修页用 multipart 表单（可多选）；此处为 JSON + base64 的等价调用，示例是一张 2×2 的 PNG，直接发送即可落盘。落盘位置 server/data/uploads/，对外访问 /uploads/…。可用 query 的 folder 指定归属文件夹（不存在会自动创建）。仅支持 PNG/JPG/WebP/GIF，单张上限 5MB，SVG 因安全原因拒收',
+    query: { folder: '' },
     body: {
       name: 'debug-2x2.png',
       data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGM4IaDHAMUAFEYDE2QuiKkAAAAASUVORK5CYII='
     }
   },
   'GET /api/media/list': {
-    note: '素材库列表：q 按原始文件名/相对路径搜索；sort 可选 new（默认）/old/big/small；page、size 分页（size 上限 200）。返回 stat 含张数、总占用与单张上限',
-    query: { q: '', sort: 'new', page: 1, size: 24 }
+    note: '素材库列表：q 按原始文件名/相对路径搜索；folder 按文件夹筛选（传 __none__ 看未分组、不传看全部）；sort 可选 new（默认）/old/big/small；page、size 分页（size 上限 200）。返回 folders 各文件夹计数、ungrouped 未分组张数与 stat 容量统计',
+    query: { q: '', folder: '', sort: 'new', page: 1, size: 24 }
   },
   'POST /api/media/delete': {
     note: '删除素材。默认先做引用检查：被 replica.js 或草稿引用时返回引用处数并拒绝；确认要删再传 force=1',
     body: { name: '{{mediaName}}', force: 0 }
+  },
+  'POST /api/media/folder': {
+    note: '素材文件夹管理（纯逻辑分类，不产生真实目录）。op=create 建（name）；op=rename 改名（from→to，里面的素材一起跟着改）；op=remove 删（name，只删分类、素材回到未分组，**不会删素材**）',
+    body: { op: 'create', name: '示例文件夹' }
+  },
+  'POST /api/media/move': {
+    note: '批量把素材移动到文件夹。names 传素材名数组（或逗号分隔字符串）；folder 省略或留空 = 移回未分组；目标文件夹不存在会自动创建',
+    body: { names: ['{{mediaName}}'], folder: '首页' }
   },
 
   /* ------------------- 后台控制台（/console 专用，全部免登录） ------------------- */

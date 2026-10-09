@@ -647,6 +647,74 @@ assert('商品图文详情：配了 detailImages 就按商品自身数据渲染�
     : (detail.data.detailBlocks || []).length > 0,
   `detailImages ${goodsDetailImgs.length} 张 → detailBlocks ${(detail.data.detailBlocks || []).length} 块`);
 
+/* —— 素材库文件夹（纯逻辑分类：只写索引，不动磁盘文件，因此绝不会让线上图裂） —— */
+const FOLDER_A = '自检文件夹A';
+const FOLDER_B = '自检文件夹B';
+const FOLDER_C = '自检文件夹C';
+
+const fdFolder = new FormData();
+fdFolder.append('file', new Blob([PNG_2X2], { type: 'image/png' }), 'selfcheck-folder.png');
+const mfUp = await call('POST', '/api/media/upload', { form: fdFolder, auth: false, query: { folder: FOLDER_A } });
+const mfItem = mfUp.ok && mfUp.data.list[0] ? mfUp.data.list[0] : null;
+assert('上传时可直接指定归属文件夹（?folder=，文件夹不存在会自动创建）',
+  !!mfItem && mfItem.folder === FOLDER_A,
+  mfItem ? `folder=${JSON.stringify(mfItem.folder)}` : mfUp.json && mfUp.json.msg);
+
+const mfListA = await call('GET', '/api/media/list', { auth: false, query: { folder: FOLDER_A }, silent: true });
+assert('按文件夹筛选只返回该文件夹的素材',
+  mfListA.ok && (mfListA.data.list || []).length > 0 && mfListA.data.list.every((x) => x.folder === FOLDER_A) &&
+    mfListA.data.list.some((x) => x.name === (mfItem && mfItem.name)),
+  `total=${mfListA.data && mfListA.data.total}`);
+
+const mfListNone = await call('GET', '/api/media/list', { auth: false, query: { folder: '__none__' }, silent: true });
+assert('未分组筛选（folder=__none__）不含已归类的素材',
+  mfListNone.ok && !(mfListNone.data.list || []).some((x) => x.name === (mfItem && mfItem.name)),
+  `未分组 ${mfListNone.data && mfListNone.data.total} 张`);
+
+assert('素材库列表返回各文件夹计数与未分组张数',
+  mfListNone.ok && Array.isArray(mfListNone.data.folders) &&
+    (mfListNone.data.folders.find((f) => f.name === FOLDER_A) || {}).count === 1 &&
+    typeof mfListNone.data.ungrouped === 'number',
+  JSON.stringify(mfListNone.data && mfListNone.data.folders));
+
+const mfMv = await call('POST', '/api/media/move', { auth: false, body: { names: [mfItem && mfItem.name], folder: FOLDER_B } });
+assert('批量移动素材到另一个文件夹（目标不存在时自动创建）',
+  mfMv.ok && mfMv.data.moved === 1 && (mfMv.data.folders.find((f) => f.name === FOLDER_B) || {}).count === 1,
+  mfMv.json && JSON.stringify(mfMv.data.folders));
+
+const mfRnBad = await call('POST', '/api/media/folder', {
+  auth: false, body: { op: 'rename', from: FOLDER_B, to: FOLDER_A }, expectFail: '改名撞名被拒'
+});
+assert('文件夹改名撞到已存在的名字时被拒绝（否则两个文件夹会被静默合并）',
+  !!mfRnBad.json && mfRnBad.json.code !== 0, mfRnBad.json && mfRnBad.json.msg);
+
+const mfRn = await call('POST', '/api/media/folder', { auth: false, body: { op: 'rename', from: FOLDER_B, to: FOLDER_C } });
+assert('文件夹改名后里面的素材一起跟着改（不会出现「文件夹还在但里面空了」）',
+  mfRn.ok && mfRn.data.renamed && mfRn.data.renamed.moved === 1 &&
+    (mfRn.data.folders.find((f) => f.name === FOLDER_C) || {}).count === 1 &&
+    !mfRn.data.folders.some((f) => f.name === FOLDER_B),
+  mfRn.json && JSON.stringify(mfRn.data.renamed));
+
+const mfRm = await call('POST', '/api/media/folder', { auth: false, body: { op: 'remove', name: FOLDER_C } });
+assert('删除文件夹只删分类：素材回到未分组而不是被删掉',
+  mfRm.ok && mfRm.data.removed === FOLDER_C && mfRm.data.movedToUngrouped === 1 &&
+    !mfRm.data.folders.some((f) => f.name === FOLDER_C),
+  mfRm.json && JSON.stringify({ moved: mfRm.data && mfRm.data.movedToUngrouped, ungrouped: mfRm.data && mfRm.data.ungrouped }));
+
+const mfBad = await call('POST', '/api/media/folder', {
+  auth: false, body: { op: 'create', name: 'a/b' }, expectFail: '非法文件夹名被拒'
+});
+assert('文件夹名含斜杠 / .. 被拒（文件夹是逻辑分类，不产生真实目录）',
+  mfBad.json && mfBad.json.code === 1001, mfBad.json && mfBad.json.msg);
+
+// 收尾：删掉自检文件夹与那张图，保证后续「无残留」断言成立
+await call('POST', '/api/media/folder', { auth: false, body: { op: 'remove', name: FOLDER_A }, silent: true });
+await call('POST', '/api/media/delete', { auth: false, body: { name: mfItem && mfItem.name, force: 1 }, silent: true });
+const mfEnd = await call('GET', '/api/media/list', { auth: false, silent: true });
+assert('自检结束后没有残留的自检文件夹',
+  mfEnd.ok && !(mfEnd.data.folders || []).some((f) => f.name.indexOf('自检') === 0),
+  JSON.stringify(mfEnd.data && mfEnd.data.folders));
+
 const mediaCount1 = await call('GET', '/api/media/list', { auth: false, silent: true });
 assert('自检结束后素材库数量与初始一致（无残留）',
   mediaCount0.ok && mediaCount1.ok && mediaCount1.data.all === mediaCount0.data.all,

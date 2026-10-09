@@ -854,34 +854,214 @@ App.views.comments = {
 
 /* ============================== 视图：素材库 ============================== */
 
+/**
+ * 素材库：左侧文件夹（**逻辑分类**）+ 右侧网格（可多选、批量移动）
+ *
+ * 三个刻意的设计，都是踩过坑之后的结论：
+ *   ① `state.sel` 存**素材名**而不是 DOM 下标 —— 翻页 / 切文件夹后选择不会错位到别的图；
+ *   ② 点选卡片**只切 class**，绝不重绘整个网格 —— 重绘会重建 <img>，
+ *      所有缩略图重新发请求（画面闪白）、搜索框失焦；
+ *   ③ 文件夹只存在于索引里（不产生真实目录）—— 图片 URL 已写进 replica.js / catalog.json，
+ *      挪动磁盘文件会让线上图直接裂掉。所以「删文件夹」也不删素材，只把素材退回未分组。
+ */
 App.views.media = {
   async render(body, state) {
-    const d = await API.get('/api/media/list', { q: state.q, sort: state.sort, page: state.page || 1, size: 40 });
+    const d = await API.get('/api/media/list', {
+      q: state.q,
+      sort: state.sort,
+      folder: state.folder,
+      page: state.page || 1,
+      size: 40
+    });
+    if (!Array.isArray(state.sel)) state.sel = [];
+
+    const FOLDER_NONE = '__none__';
+    const cur = state.folder || '';
+    const isRealFolder = !!cur && cur !== FOLDER_NONE;
+
+    const sideIt = (value, text, count, on, editable) =>
+      '<div class="media-side-it' + (on ? ' on' : '') + '" data-folder="' + esc(value) + '">' +
+        '<span class="nf">' + esc(text) + '</span><b>' + count + '</b>' +
+        (editable
+          ? '<span class="nf-op" data-rnf="' + esc(value) + '" title="重命名文件夹">✎</span>' +
+            '<span class="nf-op" data-df="' + esc(value) + '" title="删除文件夹（里面的素材回到未分组，不会删图）">✕</span>'
+          : '') +
+      '</div>';
+
+    const side =
+      '<div class="media-side">' +
+        '<div class="media-side-h">文件夹</div>' +
+        sideIt('', '全部素材', d.all, cur === '') +
+        sideIt(FOLDER_NONE, '未分组', d.ungrouped, cur === FOLDER_NONE) +
+        (d.folders.length ? '<div class="media-side-sep"></div>' : '') +
+        d.folders.map((f) => sideIt(f.name, f.name, f.count, cur === f.name, true)).join('') +
+        '<button class="btn sm block" data-newfolder style="margin-top:10px">+ 新建文件夹</button>' +
+      '</div>';
+
+    const whereText = cur === '' ? '未分组' : (cur === FOLDER_NONE ? '未分组' : '文件夹「' + cur + '」');
+
+    const grid = d.list.length
+      ? d.list.map((it) =>
+        '<div class="media-it' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') + '" data-pick="' + esc(it.name) + '">' +
+          '<img src="' + esc(it.url) + '" alt="" loading="eager">' +
+          '<div class="ops"><button data-copy="' + esc(it.url) + '" title="复制地址">⧉</button>' +
+          '<button data-del="' + esc(it.name) + '" title="删除素材">✕</button></div>' +
+          '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 14) + '</span><span>' +
+            it.width + '×' + it.height + ' · ' + (it.size / 1024).toFixed(0) + 'K</span></div>' +
+        '</div>').join('')
+      : '<div class="empty-state">' + (cur === '' ? '素材库还没有图片' : '这个文件夹里还没有图片') + '</div>';
+
+    const moveOpts = '<option value="">移动到…</option>' +
+      '<option value="' + FOLDER_NONE + '">未分组</option>' +
+      d.folders.map((f) => '<option value="' + esc(f.name) + '">' + esc(f.name) + '</option>').join('') +
+      '<option value="__new__">+ 新建文件夹并移入…</option>';
+
     body.innerHTML =
       '<div class="card"><div class="card-h"><h2>素材库</h2><div class="grow"></div>' +
-        '<span class="hint">共 ' + d.stat.count + ' 张 · 占用 ' + (d.stat.bytes / 1024 / 1024).toFixed(1) + 'MB · 单张上限 ' + (d.stat.maxBytes / 1024 / 1024) + 'MB</span></div>' +
-      '<div class="card-b">' +
-        '<div class="upzone" data-zone style="margin-bottom:14px"><b>点击选择图片</b>，或把图片拖到这里，也可直接 Ctrl+V 粘贴<br>' +
-          '<span class="sub">支持 PNG / JPG / WebP / GIF · 服务端按文件头校验真实类型</span>' +
-          '<input type="file" accept="image/*" multiple hidden data-file></div>' +
-        '<div class="filter" style="padding:0 0 12px;border:0">' +
-          '<input type="text" class="w160" placeholder="搜索文件名…" data-q value="' + esc(state.q || '') + '">' +
-          '<select class="w120" data-sort>' + [['new', '最新上传'], ['old', '最早上传'], ['big', '文件最大'], ['small', '文件最小']]
-            .map(([v, t]) => '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + t + '</option>').join('') + '</select>' +
+        '<span class="hint">共 ' + d.stat.count + ' 张 · 占用 ' + (d.stat.bytes / 1024 / 1024).toFixed(1) +
+        'MB · 单张上限 ' + (d.stat.maxBytes / 1024 / 1024) + 'MB</span></div>' +
+      '<div class="card-b media-wrap">' + side +
+        '<div class="media-main">' +
+          '<div class="upzone" data-zone style="margin-bottom:12px"><b>点击选择图片</b>，或把图片拖到这里，也可直接 Ctrl+V 粘贴<br>' +
+            '<span class="sub">上传后归入：' + esc(whereText) +
+              (isRealFolder ? '' : '（想直接归到某个文件夹，先点左侧文件夹名再上传）') +
+            ' · 支持 PNG / JPG / WebP / GIF · 服务端按文件头校验真实类型</span>' +
+            '<input type="file" accept="image/*" multiple hidden data-file></div>' +
+          '<div class="filter media-bar">' +
+            '<input type="text" class="w160" placeholder="搜索文件名…" data-q value="' + esc(state.q || '') + '">' +
+            '<select class="w120" data-sort>' +
+              [['new', '最新上传'], ['old', '最早上传'], ['big', '文件最大'], ['small', '文件最小']]
+                .map(([v, t]) => '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + t + '</option>').join('') +
+            '</select>' +
+            '<div class="grow"></div>' +
+            '<span class="selbar" data-actbar' + (state.sel.length ? '' : ' hidden') + '>' +
+              '已选 <b data-selcnt>' + state.sel.length + '</b> 张' +
+              '<select class="w160" data-moveto>' + moveOpts + '</select>' +
+              '<button class="btn sm" data-selall>全选本页</button>' +
+              '<button class="btn sm" data-selnone>清空选择</button>' +
+            '</span>' +
+          '</div>' +
+          '<div class="media-grid" data-grid>' + grid + '</div>' +
         '</div>' +
-        '<div class="media-grid" data-grid>' + (d.list.length ? d.list.map((it) =>
-          '<div class="media-it"><img src="' + esc(it.url) + '" alt="" loading="eager">' +
-            '<div class="ops"><button data-copy="' + esc(it.url) + '" title="复制地址">⧉</button>' +
-            '<button data-del="' + esc(it.name) + '" title="删除">✕</button></div>' +
-            '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 14) + '</span><span>' + it.width + '×' + it.height + ' · ' + (it.size / 1024).toFixed(0) + 'K</span></div></div>').join('')
-          : '<div class="empty-state">素材库还没有图片</div>') + '</div>' +
       '</div>' + pagerHtml(d.total, d.page, d.size) + '</div>';
 
     const reload = () => App.render();
-    body.querySelector('[data-q]').addEventListener('input', debounce((e) => { state.q = e.target.value.trim(); state.page = 1; reload(); }, 350));
+    // 只更新「已选 N 张」与操作条显隐 —— 不重绘网格（见文件头注释 ②）
+    const markSel = () => {
+      const n = body.querySelector('[data-selcnt]');
+      if (n) n.textContent = state.sel.length;
+      const bar = body.querySelector('[data-actbar]');
+      if (bar) { if (state.sel.length) bar.removeAttribute('hidden'); else bar.setAttribute('hidden', ''); }
+    };
+
+    /* ---- 切文件夹 ---- */
+    body.querySelectorAll('[data-folder]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.hasAttribute('data-rnf') || e.target.hasAttribute('data-df')) return;
+        state.folder = el.getAttribute('data-folder') || undefined;
+        state.page = 1;
+        state.sel = [];
+        reload();
+      });
+    });
+
+    /* ---- 文件夹：新建 / 重命名 / 删除 ---- */
+    body.querySelector('[data-newfolder]').addEventListener('click', async () => {
+      const name = await promptBox('新建文件夹', '', '例如：首页、莱克、双十一素材');
+      if (!name) return;
+      try {
+        await API.post('/api/media/folder', { op: 'create', name: name });
+        toast('已新建文件夹：' + name);
+        reload();
+      } catch (e) { toast(e.message, true); }
+    });
+
+    body.querySelectorAll('[data-rnf]').forEach((b) => b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const from = b.getAttribute('data-rnf');
+      const to = await promptBox('重命名文件夹', from, '新的文件夹名');
+      if (!to || to === from) return;
+      try {
+        const r = await API.post('/api/media/folder', { op: 'rename', from: from, to: to });
+        const moved = (r.renamed && r.renamed.moved) || 0;
+        toast('已改名为「' + to + '」' + (moved ? '，' + moved + ' 张素材一起跟着改' : ''));
+        if (state.folder === from) state.folder = to;
+        reload();
+      } catch (err) { toast(err.message, true); }
+    }));
+
+    body.querySelectorAll('[data-df]').forEach((b) => b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const name = b.getAttribute('data-df');
+      const sure = await confirmBox(
+        '删除文件夹「' + esc(name) + '」？<br><span class="sub">只删除这个分类，里面的素材会回到「未分组」，<b>不会删除图片本身</b>。</span>',
+        '删除文件夹'
+      );
+      if (!sure) return;
+      try {
+        const r = await API.post('/api/media/folder', { op: 'remove', name: name });
+        toast('已删除文件夹，' + (r.movedToUngrouped || 0) + ' 张素材回到未分组');
+        if (state.folder === name) state.folder = undefined;
+        reload();
+      } catch (err) { toast(err.message, true); }
+    }));
+
+    /* ---- 点选素材（原地切 class，不重绘） ---- */
+    body.querySelectorAll('[data-pick]').forEach((el) => {
+      el.addEventListener('click', (e) => {
+        if (e.target.hasAttribute('data-copy') || e.target.hasAttribute('data-del')) return;
+        const n = el.getAttribute('data-pick');
+        const i = state.sel.indexOf(n);
+        if (i > -1) { state.sel.splice(i, 1); el.classList.remove('sel'); }
+        else { state.sel.push(n); el.classList.add('sel'); }
+        markSel();
+      });
+    });
+
+    body.querySelector('[data-selall]').addEventListener('click', () => {
+      d.list.forEach((it) => { if (state.sel.indexOf(it.name) === -1) state.sel.push(it.name); });
+      body.querySelectorAll('[data-pick]').forEach((el) => el.classList.add('sel'));
+      markSel();
+    });
+
+    body.querySelector('[data-selnone]').addEventListener('click', () => {
+      state.sel = [];
+      body.querySelectorAll('[data-pick]').forEach((el) => el.classList.remove('sel'));
+      markSel();
+    });
+
+    /* ---- 批量移动到文件夹 ---- */
+    body.querySelector('[data-moveto]').addEventListener('change', async (e) => {
+      const v = e.target.value;
+      e.target.value = '';
+      if (!v) return;
+      let folder = v;
+      if (v === '__new__') {
+        const name = await promptBox('新建文件夹并移入', '', '文件夹名，例如：首页');
+        if (!name) return;
+        folder = name;
+      }
+      const target = folder === FOLDER_NONE ? '' : folder;
+      const stop = loading('移动中…');
+      try {
+        const r = await API.post('/api/media/move', { names: state.sel.slice(), folder: target });
+        toast('已移动 ' + r.moved + ' 张到「' + (target || '未分组') + '」');
+        state.sel = [];
+        reload();
+      } catch (err) { toast(err.message, true); } finally { stop(); }
+    });
+
+    /* ---- 搜索 / 排序 / 分页 ---- */
+    body.querySelector('[data-q]').addEventListener('input', debounce((e) => {
+      state.q = e.target.value.trim();
+      state.page = 1;
+      reload();
+    }, 350));
     body.querySelector('[data-sort]').addEventListener('change', (e) => { state.sort = e.target.value; reload(); });
     bindPager(body, state, reload);
 
+    /* ---- 上传（归入当前打开的文件夹） ---- */
+    const uploadFolder = isRealFolder ? cur : '';
     const upload = async (files) => {
       const list = Array.from(files || []).filter((f) => f.type.indexOf('image/') === 0);
       if (!list.length) return;
@@ -891,15 +1071,17 @@ App.views.media = {
         for (const f of list) {
           const fd = new FormData();
           fd.append('file', f, f.name);
-          const res = await fetch('/api/media/upload', { method: 'POST', body: fd });
+          const url = '/api/media/upload' + (uploadFolder ? '?folder=' + encodeURIComponent(uploadFolder) : '');
+          const res = await fetch(url, { method: 'POST', body: fd });
           const json = await res.json();
           if (json.code === 0) ok += 1;
           else toast(f.name + '：' + json.msg, true);
         }
-        toast('上传成功 ' + ok + ' 张');
+        toast('上传成功 ' + ok + ' 张' + (uploadFolder ? '（已归入「' + uploadFolder + '」）' : ''));
         reload();
       } finally { stop(); }
     };
+
     const zone = body.querySelector('[data-zone]');
     zone.addEventListener('click', () => body.querySelector('[data-file]').click());
     body.querySelector('[data-file]').addEventListener('change', (e) => upload(e.target.files));
@@ -908,30 +1090,36 @@ App.views.media = {
     zone.addEventListener('drop', (e) => upload(e.dataTransfer.files));
     body.addEventListener('paste', (e) => { if (e.clipboardData && e.clipboardData.files.length) upload(e.clipboardData.files); });
 
-    body.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async () => {
+    /* ---- 单张：复制地址 / 删除 ---- */
+    body.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const url = b.getAttribute('data-copy');
       try {
         await navigator.clipboard.writeText(url);
         toast('已复制：' + url);
-      } catch (e) { toast(url); }
+      } catch (err) { toast(url); }
     }));
-    body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+
+    body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async (e) => {
+      e.stopPropagation();
       const p = b.getAttribute('data-del');
       if (!(await confirmBox('删除该素材？<br><span class="sub">若图片正被页面或商品引用，需要再次确认强制删除。</span>', '删除'))) return;
       try {
         await API.post('/api/media/delete', { name: p });
+        state.sel = state.sel.filter((x) => x !== p);
         toast('已删除');
         reload();
-      } catch (e) {
-        if (String(e.message).indexOf('引用') > -1) {
-          const force = await confirmBox('该素材正被引用：<br><span class="sub">' + esc(e.message) + '</span>', '仍然删除');
+      } catch (err) {
+        if (String(err.message).indexOf('引用') > -1) {
+          const force = await confirmBox('该素材正被引用：<br><span class="sub">' + esc(err.message) + '</span>', '仍然删除');
           if (!force) return;
           try {
             await API.post('/api/media/delete', { name: p, force: 1 });
+            state.sel = state.sel.filter((x) => x !== p);
             toast('已强制删除');
             reload();
           } catch (e2) { toast(e2.message, true); }
-        } else toast(e.message, true);
+        } else toast(err.message, true);
       }
     }));
   }

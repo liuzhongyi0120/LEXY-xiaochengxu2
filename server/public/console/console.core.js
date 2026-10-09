@@ -127,6 +127,32 @@ function confirmBox(msg, okText) {
   });
 }
 
+/** 输入框弹层（新建 / 重命名文件夹等场景），返回 Promise<string|null>；取消返回 null */
+function promptBox(title, defaultValue, placeholder) {
+  return new Promise((resolve) => {
+    const m = openModal({
+      title: title,
+      width: 'narrow',
+      html: '<div class="field" style="padding:4px 0"><input type="text" data-input style="flex:1" placeholder="' +
+        esc(placeholder || '') + '" value="' + esc(defaultValue || '') + '"></div>',
+      footer: '<button class="btn" data-cancel>取消</button><button class="btn primary" data-ok>确定</button>'
+    });
+    const input = m.root.querySelector('[data-input]');
+    const done = (v) => { m.close(); resolve(v); };
+    setTimeout(() => { input.focus(); input.select(); }, 30);
+    m.root.querySelector('[data-cancel]').addEventListener('click', () => done(null));
+    m.root.querySelector('[data-ok]').addEventListener('click', () => done(input.value.trim() || null));
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') done(input.value.trim() || null);
+      if (e.key === 'Escape') done(null);
+    });
+    // 点遮罩或右上角 × 也要收尾，否则 Promise 永远挂起（调用方 await 后整段逻辑不执行）
+    m.root.addEventListener('click', (e) => {
+      if (e.target === m.root || e.target.hasAttribute('data-close')) done(null);
+    });
+  });
+}
+
 /* ============================== 图片选择器 ============================== */
 
 /**
