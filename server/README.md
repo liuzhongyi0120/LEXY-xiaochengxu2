@@ -789,6 +789,25 @@ ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
 node .tooling/probe-deployed.mjs            # 30 项：连通 / 管理页面被关 / 登录 / 商品 / 加购下单取消（含库存扣减与回滚）/ 静态资源 / 管理接口被拒
 ```
 
+**登录与下单链路会随服务器模式自动降级**（脚本自己分辨，不会报假红灯）：
+
+| 服务器模式 | 结果 | 说明 |
+|---|---|---|
+| 未配 `WX_APPID`/`WX_SECRET` | **30 通过 / 0 失败** | mock 登录，任何 code 都能换 token，全链路可自证 |
+| 已配（线上现状） | **20 通过 / 0 失败 / 10 跳过** | 真实 `code2Session` 要求 code 由小程序端 `wx.login` 产生，命令行拿不到 → 登录与下单 10 项标 `⊘ 跳过` 并写明原因 |
+
+想在真实登录模式下也跑全链路，用环境变量注入登录态：
+
+```bash
+# ① 在小程序端登录后，从开发者工具「Storage」面板复制 key 为 token 的值（`STORAGE.TOKEN`，见 miniprogram/utils/constants.js）
+TOKEN=<粘贴 token> node .tooling/probe-deployed.mjs
+# ② 或者喂一个真实 wx.login 的 code（一次性的，用完即废）
+WX_CODE=<真实 code> node .tooling/probe-deployed.mjs
+```
+
+`⊘` 不是通过、也不是失败，是「本环境无法验证」——**每项后面都写了原因**，
+所以「跳过 10 项」不会被误读成「这 10 项是好的」。
+
 回滚 nginx：`cp -a /etc/nginx/sites-available/lexy-official-site.bak-mall-api-<时间戳> /etc/nginx/sites-available/lexy-official-site && nginx -t && systemctl reload nginx`
 停服务：`systemctl disable --now lexy-mall`（目录 `/opt/lexy-mall` 可整体删除，不影响其它业务）
 
