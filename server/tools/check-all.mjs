@@ -1749,6 +1749,45 @@ assert('后台控制台、装修台与预览渲染三件套文件齐全',
   missAssets.length ? `缺失：${missAssets.join(', ')}` : `${CONSOLE_FILES.length} 个文件全部存在`);
 
 /* ---------------------------------------------------------------------------
+ * 15.9b 后台前端「类名撞车」静态校验
+ *
+ * 教训（真出过、而且测试全绿）：console.css 里有一条通用规则
+ *     .thumb { width: 42px; height: 42px; ... }
+ * 它是给表格里的 <img class="thumb"> 小方图用的，但**选择器写得太宽**。
+ * 素材卡片把缩略图容器也写成 <div class="thumb">，于是整片网格被按 42px 排版：
+ * 缩略图缩成一枚小图、溢出压住文件名 —— 表现就是「素材库丑得没法用、图还认不出」。
+ * 更糟的是 jsdom 不做布局，78 条 UI 断言照样全绿，只有真浏览器量像素才看得见。
+ * 所以这里做三件静态事：规则收窄、卡片用 .mt、模板不许再出现 div.thumb。
+ * ------------------------------------------------------------------------- */
+const consoleCss = readFileSync(join(__dirname, '..', 'public', 'console', 'console.css'), 'utf8');
+const consoleCssNoComment = consoleCss.replace(/\/\*[\s\S]*?\*\//g, '');
+
+const bareThumbRules = [...consoleCssNoComment.matchAll(/(^|\})\s*([^{}]*?)\{/g)]
+  .map((m) => m[2].trim())
+  .filter((sel) => sel.split(',').map((s) => s.trim()).indexOf('.thumb') > -1);
+assert('console.css 里没有裸 .thumb 规则（必须收窄为 img.thumb，否则会命中卡片容器）',
+  bareThumbRules.length === 0,
+  bareThumbRules.length ? '裸选择器：' + bareThumbRules.join(' | ') : '已收窄为 img.thumb');
+assert('console.css 里存在 img.thumb 规则（表格小方图的 42px 样式有明确归属）',
+  /img\.thumb\s*\{/.test(consoleCssNoComment));
+
+const consoleModSrc = readFileSync(join(__dirname, '..', 'public', 'console', 'console.modules.js'), 'utf8');
+const consoleCoreSrc = readFileSync(join(__dirname, '..', 'public', 'console', 'console.core.js'), 'utf8');
+const consoleJs = consoleModSrc + '\n' + consoleCoreSrc;
+assert('素材卡片模板用 .mt 作缩略图容器（不回退到 .thumb）',
+  /'<div class="mt">'/.test(consoleModSrc) && !/'<div class="thumb">'/.test(consoleJs),
+  "出现 '<div class=\"thumb\">' 即会踩 42px 撞车");
+assert('素材卡片结构 = 缩略图区(.mt) → 信息区(.inf：.nm + .meta) → 操作行(.ft)',
+  /class="mt">[\s\S]{0,900}class="inf">[\s\S]{0,400}class="nm"[\s\S]{0,200}class="meta"[\s\S]{0,200}class="ft"/.test(consoleModSrc));
+assert('卡片操作行是图标按钮且三个动作齐全（复制链接 / 下载 / 删除）',
+  /class="ft">[\s\S]{0,600}data-copy[\s\S]{0,300}data-down[\s\S]{0,300}data-del/.test(consoleModSrc));
+assert('已废弃的 .ops2（三枚中文文字按钮）不再出现在 CSS / JS（避免留下死样式）',
+  !/\.ops2/.test(consoleCssNoComment) && !/ops2/.test(consoleJs));
+assert('采集器（pickImage）也走 .mt 缩略图区（两条链路共用同一套卡片样式）',
+  (consoleCoreSrc.match(/class="mt"/g) || []).length >= 2,
+  '实测 ' + (consoleCoreSrc.match(/class="mt"/g) || []).length + ' 处');
+
+/* ---------------------------------------------------------------------------
  * 15.10 装修台预览（共享渲染核心）与 /preview（真机源码编译）
  *
  * 两条链路，各有各的约束，不能混：

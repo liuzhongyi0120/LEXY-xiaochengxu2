@@ -862,6 +862,22 @@ const MEDIA_ZOOM_ICO = '<svg viewBox="0 0 16 16" width="13" height="13" fill="no
 const MEDIA_CHECK_ICO = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" ' +
   'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
   '<path d="M3.2 8.4 6.3 11.5 12.8 4.9"/></svg>';
+/* 卡片底部操作行的三个图标（复制链接 / 下载 / 删除）。
+ * 为什么从「文字按钮」改成「图标」：40 张卡片 × 3 个中文按钮 = 一整片字，
+ * 网格被字糊住反而看不出图；图标 26px + title 提示，入口仍在（**常驻不藏 hover**），
+ * 视觉上安静得多。 */
+const MEDIA_COPY_ICO = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<rect x="5.6" y="5.6" width="7.6" height="7.6" rx="1.6"/><path d="M10.4 3.4H4.2a1.6 1.6 0 0 0-1.6 1.6v6.2"/></svg>';
+const MEDIA_DOWN_ICO = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M8 2.6v7.6M4.6 7l3.4 3.4L11.4 7M2.8 13.2h10.4"/></svg>';
+const MEDIA_TRASH_ICO = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M2.8 4.4h10.4M6.4 4.4V3a.6.6 0 0 1 .6-.6h2a.6.6 0 0 1 .6.6v1.4M4.2 4.4l.7 8.2a.9.9 0 0 0 .9.8h4.4a.9.9 0 0 0 .9-.8l.7-8.2"/>' +
+  '<path d="M6.7 7.2v3.6M9.3 7.2v3.6"/></svg>';
+const MEDIA_PLAY_ICO = '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor" aria-hidden="true">' +
+  '<path d="M4.6 3.3 12.2 8l-7.6 4.7z"/></svg>';
 
 /**
  * 素材库：左侧文件夹（**逻辑分类**）+ 右侧网格（点图放大预览、勾选圈多选、批量移动）
@@ -930,10 +946,11 @@ App.views.media = {
       '</div>';
 
     /*
-     * 卡片：**图片在上、名称在下**（对标有赞素材中心的排版）。
-     * 三行信息各司其职：文件名（可能很长，用 CSS 省略号 + title 兜底）、
-     * 元信息（尺寸/体积/时长）、操作（复制链接 / 下载 / 删除，常驻不藏在 hover 里 ——
-     * 藏起来的操作在触控板和远程桌面上常常找不到）。
+     * 卡片：**图片在上、信息在下**（对标有赞素材中心的排版）。
+     * 三块各司其职：.mt 正方形缩略图区（图/视频同形状）→ .inf 信息（文件名最多两行 +
+     * 尺寸/体积/时长）→ .ft 常驻操作行（图标：复制链接 / 下载 / 删除）。
+     * ⚠️ 缩略图区的类名必须叫 .mt，不能叫 .thumb —— `.thumb{width:42px;height:42px}`
+     * 是表格小方图的样式，套到卡片上会把缩略图缩成 42px 的小图并溢出压住文件名。
      */
     const cell = (it, i) => {
       const isVideo = it.kind === 'video';
@@ -944,21 +961,23 @@ App.views.media = {
       const nm = it.orig || it.name;
       return '<div class="media-it zoom' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') +
           '" data-pick="' + esc(it.name) + '" data-i="' + i + '" data-kind="' + (isVideo ? 'video' : 'image') + '">' +
-        '<div class="thumb">' +
+        '<div class="mt">' +
           (isVideo
             // muted + preload=metadata：只要首帧，不要出声、不要整段下载
             ? '<video src="' + esc(it.url) + '" muted preload="metadata" playsinline></video>'
             : '<img src="' + esc(it.url) + '" alt="" loading="eager">') +
-          (isVideo ? '<span class="vbadge">视频</span>' : '') +
           '<span class="zoomtip">' + MEDIA_ZOOM_ICO + (isVideo ? '播放' : '查看大图') + '</span>' +
+          (isVideo ? '<span class="vbadge">' + MEDIA_PLAY_ICO + esc(it.durationText || '视频') + '</span>' : '') +
           '<span class="pickbox" data-check="' + esc(it.name) + '" title="选择这个（也可 Ctrl / ⌘ + 点击卡片）">' + MEDIA_CHECK_ICO + '</span>' +
         '</div>' +
-        '<div class="nm" title="' + esc(nm) + '">' + esc(nm) + '</div>' +
-        '<div class="meta">' + esc(meta.join(' · ')) + '</div>' +
-        '<div class="ops2">' +
-          '<button data-copy="' + esc(it.url) + '" title="复制素材地址">复制链接</button>' +
-          '<button data-down="' + esc(it.name) + '" title="下载到本地">下载</button>' +
-          '<button data-del="' + esc(it.name) + '" title="删除素材">删除</button>' +
+        '<div class="inf">' +
+          '<div class="nm" title="' + esc(nm) + '">' + esc(nm) + '</div>' +
+          '<div class="meta">' + esc(meta.join(' · ')) + '</div>' +
+        '</div>' +
+        '<div class="ft">' +
+          '<button data-copy="' + esc(it.url) + '" title="复制素材地址">' + MEDIA_COPY_ICO + '</button>' +
+          '<button data-down="' + esc(it.name) + '" title="下载到本地">' + MEDIA_DOWN_ICO + '</button>' +
+          '<button data-del="' + esc(it.name) + '" title="删除素材">' + MEDIA_TRASH_ICO + '</button>' +
         '</div>' +
       '</div>';
     };

@@ -484,7 +484,10 @@ function pickImage(opt) {
           const up = json.data.list[0];
           add(up.url);
           box.insertAdjacentHTML('afterbegin',
-            '<div class="media-it"><img src="' + esc(up.url) + '" alt=""><div class="m"><span>' + esc(f.name).slice(0, 14) + '</span><span>' + up.width + '×' + up.height + '</span></div></div>');
+            '<div class="media-it">' +
+              '<div class="mt"><img src="' + esc(up.url) + '" alt=""></div>' +
+              '<div class="inf"><div class="nm">' + esc(f.name) + '</div>' +
+              '<div class="meta">' + up.width + '×' + up.height + '</div></div></div>');
         }
         toast('上传成功，已自动勾选');
       } catch (e) {
@@ -518,13 +521,14 @@ function pickImage(opt) {
         root.querySelector('[data-liblist]').innerHTML = d.list.length
           ? d.list.map((it, i) =>
             '<div class="media-it" data-pick="' + esc(it.url) + '">' +
-              '<div class="thumb"><img src="' + esc(it.url) + '" alt="">' +
+              '<div class="mt"><img src="' + esc(it.url) + '" alt="">' +
                 '<button class="zoombtn" data-zoom="' + i + '" title="查看大图">' +
                   '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" ' +
                   'stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/>' +
                   '<path d="M10.2 10.2 13.5 13.5M7 5.2v3.6M5.2 7h3.6"/></svg></button>' +
               '</div>' +
-              '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 12) + '</span><span>' + it.width + '×' + it.height + '</span></div>' +
+              '<div class="inf"><div class="nm" title="' + esc(it.orig || it.name) + '">' + esc(it.orig || it.name) + '</div>' +
+              '<div class="meta">' + it.width + '×' + it.height + (it.sizeText ? ' · ' + it.sizeText : '') + '</div></div>' +
             '</div>').join('')
           : '<div class="empty-state">素材库里还没有图片（视频素材请在「素材库」页面管理）</div>';
         // 这里点卡片 = 选图（选图是这个弹层的主操作），所以「看大图」单独做成角标按钮，
