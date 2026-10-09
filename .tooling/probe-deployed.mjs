@@ -20,6 +20,19 @@
  */
 const BASE = (process.argv[2] || 'https://14.103.50.137/mall-api').replace(/\/$/, '');
 
+/**
+ * 期望点位数：从**本机代码**实时算出（线上部署的就是这份代码），不写死数字。
+ *
+ * 这里曾经写死 `=== 88`，第 28 批新增 /mp-src 等路由后变成 91 —— 每次加路由都会假红一次，
+ * 而「假红」比「不检查」更糟：它会训练人忽略红灯。与 PITFALLS 里
+ * 「素材库只有我这一条视频」是同一类脆弱断言 —— **断言要锁等价性，不要锁当时的值**。
+ *
+ * 期望值取自 server/index.js 同一处口径：router.describe().length + 2（加 health / routes 两个运维点位）。
+ */
+import { createRequire } from 'node:module';
+const require_ = createRequire(import.meta.url);
+const EXPECT_ROUTES = require_('../server/routes/index.js').describe().length + 2;
+
 let pass = 0, fail = 0, skip = 0;
 const failures = [];
 function ok(cond, name, extra) {
@@ -54,7 +67,8 @@ async function call(method, path, { token, body, query } = {}) {
   console.log('【一】基础连通');
   const health = await call('GET', '/api/health');
   ok(health.status === 200 && health.json && health.json.code === 0, 'GET /api/health 通', health.status + '');
-  ok(health.json && health.json.data && health.json.data.routes === 88, '点位数为 88', health.json && health.json.data && String(health.json.data.routes));
+  ok(health.json && health.json.data && health.json.data.routes === EXPECT_ROUTES,
+    `点位数与本机代码一致（${EXPECT_ROUTES}）`, health.json && health.json.data && String(health.json.data.routes));
   ok(health.json && health.json.data && health.json.data.debugPage === 'off',
     'DEBUG_PAGE 已关（管理页面不在公网暴露）', health.json && health.json.data && health.json.data.debugPage);
 

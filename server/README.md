@@ -935,6 +935,12 @@ ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
 
 **不带 `server/data/db.json`**（用户业务数据）是**故意的**：生产环境全新自举（`emptyDb()` + 从 `catalog.json` 初始化 `stocks`），避免把本机的联调用户 / 测试订单带上线。`catalog.json`（商品/分类/券模板/店铺设置）和 `uploads/`（图片）必须带，否则线上商品为空、图片全裂。
 
+> **只改了业务数据（商品 / 素材 / 装修）时，不必重跑整套部署。**
+> 用 `node .tooling/deploy-data.mjs` 一键同步即可 —— 它把「传数据 + **重启服务**」两步
+> 串起来（少任何一步都会得到「传完了还是旧的」的假象：`catalogStore` 是进程内内存缓存），
+> 并做与小程序同路径的验证（商品数比对 + **逐个型号真的打一次详情接口** + 主图可访问）。
+> 背景、真实事故与排查口诀见 `deploy/README.md` 的「同步业务数据到线上」。
+
 ### 冒烟与回滚
 
 ```bash
