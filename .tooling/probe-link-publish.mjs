@@ -12,6 +12,7 @@ import { createRequire } from 'node:module';
 import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { adminToken } from './_admin.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -20,6 +21,10 @@ const REPLICA = join(ROOT, 'miniprogram', 'config', 'replica.js');
 const BASE = 'http://127.0.0.1:3000';
 
 const FIELDS = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS', 'PAGE_META'];
+
+// 报告 08 之后 /api/decorate/* 一律要求管理员身份。
+// 此前本脚本是匿名调用 → 第一条请求就 401，后续断言全在 null 上崩。
+const TOKEN = await adminToken(BASE);
 
 let pass = 0;
 let fail = 0;
@@ -46,7 +51,7 @@ function dataFingerprint() {
 async function api(method, path, body) {
   const res = await fetch(BASE + path, {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + TOKEN },
     body: body === undefined ? undefined : JSON.stringify(body)
   });
   const json = await res.json();

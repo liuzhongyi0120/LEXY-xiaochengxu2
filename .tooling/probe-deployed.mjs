@@ -234,9 +234,34 @@ async function call(method, path, { token, body, query } = {}) {
   }
 
   console.log('\n【六】静态资源（图片走的就是这条）');
-  const img = await fetch(BASE + '/uploads/202610/20261008-zx70ws.png');
-  ok(img.status === 200 && (img.headers.get('content-type') || '').indexOf('image/') === 0,
-    'GET /uploads/**  正常返回图片', img.status + ' ' + img.headers.get('content-type'));
+  /* 不再写死文件名：曾经写死 20261008-zx70ws.png，那张图后来被清理掉，
+   * 于是探针永远报 404 —— 一个与事实相反的假红（假红比不检查更糟，会训练人忽略红灯）。
+   * 现在从本机 replica.js 里找一张**真实被引用**的素材：正好验「本机有 → 线上也该有」这条契约。 */
+  const pickLocalImage = () => {
+    try {
+      const R = require_('../miniprogram/config/replica.js');
+      let found = '';
+      const walk = (v) => {
+        if (found || v === null || v === undefined) return;
+        if (typeof v === 'string') {
+          if (/^\/uploads\/\d{6}\/[0-9]{8}-[A-Za-z0-9_.-]+$/.test(v)) found = v;
+          return;
+        }
+        if (Array.isArray(v)) { v.forEach(walk); return; }
+        if (typeof v === 'object') { Object.keys(v).forEach((k) => walk(v[k])); }
+      };
+      walk(R);
+      return found;
+    } catch (e) { return ''; }
+  };
+  const imgPath = pickLocalImage();
+  if (!imgPath) {
+    skipped('GET /uploads/…  正常返回图片', '本机 replica.js 里找不到 /uploads 引用');
+  } else {
+    const img = await fetch(BASE + imgPath);
+    ok(img.status === 200 && (img.headers.get('content-type') || '').indexOf('image/') === 0,
+      'GET ' + imgPath + '  正常返回图片', img.status + ' ' + img.headers.get('content-type'));
+  }
 
   console.log('\n【七】管理接口必须全部被拒（NODE_ENV=production + DEBUG_PAGE=off）');
   for (const p of ['/api/admin/overview', '/api/decorate/pages', '/api/media/list']) {

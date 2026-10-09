@@ -120,6 +120,16 @@ module.exports = [
   },
   {
     method: 'POST',
+    path: '/api/admin/goods/sales',
+    auth: false,
+    desc: '批量改销量（mode=set 覆盖 / delta 增减）—— 销量只随支付累加、无自动回滚，用它修正',
+    note: T,
+    async handler(ctx) {
+      return catalog.setSales({ items: ctx.params.items, mode: ctx.params.mode });
+    }
+  },
+  {
+    method: 'POST',
     path: '/api/admin/goods/delete',
     auth: false,
     desc: '删除商品（有订单记录时拒绝，建议改为下架）',

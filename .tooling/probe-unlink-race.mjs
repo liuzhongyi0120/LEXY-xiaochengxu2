@@ -8,15 +8,21 @@
  * 本脚本连续做 N 轮「上传 → 立即删除」，统计失败率与错误码，
  * 用来判断删除是否需要加重试。
  */
+import { adminToken } from './_admin.mjs';
+
 const BASE = 'http://127.0.0.1:3000';
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAADklEQVR4nGM4IaDHAMUAFEYDE2QuiKkAAAAASUVORK5CYII=';
 
 const N = Number(process.argv[2] || 15);
 
+// 报告 08 之后 /api/media/* 一律要求管理员身份。
+// 此前本脚本匿名调用 → 401，up.json.data 为 null，下面第 32 行直接崩。
+const TOKEN = await adminToken(BASE);
+
 async function jpost(path, body) {
   const r = await fetch(BASE + path, {
     method: 'POST',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', Authorization: 'Bearer ' + TOKEN },
     body: JSON.stringify(body)
   });
   return { status: r.status, json: await r.json() };

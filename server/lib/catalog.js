@@ -482,6 +482,32 @@ function setStock({ items, mode }) {
   return { changed: result };
 }
 
+/**
+ * 批量改销量（value 或 delta 二选一）—— 与 setStock 对称。
+ *
+ * 为什么需要它：销量只在「支付成功」时由 bumpSales 累加，**没有任何回滚路径**。
+ * 自检每跑一轮都会走一次真实支付，把在售首件的 sales 永久 +N；
+ * 库存有「净影响归零」兜底、销量却没有 → 每跑一次就悄悄污染一次数据。
+ * 有了这个入口，自检可在收尾把销量补回，运营也能修正被刷高的展示数字。
+ * 注意销量是**商品级**（不是 SKU 级），所以按 goodsId 定位。
+ */
+function setSales({ items, mode }) {
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) throw new BizError('请提供要修改的销量', ERR.PARAM);
+  const result = [];
+  list.forEach((it) => {
+    const g = findAny(it.goodsId);
+    if (!g) return;
+    const next = mode === 'delta' ? toInt(g.sales) + toInt(it.value) : toInt(it.value);
+    g.sales = Math.max(0, next);
+    g.updatedAt = now();
+    result.push({ goodsId: g.id, sales: g.sales });
+  });
+  catalogStore.commit();
+  if (!result.length) throw new BizError('商品不存在', ERR.NOT_FOUND, 404);
+  return { changed: result };
+}
+
 /** 删除商品（被订单引用则拒绝） */
 function deleteGoods(id) {
   const goods = findAny(id);
@@ -753,6 +779,7 @@ module.exports = {
   saveGoods,
   setGoodsStatus,
   setStock,
+  setSales,
   deleteGoods,
   saveCategory,
   deleteCategory,

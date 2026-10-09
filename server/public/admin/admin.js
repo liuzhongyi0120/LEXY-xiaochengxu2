@@ -2201,12 +2201,12 @@
     function urlPanel() {
       var box = el('div', 'pick-url');
       box.appendChild(el('div', 'hint',
-        '粘贴已有的图片地址（http / https）。当前页面里的历史素材大多是有赞 CDN 地址，' +
-        '正式上线建议逐步换成「素材库」里的自有图片。'));
+        '粘贴图片地址。优先用「素材库」里的自有图片（站内 /uploads/… 相对路径）——' +
+        '外链一旦对方下线或换服务器就会裂图。'));
       var inp = document.createElement('input');
       inp.type = 'text';
       inp.value = picked[0] || '';
-      inp.placeholder = 'https://img.yzcdn.cn/upload_files/…';
+      inp.placeholder = '/uploads/202610/20261009-xxxxxx.png';
       box.appendChild(inp);
       var b = el('button', 'btn primary', '使用该地址');
       b.onclick = function () {

@@ -196,6 +196,10 @@ module.exports = {
     note: '批量改库存：mode=set 覆盖 / delta 增减；items 里 value 是数量（delta 时可为负）',
     body: { items: [{ skuId: '{{skuId}}', value: 66 }], mode: 'set' }
   },
+  'POST /api/admin/goods/sales': {
+    note: '批量改销量（商品级）：mode=set 覆盖 / delta 增减。销量只随支付累加、没有自动回滚，用它修正被刷高的展示数字',
+    body: { items: [{ goodsId: '{{goodsId}}', value: 0 }], mode: 'set' }
+  },
   'POST /api/admin/goods/delete': {
     note: '删除商品。被订单引用时拒绝（这种情况建议改为下架）',
     body: { id: '{{goodsId}}' }

@@ -301,6 +301,26 @@ if (stockPlan) {
 }
 const stockBefore = (await readGoodsStock()) || [];
 
+/*
+ * 销量基线（与库存同理，但此前**完全没有兜底**）：
+ * 销量只在「支付成功」时由 catalog.bumpSales 累加，**没有任何回滚路径**
+ * （取消接口只处理未支付订单）。自检每跑一轮都会走一次真实支付，
+ * 于是把参与下单的商品 sales 永久 +N —— 实测每轮 +3，越跑越虚高，
+ * 且一旦同步到线上就是运营看得见的展示数字错。
+ * 这里开跑前记录全部商品的销量，收尾时逐件补回，做到可重复运行。
+ */
+const readAllSales = async () => {
+  const r = await call('GET', '/api/admin/goods/list', {
+    auth: false, query: { page: 1, size: 500 }, silent: true
+  });
+  if (!r.ok || !r.data || !Array.isArray(r.data.list)) return null;
+  return r.data.list.map((g) => ({ goodsId: g.id, sales: Number(g.sales) || 0 }));
+};
+const adjustSales = (items) => call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items, mode: 'set' }, silent: true
+});
+const salesBefore = await readAllSales();
+
 /* 1. 点位清单 */
 const routeList = await call('GET', '/api/routes', { auth: false });
 const registered = routeList.data.list;
@@ -345,9 +365,16 @@ const sku = detail.data.skus[0];
 await call('GET', '/api/goods/comments', { auth: false, query: { goodsId, page: 1, size: 5 } });
 console.log(` 商品       ${list.data.total} 个在售，首件 ${goodsId}，SKU ${detail.data.skus.length} 个`);
 
-/* 5. 登录态基础读点位 */
+/* 5. 登录态基础读点位
+ * 头像必须用**站内素材**：曾经在这里写死一个有赞 CDN 地址，于是每跑一轮自检
+ * 就把外链写回用户头像 —— 与 check-localized「数据文件零外链」直接打架，
+ * 表现为「修好又被写回」反复出现。现在动态取素材库首件的相对路径。 */
+const avatarProbe = await call('GET', '/api/media/list', { auth: false, query: { page: 1, size: 1 }, silent: true });
+const avatarLocal = ((avatarProbe.data && avatarProbe.data.list) || [])[0]
+  ? avatarProbe.data.list[0].url
+  : '';
 await call('GET', '/api/user/profile');
-await call('POST', '/api/user/profile', { body: { nickname: '联调账号', avatar: 'https://img.yzcdn.cn/upload_files/2026/01/04/Fo69HIsVHfOzMC08PSX7N7uFY8s1.png!large.webp' } });
+await call('POST', '/api/user/profile', { body: { nickname: '联调账号', avatar: avatarLocal } });
 await call('POST', '/api/user/phone', { body: { code: 'check_phone_code_001' } });
 await call('POST', '/api/auth/refresh');
 await call('GET', '/api/cart/list');
@@ -1765,6 +1792,43 @@ assert('后台 · 改库存后小程序端读取同一值（库存真源唯一�
   adStockSet.ok && adMpStock === 88,
   `后台设为 88 → 小程序商品详情读到 ${adMpStock}`);
 
+/* —— 销量：与库存对称的入口（销量只随支付累加、没有自动回滚，必须能被显式修正） —— */
+const adSalesSet = await call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items: [{ goodsId: adGid, value: 66 }], mode: 'set' }
+});
+const adSalesRead = await call('GET', '/api/admin/goods/detail', { auth: false, query: { id: adGid } });
+const adSalesNow = (adSalesRead.data && adSalesRead.data.goods) ? adSalesRead.data.goods.sales : -1;
+assert('后台 · 改销量后读回同一值（销量是商品级，按 goodsId 定位而不是 skuId）',
+  adSalesSet.ok && adSalesNow === 66,
+  `后台设为 66 → 详情读到 ${adSalesNow}`);
+
+const adSalesDelta = await call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items: [{ goodsId: adGid, value: -6 }], mode: 'delta' }
+});
+const adSalesRead2 = await call('GET', '/api/admin/goods/detail', { auth: false, query: { id: adGid } });
+const adSalesNow2 = (adSalesRead2.data && adSalesRead2.data.goods) ? adSalesRead2.data.goods.sales : -1;
+assert('后台 · delta 模式在现有值上增减（66 → 60，可为负）',
+  adSalesDelta.ok && adSalesNow2 === 60, `读回 ${adSalesNow2}`);
+
+const adSalesEmpty = await call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items: [] },
+  expectFail: 'sales 空 items', expectHttp: 200, expectCode: 1001
+});
+assertBlocked('后台 · sales 接口空 items 报参数错误（不是静默成功）', adSalesEmpty,
+  `HTTP ${adSalesEmpty.httpStatus} / code ${adSalesEmpty.json && adSalesEmpty.json.code}`);
+
+const adSalesMissing = await call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items: [{ goodsId: 'no_such_goods_id', value: 1 }], mode: 'set' },
+  expectFail: 'sales 商品不存在', expectHttp: 404, expectCode: 404
+});
+assertBlocked('后台 · sales 接口商品不存在返回 404（不静默当作成功）', adSalesMissing,
+  `HTTP ${adSalesMissing.httpStatus} / code ${adSalesMissing.json && adSalesMissing.json.code}`);
+
+// 还原成新建时的 0，避免干扰收尾的「销量净影响归零」断言
+await call('POST', '/api/admin/goods/sales', {
+  auth: false, body: { items: [{ goodsId: adGid, value: 0 }], mode: 'set' }, silent: true
+});
+
 const adOff = await call('POST', '/api/admin/goods/status', { auth: false, body: { ids: [adGid], status: 'off_sale' } });
 const adMpListOff = await call('GET', '/api/goods/list', { auth: false, query: { keyword: adTag, page: 1, size: 50 } });
 const adStillVisible = ((adMpListOff.data && adMpListOff.data.list) || []).some((g) => g.id === adGid);
@@ -2401,6 +2465,27 @@ if (stockBefore.length) {
     unbalanced.length === 0,
     final.map((f) => `${f.skuId}:${(stockBefore.find((x) => x.skuId === f.skuId) || {}).stock}→${f.stock}`).join(' · ') ||
     '无 SKU 参与自检');
+}
+
+/* 15.96 把本次自检累加的销量补回（销量没有回滚路径，必须显式归零） */
+if (salesBefore) {
+  const salesAfter = (await readAllSales()) || [];
+  const fix = [];
+  salesAfter.forEach((a) => {
+    const b = salesBefore.find((x) => x.goodsId === a.goodsId);
+    if (b && a.sales !== b.sales) fix.push({ goodsId: a.goodsId, value: b.sales });
+  });
+  if (fix.length) await adjustSales(fix);
+
+  const salesFinal = (await readAllSales()) || [];
+  const drifted = salesFinal.filter((f) => {
+    const b = salesBefore.find((x) => x.goodsId === f.goodsId);
+    return b && f.sales !== b.sales;
+  });
+  assert('销量净影响归零：自检支付累加的 sales 已补回（可重复运行）',
+    drifted.length === 0,
+    drifted.map((f) => `${f.goodsId}:${(salesBefore.find((x) => x.goodsId === f.goodsId) || {}).sales}→${f.sales}`).join(' · ') ||
+    `参与商品 ${salesBefore.length} 件均无变化`);
 }
 
 /* 15.10 示例参数与点位一致性

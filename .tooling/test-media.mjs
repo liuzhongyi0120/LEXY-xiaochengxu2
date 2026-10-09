@@ -285,6 +285,9 @@ const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA
     for (const name of created.slice()) {
       const r = await jpost('/api/media/delete', { name: name, force: 1 });
       if (r.json.code === 0) removedCount += 1;
+      // 以前这里只计数不打印原因，「少删 1 张」只能看到 3/4 这种结果，
+      // 分不清是「被引用拦住」「批量删除护栏」还是「名字对不上」。
+      else console.log('    · 删除未成功：' + name + '  → code=' + r.json.code + ' msg=' + (r.json.msg || ''));
     }
     const after = (await jget('/api/media/list?size=200')).json.data;
     ok('测试素材已全部清理', after.all === before.all, after.all + ' vs ' + before.all);
