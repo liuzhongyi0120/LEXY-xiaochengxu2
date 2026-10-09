@@ -854,14 +854,26 @@ App.views.comments = {
 
 /* ============================== 视图：素材库 ============================== */
 
+/* 卡片上的两个角标图标。用内联 SVG 而不是 ‹🔍✓› 这类字符：
+ * 字符要靠系统字体里的字形，Windows 上曾被回退成奇怪的符号（见 core 里 ICONS 的注释）。 */
+const MEDIA_ZOOM_ICO = '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" aria-hidden="true">' +
+  '<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2 13.5 13.5M7 5.2v3.6M5.2 7h3.6"/></svg>';
+const MEDIA_CHECK_ICO = '<svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" ' +
+  'stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3.2 8.4 6.3 11.5 12.8 4.9"/></svg>';
+
 /**
- * 素材库：左侧文件夹（**逻辑分类**）+ 右侧网格（可多选、批量移动）
+ * 素材库：左侧文件夹（**逻辑分类**）+ 右侧网格（点图放大预览、勾选圈多选、批量移动）
  *
- * 三个刻意的设计，都是踩过坑之后的结论：
+ * 四个刻意的设计，都是踩过坑之后的结论：
  *   ① `state.sel` 存**素材名**而不是 DOM 下标 —— 翻页 / 切文件夹后选择不会错位到别的图；
- *   ② 点选卡片**只切 class**，绝不重绘整个网格 —— 重绘会重建 <img>，
+ *   ② 点勾选圈只切 class，绝不重绘整个网格 —— 重绘会重建 <img>，
  *      所有缩略图重新发请求（画面闪白）、搜索框失焦；
- *   ③ 文件夹只存在于索引里（不产生真实目录）—— 图片 URL 已写进 replica.js / catalog.json，
+ *   ③ **点击图片 = 放大预览，多选走左上角的勾选圈**（Ctrl/⌘+点击卡片同效）。
+ *      早先「点一下就是选中」太容易误触 —— 想凑近看清一张图，结果把它选上了，
+ *      接着点「移动到」就把它挪走了。两种意图形不同、入口也要分开。
+ *   ④ 文件夹只存在于索引里（不产生真实目录）—— 图片 URL 已写进 replica.js / catalog.json，
  *      挪动磁盘文件会让线上图直接裂掉。所以「删文件夹」也不删素材，只把素材退回未分组。
  */
 App.views.media = {
@@ -901,11 +913,15 @@ App.views.media = {
     const whereText = cur === '' ? '未分组' : (cur === FOLDER_NONE ? '未分组' : '文件夹「' + cur + '」');
 
     const grid = d.list.length
-      ? d.list.map((it) =>
-        '<div class="media-it' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') + '" data-pick="' + esc(it.name) + '">' +
-          '<img src="' + esc(it.url) + '" alt="" loading="eager">' +
-          '<div class="ops"><button data-copy="' + esc(it.url) + '" title="复制地址">⧉</button>' +
-          '<button data-del="' + esc(it.name) + '" title="删除素材">✕</button></div>' +
+      ? d.list.map((it, i) =>
+        '<div class="media-it zoom' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') + '" data-pick="' + esc(it.name) + '" data-i="' + i + '">' +
+          '<div class="thumb">' +
+            '<img src="' + esc(it.url) + '" alt="" loading="eager">' +
+            '<span class="zoomtip">' + MEDIA_ZOOM_ICO + '查看大图</span>' +
+            '<span class="pickbox" data-check="' + esc(it.name) + '" title="选择这张（也可 Ctrl / ⌘ + 点击卡片）">' + MEDIA_CHECK_ICO + '</span>' +
+            '<div class="ops"><button data-copy="' + esc(it.url) + '" title="复制地址">⧉</button>' +
+            '<button data-del="' + esc(it.name) + '" title="删除素材">✕</button></div>' +
+          '</div>' +
           '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 14) + '</span><span>' +
             it.width + '×' + it.height + ' · ' + (it.size / 1024).toFixed(0) + 'K</span></div>' +
         '</div>').join('')
@@ -942,6 +958,8 @@ App.views.media = {
             '</span>' +
           '</div>' +
           '<div class="media-grid" data-grid>' + grid + '</div>' +
+          '<div class="media-hint">点任意图片可放大预览（预览里 ← / → 翻页、Esc 关闭、可下载或删除）；' +
+            '要批量操作，勾选图片左上角的圆圈（或按住 Ctrl / ⌘ 再点卡片）。</div>' +
         '</div>' +
       '</div>' + pagerHtml(d.total, d.page, d.size) + '</div>';
 
@@ -953,6 +971,45 @@ App.views.media = {
       const bar = body.querySelector('[data-actbar]');
       if (bar) { if (state.sel.length) bar.removeAttribute('hidden'); else bar.setAttribute('hidden', ''); }
     };
+
+    /* ---- 删除一张素材（网格的 ✕ 与预览层里的删除共用同一套确认逻辑） ----
+     * 抽成函数是因为它在两处被调用：只有一份「引用检查 → 强制确认」才不会两边走偏。 */
+    const deleteMedia = async (p) => {
+      if (!(await confirmBox('删除该素材？<br><span class="sub">若图片正被页面或商品引用，需要再次确认强制删除。</span>', '删除'))) return false;
+      try {
+        await API.post('/api/media/delete', { name: p });
+        toast('已删除');
+        return true;
+      } catch (err) {
+        if (String(err.message).indexOf('引用') > -1) {
+          const force = await confirmBox('该素材正被引用：<br><span class="sub">' + esc(err.message) + '</span>', '仍然删除');
+          if (!force) return false;
+          try {
+            await API.post('/api/media/delete', { name: p, force: 1 });
+            toast('已强制删除');
+            return true;
+          } catch (e2) { toast(e2.message, true); return false; }
+        }
+        toast(err.message, true);
+        return false;
+      }
+    };
+
+    /* ---- 放大预览 ----
+     * 把**当前这一页的列表**整体交给浮层，←/→ 翻的就是「你正在看的这个筛选结果」，
+     * 顺序与网格严格一致（浮层自己再发一次请求就可能因为分页/排序不同而对不上）。 */
+    const openLightbox = (index) => lightbox({
+      list: d.list,
+      index: index,
+      onDelete: async (it) => {
+        const done = await deleteMedia(it.name);
+        if (done) {
+          state.sel = state.sel.filter((x) => x !== it.name);
+          reload();          // 网格同步刷新；浮层挂在 #layer 上，不受 body 重绘影响
+        }
+        return done;
+      }
+    });
 
     /* ---- 切文件夹 ---- */
     body.querySelectorAll('[data-folder]').forEach((el) => {
@@ -1006,15 +1063,21 @@ App.views.media = {
       } catch (err) { toast(err.message, true); }
     }));
 
-    /* ---- 点选素材（原地切 class，不重绘） ---- */
+    /* ---- 点素材卡片：勾选圈 / Ctrl(⌘)+点击 → 多选；其余 → 放大预览 ----
+     * 原来的「点一下就是选中」太容易误触（想看清楚反而被选上），
+     * 改成：点图看大图，多选走左上角常驻的勾选圈。两种操作各有明确入口。 */
     body.querySelectorAll('[data-pick]').forEach((el) => {
       el.addEventListener('click', (e) => {
-        if (e.target.hasAttribute('data-copy') || e.target.hasAttribute('data-del')) return;
-        const n = el.getAttribute('data-pick');
-        const i = state.sel.indexOf(n);
-        if (i > -1) { state.sel.splice(i, 1); el.classList.remove('sel'); }
-        else { state.sel.push(n); el.classList.add('sel'); }
-        markSel();
+        if (e.target.closest('[data-copy]') || e.target.closest('[data-del]')) return;
+        const name = el.getAttribute('data-pick');
+        if (e.target.closest('[data-check]') || e.ctrlKey || e.metaKey) {
+          const at = state.sel.indexOf(name);
+          if (at > -1) { state.sel.splice(at, 1); el.classList.remove('sel'); }
+          else { state.sel.push(name); el.classList.add('sel'); }
+          markSel();
+          return;
+        }
+        openLightbox(Number(el.getAttribute('data-i')) || 0);
       });
     });
 
@@ -1103,23 +1166,9 @@ App.views.media = {
     body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
       const p = b.getAttribute('data-del');
-      if (!(await confirmBox('删除该素材？<br><span class="sub">若图片正被页面或商品引用，需要再次确认强制删除。</span>', '删除'))) return;
-      try {
-        await API.post('/api/media/delete', { name: p });
+      if (await deleteMedia(p)) {
         state.sel = state.sel.filter((x) => x !== p);
-        toast('已删除');
         reload();
-      } catch (err) {
-        if (String(err.message).indexOf('引用') > -1) {
-          const force = await confirmBox('该素材正被引用：<br><span class="sub">' + esc(err.message) + '</span>', '仍然删除');
-          if (!force) return;
-          try {
-            await API.post('/api/media/delete', { name: p, force: 1 });
-            state.sel = state.sel.filter((x) => x !== p);
-            toast('已强制删除');
-            reload();
-          } catch (e2) { toast(e2.message, true); }
-        } else toast(err.message, true);
       }
     }));
   }

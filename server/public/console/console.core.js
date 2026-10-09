@@ -153,6 +153,184 @@ function promptBox(title, defaultValue, placeholder) {
   });
 }
 
+/* ============================== 大图预览 ============================== */
+
+/**
+ * 大图预览浮层（素材库点缩略图打开）
+ *
+ * 四个刻意的取舍，都是为了让「看图」这件事不出岔子：
+ *   ① 由调用方传入**当前这一页的整个列表** + 当前下标，而不是只传一张图的地址。
+ *      这样 ←/→ 翻的就是「你正在看的这个筛选结果」，预览层不必自己再发一次请求 ——
+ *      也就不会出现「预览里的顺序和网格里的顺序对不上」这种事后很难查的错位。
+ *   ② 切换只改 <img> 的 src，不重建浮层：重建会让遮罩闪一下。
+ *      相邻一张提前 `new Image()` 预载，翻页不空等。
+ *   ③ 加载失败必须给可见提示 + 兜底入口 —— 素材可能刚在别处被删掉，
+ *      此时白屏会让人以为「后台坏了」，而不是「这张图没了」。
+ *   ④ 键盘监听挂在 document 上，关闭时必须解绑：否则关掉预览后按 ←/→，
+ *      事件还会打到已经不在屏幕上的浮层上。
+ *
+ * @param {{list:Array, index?:number, actions?:boolean,
+ *          onDelete?:Function, onPick?:Function, pickText?:string}} opt
+ *        onDelete(item) 返回 Promise<boolean>，resolve true 表示「确实删掉了」，
+ *        浮层会把它从当前列表里摘掉并跳到下一张（全删光则自动关闭）。
+ * @returns {{close:Function}}
+ */
+function lightbox(opt) {
+  const list = (opt.list || []).filter((x) => x && x.url).slice();
+  if (!list.length) return { close() {} };
+
+  let i = Math.min(Math.max(0, Number(opt.index) || 0), list.length - 1);
+  const showActions = opt.actions !== false;
+  const single = list.length < 2;
+
+  const el = document.createElement('div');
+  el.className = 'lb';
+  el.innerHTML =
+    '<div class="lb-h">' +
+      '<div class="lb-t"><b data-name></b><span class="lb-meta" data-meta></span></div>' +
+      '<span class="grow"></span>' +
+      (single ? '' : '<span class="lb-idx" data-idx></span>') +
+      '<button class="lb-x" data-close title="关闭（Esc）">×</button>' +
+    '</div>' +
+    '<div class="lb-stage">' +
+      (single ? '' : '<button class="lb-nav prev" data-prev title="上一张（←）">‹</button>') +
+      '<div class="lb-view">' +
+        '<img data-img alt="">' +
+        '<div class="lb-tip" data-tip>加载中…</div>' +
+        '<div class="lb-err" data-err hidden>' +
+          '<b>图片加载失败</b>' +
+          '<span class="sub" data-errmeta></span>' +
+          '<button class="btn sm" data-new>在新窗口打开</button>' +
+        '</div>' +
+      '</div>' +
+      (single ? '' : '<button class="lb-nav next" data-next title="下一张（→）">›</button>') +
+    '</div>' +
+    '<div class="lb-f">' +
+      '<span class="grow"></span>' +
+      (opt.onPick ? '<button class="btn sm primary" data-pickbtn>' + esc(opt.pickText || '使用这张') + '</button>' : '') +
+      (showActions
+        ? '<button class="btn sm" data-copy>复制地址</button>' +
+          '<button class="btn sm" data-down>下载</button>'
+        : '') +
+      (opt.onDelete ? '<button class="btn sm danger" data-del>删除</button>' : '') +
+    '</div>';
+
+  const q = (s) => el.querySelector(s);
+  const img = q('[data-img]');
+  const tip = q('[data-tip]');
+  const errBox = q('[data-err]');
+
+  /** 只换 src，不重建浮层；同一张重复渲染时跳过赋值（同 src 再赋值不会重新触发 load） */
+  const show = () => {
+    const it = list[i];
+    q('[data-name]').textContent = it.orig || it.name || '';
+    const bits = [];
+    if (it.width && it.height) bits.push(it.width + '×' + it.height);
+    if (it.size) bits.push((it.size / 1024).toFixed(0) + 'KB');
+    if (it.folder) bits.push('文件夹：' + it.folder);
+    q('[data-meta]').textContent = bits.join('  ·  ');
+    const idxEl = q('[data-idx]');
+    if (idxEl) idxEl.textContent = (i + 1) + ' / ' + list.length;
+
+    errBox.setAttribute('hidden', '');
+    if (img.getAttribute('src') !== it.url) {
+      tip.textContent = '加载中…';
+      tip.removeAttribute('hidden');
+      img.setAttribute('src', it.url);
+      // 命中缓存时浏览器不会派发 load 事件（网格里的缩略图早就把这张拉过了），
+      // 不校对的话「加载中…」会一直挂着。这里补一次判定。
+      const settle = () => { if (img.complete && img.naturalWidth > 0) tip.setAttribute('hidden', ''); };
+      settle();
+      setTimeout(settle, 60);
+    }
+    // 预载下一张：翻页时不至于先看到空白
+    if (!single) { const nx = list[(i + 1) % list.length]; if (nx && nx.url !== it.url) { const pre = new Image(); pre.src = nx.url; } }
+    q('[data-errmeta]').textContent = it.url;
+  };
+
+  img.addEventListener('load', () => tip.setAttribute('hidden', ''));
+  img.addEventListener('error', () => {
+    tip.setAttribute('hidden', '');
+    errBox.removeAttribute('hidden');
+  });
+
+  const step = (d) => { i = (i + d + list.length) % list.length; show(); };
+  const prevOverflow = document.body.style.overflow;
+  document.body.style.overflow = 'hidden';
+
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (single) return;
+    if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
+    else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
+  };
+
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true;
+    document.removeEventListener('keydown', onKey, true);
+    document.body.style.overflow = prevOverflow;
+    el.remove();
+    if (opt.onClose) opt.onClose();
+  };
+
+  q('[data-close]').addEventListener('click', close);
+  const pv = q('[data-prev]'); if (pv) pv.addEventListener('click', () => step(-1));
+  const nx = q('[data-next]'); if (nx) nx.addEventListener('click', () => step(1));
+
+  // 复制地址：非 https 环境（内网 http）没有 clipboard API，退化为直接显示地址
+  const cp = q('[data-copy]');
+  if (cp) cp.addEventListener('click', async () => {
+    const u = list[i].url;
+    try { await navigator.clipboard.writeText(u); toast('已复制：' + u); } catch (e) { toast(u); }
+  });
+
+  // 下载：本站素材走 <a download>；外链（有赞 CDN 等）download 属性无效，改新窗口打开
+  const dn = q('[data-down]');
+  if (dn) dn.addEventListener('click', () => {
+    const it = list[i];
+    const same = it.url.indexOf('/uploads/') === 0 || it.url.indexOf(location.origin) === 0;
+    const a = document.createElement('a');
+    a.href = it.url;
+    if (same) a.download = String(it.orig || it.name || 'image').replace(/[^\w.\-\u4e00-\u9fa5]+/g, '_');
+    else a.target = '_blank';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+
+  const pk = q('[data-pickbtn]');
+  if (pk) pk.addEventListener('click', () => { const it = list[i]; close(); opt.onPick(it); });
+
+  // 加载失败时的兜底出口：至少让人能拿到地址，而不是只看到一个「失败」
+  const nw = q('[data-new]');
+  if (nw) nw.addEventListener('click', () => { try { window.open(list[i].url, '_blank', 'noopener'); } catch (e) { /* 弹窗被拦也不影响其它操作 */ } });
+
+  const dl = q('[data-del]');
+  if (dl) dl.addEventListener('click', async () => {
+    const ok = await opt.onDelete(list[i]);
+    if (!ok) return;
+    list.splice(i, 1);
+    if (!list.length) { close(); return; }
+    if (i >= list.length) i = 0;            // 删的是最后一张 → 回绕，而不是越界取到 undefined
+    show();
+  });
+
+  // 点图片本身不关闭（看瑕疵细节时容易误触），点图片以外的空白才关
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.lb-view') || e.target.closest('.lb-nav') ||
+        e.target.closest('.lb-h') || e.target.closest('.lb-f')) return;
+    close();
+  });
+
+  document.addEventListener('keydown', onKey, true);
+  (document.getElementById('layer') || document.body).appendChild(el);
+  show();
+
+  return { close: close };
+}
+
 /* ============================== 图片选择器 ============================== */
 
 /**
@@ -281,8 +459,32 @@ function pickImage(opt) {
         const d = await API.get('/api/media/list', { q, sort, page: 1, size: 60 });
         root.querySelector('[data-stat]').textContent = `共 ${d.stat.count} 张 · 占用 ${(d.stat.bytes / 1024 / 1024).toFixed(1)}MB`;
         root.querySelector('[data-liblist]').innerHTML = d.list.length
-          ? d.list.map((it) => '<div class="media-it" data-pick="' + esc(it.url) + '"><img src="' + esc(it.url) + '" alt=""><div class="m"><span>' + esc(it.orig || it.name).slice(0, 12) + '</span><span>' + it.width + '×' + it.height + '</span></div></div>').join('')
+          ? d.list.map((it, i) =>
+            '<div class="media-it" data-pick="' + esc(it.url) + '">' +
+              '<div class="thumb"><img src="' + esc(it.url) + '" alt="">' +
+                '<button class="zoombtn" data-zoom="' + i + '" title="查看大图">' +
+                  '<svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" ' +
+                  'stroke-linecap="round" aria-hidden="true"><circle cx="7" cy="7" r="4.2"/>' +
+                  '<path d="M10.2 10.2 13.5 13.5M7 5.2v3.6M5.2 7h3.6"/></svg></button>' +
+              '</div>' +
+              '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 12) + '</span><span>' + it.width + '×' + it.height + '</span></div>' +
+            '</div>').join('')
           : '<div class="empty-state">素材库还没有图片，去「本地上传」传一张</div>';
+        // 这里点卡片 = 选图（选图是这个弹层的主操作），所以「看大图」单独做成角标按钮，
+        // 且点它时 stopPropagation —— 否则看一眼大图就把图选上了，一次误触要手动取消。
+        root.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const card = b.closest('.media-it');
+          lightbox({
+            list: d.list,
+            index: Number(b.getAttribute('data-zoom')) || 0,
+            pickText: '使用这张',
+            onPick: (it) => {
+              add(it.url);
+              if (card) card.classList.add('sel');
+            }
+          });
+        }));
         root.querySelectorAll('[data-pick]').forEach((el) => el.addEventListener('click', () => {
           add(el.getAttribute('data-pick'));
           el.classList.add('sel');

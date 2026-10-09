@@ -335,6 +335,87 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 .media-it.sel { outline: 2px solid var(--primary); outline-offset: -2px; }
 .media-it[data-pick] { cursor: pointer; }
 
+/* ---- 素材卡片：缩略图上的覆盖层（查看大图提示 / 勾选圈 / 单张操作） ----
+ * 交互约定：点图片 = 放大预览，点左上角勾选圈 = 多选。
+ * 所以勾选圈必须**常驻可见**（只在 hover 才出现的话，用户根本不知道多选入口在哪），
+ * 「查看大图」则只是提示、不吃点击（pointer-events:none），否则会挡掉卡片本身的点击。 */
+.media-it .thumb { position: relative; }
+.media-it.zoom { cursor: zoom-in; }
+.media-it .zoomtip {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  display: inline-flex; align-items: center; gap: 5px; padding: 5px 10px; border-radius: 20px;
+  background: rgba(16, 24, 40, .66); color: #fff; font-size: 12px; white-space: nowrap;
+  opacity: 0; transition: opacity .15s; pointer-events: none;
+}
+.media-it:hover .zoomtip { opacity: 1; }
+.media-it .pickbox {
+  position: absolute; left: 6px; top: 6px; width: 21px; height: 21px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 2;
+  background: rgba(255, 255, 255, .92); border: 1.5px solid var(--line-strong);
+  box-shadow: 0 1px 3px rgba(16, 24, 40, .18); transition: background .12s, border-color .12s;
+}
+.media-it .pickbox svg { color: #fff; opacity: 0; transition: opacity .12s; }
+.media-it .pickbox:hover { border-color: var(--primary); }
+.media-it.sel .pickbox { background: var(--primary); border-color: var(--primary); }
+.media-it.sel .pickbox svg { opacity: 1; }
+.media-it .thumb .ops { z-index: 2; }
+
+/* 图选器（pickImage）里的「看大图」角标：那里点卡片 = 选图，预览必须另设入口 */
+.media-it .zoombtn {
+  position: absolute; right: 6px; bottom: 6px; width: 24px; height: 24px; border: 0; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+  background: rgba(16, 24, 40, .66); color: #fff; opacity: 0; transition: opacity .15s;
+}
+.media-it:hover .zoombtn { opacity: 1; }
+
+.media-hint { font-size: 12px; color: var(--sub); padding: 10px 2px 0; line-height: 1.7; }
+
+/* ---- 大图预览浮层（lightbox） ----
+ * 刻意用近黑遮罩而不是半透明灰：素材大多是白底商品图，浅遮罩下看不出边界在哪。
+ * 三层结构：顶栏（文件名/尺寸/序号/关闭）· 舞台（图片 + 左右翻页）· 底栏（操作）。 */
+.lb { position: fixed; inset: 0; z-index: 200; background: rgba(12, 16, 22, .93); display: flex; flex-direction: column; }
+.lb-h { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.lb-t { min-width: 0; }
+.lb-t b {
+  display: block; font-size: 13px; font-weight: 500; color: #fff;
+  max-width: 56vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lb-meta { font-size: 12px; color: rgba(255, 255, 255, .58); }
+.lb-idx { font-size: 12px; color: rgba(255, 255, 255, .72); font-variant-numeric: tabular-nums; }
+.lb-x {
+  width: 32px; height: 32px; border: 0; border-radius: 8px; cursor: pointer; flex: 0 0 auto;
+  background: rgba(255, 255, 255, .12); color: #fff; font-size: 18px; line-height: 1;
+}
+.lb-x:hover { background: rgba(255, 255, 255, .24); }
+.lb-stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
+.lb-view {
+  position: relative; flex: 1 1 auto; align-self: stretch; min-width: 0; min-height: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.lb-view img { max-width: 100%; max-height: 100%; object-fit: contain; background: #1b1e23; border-radius: 6px; box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }
+.lb-tip { position: absolute; color: rgba(255, 255, 255, .7); font-size: 13px; }
+.lb-err {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+  padding: 20px; text-align: center; color: #fff; background: rgba(27, 30, 35, .92); border-radius: 6px;
+}
+.lb-err .sub { color: rgba(255, 255, 255, .58); font-size: 12px; word-break: break-all; max-width: 420px; }
+.lb-nav {
+  flex: 0 0 auto; width: 44px; height: 64px; border: 0; border-radius: 10px; cursor: pointer;
+  background: rgba(255, 255, 255, .1); color: #fff; font-size: 26px; line-height: 1;
+}
+.lb-nav:hover { background: rgba(255, 255, 255, .22); }
+.lb-f { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+.lb-f .btn { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .18); color: #fff; }
+.lb-f .btn:hover { background: rgba(255, 255, 255, .22); }
+.lb-f .btn.primary { background: var(--primary); border-color: var(--primary); }
+.lb-f .btn.primary:hover { background: var(--primary-dark); }
+.lb-f .btn.danger { color: #ffb4ad; border-color: rgba(255, 180, 173, .35); }
+.lb-f .btn.danger:hover { background: rgba(240, 68, 56, .18); }
+@media (max-width: 700px) {
+  .lb-nav { width: 34px; height: 52px; font-size: 22px; }
+  .lb-t b { max-width: 40vw; }
+}
+
 /* ---- 素材库：左侧文件夹栏 + 右侧网格 ----
  * 文件夹是「逻辑分类」：拖动/移动素材只改索引里的 folder 字段，
  * 磁盘上的 /uploads/<yyyyMM>/… 一律不动（URL 已写进 replica.js，挪了线上就裂图）。 */
