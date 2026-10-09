@@ -323,9 +323,36 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 
 /* ---------------------------- 素材库 ---------------------------- */
 
-.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
-.media-it { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; position: relative; }
-.media-it img { width: 100%; height: 118px; object-fit: cover; display: block; background: #f0f2f5; }
+/* ---- 素材卡片：**图在上、名称在下**（对标有赞素材中心）
+ * 缩略图用 contain（不是 cover）：素材常有竖版海报、长图，cover 会裁掉一半，
+ * 运营靠缩略图认不出是哪张，等于白给。留白用浅灰底补，视觉上仍是整齐的方格。 */
+.media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(152px, 1fr)); gap: 12px; }
+.media-it {
+  border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; position: relative;
+  display: flex; flex-direction: column;
+}
+.media-it img, .media-it .thumb video { width: 100%; height: 118px; object-fit: contain; display: block; background: #f7f8fa; }
+.media-it .nm {
+  padding: 7px 8px 0; font-size: 12px; color: var(--text); line-height: 1.5;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.media-it .meta { padding: 1px 8px 7px; font-size: 11px; color: var(--sub); }
+/* 操作常驻显示，不藏在 hover 里 —— 触控板 / 远程桌面上 hover 常常触发不了 */
+.media-it .ops2 {
+  display: flex; gap: 2px; padding: 4px 5px; margin-top: auto; border-top: 1px solid var(--line); background: #fcfcfd;
+}
+.media-it .ops2 button {
+  flex: 1 1 0; min-width: 0; border: 0; border-radius: 4px; background: transparent; cursor: pointer;
+  color: var(--primary); font-size: 11px; padding: 3px 2px; white-space: nowrap;
+}
+.media-it .ops2 button:hover { background: var(--primary-soft); }
+.media-it .ops2 button[data-del] { color: var(--sub); }
+.media-it .ops2 button[data-del]:hover { color: var(--red); background: #fdecea; }
+/* 视频角标：一眼区分「图」和「片」，否则首帧容易被当成一张图 */
+.media-it .vbadge {
+  position: absolute; right: 6px; top: 6px; z-index: 2; padding: 2px 7px; border-radius: 10px;
+  background: rgba(16, 24, 40, .72); color: #fff; font-size: 11px; line-height: 1.5;
+}
 .media-it .m { padding: 6px 8px; font-size: 11px; color: var(--sub); display: flex; justify-content: space-between; gap: 6px; }
 .media-it .ops { position: absolute; right: 6px; top: 6px; display: flex; gap: 4px; opacity: 0; transition: .15s; }
 .media-it:hover .ops { opacity: 1; }
@@ -334,6 +361,21 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 }
 .media-it.sel { outline: 2px solid var(--primary); outline-offset: -2px; }
 .media-it[data-pick] { cursor: pointer; }
+
+/* ---- 素材库顶部分档（全部 / 图片 / 视频） ---- */
+.media-kinds {
+  display: flex; align-items: center; gap: 4px; padding: 10px 16px 0;
+  border-bottom: 1px solid var(--line); margin-bottom: 0;
+}
+.media-kinds .mk {
+  border: 0; background: transparent; cursor: pointer; padding: 8px 12px 10px; font-size: 13px;
+  color: var(--sub); border-bottom: 2px solid transparent; margin-bottom: -1px;
+}
+.media-kinds .mk b { font-weight: 500; color: var(--sub); margin-left: 4px; font-variant-numeric: tabular-nums; }
+.media-kinds .mk:hover { color: var(--text); }
+.media-kinds .mk.on { color: var(--text); font-weight: 500; border-bottom-color: var(--primary); }
+.media-kinds .mk.on b { color: var(--primary); }
+.media-kinds .hint { font-size: 12px; color: var(--sub); padding-bottom: 8px; }
 
 /* ---- 素材卡片：缩略图上的覆盖层（查看大图提示 / 勾选圈 / 单张操作） ----
  * 交互约定：点图片 = 放大预览，点左上角勾选圈 = 多选。
@@ -393,6 +435,10 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
   display: flex; align-items: center; justify-content: center;
 }
 .lb-view img { max-width: 100%; max-height: 100%; object-fit: contain; background: #1b1e23; border-radius: 6px; box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }
+.lb-view video {
+  max-width: 100%; max-height: 100%; background: #000; border-radius: 6px;
+  box-shadow: 0 12px 44px rgba(0, 0, 0, .5);
+}
 .lb-tip { position: absolute; color: rgba(255, 255, 255, .7); font-size: 13px; }
 .lb-err {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;

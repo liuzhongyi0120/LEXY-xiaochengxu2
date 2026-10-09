@@ -163,11 +163,15 @@ function promptBox(title, defaultValue, placeholder) {
  *      这样 ←/→ 翻的就是「你正在看的这个筛选结果」，预览层不必自己再发一次请求 ——
  *      也就不会出现「预览里的顺序和网格里的顺序对不上」这种事后很难查的错位。
  *   ② 切换只改 <img> 的 src，不重建浮层：重建会让遮罩闪一下。
- *      相邻一张提前 `new Image()` 预载，翻页不空等。
+ *      相邻一张提前 `new Image()` 预载，翻页不空等（视频不预载，代价不成比例）。
  *   ③ 加载失败必须给可见提示 + 兜底入口 —— 素材可能刚在别处被删掉，
  *      此时白屏会让人以为「后台坏了」，而不是「这张图没了」。
  *   ④ 键盘监听挂在 document 上，关闭时必须解绑：否则关掉预览后按 ←/→，
  *      事件还会打到已经不在屏幕上的浮层上。
+ *
+ * 视频分支（kind === 'video'）：
+ *   同一套翻页 / 删除 / 下载逻辑，只是把 <img> 换成 <video controls>；
+ *   切走或关闭时**必须 pause + 清 src**，否则会在后台继续缓冲、甚至继续出声。
  *
  * @param {{list:Array, index?:number, actions?:boolean,
  *          onDelete?:Function, onPick?:Function, pickText?:string}} opt
@@ -175,6 +179,25 @@ function promptBox(title, defaultValue, placeholder) {
  *        浮层会把它从当前列表里摘掉并跳到下一张（全删光则自动关闭）。
  * @returns {{close:Function}}
  */
+/**
+ * 下载一个素材（预览浮层与卡片的「下载」共用这一份实现）
+ *   - 本站素材（/uploads/… 或同源）：<a download> 直接落盘，文件名取原始名
+ *   - 外链（有赞 CDN 等）：跨域下 download 属性会被忽略，只能新窗口打开
+ * 抽出来的原因和删除一样：两处各写一份，迟早会有一处忘了处理外链。
+ */
+function downloadUrl(it) {
+  const url = (it && it.url) ? it.url : String(it || '');
+  if (!url) return;
+  const same = url.indexOf('/uploads/') === 0 || url.indexOf(location.origin) === 0;
+  const a = document.createElement('a');
+  a.href = url;
+  if (same) a.download = String((it && (it.orig || it.name)) || 'media').replace(/[^\w.\-\u4e00-\u9fa5]+/g, '_');
+  else a.target = '_blank';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 function lightbox(opt) {
   const list = (opt.list || []).filter((x) => x && x.url).slice();
   if (!list.length) return { close() {} };
@@ -196,9 +219,10 @@ function lightbox(opt) {
       (single ? '' : '<button class="lb-nav prev" data-prev title="上一张（←）">‹</button>') +
       '<div class="lb-view">' +
         '<img data-img alt="">' +
+        '<video data-video controls playsinline preload="metadata" hidden></video>' +
         '<div class="lb-tip" data-tip>加载中…</div>' +
         '<div class="lb-err" data-err hidden>' +
-          '<b>图片加载失败</b>' +
+          '<b data-errtitle>加载失败</b>' +
           '<span class="sub" data-errmeta></span>' +
           '<button class="btn sm" data-new>在新窗口打开</button>' +
         '</div>' +
@@ -217,42 +241,76 @@ function lightbox(opt) {
 
   const q = (s) => el.querySelector(s);
   const img = q('[data-img]');
+  const vid = q('[data-video]');
   const tip = q('[data-tip]');
   const errBox = q('[data-err]');
+
+  /** 是不是视频：优先看后端的 kind，外链（导入的旧素材）则用扩展名兜底 */
+  const isVideo = (it) => (it.kind ? it.kind === 'video' : /\.(mp4|m4v|mov|webm)(\?|$)/i.test(String(it.url || '')));
 
   /** 只换 src，不重建浮层；同一张重复渲染时跳过赋值（同 src 再赋值不会重新触发 load） */
   const show = () => {
     const it = list[i];
+    const video = isVideo(it);
     q('[data-name]').textContent = it.orig || it.name || '';
     const bits = [];
     if (it.width && it.height) bits.push(it.width + '×' + it.height);
     if (it.size) bits.push((it.size / 1024).toFixed(0) + 'KB');
+    if (video && it.durationText) bits.push('时长 ' + it.durationText);
     if (it.folder) bits.push('文件夹：' + it.folder);
     q('[data-meta]').textContent = bits.join('  ·  ');
     const idxEl = q('[data-idx]');
     if (idxEl) idxEl.textContent = (i + 1) + ' / ' + list.length;
 
     errBox.setAttribute('hidden', '');
-    if (img.getAttribute('src') !== it.url) {
-      tip.textContent = '加载中…';
-      tip.removeAttribute('hidden');
-      img.setAttribute('src', it.url);
-      // 命中缓存时浏览器不会派发 load 事件（网格里的缩略图早就把这张拉过了），
-      // 不校对的话「加载中…」会一直挂着。这里补一次判定。
-      const settle = () => { if (img.complete && img.naturalWidth > 0) tip.setAttribute('hidden', ''); };
-      settle();
-      setTimeout(settle, 60);
+    q('[data-errtitle]').textContent = video ? '视频加载失败' : '图片加载失败';
+
+    // 切换时把用不到的那一路彻底停掉：视频不 pause + 清 src 会在后台继续下载 / 出声
+    if (video) {
+      img.setAttribute('hidden', '');
+      img.removeAttribute('src');
+      vid.removeAttribute('hidden');
+      if (vid.getAttribute('src') !== it.url) {
+        vid.setAttribute('src', it.url);
+        tip.textContent = '加载中…';
+        tip.removeAttribute('hidden');
+      } else {
+        tip.setAttribute('hidden', '');
+      }
+    } else {
+      vid.pause();
+      vid.setAttribute('hidden', '');
+      vid.removeAttribute('src');   // 清 src 才会真正停止缓冲，只 hidden 不够
+      vid.load();
+      img.removeAttribute('hidden');
+      if (img.getAttribute('src') !== it.url) {
+        tip.textContent = '加载中…';
+        tip.removeAttribute('hidden');
+        img.setAttribute('src', it.url);
+        // 命中缓存时浏览器不会派发 load 事件（网格里的缩略图早就把这张拉过了），
+        // 不校对的话「加载中…」会一直挂着。这里补一次判定。
+        const settle = () => { if (img.complete && img.naturalWidth > 0) tip.setAttribute('hidden', ''); };
+        settle();
+        setTimeout(settle, 60);
+      }
     }
-    // 预载下一张：翻页时不至于先看到空白
-    if (!single) { const nx = list[(i + 1) % list.length]; if (nx && nx.url !== it.url) { const pre = new Image(); pre.src = nx.url; } }
+    // 预载下一张：翻页时不至于先看到空白（视频不预载 —— 视频首帧要 Range 拉一段，代价不成比例）
+    if (!single) {
+      const nextIt = list[(i + 1) % list.length];
+      if (nextIt && nextIt.url !== it.url && !isVideo(nextIt)) { const pre = new Image(); pre.src = nextIt.url; }
+    }
     q('[data-errmeta]').textContent = it.url;
   };
 
-  img.addEventListener('load', () => tip.setAttribute('hidden', ''));
-  img.addEventListener('error', () => {
+  const fail = () => {
     tip.setAttribute('hidden', '');
     errBox.removeAttribute('hidden');
-  });
+  };
+  img.addEventListener('load', () => tip.setAttribute('hidden', ''));
+  img.addEventListener('error', fail);
+  // 视频：loadeddata 之前撤占位；错误（格式不支持 / 文件没了）同样给可见提示
+  vid.addEventListener('loadeddata', () => tip.setAttribute('hidden', ''));
+  vid.addEventListener('error', fail);
 
   const step = (d) => { i = (i + d + list.length) % list.length; show(); };
   const prevOverflow = document.body.style.overflow;
@@ -269,6 +327,9 @@ function lightbox(opt) {
   const close = () => {
     if (closed) return;
     closed = true;
+    // 关掉浮层必须停掉视频：只 remove 节点的话，部分浏览器会把已经缓冲的片段继续播完
+    vid.pause();
+    vid.removeAttribute('src');
     document.removeEventListener('keydown', onKey, true);
     document.body.style.overflow = prevOverflow;
     el.remove();
@@ -286,19 +347,8 @@ function lightbox(opt) {
     try { await navigator.clipboard.writeText(u); toast('已复制：' + u); } catch (e) { toast(u); }
   });
 
-  // 下载：本站素材走 <a download>；外链（有赞 CDN 等）download 属性无效，改新窗口打开
   const dn = q('[data-down]');
-  if (dn) dn.addEventListener('click', () => {
-    const it = list[i];
-    const same = it.url.indexOf('/uploads/') === 0 || it.url.indexOf(location.origin) === 0;
-    const a = document.createElement('a');
-    a.href = it.url;
-    if (same) a.download = String(it.orig || it.name || 'image').replace(/[^\w.\-\u4e00-\u9fa5]+/g, '_');
-    else a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  });
+  if (dn) dn.addEventListener('click', () => downloadUrl(list[i]));
 
   const pk = q('[data-pickbtn]');
   if (pk) pk.addEventListener('click', () => { const it = list[i]; close(); opt.onPick(it); });
@@ -317,10 +367,17 @@ function lightbox(opt) {
     show();
   });
 
-  // 点图片本身不关闭（看瑕疵细节时容易误触），点图片以外的空白才关
+  /*
+   * 点空白处关闭。
+   * 判定必须用「点到的**元素**是不是媒体本身」，不能用容器（早先写成 `.lb-view`）——
+   * `.lb-view` 是铺满整个舞台的 flex 容器，图片四周的留白全都在它里面，
+   * 于是"点空白关不掉、只有点最外圈几像素才关"，等于这个功能形同虚设。
+   * 现在：点在图片 / 视频上不关（凑近看细节时最容易误触），其余任何位置一律关闭。
+   */
   el.addEventListener('click', (e) => {
-    if (e.target.closest('.lb-view') || e.target.closest('.lb-nav') ||
-        e.target.closest('.lb-h') || e.target.closest('.lb-f')) return;
+    const t = e.target;
+    if (t && (t.tagName === 'IMG' || t.tagName === 'VIDEO')) return;
+    if (t.closest && (t.closest('.lb-nav') || t.closest('.lb-h') || t.closest('.lb-f') || t.closest('.lb-err'))) return;
     close();
   });
 
@@ -456,7 +513,7 @@ function pickImage(opt) {
       const q = root.querySelector('[data-q]').value.trim();
       const sort = root.querySelector('[data-sort]').value;
       try {
-        const d = await API.get('/api/media/list', { q, sort, page: 1, size: 60 });
+        const d = await API.get('/api/media/list', { q, sort, page: 1, size: 60, kind: 'image' });
         root.querySelector('[data-stat]').textContent = `共 ${d.stat.count} 张 · 占用 ${(d.stat.bytes / 1024 / 1024).toFixed(1)}MB`;
         root.querySelector('[data-liblist]').innerHTML = d.list.length
           ? d.list.map((it, i) =>
@@ -469,7 +526,7 @@ function pickImage(opt) {
               '</div>' +
               '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 12) + '</span><span>' + it.width + '×' + it.height + '</span></div>' +
             '</div>').join('')
-          : '<div class="empty-state">素材库还没有图片，去「本地上传」传一张</div>';
+          : '<div class="empty-state">素材库里还没有图片（视频素材请在「素材库」页面管理）</div>';
         // 这里点卡片 = 选图（选图是这个弹层的主操作），所以「看大图」单独做成角标按钮，
         // 且点它时 stopPropagation —— 否则看一眼大图就把图选上了，一次误触要手动取消。
         root.querySelectorAll('[data-zoom]').forEach((b) => b.addEventListener('click', (e) => {

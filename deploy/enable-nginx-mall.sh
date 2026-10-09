@@ -29,7 +29,30 @@ die() { printf '\n\033[1;31m[x] %s\033[0m\n' "$*" >&2; exit 1; }
 [ -f "$SNIP" ] || die "找不到 $SNIP（部署包不完整）"
 
 if grep -q 'location \^~ /mall-api/' "$SITE"; then
-  log "已存在 /mall-api/ 反代，跳过插入（幂等）"
+  # 已存在：把整段反代块**替换成当前片段**。
+  # 只判断「有没有」是不够的 —— 片段里的参数（client_max_body_size / 超时）会随版本变，
+  # 若只跳过，重跑部署就永远同步不到服务器上那份旧配置。
+  # 用大括号配平找到块的范围，避免误伤相邻 location。
+  cp -a "$SITE" "$SITE.bak-mall-api-$STAMP"
+  awk -v snipfile="$SNIP" '
+    BEGIN { while ((getline l < snipfile) > 0) snip = snip l "\n"; }
+    /location \^~ \/mall-api\// { inblk = 1; depth = 0 }
+    inblk {
+      depth += gsub(/\{/, "{")
+      depth -= gsub(/\}/, "}")
+      if (depth <= 0) { inblk = 0; printf "%s", snip }
+      next
+    }
+    { print }
+  ' "$SITE" > "$SITE.new"
+  mv "$SITE.new" "$SITE"
+  log "已用最新片段替换原有 /mall-api/ 反代块（备份 → $SITE.bak-mall-api-$STAMP）"
+
+  # 替换是否真的发生了：片段里的关键参数必须能在站点配置里找到
+  WANT_BODY="$(grep -oE 'client_max_body_size [0-9]+m;' "$SNIP" | head -1)"
+  if [ -n "$WANT_BODY" ] && ! grep -qF "$WANT_BODY" "$SITE"; then
+    die "替换后仍未找到「$WANT_BODY」，配置不正常（备份在原处可回滚）"
+  fi
 else
   cp -a "$SITE" "$SITE.bak-mall-api-$STAMP"
   log "已备份 → $SITE.bak-mall-api-$STAMP"

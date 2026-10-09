@@ -50,6 +50,22 @@ curl -s -X POST https://127.0.0.1/mall-api/api/auth/login \
   未开通时点「绑定手机号」会报错，**不影响**登录与下单。支付不受影响：未配商户号时仍走沙箱，
   配合 `.env` 里的 `ALLOW_MOCK_PAY=1` 可完整跑通下单→支付→发货→收货。
 
+## 上传体积：三处上限必须同向放宽
+
+素材库支持视频后，单次上传的体积受**三个地方**限制，任何一处没跟上都会失败，且现象各不相同：
+
+| 位置 | 当前值 | 没跟上的现象 |
+|---|---|---|
+| nginx `client_max_body_size`（`nginx-mall-api.conf`） | **60m** | 直接 413，而且**后端日志里什么都没有** —— 请求根本没到后端（这是最难查的一种） |
+| `server/lib/media.js` 的 `MAX_VIDEO_BYTES` | **50MB** | 接口报「视频过大」，但文件已经完整传上来了，白等一场 |
+| `server/lib/media.js` 的 `MAX_BODY`（请求体） | **64MB** | 同上，报的措辞是「单次上传上限」 |
+
+单位不同是有意的：nginx 写 `60m`，后端写字节数。改的时候**三个值一起改**。
+
+`enable-nginx-mall.sh` 在重跑时会**把 `location ^~ /mall-api/` 整段替换成最新片段**（先带时间戳备份），
+所以改完 `nginx-mall-api.conf` 只要重跑一次部署脚本，服务器上那份旧参数就会自动同步 ——
+不用登机器手工 sed（手工改过的地方，下次重跑就会被片段纠正回来）。
+
 ## 三条容易踩的坑（都真实踩过）
 
 1. **打包必须带上 `miniprogram/`**。`server/lib/seed.js` 在模块加载期就 `require('../../miniprogram/mock/data')`，

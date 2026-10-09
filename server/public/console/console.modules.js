@@ -882,6 +882,7 @@ App.views.media = {
       q: state.q,
       sort: state.sort,
       folder: state.folder,
+      kind: state.kind,
       page: state.page || 1,
       size: 40
     });
@@ -912,21 +913,68 @@ App.views.media = {
 
     const whereText = cur === '' ? '未分组' : (cur === FOLDER_NONE ? '未分组' : '文件夹「' + cur + '」');
 
-    const grid = d.list.length
-      ? d.list.map((it, i) =>
-        '<div class="media-it zoom' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') + '" data-pick="' + esc(it.name) + '" data-i="' + i + '">' +
-          '<div class="thumb">' +
-            '<img src="' + esc(it.url) + '" alt="" loading="eager">' +
-            '<span class="zoomtip">' + MEDIA_ZOOM_ICO + '查看大图</span>' +
-            '<span class="pickbox" data-check="' + esc(it.name) + '" title="选择这张（也可 Ctrl / ⌘ + 点击卡片）">' + MEDIA_CHECK_ICO + '</span>' +
-            '<div class="ops"><button data-copy="' + esc(it.url) + '" title="复制地址">⧉</button>' +
-            '<button data-del="' + esc(it.name) + '" title="删除素材">✕</button></div>' +
-          '</div>' +
-          '<div class="m"><span>' + esc(it.orig || it.name).slice(0, 14) + '</span><span>' +
-            it.width + '×' + it.height + ' · ' + (it.size / 1024).toFixed(0) + 'K</span></div>' +
-        '</div>').join('')
-      : '<div class="empty-state">' + (cur === '' ? '素材库还没有图片' : '这个文件夹里还没有图片') + '</div>';
+    /* 顶部「全部 / 图片 / 视频」分档。计数取自整个素材库（不受当前筛选影响），
+     * 否则一进视频档，「全部」的数字就跟着变了。 */
+    const kinds = d.kinds || { all: 0, image: 0, video: 0 };
+    const kindTab = (v, text, n) =>
+      '<button class="mk' + ((state.kind || '') === v ? ' on' : '') + '" data-kindt="' + v + '">' +
+        esc(text) + '<b>' + n + '</b></button>';
+    const tabs =
+      '<div class="media-kinds">' +
+        kindTab('', '全部', kinds.all) +
+        kindTab('image', '图片', kinds.image) +
+        kindTab('video', '视频', kinds.video) +
+        '<span class="grow"></span>' +
+        '<span class="hint">图片 ≤ ' + (d.stat.maxBytes / 1024 / 1024) + 'MB · 视频 ≤ ' + (d.stat.maxVideoBytes / 1024 / 1024) +
+        'MB（超过 ' + (d.stat.videoWarnBytes / 1024 / 1024) + 'MB 的视频小程序端加载会慢）</span>' +
+      '</div>';
 
+    /*
+     * 卡片：**图片在上、名称在下**（对标有赞素材中心的排版）。
+     * 三行信息各司其职：文件名（可能很长，用 CSS 省略号 + title 兜底）、
+     * 元信息（尺寸/体积/时长）、操作（复制链接 / 下载 / 删除，常驻不藏在 hover 里 ——
+     * 藏起来的操作在触控板和远程桌面上常常找不到）。
+     */
+    const cell = (it, i) => {
+      const isVideo = it.kind === 'video';
+      const meta = [];
+      if (it.width && it.height) meta.push(it.width + '×' + it.height);
+      if (it.sizeText) meta.push(it.sizeText);
+      if (isVideo && it.durationText) meta.push('时长 ' + it.durationText);
+      const nm = it.orig || it.name;
+      return '<div class="media-it zoom' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') +
+          '" data-pick="' + esc(it.name) + '" data-i="' + i + '" data-kind="' + (isVideo ? 'video' : 'image') + '">' +
+        '<div class="thumb">' +
+          (isVideo
+            // muted + preload=metadata：只要首帧，不要出声、不要整段下载
+            ? '<video src="' + esc(it.url) + '" muted preload="metadata" playsinline></video>'
+            : '<img src="' + esc(it.url) + '" alt="" loading="eager">') +
+          (isVideo ? '<span class="vbadge">视频</span>' : '') +
+          '<span class="zoomtip">' + MEDIA_ZOOM_ICO + (isVideo ? '播放' : '查看大图') + '</span>' +
+          '<span class="pickbox" data-check="' + esc(it.name) + '" title="选择这个（也可 Ctrl / ⌘ + 点击卡片）">' + MEDIA_CHECK_ICO + '</span>' +
+        '</div>' +
+        '<div class="nm" title="' + esc(nm) + '">' + esc(nm) + '</div>' +
+        '<div class="meta">' + esc(meta.join(' · ')) + '</div>' +
+        '<div class="ops2">' +
+          '<button data-copy="' + esc(it.url) + '" title="复制素材地址">复制链接</button>' +
+          '<button data-down="' + esc(it.name) + '" title="下载到本地">下载</button>' +
+          '<button data-del="' + esc(it.name) + '" title="删除素材">删除</button>' +
+        '</div>' +
+      '</div>';
+    };
+
+    const grid = d.list.length
+      ? d.list.map(cell).join('')
+      : '<div class="empty-state">' +
+          (state.kind === 'video'
+            ? '还没有视频素材 —— 把 MP4 / MOV / WebM 拖到上面的上传区即可'
+            : '这个范围里还没有素材') +
+          /* 分档与文件夹是 AND：空的时候要说清「是哪两个条件叠起来才空的」，
+             否则用户会以为素材丢了（明明刚才还在） */
+          ((cur && cur !== FOLDER_NONE)
+            ? '（当前筛选：文件夹「' + esc(cur) + '」' + (state.kind ? ' + ' + (state.kind === 'video' ? '视频' : '图片') : '') + '）'
+            : '') +
+        '</div>';
     const moveOpts = '<option value="">移动到…</option>' +
       '<option value="' + FOLDER_NONE + '">未分组</option>' +
       d.folders.map((f) => '<option value="' + esc(f.name) + '">' + esc(f.name) + '</option>').join('') +
@@ -934,15 +982,16 @@ App.views.media = {
 
     body.innerHTML =
       '<div class="card"><div class="card-h"><h2>素材库</h2><div class="grow"></div>' +
-        '<span class="hint">共 ' + d.stat.count + ' 张 · 占用 ' + (d.stat.bytes / 1024 / 1024).toFixed(1) +
-        'MB · 单张上限 ' + (d.stat.maxBytes / 1024 / 1024) + 'MB</span></div>' +
+        '<span class="hint">共 ' + kinds.all + ' 个素材（图片 ' + kinds.image + ' · 视频 ' + kinds.video + '） · 占用 ' +
+        (d.stat.bytes / 1024 / 1024).toFixed(1) + 'MB</span></div>' +
+      tabs +
       '<div class="card-b media-wrap">' + side +
         '<div class="media-main">' +
-          '<div class="upzone" data-zone style="margin-bottom:12px"><b>点击选择图片</b>，或把图片拖到这里，也可直接 Ctrl+V 粘贴<br>' +
+          '<div class="upzone" data-zone style="margin-bottom:12px"><b>点击选择素材</b>，或把文件拖到这里，也可直接 Ctrl+V 粘贴<br>' +
             '<span class="sub">上传后归入：' + esc(whereText) +
               (isRealFolder ? '' : '（想直接归到某个文件夹，先点左侧文件夹名再上传）') +
-            ' · 支持 PNG / JPG / WebP / GIF · 服务端按文件头校验真实类型</span>' +
-            '<input type="file" accept="image/*" multiple hidden data-file></div>' +
+            ' · 支持 ' + esc(d.stat.acceptText) + ' · 服务端按文件头校验真实类型</span>' +
+            '<input type="file" accept="' + esc(d.stat.acceptAttr) + '" multiple hidden data-file></div>' +
           '<div class="filter media-bar">' +
             '<input type="text" class="w160" placeholder="搜索文件名…" data-q value="' + esc(state.q || '') + '">' +
             '<select class="w120" data-sort>' +
@@ -958,8 +1007,8 @@ App.views.media = {
             '</span>' +
           '</div>' +
           '<div class="media-grid" data-grid>' + grid + '</div>' +
-          '<div class="media-hint">点任意图片可放大预览（预览里 ← / → 翻页、Esc 关闭、可下载或删除）；' +
-            '要批量操作，勾选图片左上角的圆圈（或按住 Ctrl / ⌘ 再点卡片）。</div>' +
+          '<div class="media-hint">点图片 / 视频即打开预览（预览里 ← / → 翻页、<b>Esc 或点空白处关闭</b>、可复制地址 / 下载 / 删除）；' +
+            '要批量操作，勾选缩略图左上角的圆圈（或按住 Ctrl / ⌘ 再点卡片）。</div>' +
         '</div>' +
       '</div>' + pagerHtml(d.total, d.page, d.size) + '</div>';
 
@@ -1123,13 +1172,21 @@ App.views.media = {
     body.querySelector('[data-sort]').addEventListener('change', (e) => { state.sort = e.target.value; reload(); });
     bindPager(body, state, reload);
 
-    /* ---- 上传（归入当前打开的文件夹） ---- */
+    /* ---- 上传（图片 + 视频；归入当前打开的文件夹） ----
+     * 这里只做「把明显无关的文件（zip、exe…）挡在门外」的粗筛：
+     * 真实类型一律由服务端按文件头判定 —— 前端 MIME 是客户端说了算的，不可信。
+     * 有些系统给的 f.type 是空串（尤其 .mov），所以再用扩展名兜一层。 */
     const uploadFolder = isRealFolder ? cur : '';
     const upload = async (files) => {
-      const list = Array.from(files || []).filter((f) => f.type.indexOf('image/') === 0);
+      const list = Array.from(files || []).filter((f) => {
+        const t = String(f.type || '');
+        if (t.indexOf('image/') === 0 || t.indexOf('video/') === 0) return true;
+        return /\.(png|jpe?g|webp|gif|mp4|m4v|mov|webm)$/i.test(f.name || '');
+      });
       if (!list.length) return;
       const stop = loading('上传中…');
       let ok = 0;
+      let warn = '';
       try {
         for (const f of list) {
           const fd = new FormData();
@@ -1137,10 +1194,13 @@ App.views.media = {
           const url = '/api/media/upload' + (uploadFolder ? '?folder=' + encodeURIComponent(uploadFolder) : '');
           const res = await fetch(url, { method: 'POST', body: fd });
           const json = await res.json();
-          if (json.code === 0) ok += 1;
-          else toast(f.name + '：' + json.msg, true);
+          if (json.code === 0) {
+            ok += 1;
+            if (json.data && json.data.warn) warn = json.data.warn;
+          } else toast(f.name + '：' + json.msg, true);
         }
-        toast('上传成功 ' + ok + ' 张' + (uploadFolder ? '（已归入「' + uploadFolder + '」）' : ''));
+        toast('上传成功 ' + ok + ' 个素材' + (uploadFolder ? '（已归入「' + uploadFolder + '」）' : ''));
+        if (warn) toast(warn, true);   // 体积偏大的视频：照收，但把话说清楚
         reload();
       } finally { stop(); }
     };
@@ -1153,7 +1213,7 @@ App.views.media = {
     zone.addEventListener('drop', (e) => upload(e.dataTransfer.files));
     body.addEventListener('paste', (e) => { if (e.clipboardData && e.clipboardData.files.length) upload(e.clipboardData.files); });
 
-    /* ---- 单张：复制地址 / 删除 ---- */
+    /* ---- 单张：复制地址 / 下载 / 删除 ---- */
     body.querySelectorAll('[data-copy]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
       const url = b.getAttribute('data-copy');
@@ -1163,6 +1223,12 @@ App.views.media = {
       } catch (err) { toast(url); }
     }));
 
+    body.querySelectorAll('[data-down]').forEach((b) => b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const it = d.list.find((x) => x.name === b.getAttribute('data-down'));
+      if (it) downloadUrl(it);   // 与预览浮层里的「下载」共用一份实现
+    }));
+
     body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async (e) => {
       e.stopPropagation();
       const p = b.getAttribute('data-del');
@@ -1170,6 +1236,14 @@ App.views.media = {
         state.sel = state.sel.filter((x) => x !== p);
         reload();
       }
+    }));
+
+    /* ---- 顶部分档：全部 / 图片 / 视频 ---- */
+    body.querySelectorAll('[data-kindt]').forEach((b) => b.addEventListener('click', () => {
+      state.kind = b.getAttribute('data-kindt') || undefined;
+      state.page = 1;
+      state.sel = [];
+      reload();
     }));
   }
 };

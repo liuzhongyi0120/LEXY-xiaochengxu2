@@ -1,9 +1,9 @@
 /**
- * 素材库路由（图片本地上传 + 文件夹分类）
+ * 素材库路由（图片 / 视频本地上传 + 文件夹分类）
  *
- *   POST /api/media/upload   上传图片（multipart/form-data 支持多张；也兼容 JSON + base64/dataURL）
+ *   POST /api/media/upload   上传素材（multipart/form-data 支持多个；也兼容 JSON + base64/dataURL）
  *                            ?folder=页面名 可直接归入文件夹
- *   GET  /api/media/list     素材库列表（搜索 / 排序 / 分页 / 按文件夹筛选 + 各文件夹计数）
+ *   GET  /api/media/list     素材库列表（搜索 / 排序 / 分页 / 按文件夹或 kind 筛选 + 计数）
  *   POST /api/media/delete   删除素材（被页面引用时需 force=1）
  *   POST /api/media/folder   文件夹管理（op=create|rename|remove）
  *   POST /api/media/move     批量把素材移动到文件夹（folder 留空 = 移回未分组）
@@ -12,6 +12,9 @@
  *
  * 文件夹是**逻辑分类**：只写索引里的 folder 字段，不产生真实目录 —— 因为图片 URL
  * 已经写进 replica.js / catalog.json，挪动物理文件会让线上图全裂。
+ *
+ * 体积分档：图片 5MB / 视频 50MB（见 lib/media.js 的 MAX_BYTES / MAX_VIDEO_BYTES）。
+ * 注意反向代理也要放开：nginx 的 client_max_body_size 默认 1MB，不改的话视频必然 413。
  *
  * 说明：与「装修后台」同属运营管理功能，当前无管理端账号体系故未开 JWT 鉴权；
  * 正式环境请在网关层加访问控制，避免任意人上传文件占用磁盘（见 README「上线前必做」）。
@@ -26,7 +29,7 @@ module.exports = [
     path: '/api/media/upload',
     auth: false,
     raw: true, // 声明按原始流读取，跳过入口的 JSON body 解析（见 index.js）
-    desc: '上传图片到本地素材库（multipart 支持多张；?folder= 指定归属文件夹；返回相对路径 /uploads/… 与 w×h 尺寸）',
+    desc: '上传素材到本地素材库（multipart 支持多个；?folder= 指定归属文件夹；返回相对路径 /uploads/… 与尺寸、时长）',
     async handler(ctx) {
       const items = await media.collect(ctx.req);
       return media.upload(items, ctx.params.folder);
@@ -37,12 +40,13 @@ module.exports = [
     method: 'GET',
     path: '/api/media/list',
     auth: false,
-    desc: '素材库列表（q 搜索原始名/路径；folder 筛选，__none__ 表示未分组、不传表示全部；sort=new|old|big|small；page/size 分页；返回 folders 计数与容量统计）',
+    desc: '素材库列表（q 搜索原始名/路径；kind=image|video 分档；folder 筛选，__none__ 表示未分组、不传表示全部；sort=new|old|big|small；page/size 分页；返回 folders 与 kinds 计数、容量统计）',
     async handler(ctx) {
       const p = ctx.params;
       return media.list({
         q: p.q,
         type: p.type,
+        kind: p.kind,
         folder: p.folder,
         sort: p.sort,
         page: p.page,

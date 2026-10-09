@@ -7,9 +7,12 @@
  *     以 `/uploads/...` 相对路径对外暴露（见 index.js 的静态服务）。
  *   - 存相对路径而非绝对 URL 是刻意的：上线换域名时小程序端只改
  *     utils/constants.js 一处，历史数据里的图片地址全部自动跟着换。
- *   - 安全：按文件头魔数校验真实类型（不信 content-type）；仅放行
- *     png / jpg / webp / gif 四种位图，**拒收 SVG**（同源 HTML 里 SVG 可执行脚本 → 存储型 XSS）
- *   - 索引 server/data/uploads/index.json 记录原始文件名 / 尺寸 / 上传时间 / **归属文件夹**，便于素材库检索
+ *   - 安全：按文件头魔数校验真实类型（不信 content-type）；图片仅放行
+ *     png / jpg / webp / gif 四种位图，**拒收 SVG**（同源 HTML 里 SVG 可执行脚本 → 存储型 XSS）；
+ *     视频放行 mp4 / mov（ISO BMFF，看 `ftyp`）与 webm（EBML），同样是魔数判定
+ *   - 复杂度按 kind 分档：**图片 5MB / 视频 50MB**。视频体积天然大一个数量级，
+ *     用同一个上限要么逼着图片放宽、要么把视频卡死，所以拆成两个常量（见 MAX_BYTES / MAX_VIDEO_BYTES）。
+ *   - 索引 server/data/uploads/index.json 记录原始文件名 / 尺寸 / 上传时间 / **归属文件夹** / **kind**，便于素材库检索
  *   - **文件夹是逻辑分类，不是物理目录**：素材仍按 <yyyyMM>/ 落盘，
  *     归类只写索引里的 folder 字段。原因是图片 URL（`/uploads/202610/xxx.png`）已经写进了
  *     replica.js / catalog.json，**挪动物理文件就会让线上图全裂**；逻辑分类才能随便改。
@@ -28,10 +31,19 @@ const INDEX_FILE = nodePath.join(ROOT, 'index.json');
 /** 对外访问前缀（与 index.js 的静态服务一致） */
 const URL_PREFIX = '/uploads';
 
-/** 单张图片上限 */
+/** 单张图片上限（`stat.maxBytes` 对外仍报这个值，语义不变） */
 const MAX_BYTES = 5 * 1024 * 1024;
-/** 请求体上限：多图批量上传时留余量 */
-const MAX_BODY = 32 * 1024 * 1024;
+/** 单个视频上限。比图片大一档：视频是二进制流，转不成小体积；50MB 已能覆盖首页 30 秒内的宣传片 */
+const MAX_VIDEO_BYTES = 50 * 1024 * 1024;
+/** 视频「建议体积」：超了照样收，只在返回里带一句提示（小程序端加载会明显变慢） */
+const VIDEO_WARN_BYTES = 20 * 1024 * 1024;
+/** 请求体上限：多文件批量上传时留余量（按最大单文件 × 若干） */
+const MAX_BODY = 64 * 1024 * 1024;
+
+/** 取某个 kind 的单文件上限 */
+function maxBytesOf(kind) {
+  return kind === 'video' ? MAX_VIDEO_BYTES : MAX_BYTES;
+}
 
 /* ----------------------------- 文件夹（逻辑分类） ----------------------------- */
 
@@ -61,16 +73,38 @@ function normFolderName(v) {
 }
 
 /**
- * 放行的图片类型白名单
- *   sniff 用于二次校验：拿文件头魔数比对，防止把 .exe 改名成 .png 传上来
+ * ISO BMFF（mp4 / mov）的识别：第 4~8 字节固定是 'ftyp'，紧接着 4 字节是 major brand。
+ * brand 为 'qt  ' 的是 QuickTime(.mov)，其余（isom / iso2 / mp41 / mp42 / avc1 / M4V …）都算 mp4。
+ * 手机相册直接传上来的视频大多是这两种，所以都必须放行。
+ */
+function sniffIsoBmff(b) {
+  if (b.length < 12) return '';
+  if (b.slice(4, 8).toString('ascii') !== 'ftyp') return '';
+  return b.slice(8, 12).toString('ascii') === 'qt  ' ? 'video/quicktime' : 'video/mp4';
+}
+
+/**
+ * 放行的素材类型白名单（kind 区分图片 / 视频）
+ *   sniff 用于二次校验：拿文件头魔数比对，防止把 .exe 改名成 .png 传上来。
+ *   顺序有意义：probe() 按声明顺序取第一个命中的 —— 图片在前、视频在后。
  */
 const TYPES = {
-  'image/png': { ext: 'png', sniff: (b) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
-  'image/jpeg': { ext: 'jpg', sniff: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
-  'image/webp': { ext: 'webp', sniff: (b) => b.length > 12 && b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP' },
-  'image/gif': { ext: 'gif', sniff: (b) => b.length > 6 && (b.slice(0, 6).toString('ascii') === 'GIF87a' || b.slice(0, 6).toString('ascii') === 'GIF89a') }
+  'image/png': { kind: 'image', ext: 'png', sniff: (b) => b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 },
+  'image/jpeg': { kind: 'image', ext: 'jpg', sniff: (b) => b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff },
+  'image/webp': { kind: 'image', ext: 'webp', sniff: (b) => b.length > 12 && b.slice(0, 4).toString('ascii') === 'RIFF' && b.slice(8, 12).toString('ascii') === 'WEBP' },
+  'image/gif': { kind: 'image', ext: 'gif', sniff: (b) => b.length > 6 && (b.slice(0, 6).toString('ascii') === 'GIF87a' || b.slice(0, 6).toString('ascii') === 'GIF89a') },
+  'video/mp4': { kind: 'video', ext: 'mp4', sniff: (b) => sniffIsoBmff(b) === 'video/mp4' },
+  'video/quicktime': { kind: 'video', ext: 'mov', sniff: (b) => sniffIsoBmff(b) === 'video/quicktime' },
+  'video/webm': { kind: 'video', ext: 'webm', sniff: (b) => b.length > 4 && b[0] === 0x1a && b[1] === 0x45 && b[2] === 0xdf && b[3] === 0xa3 }
 };
-const EXT_TO_MIME = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif' };
+const EXT_TO_MIME = {
+  png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp', gif: 'image/gif',
+  mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm'
+};
+
+/** 供前端/文档展示的放行清单（别在别处再抄一份，否则改类型时会漏） */
+const ACCEPT_TEXT = 'PNG / JPG / WebP / GIF 图片，MP4 / MOV / WebM 视频';
+const ACCEPT_ATTR = 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/quicktime,video/webm';
 
 /* ----------------------------- 目录与索引 ----------------------------- */
 
@@ -104,6 +138,10 @@ function readIndex() {
   items = items.filter((it) => it && typeof it === 'object' && it.name);
   items.forEach((it) => {
     it.folder = typeof it.folder === 'string' ? it.folder : '';
+    // kind 是后加的字段：老索引里的条目没有它，按 mime 补出来（读时归一，写到盘上就固化了）
+    if (it.kind !== 'image' && it.kind !== 'video') {
+      it.kind = String(it.mime || '').indexOf('video/') === 0 ? 'video' : 'image';
+    }
     if (it.folder && !seen.has(it.folder)) { seen.add(it.folder); folders.push(it.folder); }
   });
   return { items, folders };
@@ -114,11 +152,66 @@ function writeIndex(idx) {
   atomic.writeFileAtomic(INDEX_FILE, JSON.stringify(idx, null, 2));
 }
 
-/* ----------------------------- 图片探测 ----------------------------- */
+/* ----------------------------- 素材探测 ----------------------------- */
+
+/** 遍历一段 ISO BMFF 里的 box：回调收到 (type, 内容起点, 内容终点) */
+function eachBox(buf, from, to, fn) {
+  let p = from;
+  while (p + 8 <= to) {
+    let size = buf.readUInt32BE(p);
+    const type = buf.slice(p + 4, p + 8).toString('ascii');
+    let head = 8;
+    if (size === 1) {
+      // 64 位长度（大文件常见），长度字段本身多占 8 字节
+      if (p + 16 > to) return;
+      const big = buf.readBigUInt64BE(p + 8);
+      if (big > BigInt(Number.MAX_SAFE_INTEGER)) return;
+      size = Number(big);
+      head = 16;
+    } else if (size === 0) {
+      size = to - p; // 最后一个 box 延续到末尾
+    }
+    if (size < head || p + size > to) return;
+    if (fn(type, p + head, p + size) === false) return;
+    p += size;
+  }
+}
 
 /**
- * 从文件头读出真实类型与像素尺寸
- * 支持 PNG / JPEG / GIF / WebP(VP8 / VP8L / VP8X)，读不出尺寸时返回 0（不阻断上传）
+ * 视频探测：从 moov 里读时长与分辨率
+ *   - 时长：mvhd 的 timescale / duration（v0 用 32 位、v1 用 64 位，偏移不同）
+ *   - 尺寸：tkhd 末尾 8 字节是 16.16 定点宽高（v0/v1 都是这个位置），取第一条尺寸非零的轨
+ *   - **读不出就返回 0，绝不阻断上传**：有些视频 moov 在文件末尾、或用了派生格式，
+ *     后台少显示一个「时长」远比「上传失败」可接受（同图片探不到尺寸的处理口径）。
+ */
+function probeVideo(buf) {
+  const out = { duration: 0, width: 0, height: 0 };
+  eachBox(buf, 0, buf.length, (type, s, e) => {
+    if (type !== 'moov') return;
+    eachBox(buf, s, e, (t2, s2, e2) => {
+      if (t2 === 'mvhd' && e2 - s2 >= 20) {
+        const v1 = buf[s2] === 1;
+        const ts = v1 ? buf.readUInt32BE(s2 + 20) : buf.readUInt32BE(s2 + 12);
+        const du = v1 ? Number(buf.readBigUInt64BE(s2 + 24)) : buf.readUInt32BE(s2 + 16);
+        if (ts > 0 && du > 0) out.duration = Math.round((du / ts) * 10) / 10;
+      } else if (t2 === 'trak') {
+        eachBox(buf, s2, e2, (t3, s3, e3) => {
+          if (t3 !== 'tkhd' || e3 - s3 < 8) return;
+          const w = Math.round(buf.readUInt32BE(e3 - 8) / 65536);
+          const h = Math.round(buf.readUInt32BE(e3 - 4) / 65536);
+          if (w > 0 && h > 0 && !out.width) { out.width = w; out.height = h; }
+        });
+      }
+    });
+  });
+  return out;
+}
+
+/**
+ * 从文件头读出真实类型与尺寸
+ *   图片：PNG / JPEG / GIF / WebP(VP8 / VP8L / VP8X)
+ *   视频：mp4 / mov（ftyp）/ webm（EBML）→ 再解析时长与分辨率
+ * 读不出尺寸时返回 0（不阻断上传）
  */
 function probe(buf) {
   let mime = '';
@@ -127,10 +220,19 @@ function probe(buf) {
   }
   if (!mime) return null;
 
+  const kind = TYPES[mime].kind;
   let w = 0;
   let h = 0;
+  let duration = 0;
 
-  if (mime === 'image/png' && buf.length > 24) {
+  if (kind === 'video') {
+    if (mime !== 'video/webm') {
+      const v = probeVideo(buf);   // webm 是 EBML 容器，不是 box 结构，解析方式不同 → 暂不解析
+      w = v.width;
+      h = v.height;
+      duration = v.duration;
+    }
+  } else if (mime === 'image/png' && buf.length > 24) {
     w = buf.readUInt32BE(16);
     h = buf.readUInt32BE(20);
   } else if (mime === 'image/gif' && buf.length > 10) {
@@ -174,7 +276,15 @@ function probe(buf) {
     }
   }
 
-  return { mime: mime, ext: TYPES[mime].ext, width: w, height: h };
+  return { mime: mime, ext: TYPES[mime].ext, kind: kind, width: w, height: h, duration: duration };
+}
+
+/** 秒 → mm:ss（后台展示用，读不出时长就返回空串而不是 00:00） */
+function durationText(sec) {
+  const s = Math.round(Number(sec) || 0);
+  if (!s) return '';
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
 }
 
 /** 人类可读体积，后台直接展示 */
@@ -267,11 +377,12 @@ async function collect(req) {
     if (!boundary) throw new BizError('multipart 缺少 boundary', ERR.PARAM);
     const buf = await readRaw(req);
     const parts = parseMultipart(buf, boundary).filter((p) => p.filename && p.data && p.data.length);
-    if (!parts.length) throw new BizError('没有收到文件，请选择图片后再上传', ERR.PARAM);
+    if (!parts.length) throw new BizError('没有收到文件，请选择图片或视频后再上传', ERR.PARAM);
     return parts.map((p) => ({ data: p.data, orig: p.filename }));
   }
 
-  const buf = await readRaw(req, MAX_BYTES + 1024 * 1024);
+  // JSON + base64 这条路只适合小图（base64 会膨胀 4/3，大视频必须走 multipart）
+  const buf = await readRaw(req, MAX_BODY);
   let json;
   try {
     json = JSON.parse(buf.toString('utf8'));
@@ -279,7 +390,7 @@ async function collect(req) {
     throw new BizError('请求体不是合法 JSON，也没有用 multipart 上传', ERR.PARAM);
   }
   let data = String(json.data || json.base64 || '');
-  if (!data) throw new BizError('缺少图片数据 data（base64 或 dataURL）', ERR.PARAM);
+  if (!data) throw new BizError('缺少素材数据 data（base64 或 dataURL）', ERR.PARAM);
   const dm = /^data:([^;]+);base64,(.*)$/s.exec(data);
   if (dm) data = dm[2];
   return [{ data: Buffer.from(data, 'base64'), orig: String(json.name || json.filename || '') }];
@@ -297,7 +408,7 @@ function makeName(ext) {
 }
 
 /**
- * 保存单张图片（含魔数校验）
+ * 保存单个素材（含魔数校验 + 按 kind 判体积上限）
  * @param item   {data, orig, rel?, source?}  rel = 指定相对路径（导入工具用，保留可辨识的原文件名）
  * @param folder 归属文件夹（'' = 未分组）
  */
@@ -305,13 +416,18 @@ function saveOne(item, folder) {
   const probed = probe(item.data);
   if (!probed) {
     throw new BizError(
-      '不支持的图片格式：' + (item.orig || '未命名') +
-      '（仅支持 PNG / JPG / WebP / GIF，SVG 因存在安全风险不予接收）',
+      '不支持的素材格式：' + (item.orig || '未命名') +
+      '（仅支持 ' + ACCEPT_TEXT + '；SVG 因存在安全风险不予接收）',
       ERR.PARAM
     );
   }
-  if (item.data.length > MAX_BYTES) {
-    throw new BizError('图片过大：' + (item.orig || '未命名') + ' ' + humanSize(item.data.length) + '，上限 ' + humanSize(MAX_BYTES), ERR.PARAM);
+  const limit = maxBytesOf(probed.kind);
+  if (item.data.length > limit) {
+    throw new BizError(
+      (probed.kind === 'video' ? '视频' : '图片') + '过大：' + (item.orig || '未命名') + ' ' +
+      humanSize(item.data.length) + '，' + (probed.kind === 'video' ? '视频' : '图片') + '上限 ' + humanSize(limit),
+      ERR.PARAM
+    );
   }
 
   const { dir, base } = makeName(probed.ext);
@@ -341,10 +457,13 @@ function saveOne(item, folder) {
     // source 只在「从外部导入」时写入（原始外链地址），便于日后重新抓取或核对
     source: item.source ? String(item.source).slice(0, 500) : undefined,
     folder: folder || '',
+    kind: probed.kind,
     size: item.data.length,
     sizeText: humanSize(item.data.length),
     width: probed.width,
     height: probed.height,
+    duration: probed.duration || 0,
+    durationText: durationText(probed.duration),
     mime: probed.mime,
     at: Date.now()
   };
@@ -376,13 +495,21 @@ function upload(items, folder) {
   if (!done.length) {
     throw new BizError(failed.length ? failed[0].reason : '上传失败', ERR.PARAM);
   }
-  done.forEach((d) => { d.sizeText = humanSize(d.size); });
+  done.forEach((d) => {
+    d.sizeText = humanSize(d.size);
+    d.durationText = durationText(d.duration);
+  });
+  const bigVideos = done.filter((d) => d.kind === 'video' && d.size > VIDEO_WARN_BYTES);
   return {
     list: done,
     success: done.length,
     failed: failed.length,
     failedList: failed,
     folder: target,
+    // 体积提示：不阻断上传，只在返回里说清「小程序端加载会慢」
+    warn: bigVideos.length
+      ? bigVideos.map((d) => d.orig + ' 有 ' + humanSize(d.size) + '，建议压到 ' + humanSize(VIDEO_WARN_BYTES) + ' 以内（小程序端首帧加载会明显变慢）').join('；')
+      : '',
     total: readIndex().items.length
   };
 }
@@ -416,6 +543,8 @@ function list(opt) {
   const q = String(opt.q || '').trim().toLowerCase();
   if (q) rows = rows.filter((x) => (x.orig || '').toLowerCase().includes(q) || x.name.toLowerCase().includes(q));
   if (opt.type) rows = rows.filter((x) => (x.mime || '') === opt.type);
+  // kind：不传 = 全部；image / video = 只看该档
+  if (opt.kind === 'image' || opt.kind === 'video') rows = rows.filter((x) => (x.kind || 'image') === opt.kind);
   // folder 三态：不传 = 全部；FOLDER_NONE = 未分组；其它 = 该文件夹
   if (opt.folder === FOLDER_NONE) rows = rows.filter((x) => !x.folder);
   else if (opt.folder) rows = rows.filter((x) => x.folder === opt.folder);
@@ -439,6 +568,10 @@ function list(opt) {
   const folderRows = idx.folders.map((name) => ({ name: name, count: counts.get(name) || 0 }));
   const ungrouped = counts.get('') || 0;
 
+  const videos = alive.filter((x) => x.kind === 'video');
+  const images = alive.filter((x) => x.kind !== 'video');
+  const sum = (arr) => arr.reduce((s, x) => s + (x.size || 0), 0);
+
   return {
     list: slice,
     total: rows.length,
@@ -448,12 +581,28 @@ function list(opt) {
     pages: Math.max(1, Math.ceil(rows.length / size)),
     folders: folderRows,
     ungrouped: ungrouped,
+    // 顶栏「全部 / 图片 / 视频」的计数与占用
+    kinds: {
+      all: alive.length,
+      image: images.length,
+      video: videos.length,
+      imageBytes: sum(images),
+      videoBytes: sum(videos)
+    },
     stat: {
       count: alive.length,
-      bytes: alive.reduce((s, x) => s + (x.size || 0), 0),
-      sizeText: humanSize(alive.reduce((s, x) => s + (x.size || 0), 0)),
+      bytes: sum(alive),
+      sizeText: humanSize(sum(alive)),
       maxBytes: MAX_BYTES,
       maxText: humanSize(MAX_BYTES),
+      maxVideoBytes: MAX_VIDEO_BYTES,
+      maxVideoText: humanSize(MAX_VIDEO_BYTES),
+      videoWarnBytes: VIDEO_WARN_BYTES,
+      videoWarnText: humanSize(VIDEO_WARN_BYTES),
+      // 放行清单随接口下发：后台的上传控件与提示文案直接用这两个字段，
+      // 免得「后端加了类型、前端文案还写着旧的那几种」这种两边不一致
+      acceptText: ACCEPT_TEXT,
+      acceptAttr: ACCEPT_ATTR,
       types: Array.from(new Set(alive.map((x) => x.mime))).filter(Boolean)
     }
   };
@@ -640,7 +789,11 @@ module.exports = {
   ROOT,
   URL_PREFIX,
   MAX_BYTES,
+  MAX_VIDEO_BYTES,
+  VIDEO_WARN_BYTES,
   MAX_BODY,
+  ACCEPT_TEXT,
+  ACCEPT_ATTR,
   FOLDER_NONE,
   FOLDER_MAX,
   TYPES,
@@ -648,6 +801,8 @@ module.exports = {
   ensureDir,
   probe,
   humanSize,
+  durationText,
+  maxBytesOf,
   normFolderName,
   collect,
   upload,

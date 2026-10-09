@@ -81,13 +81,19 @@ const MIME = {
   '.ico': 'image/x-icon'
 };
 
-/** 素材库对外访问的图片类型（比管理页的静态资源宽，含 webp / gif） */
+/** 素材库对外访问的类型（比管理页的静态资源宽，含 webp / gif 与视频）
+ *  视频这三项不是可选项：扩展名不在表里会被直接 403「不支持的素材类型」，
+ *  与 media.js 放行的 TYPES 必须一一对应（.m4v 也归 mp4，手机相册常见）。 */
 const UPLOAD_MIME = {
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
   '.webp': 'image/webp',
-  '.gif': 'image/gif'
+  '.gif': 'image/gif',
+  '.mp4': 'video/mp4',
+  '.m4v': 'video/mp4',
+  '.mov': 'video/quicktime',
+  '.webm': 'video/webm'
 };
 
 /**
@@ -167,7 +173,7 @@ function tryUploads(path, req, res) {
 
   const type = UPLOAD_MIME[nodePath.extname(rel).toLowerCase()];
   if (!type) {
-    fail(res, '不支持的素材类型（仅图片）', ERR.FORBIDDEN, 403);
+    fail(res, '不支持的素材类型（仅图片与 MP4 / MOV / WebM 视频）', ERR.FORBIDDEN, 403);
     return true;
   }
 
@@ -179,13 +185,54 @@ function tryUploads(path, req, res) {
     }
     // 文件名带随机段，可安全长缓存；用 ETag 支持 304
     const etag = '"' + st.size.toString(16) + '-' + Math.round(st.mtimeMs).toString(16) + '"';
-    if (req.headers['if-none-match'] === etag) {
+    const total = st.size;
+
+    /*
+     * Range 支持 —— 视频的必备项，不是优化项：
+     * 浏览器播放器与小程序 <video> 都会先发 `Range: bytes=0-` 再按需续取，
+     * iOS Safari 遇到「不支持 Range」的响应会**直接不播**；支持之后才能拖动进度条。
+     * 图片走不到这里（不会带 Range），逻辑与以前完全一致。
+     */
+    const rm = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || '').trim());
+    let start = 0;
+    let end = total - 1;
+    let partial = false;
+    if (rm && (rm[1] || rm[2])) {
+      if (rm[1]) {
+        start = Number(rm[1]);
+        end = rm[2] ? Number(rm[2]) : total - 1;
+      } else {
+        start = Math.max(0, total - Number(rm[2])); // bytes=-N → 末尾 N 字节
+      }
+      if (!Number.isFinite(start) || !Number.isFinite(end) || start > end || start >= total) {
+        res.writeHead(416, { 'Content-Range': 'bytes */' + total });
+        return res.end();
+      }
+      end = Math.min(end, total - 1);
+      partial = true;
+    }
+
+    // 304 只对完整请求有意义：带 Range 的响应必须真的把那段字节发出去
+    if (!partial && req.headers['if-none-match'] === etag) {
       res.writeHead(304, { ETag: etag, 'Cache-Control': 'public, max-age=604800' });
       return res.end();
     }
+    if (partial) {
+      res.writeHead(206, {
+        'Content-Type': type,
+        'Content-Range': 'bytes ' + start + '-' + end + '/' + total,
+        'Content-Length': end - start + 1,
+        'Accept-Ranges': 'bytes',
+        ETag: etag,
+        'Cache-Control': 'public, max-age=604800'
+      });
+      fs.createReadStream(file, { start: start, end: end }).pipe(res);
+      return;
+    }
     res.writeHead(200, {
       'Content-Type': type,
-      'Content-Length': st.size,
+      'Content-Length': total,
+      'Accept-Ranges': 'bytes',
       ETag: etag,
       'Cache-Control': 'public, max-age=604800'
     });
@@ -407,7 +454,7 @@ server.listen(PORT, HOST, () => {
   media.ensureDir(media.ROOT);
   let mediaCount = 0;
   try { mediaCount = media.list({ size: 1 }).stat.count; } catch (e) { /* 首次启动无目录 */ }
-  log(`素材目录   ${media.ROOT}（已有 ${mediaCount} 张，对外访问 ${media.URL_PREFIX}/…，单张上限 ${media.humanSize(media.MAX_BYTES)}）`);
+  log(`素材目录   ${media.ROOT}（已有 ${mediaCount} 个，对外访问 ${media.URL_PREFIX}/…，上限 图片 ${media.humanSize(media.MAX_BYTES)} / 视频 ${media.humanSize(media.MAX_VIDEO_BYTES)}）`);
   log(`微信能力   登录=${wechat.HAS_WX_LOGIN ? '真实接口' : '本地模拟'}  支付=${wechat.HAS_WX_PAY ? '真实接口' : '本地模拟'}`);
   log(`JWT 密钥   ${authLib.IS_DEFAULT_SECRET ? '⚠️  使用开发默认值，上线前必须设置 JWT_SECRET' : '已自定义'}`);
   log(`小程序端   把 utils/constants.js 的 ENV 改为 local 即可联调`);

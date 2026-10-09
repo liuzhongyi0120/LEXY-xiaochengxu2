@@ -618,7 +618,7 @@ const fdFake = new FormData();
 fdFake.append('file', new Blob([Buffer.from('这不是图片，只是改名成了 png', 'utf8')], { type: 'image/png' }), 'fake.png');
 const mediaFake = await call('POST', '/api/media/upload', { form: fdFake, auth: false, expectFail: '伪装图片被拒' });
 assert('伪装成 png 的文本被拒（按文件头校验）',
-  mediaFake.json && mediaFake.json.code === 1001 && /不支持的图片格式/.test(mediaFake.json.msg || ''),
+  mediaFake.json && mediaFake.json.code === 1001 && /不支持的素材格式/.test(mediaFake.json.msg || ''),
   mediaFake.json && mediaFake.json.msg);
 
 // 路径穿越：删除接口与静态服务两条路都要拦住
@@ -719,6 +719,97 @@ const mediaCount1 = await call('GET', '/api/media/list', { auth: false, silent: 
 assert('自检结束后素材库数量与初始一致（无残留）',
   mediaCount0.ok && mediaCount1.ok && mediaCount1.data.all === mediaCount0.data.all,
   `${mediaCount0.data && mediaCount0.data.all} → ${mediaCount1.data && mediaCount1.data.all}`);
+
+/* 15.7b 视频素材：ftyp 魔数 → moov 解析时长/分辨率 → kind 分档 → 静态服务 Range 支持
+ *
+ * fixture 是**手工拼的最小 ISO BMFF**（ftyp + moov[mvhd + trak[tkhd]]），不是真能播的片子 ——
+ * 自检要验的是「类型判定与元信息解析」，不是解码，这样断言才能稳定、也不需要 50MB 的测试文件。
+ */
+function boxOf(type, payload) {
+  const b = Buffer.alloc(8 + payload.length);
+  b.writeUInt32BE(8 + payload.length, 0);
+  b.write(type, 4, 'ascii');
+  payload.copy(b, 8);
+  return b;
+}
+function makeMp4Fixture(opt) {
+  const o = Object.assign({ brand: 'isom', seconds: 5.5, w: 1080, h: 1920 }, opt || {});
+  const timescale = 1000;
+  const ftyp = boxOf('ftyp', Buffer.concat([
+    Buffer.from(o.brand, 'ascii'), Buffer.from([0, 0, 2, 0]), Buffer.from('isomiso2avc1mp41', 'ascii')
+  ]));
+  const mvhdP = Buffer.alloc(100);
+  mvhdP.writeUInt32BE(timescale, 12);
+  mvhdP.writeUInt32BE(Math.round(o.seconds * timescale), 16);
+  const tkhdP = Buffer.alloc(84);
+  tkhdP.writeUInt32BE(7, 0);
+  tkhdP.writeUInt32BE(1, 12);
+  tkhdP.writeUInt32BE(Math.round(o.seconds * timescale), 20);
+  tkhdP.writeUInt32BE(o.w * 65536, 76);
+  tkhdP.writeUInt32BE(o.h * 65536, 80);
+  return Buffer.concat([
+    ftyp,
+    boxOf('moov', Buffer.concat([boxOf('mvhd', mvhdP), boxOf('trak', boxOf('tkhd', tkhdP))]))
+  ]);
+}
+
+const MP4_FIXTURE = makeMp4Fixture();
+const fdVideo = new FormData();
+fdVideo.append('file', new Blob([MP4_FIXTURE], { type: 'video/mp4' }), 'selfcheck-clip.mp4');
+const mvUp = await call('POST', '/api/media/upload', { form: fdVideo, auth: false });
+const mvItem = mvUp.ok && mvUp.data.list[0] ? mvUp.data.list[0] : null;
+assert('视频按 ftyp 魔数被识别为 video/mp4（认文件头，不认扩展名）',
+  !!mvItem && mvItem.kind === 'video' && mvItem.mime === 'video/mp4' && /^\/uploads\/\d{6}\/.+\.mp4$/.test(mvItem.url),
+  mvItem ? `${mvItem.url} kind=${mvItem.kind}` : mvUp.json && mvUp.json.msg);
+assert('mp4 能读出时长与分辨率（moov→mvhd 拿时长、trak→tkhd 拿宽高）',
+  !!mvItem && mvItem.duration === 5.5 && mvItem.durationText === '0:06' && mvItem.width === 1080 && mvItem.height === 1920,
+  mvItem ? `${mvItem.width}×${mvItem.height} ${mvItem.duration}s (${mvItem.durationText})` : '-');
+
+let mvGet = null;
+let mvRange = null;
+if (mvItem) {
+  try {
+    const r = await fetch(BASE + mvItem.url);
+    mvGet = { status: r.status, type: r.headers.get('content-type'), bytes: (await r.arrayBuffer()).byteLength, ranges: r.headers.get('accept-ranges') };
+  } catch (e) { mvGet = { error: e.message }; }
+  try {
+    const r2 = await fetch(BASE + mvItem.url, { headers: { Range: 'bytes=0-99' } });
+    mvRange = { status: r2.status, range: r2.headers.get('content-range'), len: (await r2.arrayBuffer()).byteLength };
+  } catch (e) { mvRange = { error: e.message }; }
+}
+assert('/uploads/ 直接访问视频返回 video/mp4 且带 Accept-Ranges',
+  !!mvGet && mvGet.status === 200 && mvGet.type === 'video/mp4' && mvGet.ranges === 'bytes',
+  JSON.stringify(mvGet));
+assert('视频支持 Range 请求（206 + Content-Range）—— 不支持的话小程序 / iOS 直接不播',
+  !!mvRange && mvRange.status === 206 && mvRange.len === 100 && mvRange.range === 'bytes 0-99/' + MP4_FIXTURE.length,
+  JSON.stringify(mvRange));
+
+const mvKindV = await call('GET', '/api/media/list', { auth: false, query: { kind: 'video' }, silent: true });
+const mvKindI = await call('GET', '/api/media/list', { auth: false, query: { kind: 'image' }, silent: true });
+assert('kind=video 只返回视频、kind=image 只返回图片（顶栏分档靠它）',
+  mvKindV.ok && mvKindI.ok &&
+    (mvKindV.data.list || []).length === 1 && (mvKindV.data.list[0].name === mvItem.name) &&
+    (mvKindI.data.list || []).every((x) => x.kind === 'image') &&
+    (mvKindI.data.list || []).length >= 1,
+  `video=${mvKindV.data && mvKindV.data.total} image=${mvKindI.data && mvKindI.data.total}`);
+
+assert('列表统计区分图片 / 视频上限（图片 5MB、视频 50MB）',
+  mvKindV.ok && mvKindV.data.stat.maxBytes === 5 * 1024 * 1024 && mvKindV.data.stat.maxVideoBytes === 50 * 1024 * 1024 &&
+    (mvKindV.data.kinds || {}).video === 1,
+  mvKindV.data ? JSON.stringify({ img: mvKindV.data.stat.maxBytes, vid: mvKindV.data.stat.maxVideoBytes, kinds: mvKindV.data.kinds }) : '-');
+
+const fdFakeMp4 = new FormData();
+fdFakeMp4.append('file', new Blob([Buffer.from('这只是文本，不是视频流', 'utf8')], { type: 'video/mp4' }), 'fake.mp4');
+const mvFake = await call('POST', '/api/media/upload', { form: fdFakeMp4, auth: false, expectFail: '伪装视频被拒' });
+assert('伪装成 mp4 的文本同样被拒（视频也是按魔数判定）',
+  mvFake.json && mvFake.json.code === 1001 && /不支持的素材格式/.test(mvFake.json.msg || ''),
+  mvFake.json && mvFake.json.msg);
+
+await call('POST', '/api/media/delete', { auth: false, body: { name: mvItem && mvItem.name, force: 1 }, silent: true });
+const mvEnd = await call('GET', '/api/media/list', { auth: false, query: { kind: 'video' }, silent: true });
+assert('视频自检素材已回收（未留下测试视频）',
+  mvEnd.ok && (mvEnd.data.list || []).length === 0 && (mvEnd.data.kinds || {}).video === 0,
+  `剩余视频 ${mvEnd.data && mvEnd.data.kinds && mvEnd.data.kinds.video}`);
 
 /* 15.7 小程序配置文件静态校验（抓「只有开发者工具才会报」的配置错误） */
 const MP_ROOT = join(__dirname, '..', '..', 'miniprogram');
