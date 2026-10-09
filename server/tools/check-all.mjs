@@ -1787,6 +1787,35 @@ assert('采集器（pickImage）也走 .mt 缩略图区（两条链路共用同�
   (consoleCoreSrc.match(/class="mt"/g) || []).length >= 2,
   '实测 ' + (consoleCoreSrc.match(/class="mt"/g) || []).length + ' 处');
 
+/* ---- 第二起「类名撞车」：lightbox 的裸 `.lb` 让概览页整页黑屏 ----
+ * lightbox 根样式曾写成裸 `.lb { position: fixed; inset: 0; background: rgba(12,16,22,.93) }`，
+ * 而概览页销售趋势图的 x 轴标签是 `<div class="lb">`（label 缩写，7 天 7 个）——
+ * `.bars .lb` 特异性更高只保住了字号/颜色，position/inset/background 照旧从裸 `.lb` 继承，
+ * 于是 7 个图例一起变成铺满全屏的深色 fixed 层，叠成整页黑屏。
+ * 「文字都在、元素都在、断言全绿」是这类事故的典型特征（jsdom 不做布局），
+ * 所以除了静态断言，另配了真浏览器的 .tooling/test-page-occlusion.mjs 兜底。 */
+const lbCssRules = [...consoleCssNoComment.matchAll(/(^|\})\s*([^{}]*?)\{/g)]
+  .map((m) => m[2].trim());
+const lbBareRules = lbCssRules.filter((sel) => /\.lb(?![-\w])/.test(sel));
+const lbIllegal = lbBareRules.filter((sel) => sel !== '.bars .lb');
+assert('console.css 里没有裸 .lb 规则（唯一允许的是图表图例 `.bars .lb`）',
+  lbIllegal.length === 0,
+  lbIllegal.length ? '裸选择器：' + lbIllegal.join(' | ') : '仅剩 `.bars .lb`（图表轴标签）');
+assert('lightbox 根规则带作用域（必须写成 `#layer > .lbx`，否则会再次命中图表图例）',
+  /#layer\s*>\s*\.lbx\s*\{/.test(consoleCssNoComment));
+// 只挑「子规则」（.lb-h / .lb-view / .lb-f…）；根规则 `#layer > .lbx` 不含 `.lb-`，天然排除
+const lbSubRules = lbCssRules.filter((sel) => /\.lb-/.test(sel));
+const lbUnscoped = lbSubRules.filter((sel) => !/^\.lbx\b/.test(sel));
+assert('lightbox 的子规则全部挂在 .lbx 之下（.lb-h / .lb-view / .lb-f … 不得裸用）',
+  lbSubRules.length >= 10 && lbUnscoped.length === 0,
+  lbUnscoped.length ? '未加作用域：' + lbUnscoped.join(' | ') : lbSubRules.length + ' 条子规则均已加 .lbx 前缀');
+assert('lightbox 根元素的类名是 lbx（JS 里不得回退到裸 lb）',
+  /el\.className\s*=\s*'lbx'/.test(consoleCoreSrc) && !/el\.className\s*=\s*'lb'/.test(consoleCoreSrc));
+assert('图表图例样式有明确归属（`.bars .lb` 存在，说明撞车对象仍在且被隔离）',
+  /\.bars\s+\.lb\s*\{/.test(consoleCssNoComment));
+assert('页面遮挡哨兵脚本存在（真浏览器兜底，防「撞车式黑屏」复发）',
+  existsSync(join(__dirname, '..', '..', '.tooling', 'test-page-occlusion.mjs')));
+
 /* ---------------------------------------------------------------------------
  * 15.10 装修台预览（共享渲染核心）与 /preview（真机源码编译）
  *

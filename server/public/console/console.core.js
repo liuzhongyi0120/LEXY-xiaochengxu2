@@ -207,7 +207,13 @@ function lightbox(opt) {
   const single = list.length < 2;
 
   const el = document.createElement('div');
-  el.className = 'lb';
+  /*
+   * 根类名刻意叫 `lbx` 而不是 `lb`：`lb`（label 的缩写）太短、太容易被别处占用 ——
+   * 概览页销售趋势图的 x 轴标签就是 `<div class="lb">`，CSS 里那条裸 `.lb{position:fixed;inset:0}`
+   * 会把 7 个图例一起变成铺满全屏的深色层，整页看起来就是「黑屏」。
+   * 子元素类名（lb-h / lb-view …）保持不变但 CSS 里一律挂在 .lbx 之下，杜绝同类事故。
+   */
+  el.className = 'lbx';
   el.innerHTML =
     '<div class="lb-h">' +
       '<div class="lb-t"><b data-name></b><span class="lb-meta" data-meta></span></div>' +

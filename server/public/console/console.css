@@ -437,52 +437,59 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 
 /* ---- 大图预览浮层（lightbox） ----
  * 刻意用近黑遮罩而不是半透明灰：素材大多是白底商品图，浅遮罩下看不出边界在哪。
- * 三层结构：顶栏（文件名/尺寸/序号/关闭）· 舞台（图片 + 左右翻页）· 底栏（操作）。 */
-.lb { position: fixed; inset: 0; z-index: 200; background: rgba(12, 16, 22, .93); display: flex; flex-direction: column; }
-.lb-h { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
-.lb-t { min-width: 0; }
-.lb-t b {
+ * 三层结构：顶栏（文件名/尺寸/序号/关闭）· 舞台（图片 + 左右翻页）· 底栏（操作）。
+ *
+ * ⚠️ 根类名必须叫 `.lbx`，且**每条规则都要带作用域**，绝不允许出现裸 `.lb`：
+ * 概览页销售趋势图的 x 轴标签是 `<div class="lb">`（label 缩写），
+ * 早先这里写成裸 `.lb { position: fixed; inset: 0; background: rgba(12,16,22,.93) }`，
+ * 于是 7 个图例全被变成铺满全屏的深色 fixed 层 —— 整页被 7 层 93% 不透明的黑盖住 = 「黑屏」。
+ * `.bars .lb` 特异性更高只保住了字号/颜色，position/inset/background 照旧从裸 `.lb` 继承。
+ * 这是继 `.thumb` 之后第二次类名撞车，自检已加断言锁死「裸 .lb 不得出现」。 */
+#layer > .lbx { position: fixed; inset: 0; z-index: 200; background: rgba(12, 16, 22, .93); display: flex; flex-direction: column; }
+.lbx .lb-h { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; padding: 12px 16px; }
+.lbx .lb-t { min-width: 0; }
+.lbx .lb-t b {
   display: block; font-size: 13px; font-weight: 500; color: #fff;
   max-width: 56vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.lb-meta { font-size: 12px; color: rgba(255, 255, 255, .58); }
-.lb-idx { font-size: 12px; color: rgba(255, 255, 255, .72); font-variant-numeric: tabular-nums; }
-.lb-x {
+.lbx .lb-meta { font-size: 12px; color: rgba(255, 255, 255, .58); }
+.lbx .lb-idx { font-size: 12px; color: rgba(255, 255, 255, .72); font-variant-numeric: tabular-nums; }
+.lbx .lb-x {
   width: 32px; height: 32px; border: 0; border-radius: 8px; cursor: pointer; flex: 0 0 auto;
   background: rgba(255, 255, 255, .12); color: #fff; font-size: 18px; line-height: 1;
 }
-.lb-x:hover { background: rgba(255, 255, 255, .24); }
-.lb-stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
-.lb-view {
+.lbx .lb-x:hover { background: rgba(255, 255, 255, .24); }
+.lbx .lb-stage { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; }
+.lbx .lb-view {
   position: relative; flex: 1 1 auto; align-self: stretch; min-width: 0; min-height: 0;
   display: flex; align-items: center; justify-content: center;
 }
-.lb-view img { max-width: 100%; max-height: 100%; object-fit: contain; background: #1b1e23; border-radius: 6px; box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }
-.lb-view video {
+.lbx .lb-view img { max-width: 100%; max-height: 100%; object-fit: contain; background: #1b1e23; border-radius: 6px; box-shadow: 0 12px 44px rgba(0, 0, 0, .5); }
+.lbx .lb-view video {
   max-width: 100%; max-height: 100%; background: #000; border-radius: 6px;
   box-shadow: 0 12px 44px rgba(0, 0, 0, .5);
 }
-.lb-tip { position: absolute; color: rgba(255, 255, 255, .7); font-size: 13px; }
-.lb-err {
+.lbx .lb-tip { position: absolute; color: rgba(255, 255, 255, .7); font-size: 13px; }
+.lbx .lb-err {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
   padding: 20px; text-align: center; color: #fff; background: rgba(27, 30, 35, .92); border-radius: 6px;
 }
-.lb-err .sub { color: rgba(255, 255, 255, .58); font-size: 12px; word-break: break-all; max-width: 420px; }
-.lb-nav {
+.lbx .lb-err .sub { color: rgba(255, 255, 255, .58); font-size: 12px; word-break: break-all; max-width: 420px; }
+.lbx .lb-nav {
   flex: 0 0 auto; width: 44px; height: 64px; border: 0; border-radius: 10px; cursor: pointer;
   background: rgba(255, 255, 255, .1); color: #fff; font-size: 26px; line-height: 1;
 }
-.lb-nav:hover { background: rgba(255, 255, 255, .22); }
-.lb-f { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
-.lb-f .btn { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .18); color: #fff; }
-.lb-f .btn:hover { background: rgba(255, 255, 255, .22); }
-.lb-f .btn.primary { background: var(--primary); border-color: var(--primary); }
-.lb-f .btn.primary:hover { background: var(--primary-dark); }
-.lb-f .btn.danger { color: #ffb4ad; border-color: rgba(255, 180, 173, .35); }
-.lb-f .btn.danger:hover { background: rgba(240, 68, 56, .18); }
+.lbx .lb-nav:hover { background: rgba(255, 255, 255, .22); }
+.lbx .lb-f { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 12px 16px; }
+.lbx .lb-f .btn { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .18); color: #fff; }
+.lbx .lb-f .btn:hover { background: rgba(255, 255, 255, .22); }
+.lbx .lb-f .btn.primary { background: var(--primary); border-color: var(--primary); }
+.lbx .lb-f .btn.primary:hover { background: var(--primary-dark); }
+.lbx .lb-f .btn.danger { color: #ffb4ad; border-color: rgba(255, 180, 173, .35); }
+.lbx .lb-f .btn.danger:hover { background: rgba(240, 68, 56, .18); }
 @media (max-width: 700px) {
-  .lb-nav { width: 34px; height: 52px; font-size: 22px; }
-  .lb-t b { max-width: 40vw; }
+  .lbx .lb-nav { width: 34px; height: 52px; font-size: 22px; }
+  .lbx .lb-t b { max-width: 40vw; }
 }
 
 /* ---- 素材库：左侧文件夹栏 + 右侧网格 ----
