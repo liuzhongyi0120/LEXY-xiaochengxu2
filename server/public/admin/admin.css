@@ -521,11 +521,34 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
  */
 
 /*
- * 店铺导航编辑（.view.edit.nav-mode）：
- * 底部导航是全局配置，没有「区块」可加，左栏组件库整栏收起；
- * 手机屏里也没有页面内容，给一块说明占位。
+ * 两类页面要把左栏组件库整栏收起：
+ *   .nav-mode   店铺导航（全局配置，没有「区块」可加），手机屏里给一块说明占位；
+ *   .no-blocks  固定结构页（莱克 / 资讯 / 产品 / 我的）—— 它们的 schema 是专属字段
+ *               （系列列表 / 资讯列表 / 品牌分组 / 个人中心），不是首页那种「区块流」，
+ *               点任何组件都只会弹「该页面暂不支持添加组件」。
+ *               之前组件库照常展示，运营以为坏了（实测反馈「点使用组件全部无法使用」），
+ *               不支持加组件的页面就不该给这个入口。
  */
-.view.edit.nav-mode .col-lib { display: none; }
+.view.edit.nav-mode .col-lib,
+.view.edit.no-blocks .col-lib { display: none; }
+
+/*
+ * 固定结构页收起组件库后，在「页面布局」栏顶部给一句说明 ——
+ * 不解释的话，运营会以为组件库入口丢了（比「点了报错」更难排查）。
+ * 店铺导航（.nav-mode）有自己的 .nv-hint，不叠加这条。
+ */
+.fixed-hint {
+  display: none;
+  margin: 8px 10px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line, #dcdfe6);
+  border-radius: 6px;
+  background: #fafafa;
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--gray-2, #909399);
+}
+.view.edit.no-blocks:not(.nav-mode) .fixed-hint { display: block; }
 .nv-hint {
   padding: 46px 24px;
   text-align: center;

@@ -504,6 +504,23 @@ assert('装修台含「新建页面」入口与自定义页改名 / 删除操作
 assert('装修台列表区分内置页 / 自定义页',
   adminJsSrc.indexOf('type-tag custom') >= 0 && adminJsSrc.indexOf('type-tag builtin') >= 0);
 
+/*
+ * 固定结构页（莱克 / 资讯 / 产品 / 我的）不是「区块流」，点任何组件都只会弹
+ * 「该页面暂不支持添加组件」—— 实测运营反馈「点使用组件全部都无法使用」。
+ * 这类页面必须整栏收起组件库并给出一句说明，而不是展示一个点了就报错的入口。
+ * 判断口径与 addComponent() 用同一个 findBlocksNode（同一函数，天然不会走样）；
+ * 店铺导航（nav-mode）有自己的说明占位，不叠加 fixed-hint。
+ */
+const adminCssSrc = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.css'), 'utf8');
+const adminHtmlSrc = readFileSync(join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8');
+assert('固定结构页收起组件库并给出说明（不支持加组件就不给入口）',
+  adminJsSrc.indexOf("classList.toggle('no-blocks'") >= 0 &&
+  adminJsSrc.indexOf('findBlocksNode(S.cur && S.cur.schema)') >= 0 &&
+  /\.view\.edit\.no-blocks \.col-lib\s*\{[^}]*display:\s*none/.test(adminCssSrc) &&
+  adminHtmlSrc.indexOf('fixed-hint') >= 0 &&
+  /\.view\.edit\.no-blocks:not\(\.nav-mode\) \.fixed-hint\s*\{[^}]*display:\s*block/.test(adminCssSrc),
+  'admin.js / admin.css / index.html 三处缺一不可（no-blocks 切换 / col-lib 隐藏 / 说明文案）');
+
 const mpCustomJs = join(ROOT_DIR, 'miniprogram', 'pages', 'custom', 'index.js');
 assert('小程序端通用自定义页存在，且复用 utils/blocks 的区块渲染',
   existsSync(mpCustomJs) && readFileSync(mpCustomJs, 'utf8').indexOf('utils/blocks') >= 0);

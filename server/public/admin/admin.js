@@ -461,6 +461,14 @@
     $('phTitle').textContent = (meta && meta.name) || '首页';
     // 店铺导航没有「区块」可加，左栏组件库整栏收起（见 admin.css 的 .nav-mode）
     $('viewEdit').classList.toggle('nav-mode', isNav);
+    /*
+     * 固定结构页（莱克 / 资讯 / 产品 / 我的）同样收起组件库（.no-blocks）：
+     * 它们的 schema 是专属字段，不是「区块流」，点任何组件都只会弹
+     * 「该页面暂不支持添加组件」。之前组件库照常展示，运营实测反馈
+     * 「点使用组件全部无法使用」—— 不给入口比给了再报错清晰得多。
+     * （判断与 addComponent() 用同一个 findBlocksNode，口径天然一致。）
+     */
+    $('viewEdit').classList.toggle('no-blocks', !findBlocksNode(S.cur && S.cur.schema));
     renderTabbar();
   }
 
