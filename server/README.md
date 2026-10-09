@@ -273,6 +273,7 @@ PORT=8080 node server/index.js
 | `node server/tools/reset-dev-data.mjs` | **开发期数据复位**：把 `db.json` 收敛成最小可用集（客户保留最近 1 个、评价保留 1 条、可选连带清订单、清掉孤儿 `payLogs` 与空壳键），执行前全量备份。**必须先停服务**（脚本会探测 3000 端口并拒绝在运行中改文件），默认预演、加 `--apply` 才写。详见脚本头部注释 |
 | `node server/tools/check-all.mjs` | 全量点位连通性自检（86 点位 / **340 断言**，含装修、自定义页面全生命周期、素材库、后台控制台往返、安全开关判定矩阵、持久化兜底守卫、**数据落盘原子写与瞬态重试**、**WXSS 作用域与设计令牌静态校验**、**装修跳转链路校验**、**组件库全量对账 + 19 种区块端到端覆盖**、**商品库图片的删除保护与商品图文详情**、**评价持久化与「无幽灵评价」**、**自检自身不污染真实数据（固定联调账号 / 动态库存探针）**、**`/mp-src` 源码路由的类型白名单与路径穿越拦截**、**预览页必须编译真机源码（不得有第二份 HTML 近似）**、**装修台预览与真机口径一致**、**两态渲染实测**、**店铺导航全链路（候选页面与 `app.json` 一致 / 四件套齐全 / 5 个 tab 页都同步高亮 / 三处兜底值一致 / 校验边界 / 发布器接线 / 两处预览共用唯一实现）**、**固定结构页收起组件库并给出说明**；含小程序配置与页面资源可达性静态校验） |
 | `.tooling/check-admin-nav.mjs` | 店铺导航的**浏览器验收**（18 项，需 Chrome + CDP 代理）：装修台列表卡片 / 进编辑器隐藏组件库 / 点区块树高亮跟随 / 改文案实时 5 字截断 / 图标样式切换真的生效 / `/preview` 切页高亮跟随。补「静态自检覆盖不到、只能真浏览器验」的那一段；只新开标签页用完即关，不碰已有标签页 |
+| `.tooling/probe-deployed.mjs` | **已部署服务器**的端到端冒烟（30 项，默认打 `https://14.103.50.137/mall-api`）：连通与 86 点位 / **管理页面与 44 个运营接口在公网确实被拒**（代理路径 403 + 站点根 410 两处都查，防「只是 nginx 顺手挡了」的假安全）/ 登录 / 首页 / 商品 / 分类 / **加购 → 下单 → 核对库存扣减 → 取消 → 核对库存回滚** / 图片静态资源。会真实写数据，但结尾自动取消订单；用于每次部署后确认「线上真的能用」，而不是只在本机自检通过 |
 
 **装修相关点位（14 个，`/api/decorate/*`）**：页面列表 / 组件库清单 / 页面详情 / 保存草稿 / 丢弃草稿 / 查看变更 / 发布 / 回滚 / 统计 / 可选跳转目标清单 / 模板与配额 / 新建自定义页 / 改页面信息 / 删自定义页。这些点位未开启 JWT 鉴权（当前无管理端账号体系），**正式环境请在网关层加访问控制**；设置 `DEBUG_PAGE=off` 也能把它们连同页面一起关掉（但网关层鉴权仍是首选，因为那个开关是「全开或全关」，做不到按角色细分）。
 
@@ -725,3 +726,76 @@ node server/tools/check-all.mjs
 8. 支付回调地址在小程序后台配置为 `https://<域名>/api/pay/notify`
 9. 商品数据接入真实商品库：`catalog.json` 首次由 `lib/seed.js` 迁移生成，接入 ERP / 商品中心后替换该迁移源即可（后台已在用它，切换时不需改路由）
 10. 登录接口加频次限制：`/api/auth/login` 目前无失败次数 / 速率限制，可被无限尝试；建议在网关层或 `lib/auth.js` 加滑动窗口限流
+
+---
+
+## 八、已部署实例（腾讯云 CVM）
+
+> 2026-10-09 首次部署。下面这份是**实际情况**，不是模板——照着改别的机器时请逐项核对。
+
+| 项 | 值 |
+|---|---|
+| 机器 | 腾讯云 CVM `LEXY` / `i-yerjm9ry4o6ipm9o5cdt`（华东2 上海 A），Ubuntu 22.04，4 核 16G |
+| 公网 IP | `14.103.50.137`（弹性 IP，5Mbps，2031-06 到期） |
+| 登录 | `ssh -i ~/.ssh/id_ed25519 root@14.103.50.137`（免密公钥已写入 `/root/.ssh/authorized_keys`） |
+| 应用目录 | `/opt/lexy-mall`（`server/` + `miniprogram/` + `deploy/`），约 6.3MB |
+| 进程管理 | systemd 单元 `lexy-mall.service`（**不是 pm2**；开机自启 + 崩溃 3 秒重拉），内存约 17MB |
+| 日志 | `/var/log/lexy-mall.log` |
+| 环境变量 | `/opt/lexy-mall/.env`（chmod 600，`JWT_SECRET` 随机 32 字节，装好后不再改） |
+| Node | 复用机器已有的 `/usr/local/bin/node` → `/opt/node-v22.14.0`，**不新装、不覆盖** |
+
+**⚠️ 这台机器不是专用机**，上面同时跑着团队的其它业务：`nginx`（80/443）、`kingclean-test`（Flask/gunicorn :5003）、`stopwatch-gateway`（:9123）、video-canvas（:4101/:3101）、`postgresql@14`、`proxima`、`assist-client` 等。改动前必须避让，**任何 nginx 变更都要先带时间戳备份**（机器上已有几十个历史 `.bak`，是惯例）。部署只占用了一个空闲端口 **3000**，其余一律不动。
+
+### 对外访问路径（关键设计）
+
+小程序端 `BASE_URL` = **`https://14.103.50.137/mall-api`**。链路：
+
+```
+小程序 → https://14.103.50.137/mall-api/api/health
+      → 443（stopwatch-lab 的 server 块，证书 /etc/letsencrypt/live/14.103.50.137/）
+      → 该块的 location / 反代到 127.0.0.1:80
+      → 80（lexy-official-site）命中 `location ^~ /mall-api/`
+      → 剥掉 /mall-api 前缀 → http://127.0.0.1:3000/api/health
+```
+
+**为什么挂在 80 而不是 443**：443 那个 server 块已有 catch-all 把所有未匹配请求转回 80，所以挂在 80 就等于 http/https 双通，白拿 HTTPS，且**只用改一个文件**。`proxy_pass` 末尾的 `/` 是必须的（前缀替换语义），见 `deploy/nginx-mall-api.conf` 的注释。`client_max_body_size 20m` 也不能省——nginx 默认 1m，手机拍的图 3~5MB，否则素材上传 413 且后端日志里什么都看不到。
+
+**证书是 Let's Encrypt 的短期档**（`preferred_profile = shortlived`，6 天有效期，IP 证书），由机器上既有的 `stopwatch-cert-renew.timer`（+ `stopwatch-cert-expiry.timer`，renew_hook 会 `nginx -t` 后 reload）自动续期，**本项目不参与、也不要动它**。
+
+### 部署步骤（重跑一遍就是升级）
+
+```bash
+# 本机：打包含 server/ + miniprogram/ + 数据 + deploy/
+tar -cf deploy/.build/lexy-backend.tar --exclude='server/data' \
+    --exclude='miniprogram/project.private.config.json' server miniprogram
+tar -rf deploy/.build/lexy-backend.tar server/data/catalog.json server/data/uploads \
+    deploy/lexy-mall.service deploy/setup-server.sh deploy/nginx-mall-api.conf deploy/enable-nginx-mall.sh
+gzip -9 -f deploy/.build/lexy-backend.tar
+
+scp deploy/.build/lexy-backend.tar.gz root@14.103.50.137:/root/
+# 服务器：解包 + 幂等初始化（检测 Node / 生成 .env / 装服务 / 健康检查）
+ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
+  && bash /opt/lexy-mall/deploy/setup-server.sh \
+  && bash /opt/lexy-mall/deploy/enable-nginx-mall.sh'   # 后者只在首次需要（幂等）
+```
+
+**⚠️ 打包必须带上 `miniprogram/`**：`server/lib/seed.js` 在**模块加载期**就 `require('../../miniprogram/mock/data')`，只拷 `server/` 会让进程起来就 `MODULE_NOT_FOUND` 退出（首次部署就是这么挂的）。另外 `/mp-src` 路由与素材引用检查也要读它。
+
+**不带 `server/data/db.json`**（用户业务数据）是**故意的**：生产环境全新自举（`emptyDb()` + 从 `catalog.json` 初始化 `stocks`），避免把本机的联调用户 / 测试订单带上线。`catalog.json`（商品/分类/券模板/店铺设置）和 `uploads/`（图片）必须带，否则线上商品为空、图片全裂。
+
+### 冒烟与回滚
+
+```bash
+node .tooling/probe-deployed.mjs            # 30 项：连通 / 管理页面被关 / 登录 / 商品 / 加购下单取消（含库存扣减与回滚）/ 静态资源 / 管理接口被拒
+```
+
+回滚 nginx：`cp -a /etc/nginx/sites-available/lexy-official-site.bak-mall-api-<时间戳> /etc/nginx/sites-available/lexy-official-site && nginx -t && systemctl reload nginx`
+停服务：`systemctl disable --now lexy-mall`（目录 `/opt/lexy-mall` 可整体删除，不影响其它业务）
+
+### 当前仍在生效的取舍
+
+- `DEBUG_PAGE=off` + `NODE_ENV=production` → `/admin`、`/console`、`/debug`、`/preview` 与 44 个运营接口在公网**全部 403**（已实测）。**因此装修台继续在本机用**（它的「发布」要写 `miniprogram/config/replica.js`）。想远程装修就设 `DEBUG_PAGE=1`，但那等于把管理后台开到公网，**必须先加鉴权**。
+- `ALLOW_MOCK_PAY=1` → 保留模拟支付，方便手机端跑完下单链路；接真实微信支付后删掉这一行。
+- 未配 `WX_APPID` / `WX_SECRET` → 登录走 mock，**同一个 code 稳定映射同一 openid，但每个新 code 都是新账号**（`md5(code)` 派生）。小程序端是「有 token 就不重登」，所以单台设备账号能保持；一旦 token 过期或清缓存就会变成新用户，购物车/订单不连续。要彻底解决就填上 `WX_APPID` + `WX_SECRET`。
+- 仍是 **IP + HTTPS，没有域名**：开发者工具需勾「不校验合法域名」，真机/体验版需在胶囊菜单里打开「开发调试」。正式提审必须换成已备案域名（微信不接受 IP）。
+

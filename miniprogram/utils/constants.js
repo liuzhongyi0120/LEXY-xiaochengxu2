@@ -2,25 +2,33 @@
  * 全局常量
  *
  * ENV 说明：
- *   mock  —— 无后端时的离线演示模式，仅覆盖「页面演示所需」的点位（商品/购物车等）
- *   local —— 连本机自建后端（http://127.0.0.1:3000），联调全量点位
- *   dev   —— 连开发环境接口
- *   prod  —— 连生产环境接口（必须为已备案域名的 HTTPS）
+ *   mock   —— 无后端时的离线演示模式，仅覆盖「页面演示所需」的点位（商品/购物车等）
+ *   local  —— 连本机自建后端（http://127.0.0.1:3000），只在开发者工具模拟器里可用
+ *   server —— 连云服务器（腾讯云 CVM 14.103.50.137），走 nginx 的 /mall-api 反代：
+ *             443 → catch-all → 80 → location /mall-api/ → 127.0.0.1:3000
+ *             **模拟器与真机通用**（HTTPS，不用改 IP、不用同 WiFi）
+ *   dev    —— 连开发环境接口（域名）
+ *   prod   —— 连生产环境接口（必须为已备案域名的 HTTPS）
  *
- * 联调前置（用 local 时必做）：
- *   1) 先启动后端：  node server/index.js
- *   2) 微信开发者工具 → 详情 → 本地设置 → 勾选「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」
- *      （原因：小程序正式环境只允许 HTTPS，本机调试走 http 必须临时关闭校验）
- *   3) 真机调试时把 local 的地址换成本机局域网 IP（如 http://192.168.0.10:3000），
- *      手机与电脑需在同一网段
+ * 联调前置：
+ *   1) server 档：服务器上 lexy-mall.service 需在跑（systemctl status lexy-mall）
+ *      local  档：本机需先起后端 node server/index.js
+ *   2) 微信开发者工具 → 详情 → 本地设置 → 勾选
+ *      「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」
+ *      （14.103.50.137 是 IP 不是域名，未在 mp 后台配置 request 合法域名，必须临时关校验；
+ *       真机上则用「右上角胶囊 → 开发调试 → 打开」绕过）
+ *
+ * ⚠️ 图片地址由 utils/asset.js 的 resolveAssets() 拼接成 BASE_URL + '/uploads/xxx'，
+ *    所以 BASE_URL 必须包含 /mall-api 这一段（服务器端 nginx 会把该前缀剥掉再转发）。
  */
-const ENV = 'local';
+const ENV = 'server';
 
 const BASE_URL_MAP = {
   mock: '',
-  local: 'http://127.0.0.1:3000',         // 本机自建后端（开发联调）
-  dev: 'https://dev-api.example.com',     // TODO 替换为开发环境域名
-  prod: 'https://api.example.com'         // TODO 替换为生产域名（须已备案 + HTTPS）
+  local: 'http://127.0.0.1:3000',           // 本机自建后端（仅模拟器可用）
+  server: 'https://14.103.50.137/mall-api', // 腾讯云 CVM（nginx 反代 → 本机 3000）
+  dev: 'https://dev-api.example.com',       // TODO 替换为开发环境域名
+  prod: 'https://api.example.com'           // TODO 替换为生产域名（须已备案 + HTTPS）
 };
 
 const BASE_URL = BASE_URL_MAP[ENV];

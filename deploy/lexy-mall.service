@@ -1,0 +1,38 @@
+# 莱克企业商城小程序 · 后端常驻服务（systemd）
+#
+# 安装（以 root 执行）：
+#   cp /opt/lexy-mall/deploy/lexy-mall.service /etc/systemd/system/
+#   systemctl daemon-reload && systemctl enable --now lexy-mall
+#
+# 查看：systemctl status lexy-mall   日志：tail -f /var/log/lexy-mall.log
+# 重启：systemctl restart lexy-mall
+#
+# 说明：后端零第三方依赖，不需要 npm install，也不需要 pm2。
+# 环境变量写在 /opt/lexy-mall/.env（由 setup-server.sh 生成，JWT_SECRET 必填）。
+
+[Unit]
+Description=LEXY Mall Backend (zero-dependency Node.js)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/lexy-mall/server
+EnvironmentFile=-/opt/lexy-mall/.env
+# 用绝对路径：systemd 的 PATH 很窄，写 node 会找不到
+ExecStart=/usr/local/bin/node index.js
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/lexy-mall.log
+StandardError=append:/var/log/lexy-mall.log
+
+# 最小权限：进程只应写 /opt/lexy-mall（数据与上传）与 /var/log
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+ReadWritePaths=/opt/lexy-mall /var/log
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
