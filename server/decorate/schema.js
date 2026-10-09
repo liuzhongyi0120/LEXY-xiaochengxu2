@@ -62,7 +62,8 @@ const ICONS = {
   audio: I('<path d="M9 15V6l7-2v9"/><circle cx="6.5" cy="16" r="2.5"/><circle cx="16" cy="14" r="2.5"/>'),
   service: I('<path d="M5 12a7 7 0 0114 0"/><rect x="3" y="12" width="4" height="7" rx="1.6"/><rect x="17" y="12" width="4" height="7" rx="1.6"/><path d="M17 19c0 1.3-1.4 2-3.2 2" stroke-opacity=".6"/>'),
   content_card: I('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M6 19h12M8 8h6M8 11h4"/>'),
-  buy_bar: I('<rect x="3" y="16" width="18" height="5" rx="2.5"/><path d="M7 8.5h10M7 12h6" stroke-opacity=".5"/>')
+  buy_bar: I('<rect x="3" y="16" width="18" height="5" rx="2.5"/><path d="M7 8.5h10M7 12h6" stroke-opacity=".5"/>'),
+  brand_category: I('<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="12" y="4" width="9" height="7" rx="1.5"/><rect x="12" y="13" width="9" height="7" rx="1.5"/>')
 };
 
 /* ============================ 跳转链接（对标有赞「选择链接」） ============================ */
@@ -88,6 +89,15 @@ const LINK_HINT = '留空则不跳转。点「选择链接」从页面 / 商品 
 function linkField(label) {
   return { k: 'link', label: label || '跳转链接', type: 'link', hint: LINK_HINT };
 }
+
+/**
+ * 字重可选项。取值来自有赞「品牌分类E」实测：
+ * 默认粗细 300、选中粗细 450、小组标题 700、分类标题 400 —— 都在这一组里，别再各写一套。
+ */
+const WEIGHT_OPTIONS = [
+  { value: '300', label: '较细' }, { value: '400', label: '常规' },
+  { value: '450', label: '适中' }, { value: '700', label: '加粗' }
+];
 
 /**
  * 区块数据的结构升级（幂等：新老数据跑一遍结果一致）。
@@ -632,6 +642,204 @@ const HOME_BLOCK_KINDS = {
         ]
       }
     ]
+  },
+
+  /* ---------- 品牌分类（对标有赞三方扩展「品牌分类E」 category-4-1） ---------- */
+  /**
+   * 有赞侧是开放平台三方扩展组件（`extension-cnzoom-category-4-1`），
+   * 本后台按原组件「全部功能」自建实现，字段口径逐项对齐（见 .tooling/_yz-value-full.json 抓取快照）。
+   *
+   * 数据层级三层：左侧导航（品牌）→ 右侧内容（小组）→ 条目。
+   *   - 「+ 关联商品分组」= 从商品库多选商品，自动写入「图片 / 名称 / 详情跳转」三类字段；
+   *   - 「+ 自定义图文分组」= 手工加一个空条目自己填。
+   *   两者产出的条目结构完全一致（有赞也是同一份数据结构）。
+   */
+  brand_category: {
+    label: '品牌分类',
+    lib: 'brand_category',
+    group: 'adv',
+    desc: '左侧品牌导航 + 右侧图文内容，点品牌切换内容',
+    tip: '对标有赞「高级组件 · 品牌分类E」。左栏默认占 26%（375 宽下约 98px），右侧内容按 1/2/3/4 列或导航模式排布；图片按原图比例撑高，不裁不拉伸。',
+    fields: [
+      /* ============ 内容设置 ============ */
+      {
+        k: 'brands', label: '左侧导航', type: 'list', max: 11, min: 1, sortable: true, addable: true,
+        item: {
+          type: 'object',
+          title: (v, i) => v.title || ('品牌 ' + (i + 1)),
+          fields: [
+            { k: 'title', label: '分组标题', type: 'text', required: true, hint: '显示在左侧导航栏的名字（有赞同口径就叫「分组标题」），例如：莱克' },
+            {
+              k: 'panels', label: '右侧内容', type: 'list', sortable: true, addable: true, max: 30,
+              item: {
+                type: 'object',
+                title: (v, i) => (v.title || '第 ' + (i + 1) + ' 小组') + (v.items ? '（' + v.items.length + ' 项）' : ''),
+                fields: [
+                  { k: 'title', label: '小组标题', type: 'text', hint: '可不填。例如：热门推荐' },
+                  linkField('标题链接'),
+                  {
+                    k: 'layout', label: '单图布局', type: 'radiobutton', def: '2',
+                    options: [
+                      { value: '1', label: '1 列' }, { value: '2', label: '2 列' },
+                      { value: '3', label: '3 列' }, { value: '4', label: '4 列' },
+                      { value: 'nav', label: '导航' }
+                    ],
+                    hint: '「导航」= 小图 + 文字横向排列，适合做型号入口'
+                  },
+                  {
+                    k: 'items', label: '条目', type: 'list', sortable: true, addable: true, quickAdd: 'goods', max: 60,
+                    item: {
+                      type: 'object',
+                      title: (v, i) => v.title || ('条目 ' + (i + 1)),
+                      fields: [
+                        { k: 'image', label: '图片', type: 'image' },
+                        { k: 'title', label: '标题', type: 'text' },
+                        { k: 'desc', label: '副标题', type: 'text', hint: '可不填，显示在标题下方' },
+                        {
+                          k: 'linkMode', label: '跳转方式', type: 'radiobutton', def: 'whole',
+                          options: [{ value: 'whole', label: '整体跳转' }, { value: 'hot', label: '热区跳转' }],
+                          hint: '「热区跳转」= 图片上再单独挂一层可点区域'
+                        },
+                        linkField()
+                      ]
+                    },
+                    hint: '每个条目 = 图片 + 标题 + 跳转；图片按原图比例撑高（建议同组比例一致）'
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        hint: '左侧的品牌 / 分类入口，可拖拽排序（有赞上限 11 项）。每个品牌点开后编辑它右侧的内容'
+      },
+      { k: 'bgImage', label: '内容背景图', type: 'image', hint: '宽 750、高不限；铺在右侧内容区底部，盖在模块背景色之上' },
+      { k: 'bgTopLink', label: '背景顶部链接', type: 'link', hint: '点内容区顶部的那层透明热区会跳到这里，留空则不跳' },
+      { k: 'bgTopGap', label: '背景顶部间距', type: 'slider', min: 0, max: 100, step: 1, unit: 'px', def: 0 },
+
+      /* ============ 样式设置 ============ */
+      {
+        type: 'group', label: '样式设置 · 布局', collapsed: true,
+        fields: [
+          {
+            k: 'switchMode', label: '菜单切换效果', type: 'radiobutton', def: 'page',
+            options: [{ value: 'page', label: '分页切换' }, { value: 'slide', label: '滑屏切换' }],
+            hint: '「分页切换」= 点左侧导航直接替换右侧内容；「滑屏切换」= 左右滑动过渡'
+          },
+          { k: 'navWidth', label: '左侧标题宽度', type: 'slider', min: 15, max: 60, step: 1, unit: '%', def: 26, hint: '占组件总宽度的百分比。实测有赞线上为 26%（375 宽下 98px）' },
+          { k: 'contentPadX', label: '内容区左右内距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 0 }
+        ]
+      },
+      {
+        type: 'group', label: '样式设置 · 左侧导航', collapsed: true,
+        fields: [
+          {
+            k: 'navStyle', label: '标题风格', type: 'radiobutton', def: 'C',
+            options: [
+              { value: 'A', label: '风格A' }, { value: 'B', label: '风格B' }, { value: 'C', label: '风格C' },
+              { value: 'D', label: '风格D' }, { value: 'E', label: '风格E' }
+            ],
+            hint: '实测：A 每项都有底色块（未选浅灰 / 选中主色），比其余风格高出一截；B 只有选中项才有底色；' +
+              'C = B + 跟随选中项的左侧竖条指示器；D = B + 每项底部分隔线；E = 圆角胶囊（上下各留 5px）'
+          },
+          { k: 'navBg', label: '左侧背景色', type: 'color', def: '#F1F1F1' },
+          { k: 'navColor', label: '标题色', type: 'color', def: '#050505' },
+          { k: 'navColorActive', label: '标题选中色', type: 'color', def: '#FFFFFF' },
+          { k: 'navBgActive', label: '选中背景色', type: 'color', def: '#000000' },
+          { k: 'navBgIdle', label: '未选背景色', type: 'color', def: '#F9F9F9', hint: '仅「风格 A」「风格 E」生效（每项都有底色块）' },
+          { k: 'navBorderColor', label: '选中边框色', type: 'color', def: '', hint: '留空则不画边框（有赞线上即为空）' },
+          { k: 'navBorderLine', label: '分隔线颜色', type: 'color', def: '#DDDDDD', hint: '仅「风格 D」生效' },
+          { k: 'navHeight', label: '标题高度', type: 'slider', min: 28, max: 90, step: 1, unit: 'px', def: 45 },
+          { k: 'navMargin', label: '标题间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 1, hint: '每一项外层的上下留白（有赞字段 title_margin，默认 1）' },
+          { k: 'navBorderH', label: '选中边框高度', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 10, hint: '仅「标题风格 C」「标题风格 A」的指示器 / 色块高度生效' },
+          { k: 'navBorderW', label: '选中边框宽度', type: 'slider', min: 1, max: 12, step: 1, unit: 'px', def: 1 },
+          { k: 'navFontSize', label: '标题字号', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 15 },
+          {
+            k: 'navWeight', label: '默认粗细', type: 'select', def: '300',
+            options: WEIGHT_OPTIONS
+          },
+          {
+            k: 'navWeightActive', label: '选中粗细', type: 'select', def: '450',
+            options: WEIGHT_OPTIONS
+          },
+          {
+            k: 'navAlign', label: '对齐方式', type: 'radiobutton', def: 'center',
+            options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }, { value: 'right', label: '居右' }]
+          }
+        ]
+      },
+      {
+        type: 'group', label: '样式设置 · 右侧内容', collapsed: true,
+        fields: [
+          {
+            k: 'itemShadow', label: '分类图投影', type: 'select', def: 'none',
+            options: [{ value: 'normal', label: '常规' }, { value: 'none', label: '无' }]
+          },
+          { k: 'itemBorderColor', label: '导航模式下边框色', type: 'color', def: '', hint: '仅「单图布局 = 导航」时生效，留空不画' },
+          { k: 'itemTitleColor', label: '分类标题色', type: 'color', def: '#323233', hint: '默认 #323233。置空会退化成继承父级色，预览与真机都算「未设置」' },
+          { k: 'itemGapX', label: '分类图左右间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 0 },
+          { k: 'itemGapY', label: '分类图下间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 5 },
+          { k: 'itemRadius', label: '分类图圆角', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 0 },
+          { k: 'itemTitleSize', label: '分类标题大小', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 14 },
+          {
+            k: 'itemTitleWeight', label: '分类标题粗细', type: 'select', def: '400',
+            options: WEIGHT_OPTIONS
+          },
+          {
+            k: 'itemTitleAlign', label: '标题对齐方式', type: 'radiobutton', def: 'center',
+            options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }, { value: 'right', label: '居右' }]
+          },
+          { k: 'panelTitleColor', label: '小组标题色', type: 'color', def: '#323233', hint: '默认 #323233，口径同「分类标题色」' },
+          { k: 'panelTitleSize', label: '小组标题大小', type: 'slider', min: 12, max: 28, step: 1, unit: 'px', def: 16 },
+          {
+            k: 'panelTitleWeight', label: '小组标题粗细', type: 'select', def: '700',
+            options: WEIGHT_OPTIONS
+          },
+          {
+            k: 'panelTitleAlign', label: '小组标题对齐方式', type: 'radiobutton', def: 'left',
+            options: [{ value: 'left', label: '居左' }, { value: 'center', label: '居中' }, { value: 'right', label: '居右' }]
+          },
+          { k: 'panelTitleGapX', label: '小组标题侧间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 0 },
+          { k: 'panelTitleGapY', label: '小组标题下间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 0 },
+          { k: 'panelGap', label: '分类小组下间距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 13 },
+          { k: 'contentPadBottom', label: '内容区底部内距', type: 'slider', min: 0, max: 80, step: 1, unit: 'px', def: 0 },
+          {
+            k: 'effect', label: '分类图缓动效果', type: 'radiobutton', def: 'none',
+            options: [
+              { value: 'right', label: '右入' }, { value: 'up', label: '上滑' },
+              { value: 'zoom', label: '放大' }, { value: 'fade', label: '淡入' },
+              { value: 'none', label: '关闭' }
+            ]
+          },
+          { k: 'effectSpeed', label: '缓动效果速度', type: 'slider', min: 0.2, max: 3, step: 0.1, unit: 's', def: 1 },
+          { k: 'effectDelay', label: '缓动间隔时长', type: 'slider', min: 0, max: 1, step: 0.05, unit: 's', def: 0.2, hint: '每个条目依次出场的间隔' }
+        ]
+      },
+
+      /* ============ 扩展设置 ============ */
+      {
+        type: 'group', label: '扩展设置', collapsed: true,
+        fields: [
+          { k: 'navLogo', label: '左侧导航顶部 Logo', type: 'image' },
+          linkField('Logo 跳转'),
+          {
+            k: 'searchMode', label: '搜索框设置', type: 'radiobutton', def: 'hide',
+            options: [{ value: 'hide', label: '不显示' }, { value: 'show', label: '显示' }],
+            hint: '显示时在左栏 Logo 下方进入商品搜索页'
+          },
+          { k: 'bg', label: '模块背景色', type: 'color', def: '#FFFFFF' },
+          { k: 'moduleBgImage', label: '模块背景图片', type: 'image', hint: '宽 750、高不限' },
+          {
+            k: 'moduleBgFill', label: '模块背景图片填充', type: 'radiobutton', def: 'cover',
+            options: [{ value: 'cover', label: '填充' }, { value: 'contain', label: '适应' }, { value: 'repeat', label: '平铺' }]
+          },
+          { k: 'reserveTabbar', label: '预留底部导航位置', type: 'switch', def: false, hint: '开启后底部留出 tabBar 高度的空白' },
+          {
+            k: 'navSticky', label: '左侧栏目定位', type: 'radiobutton', def: 'off',
+            options: [{ value: 'off', label: '关闭' }, { value: 'top', label: '吸顶' }]
+          }
+        ]
+      }
+    ]
   }
 };
 
@@ -760,12 +968,12 @@ const YZ_BASIC = [].concat(...YZ_BASIC_GROUPS.map((g) => g.items.map((it) => Obj
  * 有赞「高级组件」tab。
  *
  * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些），本店铺只有 2 个：
- * 「个性导航」「品牌分类E」。这类组件由有赞开放平台的三方模板提供，
- * 自建小程序没有对应运行时，因此一律标为未接入。
+ * 「个性导航」「品牌分类E」。「品牌分类E」已按原组件全部功能自建实现（见 HOME_BLOCK_KINDS.brand_category），
+ * 「个性导航」仍依赖有赞开放平台运行时，标为未接入。
  */
 const YZ_ADV = [
-  { n: '个性导航', type: 'extension-cnzoom-person-nav', ok: 0, why: '有赞开放平台三方扩展组件' },
-  { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 0, why: '有赞开放平台三方扩展组件（店铺「产品」页当前在用）' }
+  { n: '个性导航', type: 'extension-cnzoom-person-nav', ok: 0, why: '有赞开放平台三方扩展组件，依赖有赞开放平台运行时；本后台的底部导航走「全局配置 · 店铺导航」实现' },
+  { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 1, kind: 'brand_category' }
 ];
 
 /** 默认常用组件（对标有赞「常用组件」tab，用户可自行增删，存 localStorage） */
@@ -780,7 +988,7 @@ function componentLib() {
     tabs: [
       { key: 'common', name: '常用组件', count: YZ_COMMON.length, desc: '默认展示的组件，可点「添加常用组件」自行增减' },
       { key: 'basic', name: '基础组件', count: YZ_BASIC.length, desc: '对标有赞基础组件全量清单（10 组 / ' + YZ_BASIC.length + ' 个）' },
-      { key: 'adv', name: '高级组件', count: YZ_ADV.length, desc: '店铺侧扩展组件（有赞里装了什么就有什么），本后台不接入' }
+      { key: 'adv', name: '高级组件', count: YZ_ADV.length, desc: '店铺侧扩展组件（有赞里装了什么就有什么）；已接入的可直接添加' }
     ],
     /** 基础组件的真实分组（装修台左侧按分组显示，与有赞一致） */
     groups: YZ_BASIC_GROUPS.map((g) => ({

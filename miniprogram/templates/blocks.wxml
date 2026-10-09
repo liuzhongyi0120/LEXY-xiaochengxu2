@@ -457,5 +457,128 @@
     </view>
   </block>
 
+  <!-- ============ 品牌分类（对标有赞「高级组件 · 品牌分类E」） ============ -->
+  <!-- 左栏品牌导航 + 右栏图文内容；点左栏只切本地 activeBrand，不改装修数据 -->
+  <view wx:elif="{{block.type === 'brand_category'}}" class="c-bcat" style="background: {{block.bgFinal}}; {{block.modBgStyle}};">
+
+    <view class="bc-wrap">
+      <!-- 左栏：品牌导航。风格 C 的竖条是绝对定位的 <view>，所以外层要 relative -->
+      <view class="bc-navcol" style="width: {{block.navWidthPct}}%; background: {{block.navBgBase}};">
+        <view
+          wx:if="{{block.navLogo}}"
+          class="bc-logo"
+          data-link="{{block.navLogoLink}}"
+          bindtap="onTapBlock"
+          hover-class="{{block.navLogoLink ? 'hover-lite' : 'none'}}"
+          hover-stay-time="80"
+        >
+          <image src="{{block.navLogo}}" mode="widthFix" />
+        </view>
+        <view wx:if="{{block.searchOn}}" class="bc-search" catchtap="onSearchTap">🔍 搜索</view>
+
+        <view
+          wx:for="{{block.navs}}"
+          wx:key="index"
+          wx:for-item="navText"
+          wx:for-index="bi"
+          class="bc-nav {{block.navIsD ? 'is-d' : ''}}"
+          style="padding: {{block.navPadYRpx}}rpx 0; --bc-line: {{block.navLineColor}};"
+          data-blk="{{index}}"
+          data-bi="{{bi}}"
+          bindtap="onBrandTap"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >
+          <view
+            class="bc-navi {{bi === block.activeBrand ? 'on' : ''}} {{block.navIsC ? 'is-c' : ''}}"
+            style="height: {{block.navInnerHRpx}}rpx; border-radius: {{block.navRadiusRpx}}rpx; justify-content: {{block.navJustify}}; font-size: {{block.navFsRpx}}rpx; --bc-fg: {{block.navFgOff}}; --bc-fg-on: {{block.navFgOn}}; --bc-bg: {{block.navBgOff}}; --bc-bg-on: {{block.navBgOn}}; --bc-w: {{block.navWeightOff}}; --bc-w-on: {{block.navWeightOn}}; --bc-bar: {{block.navBarColor}}; --bc-bar-w: {{block.navIndWRpx}}rpx; --bc-bar-h: {{block.navIndHRpx}}rpx;"
+          >
+            <text class="bc-navt">{{navText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <!-- 右栏：内容。背景图铺在底部，标题与分类图浮在它上面 -->
+      <view class="bc-main" style="padding: 0 {{block.padXRpx}}rpx {{block.padBRpx}}rpx;">
+        <view
+          wx:if="{{block.bgImage}}"
+          class="bc-bgimg"
+          style="top: {{block.bgTopGapRpx}}rpx; background-image: url({{block.bgImage}});"
+        >
+          <view
+            wx:if="{{block.bgTopLink}}"
+            class="bc-bgtop"
+            data-link="{{block.bgTopLink}}"
+            bindtap="onTapBlock"
+          ></view>
+        </view>
+
+        <view class="bc-inner">
+          <block wx:if="{{block.brands.length}}">
+          <block wx:for="{{block.brands[block.activeBrand].panels}}" wx:key="index" wx:for-item="pn" wx:for-index="pi">
+            <view style="margin-bottom: {{block.panelGapRpx}}rpx;">
+              <view
+                wx:if="{{pn.title}}"
+                class="bc-ptitle"
+                style="font-size: {{block.panelTitleFsRpx}}rpx; font-weight: {{block.panelTitleWeight}}; text-align: {{block.panelTitleAlign}}; padding: 0 {{block.panelTitleGapXRpx}}rpx; margin-bottom: {{block.panelTitleGapYRpx}}rpx; --bc-pfg: {{block.panelTitleFg}};"
+                data-link="{{pn.link}}"
+                bindtap="onTapBlock"
+                hover-class="{{pn.link ? 'hover-lite' : 'none'}}"
+                hover-stay-time="80"
+              >{{pn.title}}</view>
+
+              <view class="bc-grid" style="margin: 0 -{{block.itemHalfGapRpx}}rpx;">
+                <view
+                  wx:for="{{pn.items}}"
+                  wx:key="index"
+                  wx:for-item="it"
+                  wx:for-index="ii"
+                  class="bc-cell {{pn.isNav ? 'nav' : ''}} {{block.effectClass}}"
+                  style="width: {{pn.isNav ? 100 : pn.cellW}}%; padding: 0 {{block.itemHalfGapRpx}}rpx; margin-bottom: {{block.itemGapYRpx}}rpx; animation-duration: {{block.effectDurMs}}ms; animation-delay: {{it.delayMs}}ms;"
+                  data-link="{{it.hot ? '' : it.link}}"
+                  bindtap="onTapBlock"
+                  hover-class="{{!it.hot && it.link ? 'hover-lite' : 'none'}}"
+                  hover-stay-time="80"
+                >
+                  <view
+                    class="bc-pic {{block.itemShadow ? 'shadow' : ''}} {{pn.isNav ? 'square' : ''}}"
+                    style="border-radius: {{block.itemRadiusRpx}}rpx; --bc-ibd: {{block.itemBorderColor}};"
+                    data-link="{{it.link}}"
+                    data-hot="{{it.hot}}"
+                    bindtap="onBrandPicTap"
+                  >
+                    <image
+                      wx:if="{{!it.failed}}"
+                      src="{{it.image}}"
+                      mode="{{pn.isNav ? 'aspectFill' : 'widthFix'}}"
+                      data-blk="{{index}}"
+                      data-bi="{{block.activeBrand}}"
+                      data-pi="{{pi}}"
+                      data-ii="{{ii}}"
+                      binderror="onBrandImgError"
+                    />
+                    <view wx:else class="bc-picph">图片加载失败</view>
+                  </view>
+                  <view class="bc-txt">
+                    <view
+                      wx:if="{{it.title}}"
+                      class="bc-it"
+                      style="font-size: {{block.itemFsRpx}}rpx; font-weight: {{block.itemWeight}}; text-align: {{block.itemAlign}}; --bc-ifg: {{block.itemFg}};"
+                    >{{it.title}}</view>
+                    <view wx:if="{{it.desc}}" class="bc-id" style="text-align: {{block.itemAlign}};">{{it.desc}}</view>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </block>
+          </block>
+
+          <!-- 品牌还没配内容：给运营一句能照着做的提示，而不是空白一片 -->
+          <view wx:if="{{!block.brands.length}}" class="bc-empty">该组件还没有品牌，请到装修台「内容设置」里添加</view>
+        </view>
+      </view>
+    </view>
+  </view>
+
   </view>
 </block>

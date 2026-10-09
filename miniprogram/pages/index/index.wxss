@@ -584,3 +584,220 @@
   color: var(--color-text-inverse);
   font-weight: 600;
 }
+
+/* ==================== 品牌分类（对标有赞「高级组件 · 品牌分类E」） ==================== */
+/* 左栏品牌导航 + 右栏图文；5 种标题风格的差异全部靠 class + CSS 变量表达，
+   具体取值由 utils/blocks.js 算好放进 inline style（模板里不做任何算术）。 */
+.c-bcat {
+  position: relative;
+  overflow: hidden;
+}
+.bc-wrap {
+  display: flex;
+  align-items: stretch;
+}
+.bc-navcol {
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+/* 左栏顶部：Logo / 搜索框 */
+.bc-logo {
+  padding: 12rpx;
+}
+.bc-logo image {
+  width: 100%;
+  display: block;
+}
+.bc-search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 12rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  background: rgba(0, 0, 0, .06);
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+/* 导航项：外层负责间距 / 分隔线，内层负责色块与文字 */
+.bc-nav {
+  position: relative;
+  box-sizing: border-box;
+}
+.bc-nav.is-d {
+  border-bottom: 1rpx solid var(--bc-line, #DDDDDD);
+}
+.bc-navi {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding: 0 12rpx;
+  overflow: hidden;
+  background: var(--bc-bg, transparent);
+  color: var(--bc-fg, #050505);
+  font-weight: var(--bc-w, 300);
+}
+.bc-navi.on {
+  background: var(--bc-bg-on, #000000);
+  color: var(--bc-fg-on, #FFFFFF);
+  font-weight: var(--bc-w-on, 450);
+}
+/* 风格 C：跟随选中项的左侧竖条（高度 / 宽度 / 颜色都可配） */
+.bc-navi.is-c.on::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: var(--bc-bar-w, 2rpx);
+  height: var(--bc-bar-h, 20rpx);
+  margin-top: -1rpx;
+  transform: translateY(-50%);
+  background: var(--bc-bar, #000000);
+}
+.bc-navt {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.25;
+}
+
+/* 右栏 */
+.bc-main {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.bc-bgimg {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: cover;
+  background-position: top center;
+  background-repeat: no-repeat;
+}
+.bc-bgtop {
+  height: 56rpx;
+}
+.bc-inner {
+  position: relative;
+}
+.bc-ptitle {
+  color: var(--bc-pfg, var(--color-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+.bc-cell {
+  box-sizing: border-box;
+}
+
+/* 分类图：网格模式按原图比例撑高（widthFix），导航模式固定方形 */
+.bc-pic {
+  position: relative;
+  overflow: hidden;
+  background: var(--color-bg-muted);
+}
+.bc-pic.shadow {
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .16);
+}
+.bc-pic image {
+  width: 100%;
+  display: block;
+}
+.bc-pic.square {
+  flex: 0 0 auto;
+  width: 96rpx;
+  height: 96rpx;
+  border: 1rpx solid var(--bc-ibd, transparent);
+}
+.bc-pic.square image {
+  height: 100%;
+}
+.bc-picph {
+  padding: 24rpx 0;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+.bc-txt {
+  min-width: 0;
+}
+.bc-it {
+  margin-top: 8rpx;
+  color: var(--bc-ifg, var(--color-text));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bc-id {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 「单图布局 = 导航」：小图 + 文字左右并排 */
+.bc-cell.nav {
+  display: flex;
+  align-items: center;
+}
+.bc-cell.nav .bc-pic {
+  margin-right: 16rpx;
+}
+.bc-cell.nav .bc-txt {
+  flex: 1;
+}
+.bc-cell.nav .bc-it {
+  margin-top: 0;
+  text-align: left;
+}
+.bc-cell.nav .bc-id {
+  text-align: left;
+}
+
+.bc-empty {
+  padding: 32rpx 0;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+/* 分类图缓动：四种效果 + 逐条延迟（延迟由 JS 按 index 算好放进 inline style） */
+.bc-cell.anim-right,
+.bc-cell.anim-up,
+.bc-cell.anim-zoom,
+.bc-cell.anim-fade {
+  animation-timing-function: ease-out;
+  animation-fill-mode: both;
+}
+.bc-cell.anim-right { animation-name: bc-in-right; }
+.bc-cell.anim-up { animation-name: bc-in-up; }
+.bc-cell.anim-zoom { animation-name: bc-in-zoom; }
+.bc-cell.anim-fade { animation-name: bc-in-fade; }
+@keyframes bc-in-right {
+  from { opacity: 0; transform: translateX(60rpx); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes bc-in-up {
+  from { opacity: 0; transform: translateY(40rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes bc-in-zoom {
+  from { opacity: 0; transform: scale(.86); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes bc-in-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -187,6 +187,49 @@ const blockPageBehavior = {
     wx.navigateTo({ url: GOODS_DETAIL + '?id=' + id, fail: () => wx.showToast({ title: '商品详情页开发中', icon: 'none' }) });
   },
 
+  /* ------------------------- 品牌分类（对标有赞「品牌分类E」） ------------------------- */
+
+  /**
+   * 点左侧品牌开关，切换右栏内容。
+   * 只改本页 data（activeBrand），**不动装修数据** —— 有赞同口径：
+   * 预览时选中哪个品牌属于浏览态，不该被发布出去。
+   */
+  onBrandTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.blk === undefined || ds.bi === undefined) return;
+    const i = Number(ds.bi);
+    if (this.data['blocks[' + ds.blk + '].activeBrand'] === i) return;
+    this.setData({ ['blocks[' + ds.blk + '].activeBrand']: i });
+  },
+
+  /** 滑屏切换模式：左右滑动右栏内容（与点左侧导航等价） */
+  onBrandSwipe(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.blk === undefined) return;
+    const i = Number(e.detail && e.detail.current);
+    if (isNaN(i)) return;
+    this.setData({ ['blocks[' + ds.blk + '].activeBrand']: i });
+  },
+
+  /**
+   * 分类图点击。
+   * 「整体跳转」时整格都能点（由外层的 onTapBlock 负责），这里只处理「热区跳转」；
+   * 用 bindtap 而不是 catchtap —— catch 会掐断冒泡，整体跳转那一格就再也点不动了。
+   */
+  onBrandPicTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.hot && ds.link) openLink(ds.link, { failText: '页面暂未开放' });
+  },
+
+  /** 分类图加载失败 → 留灰底，不显示破图 */
+  onBrandImgError(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.blk === undefined || ds.bi === undefined) return;
+    this.setData({
+      ['blocks[' + ds.blk + '].brands[' + ds.bi + '].panels[' + ds.pi + '].items[' + ds.ii + '].failed']: true
+    });
+  },
+
   /** 离开页面时释放音频，避免后台还在响 */
   onUnloadBlockAudio() {
     if (this._audio) {

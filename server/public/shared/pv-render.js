@@ -137,11 +137,204 @@
     notice: '公告', nav: '图文导航', cube: '魔方', hotspot: '热区切图', shop: '店铺信息',
     goods: '商品', rich_text: '富文本', search: '商品搜索', elevator: '电梯导航',
     enter_shop: '进入店铺', audio: '语音', service: '在线客服', content_card: '内容卡片',
-    buy_bar: '购买按钮'
+    buy_bar: '购买按钮', brand_category: '品牌分类'
   };
   function kindTag(kind, i) {
     if (!CTX.edit) return '';
     return '<span class="pv-tag">' + esc(KIND_LABEL[kind] || kind) + ' ' + (i + 1) + '</span>';
+  }
+
+  /* ------------------------- 品牌分类（对标有赞「品牌分类E」） ------------------------- */
+
+  /** 取数值：空值 / 非数字回落默认（装修草稿里的空字符串不能被当成 0） */
+  function pvNum(v, d) {
+    if (v === '' || v === null || v === undefined) return d;
+    var n = Number(v);
+    return isNaN(n) ? d : n;
+  }
+  function pvColor(v, d) { return String(v === null || v === undefined ? '' : v).trim() || d; }
+
+  /**
+   * 品牌分类：左栏品牌导航 + 右栏图文内容。
+   *
+   * 5 种标题风格按有赞实测的 DOM 尺寸还原：
+   *   A 每项都带底色块（比其它风格高「选中边框高度」）  B 只有选中项才有底色
+   *   C = B + 跟随选中项的左侧竖条                     D = B + 每项底部分隔线
+   *   E 圆角胶囊（上下各 5px 内距，圆角 = 内高一半）
+   *
+   * 单位：本组件的 px 值都是 375 基准，预览里原样使用，小程序端 ×2（见 utils/units.js）。
+   * 图片：预览按 1:1 占位；真机用 <image mode="widthFix"> 按原图比例撑高（与有赞一致）。
+   */
+  function pvBrandCategory(b) {
+    var brands = (b.brands || []).filter(function (x) { return x && typeof x === 'object'; });
+    var act = Math.min(Math.max(0, Number(CTX.brand) || 0), Math.max(0, brands.length - 1));
+
+    var navW = pvNum(b.navWidth, 26);
+    var navH = pvNum(b.navHeight, 45);
+    var navGap = pvNum(b.navMargin, 1);
+    var style = b.navStyle || 'C';
+    var fs = pvNum(b.navFontSize, 15);
+    var indH = pvNum(b.navBorderH, 10);
+    var indW = Math.max(1, pvNum(b.navBorderW, 1));
+    var navBg = pvColor(b.navBg, '#F1F1F1');
+    var navFg = pvColor(b.navColor, '#050505');
+    var navFgOn = pvColor(b.navColorActive, '#FFFFFF');
+    var navBgOn = pvColor(b.navBgActive, '#000000');
+    var navBgIdle = pvColor(b.navBgIdle, '#F9F9F9');
+    var navBorder = pvColor(b.navBorderColor, '');
+    var navLine = pvColor(b.navBorderLine, '#DDDDDD');
+    var align = b.navAlign || 'center';
+    var just = align === 'left' ? 'flex-start' : (align === 'right' ? 'flex-end' : 'center');
+
+    var navItems = brands.map(function (br, i) {
+      var on = i === act;
+      var padY = 0, innerH = navH, radius = 0, bg = 'transparent', border = '';
+      if (style === 'A') {
+        padY = navGap / 2;
+        innerH = navH + indH;              // 实测：风格 A 的色块比其它风格恰好高「选中边框高度」
+        bg = on ? navBgOn : navBgIdle;
+        if (navBorder) border = 'border:' + indW + 'px solid ' + navBorder + ';';
+      } else if (style === 'E') {
+        padY = 5;
+        innerH = Math.max(12, navH - 10);
+        radius = Math.round(innerH / 2);
+        bg = on ? navBgOn : navBgIdle;
+        if (navBorder) border = 'border:' + indW + 'px solid ' + navBorder + ';';
+      } else {
+        bg = on ? navBgOn : 'transparent';
+        if (on && navBorder) border = 'border:' + indW + 'px solid ' + navBorder + ';';
+      }
+      var bar = (style === 'C' && on)
+        ? '<i style="position:absolute;left:0;top:50%;margin-top:-' + Math.round(indH / 2) + 'px;width:' + indW +
+          'px;height:' + indH + 'px;background:' + pvColor(b.navBorderColor, navBgOn) + '"></i>'
+        : '';
+      var line = style === 'D' ? ('border-bottom:1px solid ' + navLine + ';') : '';
+      return '<div data-path="brand:' + i + '" title="' + attr(br.title || '') + '" style="position:relative;box-sizing:border-box;' +
+        'padding:' + padY + 'px 0;cursor:pointer;background:' + bg + ';' + border + line + '">' + bar +
+        '<div style="height:' + innerH + 'px;border-radius:' + radius + 'px;display:flex;align-items:center;justify-content:' + just + ';' +
+        'font-size:' + fs + 'px;font-weight:' + (on ? (b.navWeightActive || '450') : (b.navWeight || '300')) + ';' +
+        'color:' + (on ? navFgOn : navFg) + ';padding:0 6px;overflow:hidden">' +
+        '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25">' +
+        esc(br.title || '未命名品牌') + '</span></div></div>';
+    }).join('');
+
+    var gapX = pvNum(b.itemGapX, 0);
+    var gapY = pvNum(b.itemGapY, 5);
+    var itemRadius = pvNum(b.itemRadius, 0);
+    var itemFs = pvNum(b.itemTitleSize, 14);
+    var itemWeight = b.itemTitleWeight || '400';
+    var itemAlign = b.itemTitleAlign || 'center';
+    // ⚠️ 文字色必须给**真实**兜底色：留空时若原样拼出 `color:;` 是无效声明，
+    //    浏览器会整条丢弃 → 退化成继承，与真机（WXSS 令牌兜底）不是同一口径。
+    //    留空 = 用默认文字色，与 miniprogram/utils/blocks.js 的取值逐字对齐。
+    var itemFg = pvColor(b.itemTitleColor, '#323233');
+    var itemBorder = pvColor(b.itemBorderColor, '');
+    var shadow = (b.itemShadow || 'none') === 'normal' ? 'box-shadow:0 2px 8px rgba(0,0,0,.16);' : '';
+
+    var pTitleFs = pvNum(b.panelTitleSize, 16);
+    var pTitleAlign = b.panelTitleAlign || 'left';
+    var pTitleFg = pvColor(b.panelTitleColor, '#323233');
+    var pTitleGapX = pvNum(b.panelTitleGapX, 0);
+    var pTitleGapY = pvNum(b.panelTitleGapY, 0);
+    var pGap = pvNum(b.panelGap, 13);
+    var effect = b.effect || 'none';
+
+    function panelHead(pn) {
+      if (!pn.title) return '';
+      return '<div style="font-size:' + pTitleFs + 'px;font-weight:' + (b.panelTitleWeight || '700') + ';text-align:' + pTitleAlign + ';' +
+        'color:' + pTitleFg + ';padding:0 ' + pTitleGapX + 'px;margin-bottom:' + pTitleGapY + 'px">' + esc(pn.title) +
+        (pn.link ? linkBadge(pn.link) : '') + '</div>';
+    }
+
+    var brand = brands[act] || {};
+    var panels = (brand.panels || []).filter(function (x) { return x && typeof x === 'object'; });
+
+    var rightHtml = panels.map(function (pn) {
+      var layout = String(pn.layout || '2');
+      var list = (pn.items || []).filter(function (x) { return x && (x.image || x.title); });
+      if (!list.length) {
+        return '<div style="margin-bottom:' + pGap + 'px">' + panelHead(pn) +
+          '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（本小组还没有条目，用「+ 关联商品分组」添加）</div></div>';
+      }
+      var body;
+      if (layout === 'nav') {
+        // 导航模式：小图 + 文字横向排（适合做型号入口）
+        body = '<div>' + list.map(function (it) {
+          return '<div style="display:flex;align-items:center;gap:8px;position:relative;box-sizing:border-box;' +
+            'padding:0 ' + (gapX / 2) + 'px;margin-bottom:' + gapY + 'px">' +
+            '<div style="width:48px;height:48px;flex:0 0 auto;border-radius:' + (itemRadius || 4) + 'px;overflow:hidden;background:#f5f6f8;' +
+            (itemBorder ? 'border:1px solid ' + itemBorder + ';' : '') + shadow + '">' +
+            (it.image ? '<img src="' + attr(it.image) + '" style="width:100%;height:100%;object-fit:cover">' : '') + '</div>' +
+            '<div style="min-width:0;flex:1">' +
+            (it.title ? '<div style="font-size:' + itemFs + 'px;font-weight:' + itemWeight + ';color:' + itemFg +
+              ';overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
+            (it.desc ? '<div style="font-size:11px;color:#8a919e;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' +
+              esc(it.desc) + '</div>' : '') +
+            '</div>' + (it.link ? linkBadge(it.link) : '') +
+            (it.link && it.linkMode === 'hot' ? linkDot(it.link, '热区跳转', false) : '') + '</div>';
+        }).join('') + '</div>';
+      } else {
+        var cols = Math.max(1, Math.round(pvNum(layout, 2)));
+        body = '<div style="display:flex;flex-wrap:wrap;margin:0 -' + (gapX / 2) + 'px">' + list.map(function (it) {
+          return '<div style="width:' + (100 / cols) + '%;box-sizing:border-box;padding:0 ' + (gapX / 2) + 'px;margin-bottom:' + gapY + 'px">' +
+            '<div style="position:relative">' +
+            '<div style="position:relative;padding-top:100%;border-radius:' + itemRadius + 'px;overflow:hidden;background:#f5f6f8;' + shadow + '">' +
+            (it.image
+              ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">'
+              : '<div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#8a919e;font-size:12px">未设图</div>') +
+            '</div>' +
+            (it.title ? '<div style="font-size:' + itemFs + 'px;font-weight:' + itemWeight + ';text-align:' + itemAlign +
+              ';color:' + itemFg + ';margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
+            (it.desc ? '<div style="font-size:11px;color:#8a919e;text-align:' + itemAlign +
+              ';overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.desc) + '</div>' : '') +
+            (it.link && it.linkMode !== 'hot' ? linkBadge(it.link) : '') +
+            (it.link && it.linkMode === 'hot' ? linkDot(it.link, '热区跳转', false) : '') +
+            '</div></div>';
+        }).join('') + '</div>';
+      }
+      return '<div style="margin-bottom:' + pGap + 'px">' + panelHead(pn) + body + '</div>';
+    }).join('');
+
+    var navCol = '';
+    if (b.navLogo) {
+      navCol += '<div style="padding:6px;position:relative">' + img(b.navLogo, 'width:100%;display:block') +
+        (b.navLogoLink ? linkBadge(b.navLogoLink) : '') + '</div>';
+    }
+    if ((b.searchMode || 'hide') === 'show') {
+      navCol += '<div style="margin:6px;height:28px;border-radius:14px;background:rgba(0,0,0,.06);display:flex;' +
+        'align-items:center;justify-content:center;font-size:11px;color:#8a919e">🔍 搜索</div>';
+    }
+
+    var bgImage = b.bgImage
+      ? '<div style="position:absolute;left:0;right:0;bottom:0;top:' + pvNum(b.bgTopGap, 0) + 'px;' +
+        'background-image:url(' + attr(b.bgImage) + ');background-size:cover;background-position:top center"></div>' +
+        (b.bgTopLink ? '<div style="position:absolute;left:0;right:0;top:' + pvNum(b.bgTopGap, 0) + 'px;height:28px">' +
+          linkDot(b.bgTopLink, '背景顶部跳转', false) + '</div>' : '')
+      : '';
+
+    var modBg = b.moduleBgImage
+      ? 'background-image:url(' + attr(b.moduleBgImage) + ');' +
+        'background-size:' + (b.moduleBgFill === 'contain' ? 'contain' : (b.moduleBgFill === 'repeat' ? 'auto' : 'cover')) + ';' +
+        'background-repeat:' + (b.moduleBgFill === 'repeat' ? 'repeat' : 'no-repeat') + ';background-position:top center;'
+      : '';
+
+    var tips = '';
+    if (b.navSticky === 'top') tips += '<div style="font-size:10px;color:#8a919e;padding:2px 8px">左侧栏目吸顶</div>';
+    if (effect !== 'none') {
+      tips += '<div style="font-size:10px;color:#8a919e;padding:2px 8px">缓动：' +
+        ({ right: '右入', up: '上滑', zoom: '放大', fade: '淡入' }[effect] || effect) +
+        ' ' + pvNum(b.effectSpeed, 1) + 's，逐条间隔 ' + pvNum(b.effectDelay, 0.2) + 's</div>';
+    }
+
+    return '<div style="position:relative;background:' + pvColor(b.bg, '#FFFFFF') + ';' + modBg + '">' + tips +
+      '<div style="display:flex;align-items:stretch">' +
+      '<div style="width:' + navW + '%;flex:0 0 ' + navW + '%;background:' + navBg + ';overflow:hidden">' + navCol + navItems + '</div>' +
+      '<div style="flex:1;min-width:0;position:relative;padding:0 ' + pvNum(b.contentPadX, 0) + 'px ' + pvNum(b.contentPadBottom, 0) + 'px">' +
+      bgImage + '<div style="position:relative">' +
+      (rightHtml || '<div style="color:#b8bec8;font-size:12px;padding:12px 0">（该品牌还没有内容，在左栏选中它后用「+ 新增」加一个小组）</div>') +
+      '</div></div></div>' +
+      (b.reserveTabbar ? '<div style="height:50px"></div>' : '') +
+      '</div>';
   }
 
   /* --------------------------- 区块渲染 --------------------------- */
@@ -376,6 +569,8 @@
                    : '<span style="font-size:10px;color:#d46b08;margin-left:6px">未填商品 ID</span>') +
         '<span style="font-size:10px;color:#8a919e;margin-left:6px">固定吸底</span>' +
         '</div>';
+    } else if (kind === 'brand_category') {
+      box += pvBrandCategory(b);
     }
 
     box += kindTag(kind, i);

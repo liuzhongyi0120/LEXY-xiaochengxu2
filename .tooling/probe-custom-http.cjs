@@ -18,6 +18,10 @@ const BASE = 'http://127.0.0.1:3000';
 const REPLICA = nodePath.join(__dirname, '..', 'miniprogram', 'config', 'replica.js');
 const KEY = 'zzhttptest';
 const NAME = 'HTTP 自检页';
+// 改名后的标识。**必须声明在外层**：finally 里的「有没有测试页残留」判据要用它，
+// 之前写在 try 块里，finally 一引用就 ReferenceError —— 收尾逻辑自己把脚本搞崩，
+// 而且因为崩在 finally，前面的 30 多条通过会一起丢掉，看起来像整支脚本挂了。
+const NEW_KEY = KEY + '-x';
 
 /** 管理员令牌（启动时填充） */
 let ADMIN = '';
@@ -103,7 +107,10 @@ async function cleanup() {
     /* 2. 新建 */
     const made = await api('POST', '/api/decorate/page/create', { name: NAME, key: KEY, note: '自检', template: 'blank' });
     ok('新建页面成功', made.code === 0 && made.data.page.key === KEY, made.code === 0 ? made.data.page.path : made.msg);
-    ok('新建后未发布，replica 里还没有 CUSTOM_PAGES', readReplica().indexOf('CUSTOM_PAGES') < 0);
+    // ⚠️ 不能断言「replica 里根本没有 CUSTOM_PAGES」——运营建过自定义页（本仓库就有一个 p149）时
+    //    那是假红。要锁的是「这次新建的页还没被写进 replica」。
+    ok('新建后未发布，replica 里还没有这次新建的页',
+      readReplica().indexOf(KEY) < 0, `replica 中不应出现 ${KEY}`);
 
     const list1 = await api('GET', '/api/decorate/pages');
     const hit = (list1.data.list || []).filter((p) => p.key === KEY)[0];
@@ -150,8 +157,7 @@ async function cleanup() {
       !!(R.CUSTOM_PAGES && R.CUSTOM_PAGES[KEY] && R.CUSTOM_PAGES[KEY].blocks[0].text === 'HTTP 自检标题'),
       R.CUSTOM_PAGES && R.CUSTOM_PAGES[KEY] ? 'name=' + R.CUSTOM_PAGES[KEY].name : 'missing');
 
-    /* 7. 改名（key 迁移） */
-    const NEW_KEY = KEY + '-x';
+    /* 7. 改名（key 迁移）—— NEW_KEY 在外层已声明 */
     const rn = await api('POST', '/api/decorate/page/rename', { key: KEY, name: NAME + '改名', newKey: NEW_KEY });
     ok('改名成功并返回旧标识', rn.code === 0 && rn.data.renamedFrom === KEY && rn.data.page.key === NEW_KEY,
       rn.code === 0 ? `${rn.data.renamedFrom} → ${rn.data.page.key}` : rn.msg);
@@ -182,7 +188,12 @@ async function cleanup() {
     ok('删除成功', del.code === 0 && del.data.name === NAME + '改名', del.code === 0 ? del.data.name : del.msg);
 
     const afterDel = readReplica();
-    ok('删干净：replica 里没有 CUSTOM_PAGES', afterDel.indexOf('CUSTOM_PAGES') < 0);
+    // 「删干净」= 测试页自己没留痕迹；CUSTOM_PAGES 段落只要还有别的自定义页就该在（见上面那条注释）
+    const leftCustom = ((await api('GET', '/api/decorate/pages')).data.list || []).filter((p) => p.custom).length;
+    ok('删干净：replica 里不再有测试页，且 CUSTOM_PAGES 段落与剩余自定义页数量一致',
+      afterDel.indexOf(NEW_KEY) < 0 &&
+      (afterDel.indexOf('const CUSTOM_PAGES =') >= 0) === (leftCustom > 0),
+      `剩余自定义页 ${leftCustom} 个 · 段落在场 ${afterDel.indexOf('const CUSTOM_PAGES =') >= 0}`);
     ok('删干净：replica 里没有残留内容',
       afterDel.indexOf(NEW_KEY) < 0 && afterDel.indexOf('HTTP 自检标题') < 0);
     ok('内置 6 个字段完好',
@@ -218,10 +229,12 @@ async function cleanup() {
     results.push({ label: '未捕获异常', pass: false });
   } finally {
     await cleanup();
-    // 若中途异常导致 replica 没复原，用备份兜底
+    // 若中途异常导致 replica 没复原，用备份兜底。
+    // 判据是「测试页自己的标识有没有残留」，不是「CUSTOM_PAGES 段落还在不在」——
+    // 运营建的 p149 是正常内容，不能当成残留。
     const now = readReplica();
-    if (now.indexOf('CUSTOM_PAGES') >= 0) {
-      console.log('（replica 仍有残留，检查是否有自检页未清理）');
+    if (now.indexOf(KEY) >= 0 || now.indexOf(NEW_KEY) >= 0) {
+      console.log('（replica 里还有本次自检页的残留，检查清理是否中途失败）');
     }
     void originalReplica;
   }

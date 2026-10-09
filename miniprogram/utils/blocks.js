@@ -159,6 +159,132 @@ function normalizeBlock(b, index) {
     o.bgOn = o.bgOn !== false;
     o.btnBgFinal = o.theme === 'custom' ? (o.btnBg || BRAND) : BRAND;
     o.text = o.text || '立即下单';
+  } else if (kind === 'brand_category') {
+    /*
+     * 品牌分类（对标有赞「高级组件 · 品牌分类E」）。
+     *
+     * 单位：本组件的尺寸字段都是 375 基准 px，统一 ×2 转 rpx；
+     *       navWidth 是百分比，原样传给 style 的 width 用。
+     * 5 种标题风格只在「每项是否有底色块 / 圆角 / 竖条 / 分隔线」上有差别，
+     * 这里把它们摊平成几个布尔量与数值，WXML 里不再出现任何条件算术。
+     */
+    const nv = (v, d) => {
+      const n = Number(v);
+      return (v === '' || v === null || v === undefined || isNaN(n)) ? d : n;
+    };
+    const col = (v, d) => (v === null || v === undefined || String(v).trim() === '' ? d : String(v).trim());
+
+    o.navStyle = ['A', 'B', 'C', 'D', 'E'].indexOf(o.navStyle) >= 0 ? o.navStyle : 'C';
+    o.navWidthPct = Math.min(60, Math.max(15, Math.round(nv(o.navWidth, 26))));
+    o.navBand = o.navStyle === 'A' || o.navStyle === 'E';        // 每项都带底色块
+    o.navIsE = o.navStyle === 'E';                              // 胶囊
+    o.navIsC = o.navStyle === 'C';                              // 左侧竖条指示器
+    o.navIsD = o.navStyle === 'D';                              // 每项底部分隔线
+
+    o.navHRpx = px2rpx(nv(o.navHeight, 45));
+    o.navIndHRpx = px2rpx(nv(o.navBorderH, 10));
+    o.navIndWRpx = px2rpx(Math.max(1, nv(o.navBorderW, 1)));
+    o.navGapRpx = px2rpx(nv(o.navMargin, 1));
+    o.navPadYRpx = o.navIsE ? 10 : (o.navStyle === 'A' ? Math.round(o.navGapRpx / 2) : 0);
+    // 实测：风格 A 的色块比其余风格恰好高「选中边框高度」；风格 E 上下各留 5px（=10rpx）
+    o.navInnerHRpx = o.navStyle === 'A'
+      ? (o.navHRpx + o.navIndHRpx)
+      : (o.navIsE ? Math.max(24, o.navHRpx - 20) : o.navHRpx);
+    o.navRadiusRpx = o.navIsE ? Math.round(o.navInnerHRpx / 2) : 0;
+    o.navFsRpx = px2rpx(nv(o.navFontSize, 15));
+    o.navJustify = o.navAlign === 'left' ? 'flex-start' : (o.navAlign === 'right' ? 'flex-end' : 'center');
+    o.navFgOff = col(o.navColor, '#050505');
+    o.navFgOn = col(o.navColorActive, '#FFFFFF');
+    o.navBgOn = col(o.navBgActive, '#000000');
+    o.navBgOff = o.navBand ? col(o.navBgIdle, '#F9F9F9') : 'transparent';
+    o.navBgBase = col(o.navBg, '#F1F1F1');
+    o.navWeightOff = String(nv(o.navWeight, 300));
+    o.navWeightOn = String(nv(o.navWeightActive, 450));
+    o.navBorderColor = col(o.navBorderColor, '');
+    o.navBarColor = o.navBorderColor || o.navBgOn;              // 风格 C 的竖条颜色
+    o.navLineColor = col(o.navBorderLine, '#DDDDDD');           // 风格 D 的分隔线
+
+    const gx = px2rpx(nv(o.itemGapX, 0));
+    const gy = px2rpx(nv(o.itemGapY, 5));
+    o.itemGapXRpx = gx;
+    o.itemHalfGapRpx = Math.round(gx / 2);
+    o.itemGapYRpx = gy;
+    o.itemRadiusRpx = px2rpx(nv(o.itemRadius, 0));
+    o.itemFsRpx = px2rpx(nv(o.itemTitleSize, 14));
+    o.itemWeight = String(nv(o.itemTitleWeight, 400));
+    o.itemAlign = ['left', 'center', 'right'].indexOf(o.itemTitleAlign) >= 0 ? o.itemTitleAlign : 'center';
+    // 文字色留空 = 用默认文字色（#323233），**不能**留成空串：
+    // `color: var(--bc-ifg)` 里变量被置空是「无效值」，会整条声明作废并退化成继承，
+    // 与装修台预览（见 shared/pv-render.js 的 pvColor 兜底）不是同一口径。
+    o.itemFg = col(o.itemTitleColor, '#323233');
+    o.itemBorderColor = col(o.itemBorderColor, '');
+    o.itemShadow = o.itemShadow === 'normal';
+
+    o.panelTitleFsRpx = px2rpx(nv(o.panelTitleSize, 16));
+    o.panelTitleWeight = String(nv(o.panelTitleWeight, 700));
+    o.panelTitleAlign = ['left', 'center', 'right'].indexOf(o.panelTitleAlign) >= 0 ? o.panelTitleAlign : 'left';
+    o.panelTitleFg = col(o.panelTitleColor, '#323233');
+    o.panelTitleGapXRpx = px2rpx(nv(o.panelTitleGapX, 0));
+    o.panelTitleGapYRpx = px2rpx(nv(o.panelTitleGapY, 0));
+    o.panelGapRpx = px2rpx(nv(o.panelGap, 13));
+
+    o.bgTopGapRpx = px2rpx(nv(o.bgTopGap, 0));
+    o.padXRpx = px2rpx(nv(o.contentPadX, 0));
+    o.padBRpx = px2rpx(nv(o.contentPadBottom, 0));
+    o.bgFinal = col(o.bg, '#FFFFFF');
+    o.searchOn = o.searchMode === 'show';
+    o.stickyNav = o.navSticky === 'top';
+    // 模块背景图：填充 / 适应 / 平铺 三种口径直接映射到 background-size / repeat
+    o.modBgStyle = o.moduleBgImage
+      ? ('background-image: url(' + o.moduleBgImage + ');' +
+        'background-size: ' + (o.moduleBgFill === 'contain' ? 'contain' : (o.moduleBgFill === 'repeat' ? 'auto' : 'cover')) + ';' +
+        'background-repeat: ' + (o.moduleBgFill === 'repeat' ? 'repeat' : 'no-repeat') + ';' +
+        'background-position: top center;')
+      : '';
+
+    // 缓动：每种效果一条 class，速度/间隔走 inline style（小程序 WXSS 支持 var 与 animation-delay）
+    const EFFECTS = ['right', 'up', 'zoom', 'fade'];
+    o.effect = EFFECTS.indexOf(o.effect) >= 0 ? o.effect : 'none';
+    // 类名在 JS 里拼好：模板里不做字符串拼接，静态自检才能查到「class 是否有定义」
+    o.effectClass = o.effect === 'none' ? '' : ('anim-' + o.effect);
+    o.effectDurMs = Math.round(Math.min(3, Math.max(0.2, nv(o.effectSpeed, 1))) * 1000);
+    o.effectDelayMs = Math.round(Math.min(1, Math.max(0, nv(o.effectDelay, 0.2))) * 1000);
+
+    o.activeBrand = 0;
+    // 只保留有内容的品牌，并给每个条目补上动画延迟（模板里不做乘法）
+    o.brands = (o.brands || [])
+      .filter((br) => br && typeof br === 'object' && String(br.title || '').trim())
+      .slice(0, 11)
+      .map((br) => {
+        const panels = (br.panels || [])
+          .filter((pn) => pn && typeof pn === 'object')
+          .slice(0, 30)
+          .map((pn) => {
+            const layout = String(pn.layout || '2');
+            const isNav = layout === 'nav';
+            const cols = isNav ? 1 : Math.max(1, Math.min(4, Math.round(nv(layout, 2))));
+            const items = (pn.items || [])
+              .filter((it) => it && (it.image || it.title))
+              .slice(0, 60)
+              .map((it, ii) => ({
+                image: it.image || '',
+                title: it.title || '',
+                desc: it.desc || '',
+                link: it.link || '',
+                hot: it.linkMode === 'hot',
+                delayMs: ii * o.effectDelayMs
+              }));
+            return {
+              title: pn.title || '',
+              link: pn.link || '',
+              isNav,
+              cellW: Math.floor(100 / cols * 100) / 100,
+              items
+            };
+          });
+        return { title: String(br.title || '').trim(), panels };
+      });
+    o.navs = o.brands.map((br) => br.title);
   }
 
   o.__index = index;

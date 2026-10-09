@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-09 14:26:15（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-09 17:10:02（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -326,7 +326,7 @@ const PRODUCT_BRANDS = [
     groups: [
       {
         header: "/uploads/202610/20261009-48e0f5-Fo67RLzF9eQ6DB_5C38ufUycXSJV.webp",
-        link: "",
+        link: "/pages/custom/index?key=p149",
         yzId: "",
         products: [
           {
@@ -801,6 +801,40 @@ const PRODUCT_BRANDS = [
   }
 ];
 
+/** ---------------- 自定义页面（key → { name, blocks }，由装修台「新建页面」创建） ---------------- */
+const CUSTOM_PAGES = {
+  p149: {
+    name: "测试",
+    blocks: [
+      {
+        type: "swiper",
+        mode: "poster",
+        height: 1322,
+        radius: "square",
+        images: [
+          {
+            image: "/uploads/202610/20261009-7k2u7a.webp",
+            link: ""
+          }
+        ],
+        id: "xmv0pumyatyd"
+      }
+    ],
+    meta: {
+      desc: "",
+      bg: "#F5F6F8"
+    }
+  },
+  p159: {
+    name: "1",
+    blocks: [],
+    meta: {
+      desc: "",
+      bg: "#F5F6F8"
+    }
+  }
+};
+
 /** ---------------- 页面级设置（装修后台「页面设置」面板，key = 页面 key） ---------------- */
 const PAGE_META = {
   home: {
@@ -822,6 +856,14 @@ const PAGE_META = {
   mine: {
     desc: "个人中心",
     bg: "#FFFFFF"
+  },
+  p149: {
+    desc: "",
+    bg: "#F5F6F8"
+  },
+  p159: {
+    desc: "",
+    bg: "#F5F6F8"
   }
 };
 
@@ -873,6 +915,7 @@ module.exports = {
   NEWS,
   PRODUCT_NAV_LOGO,
   PRODUCT_BRANDS,
+  CUSTOM_PAGES,
   PAGE_META,
   TABBAR
 };

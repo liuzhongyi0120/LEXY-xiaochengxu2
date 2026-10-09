@@ -1445,9 +1445,12 @@
     // 图片型列表有两代结构：老的是「地址字符串数组」，新的是 [{ image, link }]
     var strImg = f.item.type === 'image';
     var objImg = f.item.type === 'object' && f.imageList === true;
-    var addBtn = el('button', 'btn sm', '+ 新增');
+    // 声明了 quickAdd 的列表：主按钮换成「关联商品分组」，另给一个手工入口
+    var quick = f.quickAdd || '';
+    var addBtn = el('button', 'btn sm', quick === 'goods' ? '+ 关联商品分组' : '+ 新增');
     addBtn.onclick = function () {
       if (f.max && arr.length >= f.max) { toast('最多 ' + f.max + ' 项', 'err'); return; }
+      if (quick) { pickGoodsInto(fullPath, f); return; }
       if (strImg || objImg) {
         // 图片列表：走统一的选择器，可一次从本地上传 / 素材库里挑多张
         pickImage({
@@ -1468,6 +1471,15 @@
       addItem(fullPath, f.item);
     };
     bar.appendChild(addBtn);
+    if (quick) {
+      var manualBtn = el('button', 'btn sm ghost', '+ 自定义图文分组');
+      manualBtn.title = '手工加一条，图片 / 标题 / 跳转自己填';
+      manualBtn.onclick = function () {
+        if (f.max && arr.length >= f.max) { toast('最多 ' + f.max + ' 项', 'err'); return; }
+        addItem(fullPath, f.item);
+      };
+      bar.appendChild(manualBtn);
+    }
     body.appendChild(bar);
 
     /* 图片 + 跳转：每项既是图片又能单独设跳转（图片广告的轮播图就是这种） */
@@ -2406,6 +2418,139 @@
       opts = { pages: d.pages || [], goods: d.goods || [], news: d.news || [] };
       o.__loaded = true;
       render();
+    });
+  }
+
+  /**
+   * 商品多选器（字段上的 `quickAdd: 'goods'` 用它）
+   *
+   * 对标有赞的「关联商品分组」：一次勾若干商品，自动长成条目，
+   * 省掉「一个个加条目 → 一张张挑主图 → 一条条粘详情链接」这套手工活。
+   * 数据源与链接选择器的「商品」tab 完全同源（`/api/decorate/link-options`），
+   * 不另开接口 —— 否则商品库改了要同步两处。
+   *
+   *   o.title   弹层标题
+   *   o.max     本列表还能加几项（0 / 不传 = 不限）
+   *   o.onPick  回调，参数是选中的商品对象数组 [{id,name,path,image,kind}]
+   */
+  function goodsPicker(o) {
+    o = o || {};
+    var st = { q: '' };
+    var opts = { goods: [] };
+    var sel = {};
+    var loaded = false;
+
+    var body = el('div', 'pick');
+    body.appendChild(el('div', 'pick-hint',
+      '勾选商品后点「确定」，会自动写入条目：图片 = 商品主图、标题 = 商品名、跳转 = 商品详情页。' +
+      (o.max ? '本列表还能加 ' + o.max + ' 项。' : '')));
+
+    var search = el('div', 'lk-search');
+    search.innerHTML = '<input type="text" placeholder="搜索商品名称或编号" value="' + attr(st.q) + '">';
+    body.appendChild(search);
+
+    var pane = el('div', 'lk-panel');
+    body.appendChild(pane);
+
+    var cnt = el('span', 'cnt', '已选 0 项');
+    var bar = el('div', 'pick-sel-bar');
+    bar.appendChild(cnt);
+    body.appendChild(bar);
+
+    var cancelBtn = el('button', 'btn', '取消');
+    cancelBtn.onclick = closeModal;
+    var okBtn = el('button', 'btn primary', '确定');
+    okBtn.onclick = function () {
+      var picked = opts.goods.filter(function (g) { return sel[g.id]; });
+      if (!picked.length) { toast('请先勾选商品', 'err'); return; }
+      closeModal();
+      if (o.onPick) o.onPick(picked);
+    };
+
+    function render() {
+      cnt.textContent = '已选 ' + Object.keys(sel).length + ' 项';
+      pane.innerHTML = '';
+      if (!loaded) {
+        pane.innerHTML = '<div class="ins-empty"><span class="spin"></span> 正在读取商品库…</div>';
+        return;
+      }
+      var kw = st.q.trim().toLowerCase();
+      var hit = opts.goods.filter(function (x) {
+        if (!kw) return true;
+        return String(x.name || '').toLowerCase().indexOf(kw) >= 0 ||
+          String(x.id || '').toLowerCase().indexOf(kw) >= 0;
+      });
+      if (!hit.length) {
+        pane.appendChild(el('div', 'ins-empty', kw
+          ? '没有匹配「' + esc(st.q) + '」的商品'
+          : '商品库里还没有商品，可先到后台控制台「商品」里新建'));
+        return;
+      }
+      var list = el('div', 'lk-list');
+      hit.forEach(function (x) {
+        var on = !!sel[x.id];
+        var it = el('div', 'lk-item lk-multi' + (on ? ' on' : ''));
+        it.innerHTML =
+          '<span class="lk-check">' + (on ? '✓' : '') + '</span>' +
+          (x.image ? '<img src="' + attr(x.image) + '" alt="">' : '<span class="lk-ph">商</span>') +
+          '<div class="lk-meta"><b>' + esc(x.name || x.id) + '</b><small>' + esc(x.path) + '</small></div>';
+        it.onclick = function () {
+          if (sel[x.id]) delete sel[x.id];
+          else {
+            if (o.max && Object.keys(sel).length >= o.max) {
+              toast('本列表最多还能加 ' + o.max + ' 项', 'err');
+              return;
+            }
+            sel[x.id] = true;
+          }
+          render();
+        };
+        list.appendChild(it);
+      });
+      pane.appendChild(list);
+    }
+
+    var inp = search.querySelector('input');
+    inp.oninput = function () { st.q = inp.value; render(); };
+
+    render();
+    modal(o.title || '关联商品', body, [cancelBtn, okBtn]);
+
+    loadLinkOptions().then(function (d) {
+      opts.goods = (d && d.goods) || [];
+      loaded = true;
+      render();
+    });
+  }
+
+  /**
+   * 「+ 关联商品分组」：把选中的商品批量写进列表
+   * 产出的条目结构与「+ 自定义条目」完全一致（有赞也是同一份数据结构）。
+   */
+  function pickGoodsInto(listPath, f) {
+    var arr = getPath(S.cur.data, listPath);
+    if (!Array.isArray(arr)) { toast('该列表不存在', 'err'); return; }
+    goodsPicker({
+      title: '关联商品分组 · ' + (f.label || f.k),
+      max: f.max ? (f.max - arr.length) : 0,
+      onPick: function (goods) {
+        var cur = getPath(S.cur.data, listPath);
+        var first = cur.length;
+        goods.forEach(function (g) {
+          cur.push({
+            id: genId(),
+            image: g.image || '',
+            title: g.name || '',
+            desc: '',
+            linkMode: 'whole',
+            link: g.path || ''
+          });
+        });
+        markDirty();
+        S.sel = listPath + '.' + first;
+        renderTree(); renderInspector(); renderPreview();
+        toast('已关联 ' + goods.length + ' 个商品，记得保存草稿');
+      }
     });
   }
 

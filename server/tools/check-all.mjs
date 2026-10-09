@@ -510,11 +510,28 @@ await call('POST', '/api/auth/logout', { body: {} });
 
 /* 15.5 店铺装修后台点位（全部无副作用：发布/回滚走「无草稿/无版本」的预期失败分支） */
 const decoPages = await call('GET', '/api/decorate/pages', { auth: false });
-assert('装修页面列表 = 5 个内置页面 + 1 个全局配置项（店铺导航，nav 标记）',
-  decoPages.ok && decoPages.data.list.length === 6 &&
-  decoPages.data.list.filter((p) => !p.nav).length === 5 &&
-  decoPages.data.list.filter((p) => p.nav).length === 1,
-  decoPages.data ? `共 ${decoPages.data.list.length} 项，其中 nav 标记 ${decoPages.data.list.filter((p) => p.nav).length} 项` : '无返回');
+/*
+ * ⚠️ 这里**不能**断言 list.length === 6。
+ * 「自定义页」是运营随时会新建的真实内容 —— 早先写死 6，运营建了第一个自定义页后
+ * 自检就永久变红（假红比不检查更糟）。改成锁「等价关系」：
+ *   · 5 个内置页非 custom 非 nav 全部在场；
+ *   · nav 标记恰好 1 项；
+ *   · 其余条目一律是 custom。
+ */
+const DECO_BUILTIN_KEYS = ['home', 'lexy', 'news', 'product', 'mine'];
+const decoListAll = decoPages.data ? decoPages.data.list : [];
+const decoKeys = decoListAll.map((p) => p.key);
+const decoBad = decoListAll.filter(
+  (p) => p.nav ? false : (!p.custom && DECO_BUILTIN_KEYS.indexOf(p.key) < 0));
+assert('装修页面列表 = 5 个内置页面 + 1 个全局配置项（店铺导航，nav 标记），其余一律是自定义页',
+  decoPages.ok &&
+  DECO_BUILTIN_KEYS.every((k) => decoKeys.indexOf(k) >= 0) &&
+  decoListAll.filter((p) => p.nav).length === 1 &&
+  decoListAll.filter((p) => !p.nav && !p.custom).length === 5 &&
+  decoBad.length === 0,
+  decoPages.data
+    ? `共 ${decoListAll.length} 项（内置 5 / 全局配置 ${decoListAll.filter((p) => p.nav).length} / 自定义 ${decoListAll.filter((p) => p.custom).length}）`
+    : '无返回');
 
 /* 组件库清单：基础组件需与有赞实测的 54 个一致；已接入组件数 = 首页区块类型数 */
 const decoLib = await call('GET', '/api/decorate/lib', { auth: false });
@@ -526,8 +543,8 @@ assert('装修组件库三 tab 数量正确（常用 10 / 基础 54 / 高级实�
   libTabs ? `实际 ${JSON.stringify(libCount)}` : '无返回');
 
 const libKinds = decoLib.ok && decoLib.data ? decoLib.data.kinds : null;
-assert('装修组件库已接入 19 种组件，且每个都带 SVG 图标',
-  !!libKinds && libKinds.length === 19 && libKinds.every((k) => !!k.icon),
+assert('装修组件库已接入 20 种组件，且每个都带 SVG 图标',
+  !!libKinds && libKinds.length === 20 && libKinds.every((k) => !!k.icon),
   libKinds ? `实际 ${libKinds.length} 种，缺图标：${libKinds.filter((k) => !k.icon).map((k) => k.kind).join(',') || '无'}` : '无返回');
 
 const decoHome = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'home' } });
@@ -580,8 +597,11 @@ const decoMake = await call('POST', '/api/decorate/page/create', {
 assert('新建自定义页面成功并返回小程序路径',
   decoMake.ok && decoMake.data.page.path === 'pages/custom/index?key=' + CUSTOM_KEY,
   decoMake.ok ? decoMake.data.page.path : decoMake.json.msg);
-assert('新建后未发布，replica.js 里还没有 CUSTOM_PAGES',
-  readFileSync(REPLICA_FILE, 'utf8').indexOf('CUSTOM_PAGES') < 0);
+// 断言「本次新建的页还没被写进 replica.js」，而不是「replica.js 里根本没有 CUSTOM_PAGES 段」——
+// 后者在运营已经建过自定义页时是假红（本仓库现在就有一个运营自建的页）。
+assert('新建后未发布，replica.js 里还没有这次新建的页面',
+  readFileSync(REPLICA_FILE, 'utf8').indexOf(CUSTOM_KEY) < 0,
+  `replica.js 中不应出现 ${CUSTOM_KEY}`);
 
 const decoMadeP = (((await call('GET', '/api/decorate/pages', { auth: false })).data.list) || [])
   .filter((x) => x.key === CUSTOM_KEY)[0];
@@ -649,8 +669,15 @@ const decoDel = await call('POST', '/api/decorate/page/delete', { body: { key: C
 assert('删除自定义页面成功', decoDel.ok && decoDel.data.name === '自检临时页改名', decoDel.ok ? decoDel.data.name : decoDel.json.msg);
 
 const replicaAfterDel = readFileSync(REPLICA_FILE, 'utf8');
-assert('删除后 replica.js 里 CUSTOM_PAGES 整段消失、无残留数据',
-  replicaAfterDel.indexOf('CUSTOM_PAGES') < 0 && replicaAfterDel.indexOf(CUSTOM_KEY) < 0);
+/*
+ * 「无残留」要锁的是**测试页自己**没留下痕迹，不是「CUSTOM_PAGES 整段消失」——
+ * 运营只要建过任何一个自定义页，这个段落就该在（写死「消失」是假红）。
+ * 顺带把「段落存在性 ⟺ 还有自定义页」这一等价关系也锁上，两边都不会漂。
+ */
+const customSectionOn = replicaAfterDel.indexOf('const CUSTOM_PAGES =') >= 0;
+assert('删除后 replica.js 里不再有测试页的任何残留，且 CUSTOM_PAGES 段落与自定义页数量一致',
+  replicaAfterDel.indexOf(CUSTOM_KEY) < 0 && customSectionOn === (baseCustom > 0),
+  `残留=${replicaAfterDel.indexOf(CUSTOM_KEY) >= 0} 段落在场=${customSectionOn} 既有自定义页=${baseCustom}`);
 assert('删除后仍保留 6 个内置装修字段',
   ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS']
     .every((k) => replicaAfterDel.indexOf('const ' + k + ' =') > 0));
@@ -1387,7 +1414,7 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
 }
 
 /* ---------------------------------------------------------------------------
- * 15.78 装修组件库全量对账 + 19 种区块端到端覆盖
+ * 15.78 装修组件库全量对账 + 20 种区块端到端覆盖
  *
  * 为什么必须有这一组：
  *   「组件库清单」是运营眼里的全部能力边界。清单只要有一处失真，
@@ -1436,7 +1463,7 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     noIcon.length === 0,
     noIcon.length ? `缺图标：${noIcon.join(', ')}` : `${allKinds.length} 个区块类型图标齐全`);
 
-  /* (3) 19 种区块的字段完整性：本轮新增的 8 种逐个点名，防止「类型加了字段忘了」 */
+  /* (3) 区块的字段完整性：逐轮新增的组件逐个点名，防止「类型加了字段忘了」 */
   const REQUIRED_FIELDS = {
     rich_text: ['html', 'bg', 'full', 'pageMargin'],
     search: ['placeholder', 'mode', 'sticky', 'shape', 'textAlign', 'boxHeight', 'scan', 'bg', 'boxBg', 'color', 'link', 'pageMargin'],
@@ -1445,11 +1472,33 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     audio: ['src', 'duration', 'text', 'avatar', 'useShopLogo', 'side', 'resume', 'pageMargin'],
     service: ['text', 'align', 'color', 'bg', 'radius', 'bgOut', 'pageMargin'],
     content_card: ['title', 'cols', 'ratio', 'items', 'style', 'radius', 'showTag', 'showRead', 'showLike', 'more', 'moreText', 'link', 'pageMargin'],
-    buy_bar: ['goodsId', 'text', 'fontSize', 'align', 'theme', 'btnBg', 'padX', 'padB', 'btnH', 'btnR', 'bgOn', 'bg', 'bgH']
+    buy_bar: ['goodsId', 'text', 'fontSize', 'align', 'theme', 'btnBg', 'padX', 'padB', 'btnH', 'btnR', 'bgOn', 'bg', 'bgH'],
+    // 品牌分类（对标有赞「品牌分类E」）：三层数据 + 三个样式分组 + 扩展设置。
+    // 这 62 个字段是有赞面板逐项抓来的，少任何一个都等于「属性面板少一项」。
+    brand_category: [
+      'brands',                                   // 左侧导航（品牌）→ panels（小组）→ items（条目）
+      'title', 'panels', 'layout', 'items',
+      'image', 'desc', 'linkMode', 'link',
+      'bgImage', 'bgTopLink', 'bgTopGap',          // 内容背景图 / 背景顶部链接 / 背景顶部间距
+      'switchMode', 'navWidth', 'contentPadX',     // 样式设置 · 布局
+      'navStyle', 'navBg', 'navColor', 'navColorActive', 'navBgActive', 'navBgIdle',
+      'navBorderColor', 'navBorderLine', 'navHeight', 'navMargin', 'navBorderH', 'navBorderW',
+      'navFontSize', 'navWeight', 'navWeightActive', 'navAlign',   // 样式设置 · 左侧导航
+      'itemShadow', 'itemBorderColor', 'itemTitleColor', 'itemGapX', 'itemGapY', 'itemRadius',
+      'itemTitleSize', 'itemTitleWeight', 'itemTitleAlign',
+      'panelTitleColor', 'panelTitleSize', 'panelTitleWeight', 'panelTitleAlign',
+      'panelTitleGapX', 'panelTitleGapY', 'panelGap', 'contentPadBottom',
+      'effect', 'effectSpeed', 'effectDelay',      // 样式设置 · 右侧内容
+      'navLogo', 'searchMode', 'bg', 'moduleBgImage', 'moduleBgFill', 'reserveTabbar', 'navSticky' // 扩展设置
+    ]
   };
-  /** 拍平后的字段键集合（含 group / list.item 里的字段） */
+  /**
+   * 拍平后的字段键集合（含 group / list.item 里的字段）。
+   * 深度上限给到 12：品牌分类是「品牌 → 小组 → 条目」三层列表嵌套，
+   * 条目字段在 object.fields × 4 层之下；上限太小会把它误判成「字段缺失」。
+   */
   const flatKeys = (node, depth = 0, out = new Set()) => {
-    if (!node || depth > 6) return out;
+    if (!node || depth > 12) return out;
     if (node.type === 'object' || Array.isArray(node.fields)) (node.fields || []).forEach((f) => flatKeys(f, depth + 1, out));
     if (node.k) out.add(node.k);
     if (node.type === 'union') Object.keys(node.kinds || {}).forEach((k) => flatKeys(node.kinds[k], depth + 1, out));
@@ -1472,11 +1521,11 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
   /* (4) 小程序端 wxml 必须给每一种区块类型写渲染分支（后台能配、真机空白＝最典型的漏接） */
   const blocksWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
   const wxmlMissing = allKinds.filter((k) => blocksWxml.indexOf(`block.type === '${k}'`) < 0);
-  assert('小程序 templates/blocks.wxml 覆盖全部 19 种区块类型（少一种就是「配了不显示」）',
+  assert('小程序 templates/blocks.wxml 覆盖全部 20 种区块类型（少一种就是「配了不显示」）',
     wxmlMissing.length === 0,
     wxmlMissing.length ? `wxml 缺分支：${wxmlMissing.join(', ')}` : `${allKinds.length} 种区块全部有渲染分支`);
 
-  /* (5) 装修台预览必须覆盖同样 19 种（后台预览不画＝运营以为没生效，会反复重配）
+  /* (5) 装修台预览必须覆盖同样 20 种（后台预览不画＝运营以为没生效，会反复重配）
    *     渲染实现已统一到 public/shared/pv-render.js（装修台与前端预览页共用一份），
    *     所以这里查的是共享模块，不是 admin.js。 */
   const adminJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
@@ -1487,7 +1536,7 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     const m = /var KIND_LABEL = \{([\s\S]*?)\};/.exec(pvRendSrc);
     return !m || m[1].indexOf(k + ':') < 0;
   });
-  assert('装修台预览覆盖全部 19 种区块类型，且每种都有中文角标名',
+  assert('装修台预览覆盖全部 20 种区块类型，且每种都有中文角标名',
     pvMissing.length === 0 && tagLabelMissing.length === 0,
     (pvMissing.length ? `预览缺分支：${pvMissing.join(', ')}` : '') +
     (tagLabelMissing.length ? ` 缺中文名：${tagLabelMissing.join(', ')}` : '') ||

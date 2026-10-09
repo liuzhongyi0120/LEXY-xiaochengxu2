@@ -161,6 +161,108 @@ for (const [re, label] of pairs) ok(label, re.test(adminCss));
 ok('装修台预览用 pv-prods 两列容器（不再是三列的 pv-grid g3）',
   /class="pv-prods"/.test(pvRender) && !/pv-grid g3/.test(pvRender.slice(pvRender.indexOf('function pvProduct'), pvRender.indexOf('function pvMine'))));
 
+/* -------------------- 6. 品牌分类（brand_category）真机链路 -------------------- */
+/*
+ * 为什么单测这一块：
+ *   /preview 的链路是「真机源码直接编译」，但它只渲染**已发布**的 replica.js；
+ *   而品牌分类是本次新接入的区块，没人会为了验它去发布一次线上内容。
+ *   所以在这里用合成数据直接跑 WXML 编译 + WXSS 对账，等价且不碰线上。
+ */
+console.log('\n【6】品牌分类（brand_category）真机渲染链路');
+
+// blocks.js 是 CommonJS（小程序侧也用它），具名导出不一定被 lexer 认出来，两条路都兜
+const blocksMod = await import('../miniprogram/utils/blocks.js');
+const normalizeBlock = blocksMod.normalizeBlock
+  || (blocksMod.default && blocksMod.default.normalizeBlock);
+if (typeof normalizeBlock !== 'function') throw new Error('拿不到 normalizeBlock，import 口径变了');
+
+const rawBlock = {
+  id: 'probe-bcat', type: 'brand_category',
+  navStyle: 'C', navWidth: 26, layout: '2',
+  effect: 'up', effectSpeed: 1.5, effectDelay: 0.3,
+  panelGap: 13, itemGapX: 12, itemGapY: 8, itemTitleColor: '', panelTitleColor: '',
+  brands: [
+    {
+      title: '莱克', panels: [
+        {
+          title: '热门推荐', layout: '2', items: [
+            { image: '/uploads/202610/a.png', title: '洗地机 X1', desc: '家用', linkMode: 'whole', link: '/packageGoods/detail/detail?id=g1' },
+            { image: '/uploads/202610/b.png', title: '吸尘器 X2', desc: '', linkMode: 'hot', link: '/packageGoods/detail/detail?id=g2' }
+          ]
+        },
+        { title: '型号入口', layout: 'nav', items: [{ image: '/uploads/202610/c.png', title: 'C5 Pro', linkMode: 'whole', link: '' }] }
+      ]
+    },
+    { title: '碧云泉', panels: [{ title: '', layout: '3', items: [{ image: '/uploads/202610/d.png', title: '净饮机 G7' }] }] },
+    { title: '   ', panels: [] }        // 空标题品牌：必须被剔除
+  ]
+};
+
+const nb = normalizeBlock(rawBlock);
+const bcatHtml = Wxml.render(Wxml.parse(homeBlocks), Wxml.makeScope({ blocks: [nb] }), {});
+
+ok('空标题品牌被剔除（3 个品牌 → 2 个导航项）',
+  (bcatHtml.match(/class="bc-nav /g) || []).length === 2 && nb.navs.length === 2, 'navs=' + JSON.stringify(nb.navs));
+ok('空标题品牌没有留下导航文案', bcatHtml.indexOf('bc-navt">   ') === -1);
+ok('左栏宽度按 navWidth 落到 inline style（26%）', /width: 26%/.test(bcatHtml));
+ok('左栏底色走 inline style（#F1F1F1）', /background: #F1F1F1/.test(bcatHtml));
+ok('第一个品牌是选中态、其余不是',
+  (bcatHtml.match(/class="bc-navi on /g) || []).length === 1 && /bc-navi on /.test(bcatHtml));
+ok('风格 C 的竖条标记落在选中项上', (bcatHtml.match(/bc-navi on is-c/g) || []).length === 1);
+/* 内联样式里的 rpx 会被 mp-wxml 换算成 px（375 基准，见 mp-wxml.js 的 style 分支），
+   所以断言要拿换算后的值：真机 20rpx×2rpx ⇔ 预览 10px×1px。 */
+ok('风格 C 的竖条尺寸真机 20rpx×2rpx → 预览 10px×1px',
+  /--bc-bar-h: 10px/.test(bcatHtml) && /--bc-bar-w: 1px/.test(bcatHtml));
+ok('导航项高度真机 90rpx → 预览 45px（rpx 换算对内联样式同样生效）',
+  /height: 45px/.test(bcatHtml));
+ok('右栏条目数 = 当前品牌下的条目数（2 列组 2 项 + 导航组 1 项 = 3）',
+  (bcatHtml.match(/class="bc-cell /g) || []).length === 3);
+ok('「导航」布局的条目带 nav 修饰类', (bcatHtml.match(/class="bc-cell nav /g) || []).length === 1);
+ok('缓动 class 由 JS 拼好并落到条目上（anim-up ×3，模板里不做字符串拼接）',
+  (bcatHtml.match(/anim-up/g) || []).length === 3);
+ok('缓动时长 / 间隔落到 animation-duration / animation-delay',
+  /animation-duration: 1500ms/.test(bcatHtml) && /animation-delay: 0ms/.test(bcatHtml) && /animation-delay: 300ms/.test(bcatHtml));
+ok('条目图片 src 真的进了产物', /\/uploads\/202610\/a\.png/.test(bcatHtml) && /\/uploads\/202610\/c\.png/.test(bcatHtml));
+ok('图片按原图比例撑高（widthFix）而非裁切', /data-mode="widthFix"/.test(bcatHtml));
+ok('导航模式下小图用 aspectFill + square', /data-mode="aspectFill"/.test(bcatHtml));
+ok('两列组的格子宽度 = 50%（cellW 由 JS 算好）', /width: 50%/.test(bcatHtml));
+ok('小组标题渲染出来（含 panelTitleGap 内距）', bcatHtml.indexOf('热门推荐') > -1 && bcatHtml.indexOf('bc-ptitle') > -1);
+ok('标题色留空时兜底 #323233（不能留成空串 —— 空的 var 是无效值，会整条声明作废）',
+  /--bc-ifg: #323233/.test(bcatHtml) && /--bc-pfg: #323233/.test(bcatHtml));
+ok('跳转与 hover 只以 data-* / hover-class 形式进产物（不泄漏 bindtap）',
+  !/bindtap|catchtap|hover-class/.test(bcatHtml));
+
+/* 空数据不炸模板，且有可照做的提示。
+   注意左栏外壳（.bc-navcol）**故意保留** —— 与有赞一致：框架在、内容空，
+   运营一眼就知道「是没配内容」而不是「组件没生效」；真正要断言的是没有导航项与条目。 */
+const emptyHtml = Wxml.render(Wxml.parse(homeBlocks), Wxml.makeScope({ blocks: [normalizeBlock({ type: 'brand_category' })] }), {});
+ok('没有品牌时：空态提示在场、导航项与条目一个都不出（左栏外壳保留）',
+  /bc-empty/.test(emptyHtml) && !/bc-navt/.test(emptyHtml) && !/bc-cell/.test(emptyHtml) && /c-bcat/.test(emptyHtml),
+  'empty=' + /bc-empty/.test(emptyHtml) + ' navt=' + /bc-navt/.test(emptyHtml) + ' cell=' + /bc-cell/.test(emptyHtml));
+
+/* 五套标题风格都跑一遍：不能有未支持的写法、不能产物为空 */
+const styleOut = ['A', 'B', 'C', 'D', 'E'].map((s) => {
+  const h = Wxml.render(Wxml.parse(homeBlocks), Wxml.makeScope({ blocks: [normalizeBlock(Object.assign({}, rawBlock, { navStyle: s }))] }), {});
+  return { s, len: h.length, isC: /bc-navi on is-c/.test(h), isD: /bc-nav is-d/.test(h), hasBc: /c-bcat/.test(h) };
+});
+ok('5 种标题风格全部渲染成功且只点亮各自专属装饰',
+  styleOut.every((x) => x.hasBc && x.len > 500) &&
+  styleOut.filter((x) => x.isC).map((x) => x.s).join('') === 'C' &&
+  styleOut.filter((x) => x.isD).map((x) => x.s).join('') === 'D',
+  JSON.stringify(styleOut));
+
+/* 品牌分类用到的 class 必须都在 wxss 里有定义（防「哑样式」：模板写了、样式没写） */
+const idxCss = norm(Wxss.compile(read('pages/index/index.wxss')));
+const appCss = norm(Wxss.compile(read('app.wxss')));
+const bcatClasses = ['c-bcat', 'bc-wrap', 'bc-navcol', 'bc-nav', 'bc-navi', 'bc-navt', 'bc-main', 'bc-inner',
+  'bc-ptitle', 'bc-grid', 'bc-cell', 'bc-pic', 'bc-picph', 'bc-txt', 'bc-it', 'bc-id', 'bc-empty'];
+const missing = bcatClasses.filter((c) => idxCss.indexOf('.' + c) === -1);
+ok('品牌分类的 17 个核心 class 都在 index.wxss 里有定义', missing.length === 0, '缺：' + missing.join(', '));
+ok('hover-lite 定义在 app.wxss（全局 hover 反馈）', appCss.indexOf('.hover-lite') > -1);
+ok('shadow / square 两个修饰类有定义', idxCss.indexOf('.shadow') > -1 && idxCss.indexOf('.square') > -1);
+const animMissing = ['anim-right', 'anim-up', 'anim-zoom', 'anim-fade'].filter((c) => idxCss.indexOf('.' + c) === -1);
+ok('4 种缓动 class 都有 keyframes 对应', animMissing.length === 0, '缺：' + animMissing.join(', '));
+
 /* ------------------------------ 汇总 ------------------------------ */
 console.log('\n' + '─'.repeat(56));
 console.log(`预览渲染内核单测：${pass} 通过 / ${fail} 失败`);

@@ -157,12 +157,25 @@ let tab = await open(SITE + '/admin/');
     return JSON.stringify({
       navCard: !!c && !c.hidden,
       navCardText: c ? c.innerText.replace(/\\s+/g, ' ') : '',
-      pageRows: document.querySelectorAll('#pageRows tr').length
+      pageRows: document.querySelectorAll('#pageRows tr').length,
+      rowKeys: [...new Set([...document.querySelectorAll('#pageRows [data-open]')].map((x) => x.getAttribute('data-open')))],
+      customKeys: [...document.querySelectorAll('#pageRows [data-del]')].map((x) => x.getAttribute('data-del'))
     });
   })()`));
   ok(info.navCard && /店铺导航/.test(info.navCardText) && /全局配置/.test(info.navCardText),
     '列表上方有「店铺导航」卡片（全局配置）', info.navCardText.slice(0, 70));
-  ok(info.pageRows === 5, '页面表格只有 5 行（导航是全局配置，不混进页面列表）', String(info.pageRows));
+  /*
+   * 别写死行数 —— 运营随时会自建自定义页（当前就有 2 个）。
+   * 锁「等价关系」：5 个内置页一个不少、自定义页数量对得上、nav 一定不在列表里。
+   * 写死 5 会在运营建页后变成假红，上一轮已经踩过一次（check-all 的同类断言）。
+   */
+  const builtin = ['home', 'lexy', 'news', 'product', 'mine'];
+  const missingBuiltin = builtin.filter((k) => info.rowKeys.indexOf(k) < 0);
+  ok(missingBuiltin.length === 0 &&
+     info.pageRows === builtin.length + info.customKeys.length &&
+     info.rowKeys.indexOf('nav') < 0,
+    '页面表格 = 5 个内置页 + 自定义页，且导航（全局配置）不混进页面列表',
+    `行数 ${info.pageRows} · 自定义 ${info.customKeys.length} 个 · 缺内置 ${missingBuiltin.join(',') || '无'} · 含 nav=${info.rowKeys.indexOf('nav') >= 0}`);
 }
 
 console.log('\n[2] 进入导航编辑器');
