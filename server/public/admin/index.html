@@ -90,7 +90,11 @@
           <th style="width:178px">页面状态</th>
           <th style="width:176px">数据来源</th>
           <th style="width:176px">备注</th>
-          <th style="width:392px">操作</th>
+          <!-- 操作列 424px：自定义页 6 个按钮（装修 / 查看变更 / 版本 / 丢弃草稿 / 改名 / 删除）
+               内联需求约 330px + 左右内边距 28px + 5 处间距 30px = 388px，留 ~36px 余量。
+               曾经是 392px（可用 364px，而需求正好 364px —— **零余量**），字体稍有差异就溢出折行，
+               实测把「查看变更」「丢弃草稿」挤成竖排文字。改列宽时必须同改 admin.css 的 table min-width。 -->
+          <th style="width:424px">操作</th>
         </tr>
       </thead>
       <tbody id="pageRows"></tbody>

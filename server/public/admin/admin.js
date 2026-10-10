@@ -504,8 +504,11 @@
          *     也不会被浏览器当弹窗拦掉。
          * href 上的 ?edit=<key> 让新窗口**直达**那个页面的编辑器（见 editKeyFromUrl）。
          */
+        /* 文案不带 ↗ 箭头（用户 2026-10-10：「装修后面不需要有箭头显示」）：
+           箭头在这里只是噪音 —— 有赞同类按钮也没有，而「新窗口打开」的提示放在 title 里，
+           悬停就能看到，不占按钮宽度（操作列本来就紧）。 */
         '<a class="btn primary" href="/admin?edit=nav" target="_blank" rel="noopener"' +
-          ' title="配置小程序底部导航栏（在新窗口打开）">设置底部导航 ↗</a>' +
+          ' title="配置小程序底部导航栏（在新窗口打开）">设置底部导航</a>' +
         '<button class="btn sm" data-vers="nav" title="历史版本与回滚">版本</button>' +
       '</div>';
   }
@@ -572,9 +575,19 @@
         '<td class="note-cell">' +
           (p.note ? '<span title="' + attr(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dim">—</span>') +
         '</td>' +
-        '<td><div class="ops">' +
+        /*
+         * 操作列：6 个按钮（自定义页）在 1440 视口下的可用宽度只有 364px，
+         * 而「装修 / 查看变更 / 版本 / 丢弃草稿 / 改名 / 删除」的内联需求正好也是 364px —— **零余量**。
+         * 字体稍有差异（Windows 雅黑 / 浏览器缩放 / 不同 DPI）就会溢出，flex 把按钮压窄，
+         * 按钮里的字随后折成两行，实测表现是自定义页那两行变成**竖排文字**。
+         * 三道防线（缺一不可，见 admin.css 的 .ops-row）：
+         *   ① 按钮 flex:0 0 auto + nowrap（admin.css）—— 绝不被压窄、绝不折字；
+         *   ② 操作列留足余量（index.html 的 th 宽度 + admin.css 的 table min-width）；
+         *   ③ 文案去掉多余的 ↗ 箭头，省下 ~10px 并去掉视觉噪音。
+         */
+        '<td><div class="ops ops-row">' +
           '<a class="btn sm" href="/admin?edit=' + attr(encodeURIComponent(p.key)) + '"' +
-            ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修 ↗</a>' +
+            ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修</a>' +
           '<button class="btn sm" data-diff="' + attr(p.key) + '" title="查看草稿与已发布内容的差异">查看变更</button>' +
           '<button class="btn sm" data-vers="' + attr(p.key) + '" title="历史版本与回滚">版本</button>' +
           '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +

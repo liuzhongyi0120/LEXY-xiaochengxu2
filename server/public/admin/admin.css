@@ -189,9 +189,14 @@ a.btn {
  * 「页面名称」里的 nowrap 子行会把列撑宽，反过来压缩「操作」列，
  * 6 个按钮被 flex 收缩后连文字都换行（实测操作列被压到 290px，需求 354px）。
  * 固定布局后表头声明的宽度就是最终宽度，超长内容交给 ellipsis。
- * min-width 保证窄屏时名称列仍有 ~130px，宁可横向滚动也不挤成一团。
+ * min-width 保证窄屏时名称列仍有 ~150px，宁可横向滚动也不挤成一团。
+ *
+ * ⚠️ min-width 必须 ≥ 「各定宽列之和 + 名称列下限」，否则名称列会被挤到没有宽度。
+ *    改 index.html 的 th 宽度时**必须同步改这里**（自检会按实际表头求和校验，漏改会红）。
+ *    2026-10-10：操作列 392 → 424（原值可用 364px = 6 个按钮的需求，零余量），
+ *    min-width 1080 → 1120（178 + 176 + 176 + 424 = 954，名称列 166px）。
  */
-table.grid { width: 100%; min-width: 1080px; table-layout: fixed; border-collapse: collapse; }
+table.grid { width: 100%; min-width: 1120px; table-layout: fixed; border-collapse: collapse; }
 table.grid th {
   text-align: left;
   font-size: 12px;
@@ -236,6 +241,23 @@ a.pname { text-decoration: none; }
 }
 .psub.warn { color: #a86a00; }
 .ops { display: flex; gap: 6px; flex-wrap: nowrap; }
+/*
+ * 列表页「操作」列的按钮组（`<td><div class="ops ops-row">`）—— 只加在列表行上，
+ * 不碰上面那个通用的 `.ops`（图片 / 区块卡片的图标按钮组另有版式）。
+ *
+ * 用户反馈：「下面两个自定义页，后面的字变成竖排了」。
+ * 根因不是列太窄那么笼统 —— 是**零余量**：1440 视口下自定义页 6 个按钮的需求正好 364px，
+ * 而操作列内容区也正好 364px。CSS px 是整数、字体度量却随系统字体 / 缩放浮动，
+ * 多出 1~2px 时 flex（默认 flex-shrink:1）先把按钮压窄，按钮里的字随即折行 ——
+ * 「查看变更」→「查看变 / 更」，「丢弃草稿」→ 竖排。内置页只有 4 个按钮，余量足，所以只有下面两行坏。
+ *
+ * 两道防线：
+ *   ① 按钮 flex:0 0 auto + white-space:nowrap —— 绝不压缩、绝不折字（**主要防线**）；
+ *   ② 容器允许换行 —— 极端情况（超大字号 / 极窄窗口）宁可整颗按钮掉到第二行，
+ *      也不要把一个词的四个字拆成两行竖排。列宽余量见 index.html 的 th 与 admin.css 的 min-width。
+ */
+.ops-row { flex-wrap: wrap; }
+.ops-row .btn { flex: 0 0 auto; white-space: nowrap; }
 /* 数据来源 / 备注：单行省略，完整内容放 title。
  * 不用 <code>：它的背景与 1px 5px 内边距会吃掉 10px，11px 等宽字体下 132px 的列根本放不下。 */
 .src-cell .src {
