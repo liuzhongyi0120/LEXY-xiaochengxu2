@@ -587,15 +587,30 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
 }
 .pv-layout-btn:hover { color: var(--blue); }
-/* 预览列被压缩到比手机还窄时（窄屏 / 选了 414 机型），让手机自身不缩、由这一层横向滚动 */
+/*
+ * 预览舞台：手机在**列正中**（两侧留白对称），与 /preview 的 .pv-stage 观感一致。
+ * 居中由 `.phone` 自己的 `margin: 0 auto` 承担（不是靠这里的 align-items）：
+ * 本层是**可横向滚动**的，若用 align-items/justify-content 居中，列宽 < 手机宽时
+ * （窄窗口，或 414 机型没跟着缩）会把手机左半边顶出容器且**滚不回去**；
+ * 而 Flexbox 规定剩余空间为负时 auto margin 按 0 处理 → 空间够就居中、不够就自动
+ * 退化成左对齐并可完整横滚。详情见下方 .phone 处的注释。
+ */
 .phone-stage {
   flex: 1;
   overflow-y: auto;
   overflow-x: auto;
+  /*
+   * 两侧都**固定预留**滚动条宽度：
+   *   ① 居中才准 —— 只右侧占 8px 时，内容盒中心比「肉眼看到的列中心」左移 4px，
+   *      手机看着偏左；两侧对称预留后视觉中心与内容中心重合；
+   *   ② 位置不跳 —— 内容不够长时没有滚动条、够长时出现，左右会随内容多少微跳 4px。
+   * 不支持的浏览器会忽略这条，退化成原来的「居中于内容盒」，不影响功能。
+   */
+  scrollbar-gutter: stable both-edges;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 0 60px;
+  padding: 24px 16px 60px;
 }
 /* 机型标签（对标有赞预览底部那行「iPhone 12 (375)」） */
 .phone-model { margin-top: 12px; font-size: 12px; color: var(--yz-tip); }
@@ -618,7 +633,16 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, .12);
   overflow: hidden;
-  align-self: flex-start;
+  /*
+   * 水平居中：用 auto margin 而**不是** `align-self: center`。
+   *   ① 之前这里写的是 `align-self: flex-start`，它**覆盖**了容器的 align-items: center
+   *      → 手机一直贴左（运营反馈「预览不居中」）；
+   *   ② 直接改成 center 在宽窗口没问题，但 .phone-stage 是可横向滚动的容器，
+   *      列宽 < 手机宽（窄窗口 / 414 机型）时居中会把左半边顶出去且滚不回来；
+   *   ③ auto margin 是**安全居中**：Flexbox 规范里剩余空间为负时 auto margin 记 0，
+   *      于是空间够时居中、不够时退化成左对齐，横滚仍能滚到最左。
+   */
+  margin: 0 auto;
   position: relative;
 }
 .phone-bar {

@@ -2301,6 +2301,33 @@ assert('机型切换用等比缩放（只改 width 会让 320 挤爆 / 414 右�
   /zoom/.test(devBlock) && !/style\.width/.test(devBlock),
   devIdx < 0 ? '未找到 #deviceSel 的分支' : (devBlock.match(/zoom[^;]*;?/) || ['(块内没有 zoom)'])[0].trim());
 
+/* ---- 手机必须**水平居中**，而且得是「安全居中」 ----
+ * 实测反馈「装修预览要居中」：原 `.phone { align-self: flex-start }` 会**覆盖**容器的
+ * `align-items: center`，手机一直贴在预览列左边。
+ * 但修的时候不能只把它改成 center —— `.phone-stage` 是**可横向滚动**的容器，列宽 < 手机宽
+ * （窄窗口，或 414 机型没跟着缩）时，靠 align-items / justify-content 居中会把手机左半边
+ * 顶出容器且**滚不回去**。所以锁三件事：① 手机用 `margin: 0 auto`（Flexbox 里剩余空间为负
+ * 时 auto margin 记 0 → 空间够居中、不够自动左对齐且能完整横滚）；② 不许再有
+ * `align-self: flex-start`；③ `.phone-stage` 必须仍是横向可滚动的容器（否则第①条的安全
+ * 回退就没意义了）。
+ */
+/* 注释里必然会提到被替换掉的旧写法（`align-self: flex-start`），不剔掉会自我误判 */
+const stripCssComments = (s) => String(s).replace(/\/\*[\s\S]*?\*\//g, '');
+const phRule = stripCssComments((adminCss.match(/\.phone\s*\{[^}]*\}/) || [''])[0]);
+const stageRule = stripCssComments((adminCss.match(/\.phone-stage\s*\{[^}]*\}/) || [''])[0]);
+assert('装修台预览的手机在列内水平居中（auto margin 安全居中，窄窗口仍能完整横滚）',
+  /margin:\s*0\s+auto/.test(phRule) && !/align-self:\s*flex-start/.test(phRule) && /overflow-x:\s*auto/.test(stageRule),
+  !phRule ? '未找到 .phone 规则'
+    : !/margin:\s*0\s+auto/.test(phRule) ? '.phone 缺 margin: 0 auto（手机贴左）'
+    : /align-self:\s*flex-start/.test(phRule) ? '.phone 仍有 align-self: flex-start（覆盖容器居中）'
+    : '.phone-stage 不是横向可滚动容器（安全回退失效）');
+/* 垂直滚动条只占右侧时，内容盒中心比「肉眼看到的列中心」左移 4px（手机看着偏左），
+ * 而且会随内容长短时有时无地左右跳。两侧对称预留即可重合 —— 实测 13/13 那条「手机相对
+ * 肉眼看到的列也居中」在钉的就是它。 */
+assert('装修台预览列两侧对称预留滚动条宽度（否则内容盒中心与视觉中心差 4px、还会随内容长短左右跳）',
+  /scrollbar-gutter:\s*stable\s+both-edges/.test(stageRule),
+  /scrollbar-gutter/.test(stageRule) ? 'scrollbar-gutter 已声明' : '.phone-stage 缺 scrollbar-gutter: stable both-edges');
+
 /* 六类编辑装饰都必须由 CTX.edit 控制，漏一处展示态就会露出真机没有的东西 */
 const editGated = ['cls', 'linkBadge', 'linkDot', 'groupTag', 'opsBar', 'kindTag'];
 const notGated = editGated.filter((fn) => {
