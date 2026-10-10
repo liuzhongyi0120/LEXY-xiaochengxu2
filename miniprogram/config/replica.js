@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-10 09:18:32（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-10 13:11:45（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -125,22 +125,11 @@ const MINE_BLOCKS = [
     type: "uc_stats",
     showBalance: true,
     showPoints: true,
-    showCard: true,
+    showCard: false,
     showCoupon: true,
-    showWallet: true,
+    showWallet: false,
     showGiftCard: false,
     showPickupCard: false
-  },
-  {
-    type: "swiper",
-    mode: "poster",
-    height: 400,
-    radius: "round",
-    images: [],
-    interval: 4500,
-    indicator: "dots",
-    pageMargin: 12,
-    imageGap: 0
   },
   {
     type: "uc_order",
@@ -347,9 +336,6 @@ const MINE_BLOCKS = [
         enabled: true
       }
     ]
-  },
-  {
-    type: "follow_oa"
   }
 ];
 
@@ -1155,7 +1141,7 @@ const TABBAR = {
     },
     {
       path: "/pages/mine/mine",
-      text: "我的",
+      text: "个人",
       icon: "",
       activeIcon: ""
     }
