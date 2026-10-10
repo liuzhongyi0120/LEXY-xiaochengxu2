@@ -491,8 +491,20 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   justify-content: center;
   padding: 20px 0 60px;
 }
+/*
+ * 手机壳。两条口径要和 /preview 对齐（那边是 .phone-screen 375×718）：
+ *   · 宽度：恒按 375 渲染（预览里的 px 值全是 375 基准），机型切换用 zoom 等比缩放 ——
+ *          见 admin.js 的 #deviceSel，别改成只改 width，320 会挤爆、414 会填不满。
+ *   · 高度：整机 718px（= 下面的手机栏 32 + 屏幕 686），与 /preview 的 --mp-screen-h 同值。
+ *          用 min-height 而不是 height —— 首页那种 11 个区块的长页面仍要能整页撑开，
+ *          运营是滚 .phone-stage 逐个看区块的。
+ *          之前这里没给屏高，空页面 / 刚新建只加了一个区块的自定义页会塌成几十像素的一条，
+ *          运营看到的“预览”根本不像一部手机（实测反馈：组件在预览里显示不全）。
+ */
 .phone {
-  width: 375px;
+  --phone-w: 375px;
+  --phone-screen-h: 686px;      /* 718 - 32（手机栏） */
+  width: var(--phone-w);
   flex: 0 0 auto;
   background: #fff;
   border-radius: 12px;
@@ -514,7 +526,8 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .ph-time { font-weight: 600; }
 .ph-title { flex: 1; text-align: center; color: #666; }
 .ph-dots { color: #bbb; letter-spacing: 1px; }
-.phone-screen { position: relative; background: #fff; }
+/* 手机屏：给整屏最小高度，短页面也像一部手机（长页面按内容继续撑高） */
+.phone-screen { position: relative; background: #fff; min-height: var(--phone-screen-h); }
 /*
  * 底部导航不再由装修台自己画：结构与样式统一在 /shared/pv-tabbar.js（与 /preview 共用一份，
  * 各写一份必然走样 —— 本项目的首屏海报就因为两处换算口径不同而错成 1.55 屏高）。

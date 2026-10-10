@@ -3021,9 +3021,14 @@
   $('btnDiscard').onclick = function () { discardDraft(); };
   $('btnAddCommon').onclick = addCommonDialog;
   $('btnPageSetting').onclick = pageSetting;
+  /*
+   * 机型：手机壳始终按 375 基准渲染，用 zoom 等比缩放 —— 与 /preview 的同名控件口径一致
+   * （rpx 本身就是等比缩放，真机换宽度也是等比放大，不是把「375 基准的 px 值」硬塞进窄壳子里）。
+   * 只改 width 是错的：换成 320 内容会挤爆、换成 414 右边缘留白。
+   */
   $('deviceSel').onchange = function () {
     S.device = Number($('deviceSel').value) || 375;
-    $('phone').style.width = S.device + 'px';
+    $('phone').style.zoom = String(S.device / 375);
   };
   $('modalClose').onclick = closeModal;
   $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });

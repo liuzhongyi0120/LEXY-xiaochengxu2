@@ -2222,6 +2222,29 @@ assert('装修台的产品页预览与真机口径一致（列数 / 选中态 / 
   pvPairBad.length === 0,
   pvPairBad.length ? '不符：' + pvPairBad.join('、') : pvPairs.length + ' 项口径全部对齐真机');
 
+/* ---- 手机壳的两条口径（两条预览链路的手机必须一样大）----
+ * 实测反馈「组件在预览里显示不全」：装修台的 .phone-screen 当时只有内容自适应高度，
+ * 空页面 / 刚新建只加了一个区块的自定义页会塌成几十像素的一条，根本不像一部手机。
+ * 这里锁三件事：① 总高与 /preview 的 --mp-screen-h 同值（两处各写一个数必然会走样）；
+ *              ② 必须是 min-height（长页面要能整页撑开，不是定高裁剪）；
+ *              ③ 机型切换必须等比缩放（只改 width 会让 320 挤爆、414 右边缘留白）。 */
+const previewCss = readFileSync(join(PUB, 'preview', 'preview.css'), 'utf8');
+const mpScreenH = Number((previewCss.match(/--mp-screen-h:\s*(\d+)px/) || [])[1] || 0);
+const phScreenH = Number((adminCss.match(/--phone-screen-h:\s*(\d+)px/) || [])[1] || 0);
+const phBarH = Number((adminCss.match(/\.phone-bar\s*\{[^}]*height:\s*(\d+)px/) || [])[1] || 0);
+assert('装修台手机壳整机高度与 /preview 的手机屏高一致（两处各写一个数必然走样）',
+  mpScreenH > 0 && phScreenH > 0 && phBarH > 0 && phScreenH + phBarH === mpScreenH,
+  `preview --mp-screen-h=${mpScreenH}px ；装修台 ${phBarH}(手机栏)+${phScreenH}(屏幕)=${phScreenH + phBarH}px`);
+assert('装修台手机屏给的是 min-height（长页面仍要整页撑开，不能变成定高裁剪）',
+  /\.phone-screen\s*\{[^}]*min-height:\s*var\(--phone-screen-h\)/.test(adminCss),
+  /\.phone-screen\s*\{[^}]*min-height/.test(adminCss) ? 'min-height 已声明' : '未给屏高（短页面会塌成一条）');
+
+const devIdx = adminSrc.indexOf("$('deviceSel').onchange");
+const devBlock = devIdx < 0 ? '' : adminSrc.slice(devIdx, devIdx + 420);
+assert('机型切换用等比缩放（只改 width 会让 320 挤爆 / 414 右边缘留白）',
+  /zoom/.test(devBlock) && !/style\.width/.test(devBlock),
+  devIdx < 0 ? '未找到 #deviceSel 的分支' : (devBlock.match(/zoom[^;]*;?/) || ['(块内没有 zoom)'])[0].trim());
+
 /* 六类编辑装饰都必须由 CTX.edit 控制，漏一处展示态就会露出真机没有的东西 */
 const editGated = ['cls', 'linkBadge', 'linkDot', 'groupTag', 'opsBar', 'kindTag'];
 const notGated = editGated.filter((fn) => {
