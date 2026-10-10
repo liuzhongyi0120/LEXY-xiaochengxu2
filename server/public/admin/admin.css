@@ -196,7 +196,7 @@ a.btn {
  *    2026-10-10：操作列 392 → 424（原值可用 364px = 6 个按钮的需求，零余量），
  *    min-width 1080 → 1120（178 + 176 + 176 + 424 = 954，名称列 166px）。
  */
-table.grid { width: 100%; min-width: 1120px; table-layout: fixed; border-collapse: collapse; }
+table.grid { width: 100%; min-width: 1040px; table-layout: fixed; border-collapse: collapse; }
 table.grid th {
   text-align: left;
   font-size: 12px;
@@ -246,12 +246,13 @@ a.pname { text-decoration: none; }
  * 不碰上面那个通用的 `.ops`（图片 / 区块卡片的图标按钮组另有版式）。
  *
  * 用户反馈：「下面两个自定义页，后面的字变成竖排了」。
- * 根因不是列太窄那么笼统 —— 是**零余量**：1440 视口下自定义页 6 个按钮的需求正好 364px，
+ * 根因不是列太窄那么笼统 —— 是**零余量**：当时 1440 视口下自定义页 6 个按钮的需求正好 364px，
  * 而操作列内容区也正好 364px。CSS px 是整数、字体度量却随系统字体 / 缩放浮动，
- * 多出 1~2px 时 flex（默认 flex-shrink:1）先把按钮压窄，按钮里的字随即折行 ——
- * 「查看变更」→「查看变 / 更」，「丢弃草稿」→ 竖排。内置页只有 4 个按钮，余量足，所以只有下面两行坏。
+ * 多出 1~2px 时 flex（默认 flex-shrink:1）先把按钮压窄，按钮里的字随即折行（「丢弃草稿」→ 竖排）。
+ * 内置页只有 4 个按钮，余量足，所以只有下面两行坏。
  *
- * 两道防线：
+ * 两道防线（2026-10-10 起按钮从 6 个降到 4 个，余量已很宽，但这两条保留 ——
+ * 余量会随列宽 / 字体 / 缩放变化，真正兜底的是「不许压窄、不许折字」而不是那点余量）：
  *   ① 按钮 flex:0 0 auto + white-space:nowrap —— 绝不压缩、绝不折字（**主要防线**）；
  *   ② 容器允许换行 —— 极端情况（超大字号 / 极窄窗口）宁可整颗按钮掉到第二行，
  *      也不要把一个词的四个字拆成两行竖排。列宽余量见 index.html 的 th 与 admin.css 的 min-width。
@@ -1327,16 +1328,9 @@ kbd {
 /* 请求进行中的按钮：防止手快连点导致重复发布 / 重复建页 */
 .btn.busy, .tb-btn.busy { opacity: .7; cursor: progress; }
 
-.diff-row { display: flex; gap: 10px; padding: 7px 0; border-bottom: 1px dashed var(--line-2); font-size: 12px; }
-.diff-row .p { flex: 0 0 240px; color: var(--gray); font-family: Consolas, monospace; word-break: break-all; }
-.diff-row .v { flex: 1; word-break: break-all; }
-.diff-row .add { color: var(--ok); }
-.diff-row .del { color: var(--danger); text-decoration: line-through; }
-
-.ver-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px dashed var(--line-2); }
-.ver-row .vid { flex: 0 0 50px; font-family: Consolas, monospace; color: var(--blue); }
-.ver-row .vt { flex: 1; font-size: 12.5px; }
-.ver-row .vt small { display: block; color: var(--gray-2); font-size: 11px; }
+/* 说明：原「查看变更」弹窗的 .diff-row 与「版本历史」弹窗的 .ver-row 样式已随两个入口下线删除
+   （2026-10-10）。后端 /api/decorate/diff、/api/decorate/rollback 仍在，日后要恢复入口时
+   把这两组样式一并取回（git 历史里搜 .ver-row 即可）。 */
 
 #toast { position: fixed; top: 62px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 #toast .t {

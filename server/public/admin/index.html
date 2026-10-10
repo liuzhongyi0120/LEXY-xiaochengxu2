@@ -32,8 +32,8 @@
     <button class="tb-btn" id="btnWho" title="使用管理员口令或长期令牌登录">登录</button>
     <span class="tb-dirty tb-edit-only" id="edDirty">无未保存改动</span>
     <button class="tb-btn tb-edit-only" id="btnKeys" title="键盘快捷键（Ctrl / ⌘ + K）">?</button>
-    <button class="tb-btn tb-edit-only" id="btnDiff">查看变更</button>
-    <button class="tb-btn tb-edit-only" id="btnVersions">版本</button>
+    <!-- 「查看变更」「版本」两个按钮已按用户要求撤掉（2026-10-10）：入口从顶栏与列表操作列一并下线，
+         不留「半截功能」。编辑只改草稿、点「生成代码」写回 replica.js，这条主链路不受影响。 -->
     <button class="tb-btn tb-edit-only" id="btnDiscard">丢弃草稿</button>
     <button class="tb-btn tb-edit-only" id="btnSave">存至草稿</button>
     <button class="tb-btn primary tb-edit-only" id="btnPublish"
@@ -90,11 +90,13 @@
           <th style="width:178px">页面状态</th>
           <th style="width:176px">数据来源</th>
           <th style="width:176px">备注</th>
-          <!-- 操作列 424px：自定义页 6 个按钮（装修 / 查看变更 / 版本 / 丢弃草稿 / 改名 / 删除）
-               内联需求约 330px + 左右内边距 28px + 5 处间距 30px = 388px，留 ~36px 余量。
-               曾经是 392px（可用 364px，而需求正好 364px —— **零余量**），字体稍有差异就溢出折行，
-               实测把「查看变更」「丢弃草稿」挤成竖排文字。改列宽时必须同改 admin.css 的 table min-width。 -->
-          <th style="width:424px">操作</th>
+          <!-- 操作列 320px：自定义页 4 个按钮（装修 / 丢弃草稿 / 改名 / 删除）
+               内联需求约 236px + 左右内边距 28px = 264px，留 ~56px 余量。
+               曾经是 392px（可用 364px，而当时 6 个按钮的需求正好 364px —— **零余量**），
+               字体稍有差异就溢出折行，实测把按钮挤成竖排文字。
+               2026-10-10 撤掉「查看变更 / 版本」两个按钮后又宽出 130px，故列宽一并收窄。
+               改列宽时必须同改 admin.css 的 table min-width。 -->
+          <th style="width:320px">操作</th>
         </tr>
       </thead>
       <tbody id="pageRows"></tbody>

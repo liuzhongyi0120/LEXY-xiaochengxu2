@@ -335,7 +335,7 @@
   /**
    * 顶栏有两种形态（靠 .mode-list 切换，样式在 admin.css）：
    *   list —— 只看得到「LEXY 店铺装修台 / 店铺页面」，
-   *           隐藏「正在装修：—」「内置页」与编辑专属按钮（查看变更 / 版本 / 丢弃草稿 / 存至草稿 / 生成代码）。
+   *           隐藏「正在装修：—」「内置页」与编辑专属按钮（丢弃草稿 / 存至草稿 / 生成代码）。
    *           之前不区分视图，列表页顶栏会显示「正在装修：—」并挂着一排编辑按钮，语义错乱且容易误点发布。
    *   edit —— 完整编辑器工具栏。
    */
@@ -509,7 +509,6 @@
            悬停就能看到，不占按钮宽度（操作列本来就紧）。 */
         '<a class="btn primary" href="/admin?edit=nav" target="_blank" rel="noopener"' +
           ' title="配置小程序底部导航栏（在新窗口打开）">设置底部导航</a>' +
-        '<button class="btn sm" data-vers="nav" title="历史版本与回滚">版本</button>' +
       '</div>';
   }
 
@@ -576,20 +575,19 @@
           (p.note ? '<span title="' + attr(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dim">—</span>') +
         '</td>' +
         /*
-         * 操作列：6 个按钮（自定义页）在 1440 视口下的可用宽度只有 364px，
-         * 而「装修 / 查看变更 / 版本 / 丢弃草稿 / 改名 / 删除」的内联需求正好也是 364px —— **零余量**。
-         * 字体稍有差异（Windows 雅黑 / 浏览器缩放 / 不同 DPI）就会溢出，flex 把按钮压窄，
-         * 按钮里的字随后折成两行，实测表现是自定义页那两行变成**竖排文字**。
-         * 三道防线（缺一不可，见 admin.css 的 .ops-row）：
+         * 操作列：自定义页 4 个按钮（装修 / 丢弃草稿 / 改名 / 删除）。
+         * 曾经是 6 个（多出「查看变更」「版本」），而当时 1440 视口下 6 个按钮的内联需求
+         * 正好等于操作列可用宽度 —— **零余量**：字体稍有差异就会溢出，flex 把按钮压窄，
+         * 按钮里的字随即折成两行，实测表现是自定义页那两行变成**竖排文字**。
+         * 2026-10-10 按用户要求撤掉「查看变更 / 版本」，入口下线后也就顺手宽出 ~130px。
+         * 剩下的规则照旧（见 admin.css 的 .ops-row）：
          *   ① 按钮 flex:0 0 auto + nowrap（admin.css）—— 绝不被压窄、绝不折字；
          *   ② 操作列留足余量（index.html 的 th 宽度 + admin.css 的 table min-width）；
-         *   ③ 文案去掉多余的 ↗ 箭头，省下 ~10px 并去掉视觉噪音。
+         *   ③ 文案不带多余的 ↗ 箭头（去掉视觉噪音，也省列宽）。
          */
         '<td><div class="ops ops-row">' +
           '<a class="btn sm" href="/admin?edit=' + attr(encodeURIComponent(p.key)) + '"' +
             ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修</a>' +
-          '<button class="btn sm" data-diff="' + attr(p.key) + '" title="查看草稿与已发布内容的差异">查看变更</button>' +
-          '<button class="btn sm" data-vers="' + attr(p.key) + '" title="历史版本与回滚">版本</button>' +
           '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +
             ' title="' + (p.hasDraft ? '恢复到已发布内容' : '当前没有草稿') + '">丢弃草稿</button>' +
           (p.custom
@@ -2818,72 +2816,23 @@
       b1.onclick = function () { closeModal(); saveDraft().then(doIt); };
       var b2 = el('button', 'btn', '直接发布当前内容');
       b2.onclick = function () { closeModal(); doIt(); };
-      modal('还有未保存的改动', '<div class="hint">建议先保存草稿再发布，这样版本历史里能追溯到这次改动。</div>', [b1, b2, btnClose()]);
+      modal('还有未保存的改动', '<div class="hint">建议先保存草稿再发布：发布会把内容写回 replica.js，出问题可从生成前的自动备份恢复。</div>', [b1, b2, btnClose()]);
       return;
     }
     doIt();
   }
 
-  function showDiff(key) {
-    var k = key || (S.cur && S.cur.key);
-    if (!k) return;
-    api('GET', '/api/decorate/diff', { query: { key: k } }).then(function (d) {
-      var box = el('div');
-      if (!d.hasDraft) {
-        box.innerHTML = '<div class="hint">当前没有草稿，页面与线上一致。</div>';
-      } else if (!d.total) {
-        box.innerHTML = '<div class="hint">草稿与已发布内容一致，没有差异。</div>';
-      } else {
-        box.innerHTML = '<div class="hint" style="margin-bottom:8px">共 <b>' + d.total + '</b> 处差异（新增 ' + d.added + ' / 删除 ' + d.removed + ' / 修改 ' + d.changed + '）' +
-          (d.truncated ? '，仅显示前 ' + d.list.length + ' 条' : '') + '</div>' +
-          d.list.map(function (x) {
-            return '<div class="diff-row"><div class="p">' + esc(x.path) + '</div><div class="v">' +
-              (x.type === 'add' ? '<span class="add">+ ' + esc(x.to) + '</span>'
-                : x.type === 'del' ? '<span class="del">- ' + esc(x.from) + '</span>'
-                  : '<span class="del">' + esc(x.from) + '</span> → <span class="add">' + esc(x.to) + '</span>') +
-              '</div></div>';
-          }).join('');
-      }
-      modal('查看变更 · ' + k, box, [btnClose()]);
-    }).catch(function (e) { toast(e.message, 'err'); });
-  }
-
-  function showVersions(key) {
-    var k = key || (S.cur && S.cur.key);
-    if (!k) return;
-    api('GET', '/api/decorate/page', { query: { key: k } }).then(function (d) {
-      var box = el('div');
-      var vs = d.versions || [];
-      if (!vs.length) {
-        box.innerHTML = '<div class="hint">还没有发布记录。首次发布后这里会保留最近 20 个版本。</div>';
-      } else {
-        box.innerHTML = vs.map(function (v) {
-          return '<div class="ver-row"><span class="vid">' + esc(v.id) + '</span>' +
-            '<span class="vt">' + esc(v.note || '发布') + '<small>' + esc(v.atText) + '</small></span>' +
-            '<button class="btn sm" data-rb="' + attr(v.id) + '">恢复为草稿</button>' +
-            '<button class="btn sm primary" data-rbp="' + attr(v.id) + '">恢复并发布</button></div>';
-        }).join('');
-      }
-      modal('版本历史 · ' + k, box, [btnClose()]);
-      box.querySelectorAll('[data-rb]').forEach(function (b) {
-        b.onclick = function () { rollback(k, b.getAttribute('data-rb'), 'draft'); };
-      });
-      box.querySelectorAll('[data-rbp]').forEach(function (b) {
-        b.onclick = function () { rollback(k, b.getAttribute('data-rbp'), 'publish'); };
-      });
-    }).catch(function (e) { toast(e.message, 'err'); });
-  }
-
-  function rollback(key, versionId, mode) {
-    api('POST', '/api/decorate/rollback', { body: { key: key, versionId: versionId, mode: mode } })
-      .then(function () {
-        closeModal();
-        toast(mode === 'publish' ? '已恢复到 ' + versionId + ' 并发布' : '已把 ' + versionId + ' 恢复为草稿', 'ok');
-        if (S.cur && S.cur.key === key) openPage(key);
-        else loadPages();
-      })
-      .catch(function (e) { toast('回滚失败：' + e.message, 'err'); });
-  }
+  /*
+   * 「查看变更」与「版本历史」两个入口按用户要求下线（2026-10-10）：
+   * 前端相关实现（showDiff / showVersions / rollback）一并移除，顶栏和列表操作列都不再出现，
+   * 不留「半截功能」—— 按钮没了、函数还在，最容易在日后被误当成还能用。
+   *
+   * 后端 /api/decorate/diff 与 /api/decorate/rollback **保留**：它们本就是发布链路的组成部分
+   * （发布前自动备份到 server/data/decorate/backup/，保留最近 20 份），需要时可用 /debug 调试台
+   * 或脚本调用；日后若要把入口加回来，前端补一个按钮即可，不用重写后端。
+   *
+   * 前端剩下的草稿能力只有「丢弃草稿」（列表行 + 编辑器顶栏各一处）与「存至草稿」。
+   */
 
   function discardDraft(key) {
     var k = key || (S.cur && S.cur.key);
@@ -3211,12 +3160,10 @@
   document.addEventListener('click', function (e) {
     if ($('viewList').hidden) return;
     var t = e.target && e.target.closest
-      ? e.target.closest('[data-diff],[data-vers],[data-discard],[data-rename],[data-del]')
+      ? e.target.closest('[data-discard],[data-rename],[data-del]')
       : null;
     if (!t) return;
-    var key = t.getAttribute('data-diff'); if (key) { showDiff(key); return; }
-    key = t.getAttribute('data-vers'); if (key) { showVersions(key); return; }
-    key = t.getAttribute('data-discard'); if (key) { discardDraft(key); return; }
+    var key = t.getAttribute('data-discard'); if (key) { discardDraft(key); return; }
     key = t.getAttribute('data-rename'); if (key) { renamePageDialog(key); return; }
     key = t.getAttribute('data-del'); if (key) { deletePage(key); return; }
   });
@@ -3227,8 +3174,6 @@
   };
   $('btnSave').onclick = function () { withBusy($('btnSave'), saveDraft); };
   $('btnPublish').onclick = function () { withBusy($('btnPublish'), publish); };
-  $('btnDiff').onclick = function () { showDiff(); };
-  $('btnVersions').onclick = function () { showVersions(); };
   $('btnDiscard').onclick = function () { discardDraft(); };
   $('btnAddCommon').onclick = addCommonDialog;
   $('btnPageSetting').onclick = pageSetting;

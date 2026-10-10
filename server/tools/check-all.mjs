@@ -2403,19 +2403,24 @@ assert('内嵌装修台的 iframe 高度按整页占位计算（52 顶栏 + 56 b
 /* ---- 装修台列表「操作」列：按钮绝不能被压成竖排文字 ----
  *
  * 用户反馈（2026-10-10）：「下面两个自定义页，后面的字变成竖排了」。
- * 根因不是「列太窄」这么笼统 —— 是**零余量**：自定义页 6 个按钮（装修 / 查看变更 / 版本 /
+ * 根因不是「列太窄」这么笼统 —— 是**零余量**：当时自定义页 6 个按钮（装修 / 查看变更 / 版本 /
  * 丢弃草稿 / 改名 / 删除）在 1440 视口下内联需求正好 364px，而操作列内容区也正好 364px。
  * CSS px 是整数、字体度量却随系统字体 / 浏览器缩放浮动，多出 1~2px 时 flex（默认 flex-shrink:1）
- * 先把按钮压窄，字随即折行：「查看变更」→「查看变 / 更」。内置页只有 4 个按钮、余量足，
+ * 先把按钮压窄，字随即折行；内置页只有 4 个按钮、余量足，
  * 所以现象只在自定义页那两行出现（用户截图正是如此）。
  *
- * 三处必须同时在位，缺一处这种「零余量折行」就会回来：
+ * 同日稍后用户又要求「把查看变更和版本去掉」—— 两个入口下架，操作列宽度随之 424 → 320px，
+ * 余量从「零」变成 ~56px。但**防御重点从来不是那点余量**（列宽 / 字体 / 系统缩放都会变），
+ * 而是下面第 ① 条。三处同时在位，缺一处这种「零余量折行」就会回来：
  *   ① 按钮 flex:0 0 auto + white-space:nowrap（主要防线，字体再宽也不折字）；
- *   ② 操作列宽度留余量（≥400px），且表格 min-width 要容得下「各定宽列之和 + 名称列下限」；
+ *   ② 操作列宽度留余量（≥300px），且表格 min-width 要容得下「各定宽列之和 + 名称列下限」；
  *   ③ 文案不带多余的 ↗ 箭头（省 ~15px，也是用户明确要求）。
  * 真实几何（按钮总宽 vs 可用宽）由 .tooling/probe-admin-list.mjs 在真浏览器里量，这里只锁写法。
  */
 const decoHtml = readFileSync(join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8');
+/* 断言前先剥掉 HTML 注释：下面的说明性注释里会**原样引用**被删掉的入口名，
+   不剥就会拿「自己写的注释」判红（这类假红比不检查更浪费时间）。 */
+const decoHtmlNoComment = decoHtml.replace(/<!--[\s\S]*?-->/g, '');
 assert('操作列的按钮组带 ops-row 类（列宽富余与不压缩的规则都挂在它上面）',
   /class="ops ops-row"/.test(decoJsNoComment),
   '缺了就只剩通用 .ops 的 nowrap —— flex 仍会把按钮压窄并折字');
@@ -2423,20 +2428,33 @@ assert('操作列按钮不被压缩、不折字（flex:0 0 auto + white-space:no
   /\.ops-row\s*\{[^}]*flex-wrap:\s*wrap/.test(decoCssNoComment) &&
   /\.ops-row\s+\.btn\s*\{[^}]*flex:\s*0\s+0\s+auto[^}]*\}/.test(decoCssNoComment) &&
   /\.ops-row\s+\.btn\s*\{[^}]*white-space:\s*nowrap/.test(decoCssNoComment),
-  '少了 flex:0 0 auto，列一紧张 flex 就把「查看变更」压成「查看变 / 更」两行');
+  '少了 flex:0 0 auto，列一紧张 flex 就把「丢弃草稿」压成两行竖排');
 {
   /* 表头各定宽列 + 名称列下限 与 table min-width 的**关系**（不写死数值，运营改列宽时会自动跟着算） */
   const thW = [...decoHtml.matchAll(/<th style="width:(\d+)px"/g)].map((m) => Number(m[1]));
   const sum = thW.reduce((a, b) => a + b, 0);
   const tableMin = Number((/table\.grid\s*\{[^}]*min-width:\s*(\d+)px/.exec(decoCssNoComment) || [])[1]);
   const opsW = thW[thW.length - 1];
-  assert('装修台列表：操作列 ≥400px（6 个按钮内联需求约 330px + 内边距 28 与间距 30 = 388px）',
-    opsW >= 400,
+  assert('装修台列表：操作列 ≥300px（撤掉「查看变更/版本」后剩 4 个按钮，需求约 236px + 内边距 28 = 264px）',
+    opsW >= 300,
     `操作列 width=${opsW}px`);
   assert('装修台列表：表格 min-width 容得下「各定宽列之和 + 名称列 ≥150px」',
     tableMin >= sum + 150,
     `min-width=${tableMin}px ｜ 定宽列之和=${sum}px（${thW.join('+')}）→ 名称列只剩 ${tableMin - sum}px`);
 }
+/* 「查看变更 / 版本」两个入口下架（用户 2026-10-10：「把查看变更和版本去掉」）。
+ * 三处入口（编辑器顶栏 / 列表操作列 / 店铺导航卡片）都要撤干净：
+ * 只删一两处会留下「点得到、但流程半截」的按钮，比全留还难查。
+ * 同时断言前端**不再保留** showDiff / showVersions / rollback 三个函数 ——
+ * 入口删了函数还留着，就是「按不到了但还在跑」的死代码，日后极易被误判成功能仍然可用。
+ * 后端 /api/decorate/diff、/api/decorate/rollback 刻意保留（发布链路的备份/回滚能力），
+ * 所以这里只查前端。 */
+assert('装修台不再有「查看变更 / 版本」入口（顶栏、列表操作列、店铺导航卡片都不许挂）',
+  !/btnDiff|btnVersions|data-diff=|data-vers=/.test(decoJsNoComment + '\n' + decoHtmlNoComment),
+  '两个入口已按用户要求下线；加回来之前先看 admin.js 里那段「入口下线」的说明');
+assert('「查看变更 / 版本历史」的前端实现已随入口删除（不留按不到的死函数）',
+  !/function showDiff|function showVersions|function rollback/.test(decoJsNoComment),
+  '留着这三个函数 = 死代码，日后会被当成功能仍然可用');
 assert('装修台的按钮文案不带 ↗ 箭头（用户 2026-10-10：「装修后面不需要有箭头显示」）',
   !/↗/.test(decoJsNoComment),
   '「新窗口打开」的提示已放在 title 里（悬停可见），箭头只是噪音，还白占 ~15px 列宽');
