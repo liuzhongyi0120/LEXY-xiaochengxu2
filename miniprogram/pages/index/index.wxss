@@ -801,3 +801,108 @@
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ============================================================
+   有赞基础/高级组件余下 37 项（依赖型 + 展示型）的统一外观
+   —— 与 templates/blocks.wxml 的 `block.fam` 分支一一对应。
+   设计口径：中性的「配置卡片」，把运营配了什么如实显示出来；
+   底部固定一行「依赖 XX · 仅占位展示」，避免运营以为真机已经跑起来了。
+   ============================================================ */
+.c-yz {
+  box-sizing: border-box;
+  background: var(--color-bg-card);
+}
+
+.yz-hd {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-text);
+  padding: 8rpx 0 12rpx;
+}
+
+.yz-pic {
+  display: block;
+  width: 100%;
+  background: var(--color-bg-muted);
+}
+
+.yz-pic.round { border-radius: var(--radius-base); }
+
+.yz-desc {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+  padding: 12rpx 0 0;
+}
+
+.yz-btn {
+  display: inline-block;
+  margin-top: 16rpx;
+  padding: 0 var(--space-lg);
+  height: 60rpx;
+  line-height: 60rpx;
+  font-size: var(--font-base);
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: var(--radius-lg);
+}
+
+/* 依赖标注：只在「本体依赖外部业务系统」的组件上出现，别套到能真跑的组件上 */
+.yz-dep {
+  margin-top: 16rpx;
+  padding: 10rpx 16rpx;
+  font-size: var(--font-xs);
+  line-height: 1.5;
+  color: var(--color-warning);
+  background: var(--color-bg-muted);
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+/* ==================== 商品分组（真跑：分类菜单 + 该分组商品） ==================== */
+.c-grp { box-sizing: border-box; }
+.cgp-menu {
+  white-space: nowrap;
+  display: flex;
+  padding: 8rpx 0;
+  border-bottom: 1rpx solid var(--color-border);
+}
+.cgp-menu.left { flex-direction: column; }
+.cgp-tab {
+  flex: 0 0 auto;
+  padding: 12rpx 24rpx;
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+.cgp-tab.on {
+  color: var(--color-primary);
+  font-weight: 600;
+  border-bottom: 4rpx solid var(--color-primary);
+}
+.cgp-menu.left .cgp-tab.on { border-bottom: 0; border-left: 6rpx solid var(--color-primary); }
+.cgp-list { display: flex; flex-wrap: wrap; }
+.cgp-cell { box-sizing: border-box; padding: 8rpx; }
+
+/* ==================== 店铺热搜（真跑：词表在装修台里配） ==================== */
+.c-hotw { padding: 16rpx var(--space-base); }
+.chw-hd { display: flex; align-items: center; }
+.chw-badge {
+  flex: 0 0 auto;
+  margin-right: 8rpx;
+  padding: 0 8rpx;
+  font-size: var(--font-xs);
+  line-height: 32rpx;
+  color: var(--color-text-inverse);
+  background: var(--color-primary);
+  border-radius: var(--radius-sm);
+}
+.chw-title { font-size: var(--font-base); font-weight: 600; color: var(--color-text); }
+.chw-list { display: flex; flex-wrap: wrap; margin-top: 12rpx; }
+.chw-list.single { flex-wrap: nowrap; overflow: hidden; }
+.chw-word {
+  margin: 0 16rpx 12rpx 0;
+  padding: 6rpx 20rpx;
+  font-size: var(--font-sm);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-lg);
+}

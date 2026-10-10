@@ -11,14 +11,17 @@
 <!-- ============================ 顶栏（对标有赞：退出编辑器 / 正在装修 / 预览 · 存至草稿 · 生成代码） ============================ -->
 <!-- ⚠️ 按钮叫「生成代码」而不是「立即发布」：它写回的是代码包里的 replica.js，
      已发布的小程序不会因此立刻更新，还需要在微信开发者工具上传并发布新版本。 -->
+<!-- 结构与配色对齐有赞装修台顶栏：56px 高 / #202033 底 / 右侧按钮组 gap 16px、
+     次级按钮 #444454、主按钮 #155BD4，圆角统一 2px。 -->
 <header class="topbar mode-list" id="topbar">
   <div class="tb-left">
+    <button class="tb-back tb-edit-only" id="btnBack" title="返回页面列表"><i class="tb-back-ic">‹</i>退出编辑器</button>
     <span class="tb-brand">LEXY 店铺装修台</span>
-    <button class="tb-back tb-edit-only" id="btnBack" title="返回页面列表">‹ 退出编辑器</button>
   </div>
   <div class="tb-center">
     <span class="tb-list-title">店铺页面</span>
-    <span class="tb-label tb-edit-only">正在装修：</span>
+    <span class="tb-label tb-edit-only">正在装修:</span>
+    <span class="tb-logo tb-edit-only" id="edLogo"></span>
     <span class="tb-page tb-edit-only" id="edName">—</span>
     <span class="tb-tag tb-edit-only" id="edPath">—</span>
     <span class="tb-tag tb-edit-only" id="edPageTag">内置页</span>
@@ -96,7 +99,9 @@
   <div class="foot-hint" id="listFoot"></div>
 </section>
 
-<!-- ============================ 二、装修编辑器（四区：组件库 / 页面布局 / 手机预览 / 属性面板） ============================ -->
+<!-- ============================ 二、装修编辑器（对标有赞三栏：组件库 / 手机预览 / 属性面板） ============================ -->
+<!-- 有赞的「页面布局」不是常驻栏，而是预览区右上角的一个按钮 + 右侧浮层面板；
+     这里同构：从四栏收成三栏，页面布局收进 .col-layout-float。 -->
 <section id="viewEdit" class="view edit" hidden>
 
   <!-- ---------- 左：组件库 ---------- -->
@@ -109,23 +114,7 @@
     </div>
   </aside>
 
-  <!-- ---------- 中左：页面布局（组件大纲） ---------- -->
-  <aside class="col col-layout">
-    <div class="col-head">
-      <b>页面布局</b>
-      <span class="muted" id="treeCount"></span>
-    </div>
-    <div class="col-scroll">
-      <div class="fixed-hint">本页为固定结构页（内容按既定栏目排版），不支持拼装组件；需要自由排版请装修「首页」，或在页面列表「+ 新建页面」创建自定义页。</div>
-      <div id="tree" class="tree"></div>
-      <div id="treeAddWrap" class="tree-add"></div>
-    </div>
-    <div class="layout-foot" id="btnPageSetting">
-      <i class="ic-gear"></i>页面设置
-    </div>
-  </aside>
-
-  <!-- ---------- 中：手机预览 ---------- -->
+  <!-- ---------- 中：手机预览（页面布局浮层挂在这里） ---------- -->
   <div class="col col-mid">
     <div class="mid-head">
       <span class="muted">点击预览中的组件可直接选中</span>
@@ -139,17 +128,41 @@
       </label>
       <label class="mini"><input type="checkbox" id="autoScroll" checked> 选中时定位</label>
     </div>
-    <div class="phone-stage">
-      <div class="phone" id="phone">
-        <div class="phone-bar">
-          <span class="ph-time">9:41</span>
-          <span class="ph-title" id="phTitle">首页</span>
-          <span class="ph-dots">···</span>
+
+    <div class="preview-stage">
+      <!-- 对标有赞：预览区右上角「页面布局」按钮（104×48 / 白底 / 阴影 / 圆角 2px） -->
+      <button class="pv-layout-btn" id="btnPageLayout" title="显示 / 收起页面布局">页面布局</button>
+
+      <div class="phone-stage">
+        <div class="phone" id="phone">
+          <div class="phone-bar">
+            <span class="ph-time">9:41</span>
+            <span class="ph-title" id="phTitle">首页</span>
+            <span class="ph-dots">···</span>
+          </div>
+          <div class="phone-screen" id="preview"></div>
+          <!-- 底部导航由 PvTabbar 按「店铺导航」的已发布配置渲染（不再写死 5 个文字） -->
+          <div id="phTabbar"></div>
         </div>
-        <div class="phone-screen" id="preview"></div>
-        <!-- 底部导航由 PvTabbar 按「店铺导航」的已发布配置渲染（不再写死 5 个文字） -->
-        <div id="phTabbar"></div>
+        <div class="phone-model" id="phModel">iPhone 12 (375)</div>
       </div>
+
+      <!-- 页面布局浮层（对标有赞 .preview-page-manager-wrapper：白底、左侧投影、贴预览区右缘） -->
+      <aside class="col-layout-float" id="layoutPanel" hidden>
+        <div class="col-head">
+          <b>页面布局</b>
+          <span class="muted" id="treeCount"></span>
+          <button class="lp-close" id="btnLayoutClose" title="收起">✕</button>
+        </div>
+        <div class="col-scroll">
+          <div class="fixed-hint">本页为固定结构页（内容按既定栏目排版），不支持拼装组件；需要自由排版请装修「首页」，或在页面列表「+ 新建页面」创建自定义页。</div>
+          <div id="tree" class="tree"></div>
+          <div id="treeAddWrap" class="tree-add"></div>
+        </div>
+        <div class="layout-foot" id="btnPageSetting">
+          <i class="ic-gear"></i>页面设置
+        </div>
+      </aside>
     </div>
   </div>
 

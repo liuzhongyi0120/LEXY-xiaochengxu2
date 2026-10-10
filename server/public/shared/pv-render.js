@@ -132,13 +132,136 @@
   }
 
   /** 区块类型角标：**仅编辑态**（有赞预览里的「图片广告 1」这种标签） */
+  /* 每个区块类型的中文角标名；新增区块类型必须在这里补一行（自检会逐个核对，漏了会红）。 */
   var KIND_LABEL = {
     swiper: '图片广告', image: '图片', video: '视频', title: '标题文本', line: '辅助分割',
     notice: '公告', nav: '图文导航', cube: '魔方', hotspot: '热区切图', shop: '店铺信息',
     goods: '商品', rich_text: '富文本', search: '商品搜索', elevator: '电梯导航',
     enter_shop: '进入店铺', audio: '语音', service: '在线客服', content_card: '内容卡片',
-    buy_bar: '购买按钮', brand_category: '品牌分类'
+    buy_bar: '购买按钮', brand_category: '品牌分类',
+    // 2026-10-10：有赞基础/高级组件余下 37 项
+    custom_module: '自定义模块', fans: '涨粉', goods_group: '商品分组', game_category: '游戏分类',
+    point_order: '点单卡片', shelf_asset: '客户资产', nearby_store: '附近门店', order_pool: '好友拼单',
+    on_way_order: '在途订单', coupon: '优惠券', limit_discount: '限时折扣', seckill: '秒杀',
+    bargain: '砍价', new_zone: '新人专区', groupon: '拼团', reward_points: '集点卡',
+    member_goods: '会员专享价', member_value: '会员储值', join_member: '办会员', point_asset: '积分资产',
+    wx_live: '小程序直播', wxvideo_live: '视频号直播', guang_live: '爱逛直播',
+    goods_recommend_adv: '人群运营', crowd_image: '人群图片', hot_words: '店铺热搜',
+    shop_rank: '店铺榜单', points_goods: '积分兑换商品', member_card: '会员卡片',
+    shop_banner_card: '店招信息', course: '课程', paid_column: '知识专栏', paid_content: '知识内容',
+    content_live: '知识直播', paid_member: '知识付费会员', punch: '群打卡', personal_nav: '个性导航'
   };
+
+  /**
+   * 「依赖型 / 展示型」区块的渲染族。
+   *
+   * ⚠️ 键必须与 `miniprogram/utils/blocks.js` 的 `SHELL_FAMILY` **完全一致**：
+   *   两份表一个管装修台预览、一个管真机，键不一致就会出现「预览里是个卡片、真机一片空白」。
+   *   自检（check-all 15.8x）会逐个比对两张表的键集，漏一个就红。
+   */
+  var SHELL_PARTS = {
+    custom_module: 'card', fans: 'card', game_category: 'list',
+    point_order: 'card', shelf_asset: 'card', nearby_store: 'card', order_pool: 'card', on_way_order: 'card',
+    coupon: 'list', limit_discount: 'list', seckill: 'list', bargain: 'list', new_zone: 'card',
+    groupon: 'list', reward_points: 'card', member_goods: 'list', member_value: 'card',
+    join_member: 'card', point_asset: 'card', wx_live: 'card', wxvideo_live: 'card', guang_live: 'card',
+    goods_recommend_adv: 'card', crowd_image: 'list', points_goods: 'list',
+    member_card: 'card', shop_banner_card: 'card',
+    course: 'list', paid_column: 'list', paid_content: 'list', content_live: 'list', paid_member: 'card', punch: 'list',
+    personal_nav: 'card'
+  };
+
+  /** 展示位取值：按优先级取第一个非空字符串（与真机 blocks.js 的 firstOf 同规则） */
+  function pvFirst(b, keys) {
+    for (var i = 0; i < keys.length; i++) {
+      var v = b[keys[i]];
+      if (typeof v === 'string' && v.trim()) return v.trim();
+    }
+    return '';
+  }
+  function pvFirstImage(list) {
+    if (!list || !list.length) return '';
+    var x = list[0];
+    return typeof x === 'string' ? x : ((x && (x.image || x.src)) || '');
+  }
+
+  /**
+   * 依赖型 / 展示型区块的预览。
+   * 与真机 `templates/blocks.wxml` 的 `block.fam` 分支一一对应：
+   * 标题 / 主图 / 描述 / 按钮 + 底部「依赖 XX · 仅占位展示」。
+   */
+  function pvShell(b, kind) {
+    var margin = b.pageMargin || 12;
+    var t = pvFirst(b, ['title', 'name', 'text', 'notice']);
+    var d = pvFirst(b, ['desc', 'subTitle', 'slogan', 'note']);
+    var im = pvFirst(b, ['image', 'cover', 'photo', 'icon', 'qr']) || pvFirstImage(b.images);
+    var btn = pvFirst(b, ['btnText']);
+    var h = '<div style="padding:12px ' + margin + 'px">';
+    if (t) h += '<div style="font-size:15px;font-weight:600;color:#323233;padding-bottom:6px">' + esc(t) + '</div>';
+    if (im) h += img(im, 'width:100%;display:block;border-radius:' + (b.corner === 'round' ? '8px' : '0'));
+    if (d) h += '<div style="font-size:12px;color:#646566;padding-top:6px;line-height:1.6">' + esc(d) + '</div>';
+    if (btn) h += '<div style="display:inline-block;margin-top:8px;padding:0 16px;height:30px;line-height:30px;font-size:13px;color:#fff;background:#C8102E;border-radius:15px">' + esc(btn) + '</div>';
+    if (!t && !im && !d && !btn) h += '<div style="color:#b8bec8;font-size:12px;line-height:2">该组件还没有可展示的内容<br>在右侧属性面板里试试填「标题 / 图片 / 描述」</div>';
+    if (b.dep) h += '<div style="margin-top:8px;padding:5px 8px;font-size:11px;color:#FF976A;background:#F7F8FA;border:1px solid #EBEDF0;border-radius:2px">依赖 ' + esc(b.dep) + ' · 仅占位展示</div>';
+    h += '</div>';
+    return h;
+  }
+
+  /** 店铺榜单预览（真机复用「商品」卡片并按销量降序，预览不拉真实商品，只描述口径） */
+  function pvShopRank(b) {
+    var margin = b.pageMargin || 15;
+    return '<div style="padding:0 ' + margin + 'px">' +
+      '<div style="font-size:15px;font-weight:600;color:#323233;padding:8px 0 6px">' + esc(b.title || '店铺榜单') + '</div>' +
+      '<div style="display:flex;gap:8px">' +
+      [0, 1].map(function () {
+        return '<div style="flex:1;border:1px solid #EBEDF0;border-radius:2px;overflow:hidden">' +
+          '<div style="height:56px;background:#F7F8FA"></div>' +
+          '<div style="height:12px;margin:6px;background:#EBEDF0;border-radius:2px"></div></div>';
+      }).join('') + '</div>' +
+      '<div style="font-size:11px;color:#969799;padding:6px 0">真机按商品库真实销量降序取 ' + (b.limit || 6) + ' 件（预览不拉真实商品）</div></div>';
+  }
+
+  /** 商品分组预览：分类菜单 + 商品占位（真机按分组名向商品库取数） */
+  function pvGoodsGroup(b) {
+    var margin = b.pageMargin || 12;
+    var names = (b.groups || []).map(function (g) { return g && g.name; }).filter(Boolean);
+    var h = '<div style="padding:0 ' + margin + 'px">';
+    if (!names.length) {
+      return h + '<div style="color:#b8bec8;font-size:12px;padding:12px 0;line-height:2">还没有配置分组<br>在右侧「商品管理」里加上商品库的分类名</div></div>';
+    }
+    h += '<div style="display:flex;overflow:hidden;border-bottom:1px solid #EBEDF0">' +
+      names.slice(0, 6).map(function (nm, k) {
+        return '<span style="padding:6px 10px;font-size:13px;white-space:nowrap;' +
+          (k === 0 ? 'color:#155BD4;font-weight:600;border-bottom:2px solid #155BD4' : 'color:#646566') + '">' + esc(nm) + '</span>';
+      }).join('') + '</div>';
+    h += '<div style="display:flex;flex-wrap:wrap;margin-top:4px">' +
+      [0, 1].map(function () {
+        return '<div style="width:50%;padding:4px"><div style="border:1px solid #EBEDF0;border-radius:2px;overflow:hidden">' +
+          '<div style="height:48px;background:#F7F8FA"></div>' +
+          '<div style="height:10px;margin:6px;background:#EBEDF0;border-radius:2px"></div></div></div>';
+      }).join('') + '</div>';
+    h += '<div style="font-size:11px;color:#969799;padding:4px 0">真机按分组名（商品库分类，含子分类）取商品，切换分组不再请求接口</div></div>';
+    return h;
+  }
+
+  /** 店铺热搜预览：词表就在面板里配，预览即真机效果 */
+  function pvHotWords(b) {
+    var words = (b.words || []).map(function (w) { return typeof w === 'string' ? w : (w && w.word) || ''; })
+      .map(function (w) { return String(w).trim(); }).filter(Boolean).slice(0, 10);
+    var fg = (b.colorMode === 'custom' && b.color) ? b.color : '#C8102E';
+    var h = '<div style="padding:12px 12px 6px">' +
+      '<div style="display:flex;align-items:center">' +
+      (b.badge !== false ? '<span style="margin-right:4px;padding:0 4px;font-size:11px;line-height:16px;color:#fff;background:#C8102E;border-radius:2px">热</span>' : '') +
+      '<span style="font-size:14px;font-weight:600;color:#323233">' + esc(b.title || '大家都在搜') + '</span></div>';
+    if (!words.length) {
+      return h + '<div style="color:#b8bec8;font-size:12px;padding:8px 0">还没有配置热词</div></div>';
+    }
+    h += '<div style="display:flex;flex-wrap:wrap;margin-top:6px">' +
+      words.map(function (w) {
+        return '<span style="margin:0 8px 6px 0;padding:3px 10px;font-size:12px;color:' + fg + ';background:#F7F8FA;border-radius:12px">' + esc(w) + '</span>';
+      }).join('') + '</div></div>';
+    return h;
+  }
   function kindTag(kind, i) {
     if (!CTX.edit) return '';
     return '<span class="pv-tag">' + esc(KIND_LABEL[kind] || kind) + ' ' + (i + 1) + '</span>';
@@ -571,6 +694,14 @@
         '</div>';
     } else if (kind === 'brand_category') {
       box += pvBrandCategory(b);
+    } else if (kind === 'shop_rank') {
+      box += pvShopRank(b);
+    } else if (kind === 'goods_group') {
+      box += pvGoodsGroup(b);
+    } else if (kind === 'hot_words') {
+      box += pvHotWords(b);
+    } else if (SHELL_PARTS[kind]) {
+      box += pvShell(b, kind);
     }
 
     box += kindTag(kind, i);

@@ -267,7 +267,8 @@
   </view>
 
   <!-- ============ 商品 ============ -->
-  <view wx:elif="{{block.type === 'goods'}}" class="c-goods" style="padding: 0 {{block.marginRpx}}rpx;">
+  <!-- 店铺榜单与「商品」共用同一套卡片（数据侧按销量降序，见 utils/blocks.js 的 loadGoodsData） -->
+  <view wx:elif="{{block.type === 'goods' || block.type === 'shop_rank'}}" class="c-goods" style="padding: 0 {{block.marginRpx}}rpx;">
     <view wx:if="{{block.title}}" class="cg-title">{{block.title}}</view>
     <view class="cg-grid">
       <view
@@ -578,6 +579,95 @@
         </view>
       </view>
     </view>
+  </view>
+
+  <!--
+    ===== 有赞基础/高级组件余下的 37 项（依赖型 + 展示型） =====
+    这些组件在有赞里各自依赖一套业务底座（会员 / 营销中台 / 门店 / 直播 / 教育 …），
+    自建商城没有对应数据源。按约定「全量复刻，真机标注」：
+      · 装修台里可以像有赞一样自由添加、属性面板 1:1 配置；
+      · 真机按配置**忠实渲染**（标题 / 主图 / 描述 / 按钮），
+      · 并在区块底部原样标注「依赖 XX · 仅占位展示」，不假装可用。
+    能真跑的同类组件（商品分组 / 店铺热搜 / 店铺榜单 / 优惠券…）另有专属分支，不走这里。
+  -->
+  <!-- ===== 商品分组：菜单 + 当前分组的商品（真跑，数据来自商品库分类） ===== -->
+  <view wx:elif="{{block.type === 'goods_group'}}" class="c-grp" style="padding: 0 {{block.marginRpx}}rpx;">
+    <scroll-view class="cgp-menu {{block.menuTop ? '' : 'left'}}" scroll-x enable-flex>
+      <view
+        wx:for="{{block.groupTabs}}"
+        wx:key="name"
+        wx:for-item="g"
+        wx:for-index="gi"
+        class="cgp-tab {{gi === block.active ? 'on' : ''}}"
+        data-b="{{index}}"
+        data-gi="{{gi}}"
+        bindtap="onTapGroupTab"
+      >{{g.name}}</view>
+    </scroll-view>
+    <view class="cgp-list">
+      <view
+        wx:for="{{block.groupTabs[block.active].goods}}"
+        wx:key="goodsId"
+        wx:for-item="g"
+        wx:for-index="gIndex"
+        class="cgp-cell"
+        style="width: {{block.cellW}}%;"
+        data-goods="{{g.goodsId}}"
+        bindtap="onTapGoods"
+        hover-class="hover-lite"
+        hover-stay-time="80"
+      >
+        <view class="cg-card" style="background: {{block.cardBg}};">
+          <image wx:if="{{g.image}}" class="cg-img" src="{{g.image}}" mode="aspectFill" />
+          <view wx:else class="cg-img cg-img-failed">暂无图片</view>
+          <view class="cg-info">
+            <view wx:if="{{block.showTitle}}" class="cg-name">{{g.name}}</view>
+            <view wx:if="{{block.showPrice}}" class="cg-price">
+              <text class="cg-cur">¥</text><text class="cg-num">{{g.priceText}}</text>
+            </view>
+            <view wx:if="{{block.showBuy}}" class="cg-buy">立即购买</view>
+          </view>
+        </view>
+      </view>
+    </view>
+    <view wx:if="{{block.goodsFailed}}" class="cg-empty">分组里的商品没取到，请检查分组名是否与商品库分类一致</view>
+    <view wx:elif="{{!block.groupTabs.length}}" class="cg-empty">还没有配置分组，请到装修台「商品分组」里添加</view>
+  </view>
+
+  <!-- ===== 店铺热搜：词表在装修台里配，真机直接用 ===== -->
+  <view wx:elif="{{block.type === 'hot_words'}}" class="c-hotw" style="background: {{block.bg || 'transparent'}};">
+    <view class="chw-hd">
+      <text wx:if="{{block.badgeOn}}" class="chw-badge">热</text>
+      <text class="chw-title">{{block.title || '大家都在搜'}}</text>
+    </view>
+    <view class="chw-list {{block.singleLine ? 'single' : ''}}">
+      <view
+        wx:for="{{block.words}}"
+        wx:key="*this"
+        wx:for-item="w"
+        class="chw-word"
+        style="color: {{block.fg}};"
+        data-w="{{w}}"
+        bindtap="onSearchTap"
+        hover-class="hover-lite"
+      >{{w}}</view>
+    </view>
+    <view wx:if="{{!block.words.length}}" class="cg-empty">还没有配置热词，请到装修台「店铺热搜」里添加</view>
+  </view>
+
+  <view wx:elif="{{block.fam}}" class="c-yz" style="padding: 12rpx {{block.marginRpx}}rpx;">
+    <view wx:if="{{block.cardTitle}}" class="yz-hd">{{block.cardTitle}}</view>
+    <image
+      wx:if="{{block.cardImage}}"
+      class="yz-pic {{block.round ? 'round' : ''}}"
+      src="{{block.cardImage}}"
+      mode="widthFix"
+      lazy-load
+      binderror="onImgError"
+    />
+    <view wx:if="{{block.cardDesc}}" class="yz-desc">{{block.cardDesc}}</view>
+    <view wx:if="{{block.btnText}}" class="yz-btn" hover-class="hover-lite" bindtap="onTapBlock" data-index="{{index}}">{{block.btnText}}</view>
+    <view wx:if="{{block.dep}}" class="yz-dep">依赖 {{block.dep}} · 仅占位展示</view>
   </view>
 
   </view>

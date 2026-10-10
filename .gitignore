@@ -25,6 +25,15 @@ server/data/
 # _yz-panels.json 有赞装修编辑器 54 个组件的中文面板字段原文（组件库对账的依据）
 !.tooling/home.json
 !.tooling/_yz-panels.json
+# 以下四份是**脚本的运行时输入**，不放行的话克隆后 yz-panels2 / yz-tabs-scan 直接跑不起来：
+# _yz-panels2.json   结构化面板抓取（含全部选项）—— yzPanels.js 的字段来源
+# _yz-lib-basic.json 基础组件库清单（脚本按它遍历 55 个组件）
+# _yz-ctrls.json     控件实测 computed style（输入框 / 开关 / 单选 / 步进器 / 图片选择器的尺寸色值）
+# _yz-tabs.json      面板 tab 归属扫描结果（回答「三段 tab 要不要复刻」）
+!.tooling/_yz-panels2.json
+!.tooling/_yz-lib-basic.json
+!.tooling/_yz-ctrls.json
+!.tooling/_yz-tabs.json
 # AI 助手工作记忆（含内部上下文，不入公开仓库）
 .workbuddy/
 

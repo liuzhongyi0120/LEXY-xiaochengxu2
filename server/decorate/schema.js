@@ -843,6 +843,70 @@ const HOME_BLOCK_KINDS = {
   }
 };
 
+/* ==================== 有赞其余组件：面板字段合并进区块类型 ==================== */
+
+/**
+ * 2026-10-10：把有赞「基础组件 55 + 高级组件 2」里尚未接入的 **37 个**按实测面板补齐
+ * （字段定义在 `./yzPanels.js`，来源与口径见该文件头注释）。
+ *
+ * 至此组件库的 **57 项每一项都有对应区块类型**——点一下就能加到页面、能改属性、能在预览里看到，
+ * 与有赞「全部组件都可配置」保持一致。
+ * 小程序端能真跑的用真数据（商品分组 / 店铺热搜 / 店铺榜单 等），
+ * 缺业务底座的按 `dep` 忠实占位渲染并在真机上标注依赖，不做「假装可用」。
+ */
+const { PANELS: YZ_PANELS } = require('./yzPanels');
+
+/** 新区块类型用哪个图标（不在表里的回落 cube） */
+const KIND_LIB = {
+  custom_module: 'cube', fans: 'fans', goods_group: 'goods', game_category: 'cube',
+  point_order: 'service', shelf_asset: 'shop', nearby_store: 'shop', order_pool: 'groupbuy',
+  on_way_order: 'shop', coupon: 'coupon', limit_discount: 'discount', seckill: 'discount',
+  bargain: 'discount', new_zone: 'coupon', groupon: 'groupbuy', reward_points: 'coupon',
+  member_goods: 'goods', member_value: 'coupon', join_member: 'shop', point_asset: 'coupon',
+  wx_live: 'video', wxvideo_live: 'video', guang_live: 'video',
+  goods_recommend_adv: 'recommend', crowd_image: 'image_ad', hot_words: 'search',
+  shop_rank: 'anchor', points_goods: 'goods', member_card: 'shop', shop_banner_card: 'shop',
+  course: 'content_card', paid_column: 'content_card', paid_content: 'content_card',
+  content_live: 'content_card', paid_member: 'content_card', punch: 'content_card',
+  personal_nav: 'nav'
+};
+
+/** 「组件名 → 区块 kind」：由它把有赞清单里的 ok:0 一次性转成可用 */
+const KIND_OF_NAME = {
+  自定义模块: 'custom_module', 涨粉: 'fans', 商品分组: 'goods_group', 游戏分类: 'game_category',
+  点单卡片: 'point_order', 客户资产: 'shelf_asset', 附近门店: 'nearby_store', 好友拼单: 'order_pool',
+  在途订单: 'on_way_order', 优惠券: 'coupon', 限时折扣: 'limit_discount', 秒杀: 'seckill',
+  砍价: 'bargain', 新人专区: 'new_zone', 拼团: 'groupon', 集点卡: 'reward_points',
+  会员专享价: 'member_goods', 会员储值: 'member_value', 办会员: 'join_member', 积分资产: 'point_asset',
+  小程序直播: 'wx_live', 视频号直播: 'wxvideo_live', 爱逛直播: 'guang_live',
+  人群运营: 'goods_recommend_adv', 人群图片: 'crowd_image', 店铺热搜: 'hot_words',
+  店铺榜单: 'shop_rank', 积分兑换商品: 'points_goods', 会员卡片: 'member_card',
+  店招信息: 'shop_banner_card', 课程: 'course', 知识专栏: 'paid_column', 知识内容: 'paid_content',
+  知识直播: 'content_live', 知识付费会员: 'paid_member', 群打卡: 'punch', 个性导航: 'personal_nav'
+};
+
+/**
+ * 依赖说明取一个「短语」，供区块数据携带、真机原样显示。
+ * 完整说明（可能两三百字）留在属性面板的提示里，避免真机上出现一整段小字。
+ */
+function depTagOf(dep) {
+  var s = String(dep || '').split(/[：:，,（(。；;]/)[0].trim();
+  return s.length > 16 ? s.slice(0, 16) : s;
+}
+
+Object.keys(YZ_PANELS).forEach(function (k) {
+  HOME_BLOCK_KINDS[k] = {
+    label: YZ_PANELS[k].label,
+    lib: KIND_LIB[k] || 'cube',
+    group: 'basic',
+    desc: YZ_PANELS[k].desc,
+    dep: YZ_PANELS[k].dep || '',
+    depTag: depTagOf(YZ_PANELS[k].dep),
+    yz: true,
+    fields: YZ_PANELS[k].fields
+  };
+});
+
 /* ============================ 组件库（对标有赞左侧组件库） ============================ */
 
 /**
@@ -885,6 +949,9 @@ const YZ_BASIC_GROUPS = [
     items: [
       { n: '商品', type: 'goods_weapp,goods,goods_new', ok: 1, kind: 'goods' },
       { n: '商品分组', type: 'tag_list_top,tag_list_left,goods_group,goods_group_new', ok: 0, why: '需要「商品分组」这一数据维度，本后台商品库暂无分组字段' },
+      // 2026-10-10 有赞实测「基础组件」tab 共 55 个，比首轮抓取（54）多这一个，
+      // 位置在「商品分组」之后、「购买按钮」之前；type 一栏未取到真实值，按有赞命名惯例推测，仅作对照注释。
+      { n: '游戏分类', type: 'game_category', ok: 0, why: '有赞零售「游戏化分类」组件，依赖有赞营销游戏（抽奖 / 大转盘等）业务，自建商城无对应能力' },
       { n: '购买按钮', type: 'buy_button', ok: 1, kind: 'buy_bar' }
     ]
   },
@@ -976,11 +1043,58 @@ const YZ_ADV = [
   { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 1, kind: 'brand_category' }
 ];
 
+/**
+ * 2026-10-10：把清单里所有已补齐面板的项一次性转成「已接入」（要放在 YZ_BASIC / YZ_ADV 之后）。
+ * 依据是 `KIND_OF_NAME`；先校验它指向的区块类型都真实存在，避免「清单说能用、实际没有类型」。
+ */
+(function convertUnconnected() {
+  Object.keys(KIND_OF_NAME).forEach(function (n) {
+    if (!HOME_BLOCK_KINDS[KIND_OF_NAME[n]]) {
+      throw new Error('KIND_OF_NAME 指向了不存在的区块类型：' + n + ' → ' + KIND_OF_NAME[n]);
+    }
+  });
+  /*
+   * ⚠️ 必须连 YZ_BASIC 一起改：它是 YZ_BASIC_GROUPS 的**浅拷贝副本**
+   *   （`Object.assign({}, it)` 复制了属性值），只改原始项的话，
+   *   `componentLib().groups` 是新状态、`componentLib().basic` 还是旧状态，
+   *   前端两个 tab 会显示不一样的结果 —— 这个坑踩过一次。
+   */
+  [].concat(...YZ_BASIC_GROUPS.map((g) => g.items)).concat(YZ_ADV).concat(YZ_BASIC).forEach(function (it) {
+    var k = KIND_OF_NAME[it.n];
+    if (!k) return;
+    it.ok = 1;
+    it.kind = k;
+    it.dep = depTagOf(YZ_PANELS[k] && YZ_PANELS[k].dep);
+    delete it.why;
+  });
+})();
+
 /** 默认常用组件（对标有赞「常用组件」tab，用户可自行增删，存 localStorage） */
 const YZ_COMMON = ['title', 'line', 'swiper', 'video', 'notice', 'nav', 'cube', 'hotspot', 'goods', 'shop'];
 
 /** 有赞该店铺「常用组件」实测清单（14 个），仅作对照说明，不参与前端渲染 */
 const YZ_COMMON_ACTUAL = ['标题文本', '辅助分割', '图片广告', '视频', '涨粉', '商品', '优惠券', '限时折扣', '拼团', '个性化推荐', '商品搜索', '积分兑换商品', '办会员', '在线客服'];
+
+/**
+ * 每个组件在**单个页面**里的数量上限。
+ * 2026-10-10 从有赞「基础组件 / 高级组件」卡片第二行「已用 / 上限」逐个实测抄录，
+ * 前端据此在卡片上显示同样的计数并在达到上限时拦截，别凭印象改这几个数。
+ * 与有赞实测值不一致的地方（有赞 55 个基础组件，本清单同名同值）以实测为准。
+ */
+const YZ_MAX = {
+  标题文本: 50, 富文本: 200, 辅助分割: 50, 图片广告: 500, 热区切图: 300, 魔方: 200,
+  商品搜索: 2, 图文导航: 10, 电梯导航: 1, 视频: 50, 店铺信息: 50, 进入店铺: 1,
+  公告: 20, 语音: 50, 自定义模块: 5, 涨粉: 20, 内容卡片: 20, 在线客服: 1,
+  商品: 100, 商品分组: 100, 游戏分类: 100, 购买按钮: 1,
+  点单卡片: 1, 客户资产: 1, 附近门店: 1, 好友拼单: 5, 在途订单: 1,
+  优惠券: 50, 限时折扣: 50, 秒杀: 50, 砍价: 50, 新人专区: 3, 拼团: 50, 集点卡: 1,
+  会员专享价: 5, 会员储值: 5, 办会员: 1, 积分资产: 1,
+  小程序直播: 20, 视频号直播: 5, 爱逛直播: 20,
+  个性化推荐: 1, 人群运营: 1, 人群图片: 1, 店铺热搜: 1, 店铺榜单: 1,
+  课程: 20, 知识专栏: 20, 知识内容: 20, 知识直播: 20, 知识付费会员: 20, 群打卡: 10,
+  积分兑换商品: 50, 会员卡片: 1, 店招信息: 1,
+  个性导航: 20, 品牌分类E: 20
+};
 
 /** 组件库全景（随 /api/decorate/pages 一起下发给前端） */
 function componentLib() {
@@ -994,22 +1108,24 @@ function componentLib() {
     groups: YZ_BASIC_GROUPS.map((g) => ({
       name: g.name,
       count: g.items.length,
-      items: g.items
+      items: g.items.map((it) => Object.assign({}, it, { max: YZ_MAX[it.n] || 0 }))
     })),
-    /** 已接入、真正可用的组件（点一下就能加到页面） */
+    /** 已接入、真正可用的组件（点一下就能加到页面）；`dep` 非空表示真机要标注依赖 */
     kinds: Object.keys(HOME_BLOCK_KINDS).map((k) => ({
       kind: k,
       label: HOME_BLOCK_KINDS[k].label,
       lib: HOME_BLOCK_KINDS[k].lib,
       icon: ICONS[HOME_BLOCK_KINDS[k].lib] || ICONS.image_ad,
       desc: HOME_BLOCK_KINDS[k].desc,
+      dep: HOME_BLOCK_KINDS[k].dep || '',
+      depTag: HOME_BLOCK_KINDS[k].depTag || '',
       group: HOME_BLOCK_KINDS[k].group || 'basic'
     })),
     icons: ICONS,
     common: YZ_COMMON,
     commonActual: YZ_COMMON_ACTUAL,
-    basic: YZ_BASIC,
-    adv: YZ_ADV
+    basic: YZ_BASIC.map((it) => Object.assign({}, it, { max: YZ_MAX[it.n] || 0 })),
+    adv: YZ_ADV.map((it) => Object.assign({}, it, { max: YZ_MAX[it.n] || 0 }))
   };
 }
 

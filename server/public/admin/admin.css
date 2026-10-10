@@ -1,7 +1,10 @@
 /* =========================================================================
  * 店铺装修台 · 样式
  * 视觉对标有赞「店铺装修」编辑器（/v4/deco/decorate#/edit/<id>）：
- *   深色顶栏 + 四区（组件库 / 页面布局 / 手机预览 / 属性面板）
+ *   56px 深色顶栏(#202033) + 三栏（组件库 284 / 手机预览 / 属性面板 376）
+ * 下列 --yz-* 令牌全部取自 2026-10-10 对有赞装修台的实测 computed style
+ *   （见 .tooling/_yz-layout.txt / _yz-lib.txt / _yz-ctrls.txt），
+ *   改这里之前先回有赞复测，不要凭印象调。
  * ========================================================================= */
 
 :root {
@@ -20,9 +23,29 @@
   --danger: #e54d42;
   --warn: #f59f00;
   --ok: #12b76a;
-  --top: #262626;
+  --top: #202033;           /* 顶栏底色（有赞 .new-top-bar-bg） */
   --radius: 6px;
   --shadow: 0 2px 8px rgba(0, 0, 0, .08);
+
+  /* —— 有赞装修台实测令牌 —— */
+  --yz-top-h: 56px;         /* 顶栏高 */
+  --yz-top-btn: #444454;    /* 顶栏次级按钮底 */
+  --yz-top-btn-h: #55556a;
+  --yz-pub: #155bd4;        /* 「立即发布 / 生成代码」主按钮 */
+  --yz-text: #323233;       /* 正文（组件名 / 输入值） */
+  --yz-sub: #646566;        /* 次要文字（未选中 tab） */
+  --yz-label: #969799;      /* 分组标签 */
+  --yz-tip: #7d7e80;        /* 组件卡片的用量文字 */
+  --yz-border: #dcdee0;     /* 输入框 / 步进器描边 */
+  --yz-divider: #ebedf0;    /* 分隔条底色 */
+  --yz-hover: #f7f8fa;      /* 预览区底色 / 悬停底 */
+  --yz-w-lib: 284px;        /* 左侧组件库宽 */
+  --yz-w-lib-inner: 280px;
+  --yz-w-insp: 376px;       /* 右侧属性面板宽 */
+  --yz-cell: 92px;          /* 组件库卡片：92×100，3 列满铺 */
+  --yz-radius: 2px;         /* 有赞控件统一圆角 */
+  --yz-ctl-h: 32px;         /* 输入框 / 步进器高 */
+  --yz-input-w: 272px;      /* 单行文本输入宽 */
 }
 
 * { box-sizing: border-box; }
@@ -219,129 +242,159 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .topbar {
   display: flex;
   align-items: center;
-  height: 48px;
-  padding: 0 4px 0 0;
+  height: var(--yz-top-h);
+  padding: 0;
   background: var(--top);
   color: #fff;
   position: relative;
   z-index: 30;
 }
-.tb-left { display: flex; align-items: center; }
+.tb-left { display: flex; align-items: center; height: 100%; }
+/* 「退出编辑器」：有赞 .new-top-bar-back = 97×56，文字 14px 纯白，左边距 15px */
 .tb-back {
-  height: 48px;
-  padding: 0 18px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: var(--yz-top-h);
+  padding: 0 15px 0 10px;
   border: 0;
   background: transparent;
-  color: #d8d8d8;
-  font-size: 13px;
+  color: #fff;
+  font-size: 14px;
 }
-.tb-back:hover { color: #fff; background: rgba(255, 255, 255, .08); }
-.tb-center { display: flex; align-items: center; gap: 8px; margin-left: 4px; }
-.tb-label { color: #999; font-size: 13px; }
-.tb-page { font-size: 13px; font-weight: 600; color: #fff; }
-.tb-tag { font-size: 11px; color: #9aa0a6; background: rgba(255, 255, 255, .1); padding: 1px 7px; border-radius: 3px; }
-.tb-right { margin-left: auto; display: flex; align-items: center; gap: 8px; padding-right: 12px; }
+.tb-back:hover { background: rgba(255, 255, 255, .1); }
+.tb-back-ic { font-style: normal; font-size: 18px; line-height: 1; transform: translateY(-1px); }
+.tb-center { display: flex; align-items: center; gap: 8px; margin-left: 8px; }
+.tb-label { color: #999; font-size: 14px; }
+.tb-page { font-size: 14px; font-weight: 500; color: #fff; }
+/* 店铺 logo：有赞 .top-bar-logo = 30×30 圆形 */
+.tb-logo {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #fff center/cover no-repeat;
+  flex: 0 0 auto;
+}
+.tb-logo:empty { display: none; }
+.tb-tag { font-size: 12px; color: #c8c9cc; background: rgba(255, 255, 255, .12); padding: 2px 8px; border-radius: var(--yz-radius); }
+.tb-right { margin-left: auto; display: flex; align-items: center; gap: 16px; padding-right: 16px; }
 .tb-dirty { font-size: 12px; color: #8a919e; }
 .tb-dirty.on { color: #ffc53d; }
+/* 顶栏按钮：有赞 .zent-btn.new-deco-editor-color = 高 32 / 圆角 2 / padding 0 16 / 14px */
 .tb-btn {
-  height: 30px;
-  padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, .22);
-  border-radius: 4px;
-  background: rgba(255, 255, 255, .1);
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--yz-top-btn);
+  border-radius: var(--yz-radius);
+  background: var(--yz-top-btn);
   color: #fff;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 30px;
 }
-.tb-btn:hover { background: rgba(255, 255, 255, .2); }
-.tb-btn.primary { background: var(--blue); border-color: var(--blue); }
-.tb-btn.primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
+.tb-btn:hover { background: var(--yz-top-btn-h); border-color: var(--yz-top-btn-h); }
+.tb-btn.primary { background: var(--yz-pub); border-color: var(--yz-pub); }
+.tb-btn.primary:hover { background: #2b6fe0; border-color: #2b6fe0; }
 .tb-btn:disabled { opacity: .4; cursor: not-allowed; }
 
 /*
  * 顶栏双形态：默认（编辑态）样式写在上面；
- * 列表态加 .mode-list 后，把「正在装修：X / 路径 / 内置页」与整排编辑按钮收起来，
+ * 列表态加 .mode-list 后，把「正在装修: X / 路径 / 内置页」与整排编辑按钮收起来，
  * 换成品牌名 + 「店铺页面」，避免列表页出现「正在装修：—」这种空语义和误点发布。
  */
 .tb-brand {
   display: none;
-  padding: 0 18px;
-  font-size: 13px;
+  padding: 0 15px;
+  font-size: 14px;
   font-weight: 600;
   letter-spacing: .3px;
   color: #fff;
 }
-.tb-list-title { display: none; font-size: 13px; font-weight: 600; color: #fff; }
+.tb-list-title { display: none; font-size: 14px; font-weight: 600; color: #fff; }
 .topbar.mode-list .tb-edit-only { display: none !important; }
 .topbar.mode-list .tb-brand { display: block; }
 .topbar.mode-list .tb-list-title { display: inline; }
 
-/* ============================ 二、编辑器四区 ============================ */
+/* ============================ 二、编辑器三栏（对标有赞） ============================ */
 
 /*
- * 四区用「弹性基准 + 收缩下限」而不是写死宽度：
- *   写死时四区合计固定 1238px，1180 / 1024 的屏上属性面板会被 .view.edit 的 overflow:hidden 直接裁掉，
- *   右侧的编辑字段完全点不到。改成 flex-shrink:1 + min-width 后，
- *   ≥1240 保持原宽度，窄屏按比例收缩（下限合计 1022px），再窄才出现横向滚动条。
+ * 有赞是「左侧组件库 284 固定 + 中间预览 flex + 右侧属性面板 376 固定」三栏，
+ * 「页面布局」不是常驻栏，而是预览区里的一个浮层。
+ * 三栏用固定/弹性基准而不是写死：窄屏时中间预览先收缩，两侧保持可点。
  */
 .view.edit {
   display: flex;
-  height: calc(100% - 48px);
-  overflow-x: auto;
-  overflow-y: hidden;
+  height: calc(100% - var(--yz-top-h));
+  overflow: hidden;
   padding: 0;
+  background: var(--yz-hover);
 }
 .col { display: flex; flex-direction: column; background: #fff; min-height: 0; }
 .col-head, .insp-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 38px;
-  padding: 0 12px;
-  border-bottom: 1px solid var(--line);
-  font-size: 13px;
+  height: 48px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--yz-divider);
+  font-size: 14px;
   flex: 0 0 auto;
 }
 .col-head b, .insp-head b { font-weight: 600; }
+/* 属性面板标题：有赞 .deco-component-title = padding 24/16/16，组件名 20px / 600 / #323233 */
+.insp-head {
+  align-items: baseline;
+  height: auto;
+  padding: 24px 16px 16px;
+}
+.insp-head b { font-size: 20px; font-weight: 600; color: var(--yz-text); }
+.insp-head .muted { font-size: 13px; color: var(--yz-label); }
 .col-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
 
-/* ---------- 左：组件库 ---------- */
-.col-lib { flex: 0 1 252px; min-width: 186px; border-right: 1px solid var(--line); }
-.lib-tabs { display: flex; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
+/* ---------- 左：组件库（284，对标 .deco-editor-left-wrapper） ---------- */
+.col-lib { flex: 0 0 var(--yz-w-lib); width: var(--yz-w-lib); border-right: 1px solid var(--yz-divider); }
+/* tabs：有赞 .coms-lib-header-tab 高 57，三项各 64×24，左起 23px、间隔 23px，字号 16px */
+.lib-tabs { display: flex; align-items: center; gap: 23px; height: 57px; padding: 0 23px; flex: 0 0 auto; }
 .lib-tab {
-  flex: 1;
-  height: 40px;
-  line-height: 40px;
+  flex: 0 0 auto;
+  min-width: 64px;
+  height: 24px;
+  line-height: 24px;
+  padding: 0;
   text-align: center;
-  font-size: 13px;
-  color: var(--gray);
+  font-size: 16px;
+  color: var(--ink-2);
   background: transparent;
   border: 0;
-  border-bottom: 2px solid transparent;
   transition: .15s;
 }
 .lib-tab:hover { color: var(--blue); }
-.lib-tab.on { color: var(--blue); font-weight: 600; border-bottom-color: var(--blue); }
-.lib-body { flex: 1; overflow-y: auto; padding: 4px 0 16px; }
-.lib-desc { padding: 8px 12px; font-size: 11px; color: var(--gray-2); line-height: 1.6; }
-.lib-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; padding: 0 4px; }
+.lib-tab.on { color: var(--blue); font-weight: 400; }
+.lib-body { flex: 1; overflow-y: auto; padding: 0 4px 16px; }
+.lib-desc { padding: 8px 19px; font-size: 12px; color: var(--yz-tip); line-height: 1.7; }
+/* 卡片：有赞 .com-item-ns = 92×100、3 列满铺（280/3）、无间隙 */
+.lib-grid { display: grid; grid-template-columns: repeat(3, var(--yz-cell)); gap: 0; padding: 0; justify-content: flex-start; }
 .lib-item {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 12px 4px 10px;
-  border-radius: 6px;
-  border: 1px solid transparent;
+  width: var(--yz-cell);
+  height: 100px;
+  padding: 8px 0 0;
+  border: 0;
+  border-radius: 0;
   background: transparent;
   transition: .15s;
+  overflow: hidden;
 }
-.lib-item:hover { background: var(--blue-light); border-color: var(--blue-border); }
-.lib-item.off { opacity: .38; cursor: not-allowed; }
-.lib-item.off:hover { background: var(--line-2); border-color: transparent; }
-.lib-item svg { width: 30px; height: 30px; color: var(--ink-2); }
+.lib-item:hover { background: var(--yz-hover); }
+.lib-item.off { cursor: not-allowed; }
+.lib-item.off svg, .lib-item.off .lib-name, .lib-item.off .lib-num { opacity: .38; }
+.lib-item svg { width: 40px; height: 40px; flex: 0 0 auto; color: var(--ink-2); }
 .lib-item:hover svg { color: var(--blue); }
-.lib-name { font-size: 12px; color: var(--ink-2); text-align: center; line-height: 1.2; }
+.lib-name { margin-top: 10px; font-size: 14px; line-height: 18px; color: var(--yz-text); text-align: center; }
+/* 「已用 / 上限」计数（有赞 .com-item-ns__num） */
+.lib-num { margin-top: 4px; font-size: 12px; line-height: 16px; color: var(--yz-tip); }
 .lib-item:hover .lib-name { color: var(--blue); }
 .lib-item .lib-flag { font-size: 10px; color: var(--gray-3); }
 /* 分组标题：网格里整行占满（对标有赞左侧组件库的分组分隔） */
@@ -370,8 +423,35 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 }
 .lib-add:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
 
-/* ---------- 中左：页面布局 ---------- */
-.col-layout { flex: 0 1 226px; min-width: 176px; border-right: 1px solid var(--line); }
+/* ---------- 页面布局浮层（对标有赞 .preview-page-manager-wrapper） ----------
+ * 有赞里它不是常驻栏，而是贴预览区右缘的一个白色浮层（左侧单向投影）。
+ * 有赞实测宽 169，装不下「缩略图 + 名称 + 上下移/删除」这排操作，这里放宽到 260。
+ * 位置、底色、投影三者与有赞一致，只有宽度按内容需要调整。
+ */
+.col-layout-float {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 260px;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  box-shadow: -5px 0 10px -5px rgba(0, 0, 0, .1);
+}
+.lp-close {
+  margin-left: auto;
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: var(--yz-radius);
+  background: transparent;
+  color: var(--yz-label);
+  font-size: 14px;
+  line-height: 1;
+}
+.lp-close:hover { background: var(--yz-hover); color: var(--yz-text); }
 .tree { padding: 6px 0; }
 .tnode {
   display: flex;
@@ -468,29 +548,57 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   border-radius: 50%;
 }
 
-/* ---------- 中：手机预览 ---------- */
-.col-mid { flex: 1 1 auto; min-width: 360px; background: var(--bg); }
+/* ---------- 中：手机预览（对标有赞 .preview-wrap） ---------- */
+.col-mid { flex: 1 1 auto; min-width: 360px; background: var(--yz-hover); display: flex; flex-direction: column; }
 .mid-head {
   display: flex;
   align-items: center;
   gap: 14px;
-  height: 38px;
-  padding: 0 14px;
+  height: 48px;
+  padding: 0 16px;
   background: #fff;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--yz-divider);
   flex: 0 0 auto;
 }
-.mid-head .mini { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--gray); }
-.mid-head select { height: 26px; border: 1px solid var(--line); border-radius: 4px; background: #fff; }
+.mid-head .muted { font-size: 13px; }
+.mid-head .mini { display: flex; align-items: center; gap: 5px; font-size: 13px; color: var(--yz-sub); }
+.mid-head select {
+  height: var(--yz-ctl-h);
+  border: 1px solid var(--yz-border);
+  border-radius: var(--yz-radius);
+  background: #fff;
+  font-size: 13px;
+}
+/* 预览舞台：承载手机 + 页面布局浮层，自身是定位基准 */
+.preview-stage { flex: 1; position: relative; min-height: 0; display: flex; }
+/* 「页面布局」把手按钮：对标有赞 .preview-page（白底 / 圆角 2 / 阴影 0 2px 8px rgba(0,0,0,.1)） */
+.pv-layout-btn {
+  position: absolute;
+  top: 24px;
+  right: 16px;
+  z-index: 9;
+  height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--yz-radius);
+  background: #fff;
+  color: var(--yz-text);
+  font-size: 14px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, .1);
+}
+.pv-layout-btn:hover { color: var(--blue); }
 /* 预览列被压缩到比手机还窄时（窄屏 / 选了 414 机型），让手机自身不缩、由这一层横向滚动 */
 .phone-stage {
   flex: 1;
   overflow-y: auto;
   overflow-x: auto;
   display: flex;
-  justify-content: center;
-  padding: 20px 0 60px;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 0 60px;
 }
+/* 机型标签（对标有赞预览底部那行「iPhone 12 (375)」） */
+.phone-model { margin-top: 12px; font-size: 12px; color: var(--yz-tip); }
 /*
  * 手机壳。两条口径要和 /preview 对齐（那边是 .phone-screen 375×718）：
  *   · 宽度：恒按 375 渲染（预览里的 px 值全是 375 基准），机型切换用 zoom 等比缩放 ——
@@ -758,7 +866,7 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .pv-ccard img { display: block; }
 
 /* ---------- 右：属性面板 ---------- */
-.col-inspector { flex: 0 1 380px; min-width: 300px; border-left: 1px solid var(--line); }
+.col-inspector { flex: 0 0 var(--yz-w-insp); width: var(--yz-w-insp); border-left: 1px solid var(--yz-divider); }
 #inspector { padding: 0 0 40px; }
 
 .insp-empty { padding: 40px 16px; text-align: center; color: var(--gray-2); font-size: 12px; }
@@ -797,19 +905,20 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 .tpl-item.on span { color: var(--blue); font-weight: 600; }
 
 /* 分组 */
-.grp { border-bottom: 1px solid var(--line-2); }
+/* 分组：有赞的小节标题（.cnzoom-hd）是「14px 正文色 + padding 10/16」，没有底色和粗体 */
+.grp { border-bottom: 0; }
 .grp-head {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 11px 14px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: var(--ink-2);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--yz-text);
   cursor: pointer;
   user-select: none;
 }
-.grp-head:hover { background: #fafbfc; }
+.grp-head:hover { background: var(--yz-hover); }
 .grp-head .arw {
   width: 0; height: 0;
   border-left: 4px solid var(--gray-2);
@@ -818,14 +927,35 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   transition: .18s;
 }
 .grp.open .grp-head .arw { transform: rotate(90deg) translateX(1px); }
-.grp-head .gk { margin-left: auto; font-size: 11px; color: var(--gray-3); font-weight: 400; }
-.grp-body { padding: 0 14px 12px; display: none; }
+.grp-head .gk { margin-left: auto; font-size: 12px; color: var(--yz-label); font-weight: 400; }
+/* 字段自己带 12px/16px 的内边距，这里不再叠加 */
+.grp-body { padding: 0; display: none; }
 .grp.open .grp-body { display: block; }
 .grp-body > .fld:first-child { padding-top: 0; }
 
 /* 独立字段 */
-.fld { padding: 9px 0; }
-.fld > label { display: block; font-size: 12px; color: var(--gray); margin-bottom: 5px; }
+/* 字段：有赞是「label 左 + 控件右」横向排布（label 14px / #969799 / 宽 ~72px，控件区占满剩余） */
+.fld {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 12px 16px;
+}
+.fld > label {
+  flex: 0 0 auto;
+  width: 72px;
+  margin: 0;
+  font-size: 14px;
+  line-height: 18px;
+  color: var(--yz-label);
+}
+.fld > label + * { flex: 1 1 0; min-width: 0; }
+.fld .hint { flex: 1 1 100%; margin: 0; }
+/* 需要独整行的字段（列表 / 图文 / 富文本 / 模板）：label 回到上方，控件占满宽度 */
+.fld-wide { display: block; }
+.fld-wide > label { width: auto; margin-bottom: 8px; }
+.fld-wide > label + * { display: block; }
 .fld .req { color: var(--danger); margin-left: 2px; }
 .hint { font-size: 11px; color: var(--gray-3); line-height: 1.6; margin-top: 4px; }
 .tip {
@@ -839,42 +969,94 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 }
 .ro { padding: 6px 10px; background: var(--line-2); border-radius: var(--radius); font-size: 12px; color: var(--gray); }
 
+/* 输入框：有赞 .zent-input-wrapper = 高 32 / 圆角 2 / 描边 0.8px #DCDEE0 / 文字 14px #323233 */
 .fld input[type=text], .fld input[type=number], .fld input[type=password], .fld textarea, .fld select {
   width: 100%;
-  height: 32px;
+  height: var(--yz-ctl-h);
   padding: 0 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius);
+  border: 1px solid var(--yz-border);
+  border-radius: var(--yz-radius);
   background: #fff;
+  font-size: 14px;
+  color: var(--yz-text);
   transition: .15s;
 }
 .fld textarea { height: auto; min-height: 62px; padding: 7px 10px; line-height: 1.6; resize: vertical; }
 .fld input:focus, .fld textarea:focus, .fld select:focus { outline: 0; border-color: var(--blue); box-shadow: 0 0 0 2px rgba(21, 91, 212, .12); }
 
-/* 按钮组单选（对标有赞 deco-radio-button-group） */
-.rbg { display: flex; border-radius: var(--radius); overflow: hidden; width: fit-content; max-width: 100%; }
+/* 数字步进器（对标有赞 .zent-number-input = 100×32 / 圆角 2 / 描边 0.8px #DCDEE0；
+   两侧 −/+ 各 28 宽、色 #646566、字号 14；中间数值居中、无边框。
+   ⚠️ 这里的 `.fld .numf` 必须带 `.fld` 前缀：`.fld > label + *` 会给兄弟控件设 flex:1 1 0，
+   只用 `.numf` 会被它撑满整行，与有赞的 100px 定宽不一致。 */
+.fld .numf {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  width: 100px;
+  height: var(--yz-ctl-h);
+  border: 1px solid var(--yz-border);
+  border-radius: var(--yz-radius);
+  background: #fff;
+  overflow: hidden;
+}
+.fld .numf .nb {
+  flex: 0 0 28px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: #fff;
+  color: var(--yz-sub);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: .15s;
+}
+.fld .numf .nb:hover { color: var(--blue); background: var(--yz-hover); }
+.fld .numf .nb:active { background: var(--line-2); }
+.fld .numf .nv,
+.fld .numf .nv:focus {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  height: 100%;
+  padding: 0 2px;
+  border: 0;
+  border-left: 1px solid var(--yz-border);
+  border-right: 1px solid var(--yz-border);
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  font-size: 14px;
+  color: var(--yz-text);
+  box-shadow: none;
+}
+.fld .numf .nv::-webkit-outer-spin-button,
+.fld .numf .nv::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+
+/* 按钮组单选（对标有赞 deco-radio-button：高 32 / 圆角 2 / 12px / 选中蓝底白字） */
+.rbg { display: flex; border-radius: var(--yz-radius); overflow: hidden; width: fit-content; max-width: 100%; flex-wrap: wrap; }
 .rbg button {
-  height: 30px;
+  height: var(--yz-ctl-h);
   padding: 0 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--yz-border);
   border-left-width: 0;
   background: #fff;
-  color: var(--gray);
+  color: var(--yz-sub);
   font-size: 12px;
   transition: .15s;
 }
-.rbg button:first-child { border-left-width: 1px; border-radius: var(--radius) 0 0 var(--radius); }
-.rbg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.rbg button:first-child { border-left-width: 1px; border-radius: var(--yz-radius) 0 0 var(--yz-radius); }
+.rbg button:last-child { border-radius: 0 var(--yz-radius) var(--yz-radius) 0; }
 .rbg button:hover { color: var(--blue); border-color: var(--blue-border); }
 .rbg button.on { background: var(--blue); border-color: var(--blue); color: #fff; font-weight: 500; }
 .rbg button.on + button { border-left-color: var(--blue); }
 
-/* 开关（对标有赞 switch） */
+/* 开关（对标有赞 .zent-switch-small = 28×16 / 圆角 100px / 选中 #155BD4） */
 .sw { display: flex; align-items: center; gap: 8px; }
 .sw input { display: none; }
 .sw .track {
-  width: 40px; height: 22px;
-  border-radius: 11px;
+  width: 28px; height: 16px;
+  border-radius: 100px;
   background: #d8dce3;
   position: relative;
   transition: .2s;
@@ -885,14 +1067,14 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   content: '';
   position: absolute;
   top: 2px; left: 2px;
-  width: 18px; height: 18px;
+  width: 12px; height: 12px;
   border-radius: 50%;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, .2);
   transition: .2s;
 }
 .sw input:checked + .track { background: var(--blue); }
-.sw input:checked + .track::after { transform: translateX(18px); }
+.sw input:checked + .track::after { transform: translateX(12px); }
 .sw .txt { font-size: 12px; color: var(--gray); }
 
 /* 滑块（对标有赞 zent-slider） */
@@ -943,14 +1125,16 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 }
 .colorf .chip i { position: absolute; inset: 0; display: block; }
 .colorf input[type=color] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%; border: 0; padding: 0; }
-.colorf input[type=text] { flex: 1; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); text-transform: uppercase; }
-.colorf .rst { flex: 0 0 auto; height: 28px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; color: var(--gray); font-size: 11px; }
+/* 有赞控件统一高 32（原 30/28 与同排其它控件不齐） */
+.colorf input[type=text] { flex: 1; height: var(--yz-ctl-h); padding: 0 10px; border: 1px solid var(--yz-border); border-radius: var(--yz-radius); text-transform: uppercase; }
+.colorf .rst { flex: 0 0 auto; height: var(--yz-ctl-h); padding: 0 10px; border: 1px solid var(--yz-border); border-radius: var(--yz-radius); background: #fff; color: var(--yz-sub); font-size: 12px; }
 .colorf .rst:hover { color: var(--blue); border-color: var(--blue-border); }
 
 /* 图片字段（对标有赞 rc-design-common-choice-image-component） */
 .imgf { display: flex; gap: 10px; }
 .imgf .thumb {
-  width: 72px; height: 72px;
+  /* 有赞实测 .rc-design-common-choice-image-component = 61.6×61.6（取整 62），不是 72 */
+  width: 62px; height: 62px;
   flex: 0 0 auto;
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -975,7 +1159,8 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
 }
 .imgf .thumb:hover .zoom { opacity: 1; }
 .imgf .mid { flex: 1; min-width: 0; }
-.imgf .mid input { width: 100%; height: 30px; padding: 0 9px; border: 1px solid var(--line); border-radius: var(--radius); }
+/* 有赞控件统一高 32（原为 30，与同排的其它输入框不一致） */
+.imgf .mid input { width: 100%; height: var(--yz-ctl-h); padding: 0 10px; border: 1px solid var(--yz-border); border-radius: var(--yz-radius); }
 .imgf .mid .btns { display: flex; gap: 6px; margin-top: 6px; }
 
 /* 列表管理 */
@@ -1099,6 +1284,19 @@ kbd {
 }
 #toast .t.ok { background: rgba(18, 183, 106, .95); }
 #toast .t.err { background: rgba(229, 77, 66, .95); }
+/* toast 里的操作按钮（删除后的「撤销」）：内联在气泡里，不抢文字焦点 */
+#toast .t-act {
+  margin-left: 10px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: #82c7ff;
+  font-size: 13px;
+  font-family: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+#toast .t-act:hover { color: #b6ddff; }
 @keyframes tin { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
 
 .img-preview {

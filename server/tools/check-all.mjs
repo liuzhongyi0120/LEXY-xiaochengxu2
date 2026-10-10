@@ -533,19 +533,24 @@ assert('装修页面列表 = 5 个内置页面 + 1 个全局配置项（店铺�
     ? `共 ${decoListAll.length} 项（内置 5 / 全局配置 ${decoListAll.filter((p) => p.nav).length} / 自定义 ${decoListAll.filter((p) => p.custom).length}）`
     : '无返回');
 
-/* 组件库清单：基础组件需与有赞实测的 54 个一致；已接入组件数 = 首页区块类型数 */
+/* 组件库清单：基础组件需与有赞实测的 55 个一致（2026-10-10 复测补上「游戏分类」）；已接入组件数 = 首页区块类型数 */
 const decoLib = await call('GET', '/api/decorate/lib', { auth: false });
 const libTabs = decoLib.ok && decoLib.data ? decoLib.data.tabs : null;
 const libCount = {};
 if (libTabs) libTabs.forEach((t) => { libCount[t.key] = t.count; });
-assert('装修组件库三 tab 数量正确（常用 10 / 基础 54 / 高级实测 2）',
-  !!libTabs && libCount.common === 10 && libCount.basic === 54 && libCount.adv >= 1,
+assert('装修组件库三 tab 数量正确（常用 10 / 基础 55 / 高级实测 2）',
+  !!libTabs && libCount.common === 10 && libCount.basic === 55 && libCount.adv >= 1,
   libTabs ? `实际 ${JSON.stringify(libCount)}` : '无返回');
 
 const libKinds = decoLib.ok && decoLib.data ? decoLib.data.kinds : null;
-assert('装修组件库已接入 20 种组件，且每个都带 SVG 图标',
-  !!libKinds && libKinds.length === 20 && libKinds.every((k) => !!k.icon),
-  libKinds ? `实际 ${libKinds.length} 种，缺图标：${libKinds.filter((k) => !k.icon).map((k) => k.kind).join(',') || '无'}` : '无返回');
+/* 2026-10-10：有赞 55 基础 + 2 高级已全部接入（原先 20 种），
+ * 这里锁「清单里每一项都有对应的区块类型」而不是写死数字 —— 数量会继续增加，等价关系不会。 */
+const libBasicAll = decoLib.ok && decoLib.data ? decoLib.data.basic.concat(decoLib.data.adv) : [];
+const libNoKind = libBasicAll.filter((it) => it.ok && !it.kind);
+assert('装修组件库每一件（55 基础 + 2 高级）都已接入为区块类型，且每个都带 SVG 图标',
+  !!libKinds && libKinds.length >= 57 && libKinds.every((k) => !!k.icon) && libNoKind.length === 0,
+  libKinds ? `实际 ${libKinds.length} 种，缺图标：${libKinds.filter((k) => !k.icon).map((k) => k.kind).join(',') || '无'}` +
+    (libNoKind.length ? `，清单里没接上：${libNoKind.map((x) => x.n).join(',')}` : '') : '无返回');
 
 const decoHome = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'home' } });
 assert('装修首页详情：schema + 区块数据 + 已发布数据',
@@ -707,6 +712,33 @@ assert('固定结构页收起组件库并给出说明（不支持加组件就不
   adminHtmlSrc.indexOf('fixed-hint') >= 0 &&
   /\.view\.edit\.no-blocks:not\(\.nav-mode\) \.fixed-hint\s*\{[^}]*display:\s*block/.test(adminCssSrc),
   'admin.js / admin.css / index.html 三处缺一不可（no-blocks 切换 / col-lib 隐藏 / 说明文案）');
+
+/*
+ * 数字步进器（对标有赞 .zent-number-input：整块 100×32 / 两侧 −/+ 各 28 宽）。
+ *
+ * 这里锁的是**两条容易悄悄退化**的点：
+ *   ① 数字字段必须走 .numf 步进器，而不是退回裸 <input type=number>（裸控件带浏览器自带的
+ *      上下小箭头、也没有 −/+，与有赞面板一眼就能看出不一样）；
+ *   ② CSS 选择器**必须带 `.fld` 前缀** —— `.fld > label + *` 会给同排兄弟控件设 `flex: 1 1 0`，
+ *      只写 `.numf` 会被撑满整行，从 100px 定宽变成通栏。这条只有真去量渲染宽度才会发现，
+ *      静态看 CSS 完全正常，所以必须单独钉住。
+ */
+assert('数字字段渲染成步进器（−/+ 两侧按钮 + 居中数值），不是裸 number 输入框',
+  adminJsSrc.indexOf("el('div', 'numf')") >= 0 &&
+  adminJsSrc.indexOf("el('button', 'nb', '–')") >= 0 &&
+  adminJsSrc.indexOf("el('button', 'nb', '+')") >= 0 &&
+  /function clampNum\(/.test(adminJsSrc),
+  'admin.js 的数字分支没走 .numf 步进器');
+
+assert('步进器样式带 .fld 前缀（否则被 .fld > label + * 的 flex:1 1 0 撑满整行）',
+  /\.fld \.numf\s*\{[^}]*flex:\s*0 0 auto[^}]*width:\s*100px/.test(adminCssSrc) &&
+  /\.fld \.numf \.nv/.test(adminCssSrc),
+  'admin.css 里 .numf 没有 .fld 前缀或没锁死 100px 定宽');
+
+/* 图片选择器有赞实测 61.6×61.6（取整 62），原为 72 —— 与面板其它控件不成比例 */
+assert('图片选择器缩略图 62×62（有赞实测 61.6×61.6）',
+  /\.imgf \.thumb\s*\{[^}]*width:\s*62px;\s*height:\s*62px/.test(adminCssSrc),
+  'admin.css 的 .imgf .thumb 不是 62×62');
 
 const mpCustomJs = join(ROOT_DIR, 'miniprogram', 'pages', 'custom', 'index.js');
 assert('小程序端通用自定义页存在，且复用 utils/blocks 的区块渲染',
@@ -1425,19 +1457,20 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
  *   所以这一组把「有赞实测清单 ↔ schema 区块类型 ↔ wxml 渲染分支 ↔ 装修台预览分支」
  *   四个环节串起来对账，任一处漏接都会红。
  *
- * 数据来源：2026-10-08 用真实浏览器打开有赞装修编辑器逐个点击组件抓取，
- *   见 .tooling/yz-extract.mjs / .tooling/_yz-panels.json（54 个组件的中文面板字段原文）。
+ * 数据来源：2026-10-08 用真实浏览器打开有赞装修编辑器逐个点击组件抓取（见 .tooling/yz-extract.mjs /
+ *   .tooling/_yz-panels.json，54 个组件的中文面板字段原文）；
+ *   2026-10-10 复测「基础组件」tab 实际为 55 个（多一个「游戏分类」，归在「商品」组），本段按 55 校准。
  * ------------------------------------------------------------------------- */
 {
-  /* (1) 基础组件清单：54 个、分 10 组，组名与各组数量锁定到有赞实测值 */
+  /* (1) 基础组件清单：55 个、分 10 组，组名与各组数量锁定到有赞实测值 */
   const YZ_GROUPS = [
-    ['页面装修', 18], ['商品', 3], ['新零售', 5], ['营销活动', 7], ['会员', 4],
+    ['页面装修', 18], ['商品', 4], ['新零售', 5], ['营销活动', 7], ['会员', 4],
     ['直播', 3], ['智能运营', 5], ['教育', 6], ['积分', 1], ['其他', 2]
   ];
   const groups = schemaMod.componentLib().groups || [];
   const gotGroups = groups.map((g) => g.name + ':' + g.items.length);
   const wantGroups = YZ_GROUPS.map((g) => g[0] + ':' + g[1]);
-  assert('装修组件库「基础组件」= 有赞实测 10 组 / 54 个（分组名与数量逐组对齐）',
+  assert('装修组件库「基础组件」= 有赞实测 10 组 / 55 个（分组名与数量逐组对齐）',
     gotGroups.join('|') === wantGroups.join('|'),
     `实际 ${gotGroups.join(' ')}`);
 
@@ -1518,31 +1551,54 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     fieldGaps.length ? fieldGaps.join(' | ')
       : `${Object.keys(REQUIRED_FIELDS).length} 种新组件共 ${Object.keys(REQUIRED_FIELDS).reduce((n, k) => n + REQUIRED_FIELDS[k].length, 0)} 个字段全部就位`);
 
-  /* (4) 小程序端 wxml 必须给每一种区块类型写渲染分支（后台能配、真机空白＝最典型的漏接） */
+  /* (4) 小程序端 wxml 必须给每一种区块类型写渲染分支（后台能配、真机空白＝最典型的漏接）
+   *     两类覆盖方式：
+   *       ① 专属分支 —— wxml 里有 `block.type === 'k'`；
+   *       ② 通用族   —— 「依赖型 / 展示型」走 `block.fam` 分支，但该类型**必须**登记在
+   *          `miniprogram/utils/blocks.js` 的 SHELL_FAMILY 里，否则配了就是一片空白。 */
   const blocksWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
-  const wxmlMissing = allKinds.filter((k) => blocksWxml.indexOf(`block.type === '${k}'`) < 0);
-  assert('小程序 templates/blocks.wxml 覆盖全部 20 种区块类型（少一种就是「配了不显示」）',
-    wxmlMissing.length === 0,
-    wxmlMissing.length ? `wxml 缺分支：${wxmlMissing.join(', ')}` : `${allKinds.length} 种区块全部有渲染分支`);
+  const blocksJsSrc = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+  const shellFamSrc = /const SHELL_FAMILY = \{([\s\S]*?)\n\};/.exec(blocksJsSrc);
+  /* 一行里可能写好几个键（`a: 'card', b: 'card',`）→ 必须全局匹配，不能只在行首找 */
+  const keysOf = (src) => new Set(((src || '').match(/([a-z_][a-z_0-9]*)\s*:/g) || []).map((s) => s.replace(/[\s:]/g, '')));
+  const shellFams = keysOf(shellFamSrc && shellFamSrc[1]);
+  const wxmlMissing = allKinds.filter((k) => blocksWxml.indexOf(`block.type === '${k}'`) < 0 && !shellFams.has(k));
+  assert('小程序 templates/blocks.wxml 覆盖全部区块类型（少一种就是「配了不显示」）',
+    wxmlMissing.length === 0 && /block\.fam/.test(blocksWxml),
+    wxmlMissing.length ? `wxml 缺分支：${wxmlMissing.join(', ')}`
+      : `${allKinds.length} 种区块全部有渲染分支（专属分支 ${allKinds.length - shellFams.size} 种 + 通用族 ${shellFams.size} 种）`);
 
   /* (5) 装修台预览必须覆盖同样 20 种（后台预览不画＝运营以为没生效，会反复重配）
    *     渲染实现已统一到 public/shared/pv-render.js（装修台与前端预览页共用一份），
    *     所以这里查的是共享模块，不是 admin.js。 */
   const adminJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
   const pvRendSrc = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
-  const pvMissing = allKinds.filter((k) => pvRendSrc.indexOf(`kind === '${k}'`) < 0);
+  const pvShellSrc = /var SHELL_PARTS = \{([\s\S]*?)\n  \};/.exec(pvRendSrc);
+  const pvShells = keysOf(pvShellSrc && pvShellSrc[1]);
+  const pvMissing = allKinds.filter((k) => pvRendSrc.indexOf(`kind === '${k}'`) < 0 && !pvShells.has(k));
   const tagLabelMissing = allKinds.filter((k) => {
     // 预览右上角的角标名（如 buy_bar → 购买按钮）必须能查到，否则会退回显示英文类型名
     const m = /var KIND_LABEL = \{([\s\S]*?)\};/.exec(pvRendSrc);
     return !m || m[1].indexOf(k + ':') < 0;
   });
-  assert('装修台预览覆盖全部 20 种区块类型，且每种都有中文角标名',
-    pvMissing.length === 0 && tagLabelMissing.length === 0,
+  assert('装修台预览覆盖全部区块类型，且每种都有中文角标名',
+    pvMissing.length === 0 && tagLabelMissing.length === 0 && /SHELL_PARTS\[kind\]/.test(pvRendSrc),
     (pvMissing.length ? `预览缺分支：${pvMissing.join(', ')}` : '') +
     (tagLabelMissing.length ? ` 缺中文名：${tagLabelMissing.join(', ')}` : '') ||
     `${allKinds.length} 种区块的预览分支与中文角标全部就位`);
 
-  /* (6) 装修台左侧按「有赞真实分组」渲染，而不是拍平成一堆（否则 54 个平铺没法找） */
+  /* (5b) 两张「依赖型组件族」表必须键集一致。
+   *      一张在装修台预览（pv-render.js 的 SHELL_PARTS）、一张在真机（blocks.js 的 SHELL_FAMILY），
+   *      键不一致 = 「装修台预览里是个卡片、真机上一片空白」。这两张表天生无法合并（一个跑在浏览器、
+   *      一个跑在小程序），所以只能靠这条断言钉住。 */
+  const onlyPv = [...pvShells].filter((k) => !shellFams.has(k));
+  const onlyMp = [...shellFams].filter((k) => !pvShells.has(k));
+  assert('装修台预览与真机的「依赖型组件族」表键集完全一致',
+    onlyPv.length === 0 && onlyMp.length === 0,
+    (onlyPv.length ? `预览多出：${onlyPv.join(', ')}` : '') + (onlyMp.length ? ` 真机多出：${onlyMp.join(', ')}` : '') ||
+    `两侧各 ${pvShells.size} 项，逐一对应`);
+
+  /* (6) 装修台左侧按「有赞真实分组」渲染，而不是拍平成一堆（否则 55 个平铺没法找） */
   assert('装修台左侧按 lib.groups 分组渲染，且未接入项会展示具体原因',
     /lib\.groups/.test(adminJs) && /__group/.test(adminJs) && /it\.why/.test(adminJs),
     'renderLib 已按 lib.groups 分组 + 显示 why');

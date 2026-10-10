@@ -1,0 +1,342 @@
+{
+ "at": "2026-10-10T01:15:35.064Z",
+ "items": {
+  "标题文本": {
+   "added": true,
+   "navs": [
+    {
+     "w": 376,
+     "texts": [
+      "传统样式",
+      "微信图文样式"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "富文本": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "辅助分割": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "图片广告": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "热区切图": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "魔方": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "商品搜索": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "图文导航": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "电梯导航": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "视频": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "店铺信息": {
+   "added": true,
+   "navs": [
+    {
+     "w": 376,
+     "texts": [
+      "店铺信息",
+      "线下门店"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "进入店铺": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "公告": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "语音": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "自定义模块": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "涨粉": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "内容卡片": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "在线客服": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "商品": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "商品分组": {
+   "added": true,
+   "navs": [
+    {
+     "w": 376,
+     "texts": [
+      "样式管理",
+      "商品管理"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "游戏分类": {
+   "err": "notfound"
+  },
+  "购买按钮": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "点单卡片": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "客户资产": {
+   "added": true,
+   "navs": [
+    {
+     "w": 215,
+     "texts": [
+      "直角",
+      "圆角"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "附近门店": {
+   "added": true,
+   "navs": [
+    {
+     "w": 215,
+     "texts": [
+      "直角",
+      "圆角"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "好友拼单": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "在途订单": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "优惠券": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "限时折扣": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "秒杀": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "砍价": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "新人专区": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "拼团": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "集点卡": {
+   "added": true,
+   "navs": [
+    {
+     "w": 215,
+     "texts": [
+      "直角",
+      "圆角"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "会员专享价": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "会员储值": {
+   "added": true,
+   "navs": [
+    {
+     "w": 166,
+     "texts": [
+      "模板一",
+      "模板二"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "办会员": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "积分资产": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "小程序直播": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "视频号直播": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "爱逛直播": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "个性化推荐": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "人群运营": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "人群图片": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "店铺热搜": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "店铺榜单": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "课程": {
+   "added": true,
+   "navs": [
+    {
+     "w": 376,
+     "texts": [
+      "课程",
+      "课程分组"
+     ]
+    }
+   ],
+   "panelTabs": null
+  },
+  "知识专栏": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "知识内容": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "知识直播": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "知识付费会员": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "群打卡": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "积分兑换商品": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "会员卡片": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  },
+  "店招信息": {
+   "added": true,
+   "navs": [],
+   "panelTabs": null
+  }
+ }
+}

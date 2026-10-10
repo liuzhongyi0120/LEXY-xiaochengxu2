@@ -88,10 +88,25 @@ const blockPageBehavior = {
       openLink(ds.link, { failText: '页面暂未开放' });
       return;
     }
+    // 「店铺热搜」点某个词 → 带着关键词进列表页直接搜（有赞同义）
+    const kw = String(ds.w || '').trim();
+    const q = kw ? ('keyword=' + encodeURIComponent(kw)) : 'focus=1';
     wx.navigateTo({
-      url: GOODS_LIST + '?focus=1',
+      url: GOODS_LIST + '?' + q,
       fail: () => wx.showToast({ title: '商品列表页开发中', icon: 'none' })
     });
+  },
+
+  /**
+   * 「商品分组」切换分组。
+   *
+   * 分组的商品在 loadGoodsData 里**一次性全取回来了**（存在 `blocks[i].groupTabs`），
+   * 所以这里只改当前下标，不再打接口 —— 列表页横滑分组时最忌讳「点一次打一次」。
+   */
+  onTapGroupTab(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.b === undefined || ds.gi === undefined) return;
+    this.setData({ ['blocks[' + ds.b + '].active']: Number(ds.gi) || 0 });
   },
 
   /** 扫一扫 → 拿条码/文字去商品列表页搜（与有赞「扫商品条码」同义） */

@@ -17,6 +17,29 @@ const goodsSvc = require('../services/goods');
 
 const SIZE_CLASS = { sm: 's-sm', md: 's-md', lg: 's-lg' };
 
+/**
+ * 「有赞基础/高级组件余下 37 项」的渲染族。
+ *
+ * 键 = 区块类型（与装修台 `schema.js` 的区块 kind 一一对应），值 = 渲染族：
+ *   card —— 单卡片（标题 / 主图 / 描述 / 按钮）
+ *   list —— 列表型（同上，但语义上是「一组」）
+ *   这两种当前共用同一段 WXML；分族是为了以后要分开渲染时不用改数据结构。
+ *
+ * ⚠️ 新增依赖型组件要同时改三处：这里 → `templates/blocks.wxml` 的 `block.fam` 分支 →
+ *    `pages/index/index.wxss` 的 `.c-yz` 系列样式（装修台预览另有 `shared/pv-render.js`）。
+ */
+const SHELL_FAMILY = {
+  custom_module: 'card', fans: 'card', game_category: 'list',
+  point_order: 'card', shelf_asset: 'card', nearby_store: 'card', order_pool: 'card', on_way_order: 'card',
+  coupon: 'list', limit_discount: 'list', seckill: 'list', bargain: 'list', new_zone: 'card',
+  groupon: 'list', reward_points: 'card', member_goods: 'list', member_value: 'card',
+  join_member: 'card', point_asset: 'card', wx_live: 'card', wxvideo_live: 'card', guang_live: 'card',
+  goods_recommend_adv: 'card', crowd_image: 'list', points_goods: 'list',
+  member_card: 'card', shop_banner_card: 'card',
+  course: 'list', paid_column: 'list', paid_content: 'list', content_live: 'list', paid_member: 'card', punch: 'list',
+  personal_nav: 'card'
+};
+
 /** 店铺主题色（按钮「跟随店铺风格」时使用；与 tabBar selectedColor 保持一致） */
 const BRAND = '#C8102E';
 
@@ -103,6 +126,49 @@ function normalizeBlock(b, index) {
     o.goods = [];
     // 「没有商品」与「接口失败」是两件事，模板要能分开说，不能一律显示「暂无商品」
     o.goodsFailed = false;
+  } else if (kind === 'shop_rank') {
+    /* 店铺榜单：复用「商品」那套卡片样式，数据按销量降序（在 loadGoodsData 里排）。 */
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.cellW = 50;
+    o.limit = Number(o.limit) || 6;
+    o.cols = '2';
+    o.cardBg = o.cardBg || '#FFFFFF';
+    o.showTitle = o.showTitle !== false;
+    o.showPrice = o.showPrice !== false;
+    o.showBuy = false;
+    o.title = o.title || '店铺榜单';
+    o.goods = [];
+    o.goodsFailed = false;
+  } else if (kind === 'goods_group') {
+    /*
+     * 商品分组：菜单 + 当前分组的商品。
+     * 分组内容由 `loadGoodsData` 一次性填进 `o.groupTabs`（每项 { name, goods }），
+     * 这里只算「当前展示哪个分组」，切分组是页面 setData，不再打接口。
+     */
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.menuTop = o.menuStyle !== 'left';
+    o.stickyOn = o.sticky === '1';
+    o.groupTabs = [];
+    o.active = 0;
+    o.goods = [];
+    o.goodsFailed = false;
+    o.cellW = o.listStyle === 'three' ? 33.33 : (o.listStyle === 'one' ? 100 : 50);
+    o.cardBg = o.cardBg || '#FFFFFF';
+    o.showTitle = true;
+    o.showPrice = true;
+    o.showBuy = o.btnStyle !== 'plain';
+  } else if (kind === 'hot_words') {
+    /* 店铺热搜：词表就在面板里配，真机直接用（不需要后端）。 */
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.singleLine = o.mode === 'single';
+    o.badgeOn = o.badge !== false;
+    o.colorOn = o.colorMode === 'custom';
+    o.fg = o.colorOn && o.color ? o.color : BRAND;
+    o.words = (o.words || [])
+      .map((w) => (typeof w === 'string' ? w : (w && w.word) || ''))
+      .map((w) => String(w).trim())
+      .filter(Boolean)
+      .slice(0, 10);
   } else if (kind === 'rich_text') {
     // 「全屏显示」= 内容占满整宽，此时忽略页面边距（与有赞一致）
     o.marginRpx = o.full === '0' ? px2rpx(o.pageMargin) : 0;
@@ -285,10 +351,51 @@ function normalizeBlock(b, index) {
         return { title: String(br.title || '').trim(), panels };
       });
     o.navs = o.brands.map((br) => br.title);
+  } else if (SHELL_FAMILY[kind]) {
+    /*
+     * 有赞基础/高级组件余下的 37 项（依赖型 + 展示型）。
+     *
+     * 这些组件在有赞里各自依赖一套业务底座（会员 / 营销中台 / 门店 / 直播 / 教育…），
+     * 自建商城没有对应数据源。按约定「全量复刻，真机标注」：
+     *   · 装修台里可以像有赞一样添加、属性面板 1:1 配置；
+     *   · 真机按配置忠实渲染标题 / 主图 / 描述 / 按钮；
+     *   · 区块底部原样标注「依赖 XX · 仅占位展示」，不假装可用。
+     * 字段到展示位的映射只此一份：`cardTitle` / `cardDesc` / `cardImage` / `btnText`。
+     * 能真跑的同类组件（商品分组 / 店铺热搜 / 店铺榜单）不在这里，另有专属分支。
+     */
+    o.fam = SHELL_FAMILY[kind];
+    o.cardTitle = firstOf(o, ['title', 'name', 'text', 'notice']);
+    o.cardDesc = firstOf(o, ['desc', 'subTitle', 'slogan', 'note']);
+    o.cardImage = firstOf(o, ['image', 'cover', 'photo', 'icon', 'qr']) || firstImageOf(o.images);
+    o.btnText = firstOf(o, ['btnText']);
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.round = o.corner === 'round';
+    o.dep = String(o.dep || '');
   }
 
   o.__index = index;
   return o;
+}
+
+/**
+ * 展示位取值的统一规则：按优先级取第一个非空字符串。
+ * 37 个依赖型组件的字段名各不相同（title / name / text / notice …），
+ * 这里收敛成一处，避免在 WXML 里写一长串 `a || b || c`。
+ */
+function firstOf(o, keys) {
+  for (let i = 0; i < keys.length; i++) {
+    const v = o[keys[i]];
+    if (typeof v === 'string' && v.trim()) return v.trim();
+  }
+  return '';
+}
+
+/** 从图片列表里取第一张（图片既可能是字符串，也可能是 { image } 对象） */
+function firstImageOf(list) {
+  if (!Array.isArray(list) || !list.length) return '';
+  const x = list[0];
+  if (typeof x === 'string') return x;
+  return (x && (x.image || x.src)) || '';
 }
 
 /** 批量转换（首页与自定义页共用） */
@@ -312,14 +419,16 @@ function applyShopAvatar(blocks, shopAvatar) {
   return blocks;
 }
 
-/** 商品卡片渲染字段（区块模板只认这四个键；goodsId 为空会导致点击无效） */
+/** 商品卡片渲染字段（区块模板只认这几个键；goodsId 为空会导致点击无效） */
 function toCard(g) {
   if (!g) return null;
   return {
     goodsId: g.goodsId || g.id || '',
     name: g.name || '',
     image: assetUrl(g.image || g.cover || (g.images && g.images[0]) || ''),
-    priceText: g.priceText || ((Number(g.price) || 0) / 100).toFixed(2)
+    priceText: g.priceText || ((Number(g.price) || 0) / 100).toFixed(2),
+    // 「店铺榜单」要按销量排序，卡片里带上销量（其余区块用不到，多一个键不影响）
+    sales: Number(g.sales) || 0
   };
 }
 
@@ -355,14 +464,20 @@ function mapLimit(items, limit, fn) {
 
 function loadGoodsData(blocks) {
   const idxs = [];
-  (blocks || []).forEach((b, i) => { if (b.type === 'goods') idxs.push(i); });
-  if (!idxs.length) return Promise.resolve(null);
+  const rankIdxs = [];   // 「店铺榜单」：同一套取数，取回后按销量排
+  const groupIdxs = [];  // 「商品分组」：按分类逐个取
+  (blocks || []).forEach((b, i) => {
+    if (b.type === 'goods') idxs.push(i);
+    else if (b.type === 'shop_rank') rankIdxs.push(i);
+    else if (b.type === 'goods_group') groupIdxs.push(i);
+  });
+  if (!idxs.length && !rankIdxs.length && !groupIdxs.length) return Promise.resolve(null);
 
   const idBlocks = [];
   const listGroups = {}; // limit → [区块下标]
-  idxs.forEach((i) => {
+  idxs.concat(rankIdxs).forEach((i) => {
     const b = blocks[i];
-    if (b.mode === 'ids' && b.ids) {
+    if (b.type === 'goods' && b.mode === 'ids' && b.ids) {
       const ids = String(b.ids).split(/[,，\s]+/).filter(Boolean).slice(0, b.limit);
       idBlocks.push({ i, ids });
     } else {
@@ -399,7 +514,26 @@ function loadGoodsData(blocks) {
     return byLimit;
   });
 
-  return Promise.all([idJob, listJob]).then(([idRes, byLimit]) => {
+  /*
+   * 「商品分组」：面板里配了几个分组就取几次，按分类名去问商品库。
+   * 全部分组**一次取完**（分组数 ≤ 15，实际就几个），这样切换分组是纯前端 setData，
+   * 不会每点一次 tab 就打一次接口（列表页横滑分组时最怕这个）。
+   */
+  const groupJob = mapLimit(groupIdxs, GOODS_CONCURRENCY, (i) => {
+    const names = (blocks[i].groups || []).map((g) => String(g.name || '').trim()).filter(Boolean);
+    if (!names.length) return Promise.resolve({ i, groups: [], failed: false });
+    return mapLimit(names, GOODS_CONCURRENCY, (name, gi) => {
+      const limit = Number((blocks[i].groups[gi] || {}).limit) || 6;
+      return goodsSvc.fetchList({ page: 1, size: limit, categoryId: name, sort: 'sales' })
+        .then((d) => ({ name: name, goods: ((d && d.list) || []).map(toCard).filter(Boolean) }))
+        .catch((err) => {
+          console.warn('[blocks] 商品分组加载失败 category=' + name, err && err.message);
+          return { name: name, goods: [] };
+        });
+    }).then((groups) => ({ i, groups, failed: groups.every((g) => !g.goods.length) }));
+  });
+
+  return Promise.all([idJob, listJob, groupJob]).then(([idRes, byLimit, groupRows]) => {
     const next = {};
     idBlocks.forEach((b) => {
       next['blocks[' + b.i + '].goods'] = b.ids.map((id) => toCard(idRes.byId[id])).filter(Boolean);
@@ -411,6 +545,18 @@ function loadGoodsData(blocks) {
       const r = byLimit[String(blocks[i].limit)];
       next['blocks[' + i + '].goods'] = r ? r.list.map(toCard).filter(Boolean) : [];
       next['blocks[' + i + '].goodsFailed'] = !!(r && r.failed);
+    });
+    /* 榜单：取回后按销量降序（有赞那边是系统算法，这里用商品库的真实销量字段） */
+    rankIdxs.forEach((i) => {
+      const r = byLimit[String(blocks[i].limit)];
+      const list = r ? r.list.map(toCard).filter(Boolean) : [];
+      list.sort((a, b) => (b.sales || 0) - (a.sales || 0));
+      next['blocks[' + i + '].goods'] = list;
+      next['blocks[' + i + '].goodsFailed'] = !!(r && r.failed);
+    });
+    groupRows.forEach((row) => {
+      next['blocks[' + row.i + '].groupTabs'] = row.groups;
+      next['blocks[' + row.i + '].goodsFailed'] = row.failed;
     });
     return next;
   });

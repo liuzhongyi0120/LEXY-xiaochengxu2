@@ -51,12 +51,27 @@
   }
   function genId() { return 'x' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-  function toast(msg, type) {
+  /**
+   * toast(msg, 'err')                       —— 旧签名，第二参是类型
+   * toast(msg, { action, onAction })        —— 带操作按钮（如删除后的「撤销」）
+   * 带按钮的停留 5.2 秒，给用户留出反应时间。
+   */
+  function toast(msg, type, opt) {
+    if (type && typeof type === 'object') { opt = type; type = ''; }
     var box = $('toast');
     var t = el('div', 't' + (type ? ' ' + type : ''), esc(msg));
+    if (opt && opt.action && typeof opt.onAction === 'function') {
+      var btn = el('button', 't-act', esc(opt.action));
+      btn.onclick = function () {
+        // 撤销动作自身的异常不能吞掉 toast 的关闭
+        try { opt.onAction(); } catch (e) { /* 忽略：撤销失败也把提示收掉 */ }
+        t.remove();
+      };
+      t.appendChild(btn);
+    }
     box.appendChild(t);
-    // 错误信息（尤其是服务端的校验提示）需要阅读时间，2.2 秒根本来不及看
-    setTimeout(function () { t.remove(); }, type === 'err' ? 4600 : 2200);
+    setTimeout(function () { t.remove(); },
+      opt && opt.action ? 5200 : (type === 'err' ? 4600 : 2200));
   }
 
   /**
@@ -561,7 +576,7 @@
       renderInspector();
       renderPreview();
       renderDirty();
-      var sc = document.querySelector('.col-layout .col-scroll');
+      var sc = document.querySelector('.col-layout-float .col-scroll');
       if (sc) sc.scrollTop = 0;
     }).catch(function (e) {
       toast('打开页面失败：' + e.message, 'err');
@@ -670,6 +685,22 @@
     return hit;
   }
 
+  /** 当前页面里某个 kind 的区块数（组件库卡片上的「已用」，对标有赞 .com-item-ns__num） */
+  function usedCount(kind) {
+    if (!kind || !S.cur || !S.cur.data || !Array.isArray(S.cur.data.blocks)) return 0;
+    return S.cur.data.blocks.filter(function (b) { return b && b.type === kind; }).length;
+  }
+  /** 按组件名查上限（常用组件 tab 的条目来自 lib.kinds，没带 max，得回 groups/adv 里找） */
+  function maxOfLabel(label) {
+    var lib = S.lib; if (!lib) return 0;
+    var hit = 0;
+    (lib.groups || []).forEach(function (g) {
+      (g.items || []).forEach(function (x) { if (x.n === label) hit = x.max || 0; });
+    });
+    (lib.adv || []).forEach(function (x) { if (x.n === label) hit = x.max || 0; });
+    return hit;
+  }
+
   function renderLib() {
     var lib = S.lib;
     if (!lib) return;
@@ -691,7 +722,7 @@
       desc.textContent = meta.desc || '';
       S.common.forEach(function (k) {
         var kk = (lib.kinds || []).filter(function (x) { return x.kind === k; })[0];
-        if (kk) items.push(Object.assign({}, kk, { on: true }));
+        if (kk) items.push(Object.assign({}, kk, { on: true, max: maxOfLabel(kk.label), dep: kk.dep || kk.depTag || '' }));
       });
       if (!items.length) desc.textContent = '还没有常用组件，点下方「添加常用组件」挑选。';
     } else {
@@ -705,8 +736,12 @@
         items.push({
           kind: x.kind,
           label: x.n,
+          max: x.max || 0,
           icon: kind ? kind.icon : lib.icons.image_ad,
           desc: kind ? kind.desc : '需在小程序端开发对应组件后接入',
+          /* 依赖说明：组件带 dep 就用它，否则回落到区块类型上的 depTag。
+             ⚠️ 漏掉这一行时卡片上不会出现「依赖」角标 —— 运营就以为真机已经跑起来了。 */
+          dep: x.dep || (kind ? kind.depTag : '') || '',
           why: on ? '' : (x.why || '需在小程序端开发对应组件后接入'),
           on: on
         });
@@ -732,12 +767,27 @@
         grid.appendChild(h);
         return;
       }
+      var used = it.on ? usedCount(it.kind) : 0;
+      var cap = it.max || 0;
       var b = el('button', 'lib-item' + (it.on ? '' : ' off'));
+      /* 三种状态：可添加（可能带「依赖」角标）/ 未接入（灰显） */
       b.innerHTML = (it.icon || '') + '<span class="lib-name">' + esc(it.label) + '</span>' +
-        (it.on ? '' : '<span class="lib-flag">未接入</span>');
-      b.title = (it.on ? '点击添加到「页面区块」末尾' : '未接入：') + (it.why || it.desc || '');
-      if (it.on) b.onclick = function () { addComponent(it.kind); };
-      else b.onclick = function () { toast(it.label + '：' + (it.why || it.desc || '暂未接入'), 'err'); };
+        (cap ? '<span class="lib-num">' + used + ' / ' + cap + '</span>' : '') +
+        (it.on ? (it.dep ? '<span class="lib-dep">依赖</span>' : '') : '<span class="lib-flag">未接入</span>');
+      b.title = (it.on
+        ? '点击添加到「页面区块」末尾' + (it.dep ? '（依赖 ' + it.dep + '，真机会原样标注）' : '')
+        : '未接入：') + (it.why || it.desc || '') +
+        (cap ? '（本页已用 ' + used + ' / 上限 ' + cap + '）' : '');
+      if (it.on) {
+        b.onclick = function () {
+          // 达到有赞同款上限就拦住，避免出现「后台能加、真机不渲染」的偏差
+          if (cap > 0 && usedCount(it.kind) >= cap) {
+            toast(it.label + '：单个页面最多添加 ' + cap + ' 个（有赞同款上限）', 'err');
+            return;
+          }
+          addComponent(it.kind);
+        };
+      } else b.onclick = function () { toast(it.label + '：' + (it.why || it.desc || '暂未接入'), 'err'); };
       grid.appendChild(b);
     });
   }
@@ -1185,9 +1235,14 @@
     return box;
   }
 
+  /* 需要独占整行的字段类型：这些控件的可用宽度直接决定能不能用，
+     塞进「label 左 + 控件右」的横向槽里会被压到没法操作。
+     其余短控件（开关 / 滑块 / 数字 / 文本 / 下拉 / 选色）都走有赞的横向布局。 */
+  var WIDE_FIELD = { list: 1, textarea: 1, template: 1, union: 1, image: 1 };
+
   /** 单个字段（对标有赞属性面板的控件体系） */
   function fieldNode(f, parentData, fullPath) {
-    var wrap = el('div', 'fld');
+    var wrap = el('div', 'fld' + (WIDE_FIELD[f.type] ? ' fld-wide' : ''));
     var val = parentData ? parentData[f.k] : undefined;
     if (val === undefined && f.def !== undefined) val = f.def;
 
@@ -1214,19 +1269,49 @@
       input.oninput = function () { write(fullPath, input.value); };
 
     } else if (f.type === 'number') {
-      input = document.createElement('input');
-      input.type = 'number';
-      if (f.min != null) input.min = f.min;
-      if (f.max != null) input.max = f.max;
-      if (f.step != null) input.step = f.step;
-      input.value = val == null ? '' : val;
-      input.oninput = function () {
-        var n = Number(input.value);
-        if (isNaN(n)) return;
+      /* 数字步进器（对标有赞 .zent-number-input：整块 100×32 / 圆角 2 / 描边 #DCDEE0，
+         两侧 −/+ 各 28 宽、色 #646566，中间是居中的数值输入框）。
+         原来只用裸 <input type=number>：有赞的 −/+ 才是它的主要操作方式，且裸 number input
+         在部分浏览器上还带上下小箭头，视觉与有赞不一致。 */
+      var nstep = f.step != null ? Math.abs(Number(f.step)) || 1 : 1;
+      var nf = el('div', 'numf');
+      var nbMinus = el('button', 'nb', '–');
+      var nbPlus = el('button', 'nb', '+');
+      var nin = document.createElement('input');
+      nin.type = 'text';
+      nin.className = 'nv';
+      nin.setAttribute('inputmode', 'decimal');
+      nin.value = val == null ? '' : String(val);
+      function clampNum(v) {
+        var n = Number(v);
+        if (v === '' || v == null || isNaN(n)) return null;
         if (f.min != null && n < f.min) n = f.min;
         if (f.max != null && n > f.max) n = f.max;
+        return n;
+      }
+      function commitNum(n) {
+        if (n == null) return;
+        nin.value = String(n);
         write(fullPath, n);
+      }
+      /* 输入过程中允许中间态（比如只敲了「-」），只在能解析出数字时才写；
+         失焦与点 ± 时才做 min/max 夹取并回写，避免打字打到一半被强行改值。 */
+      nin.oninput = function () { var n = clampNum(nin.value); if (n != null) write(fullPath, n); };
+      nin.onblur = function () { commitNum(clampNum(nin.value)); };
+      nbMinus.onclick = function () {
+        var n = clampNum(nin.value);
+        commitNum((n == null ? (f.min != null ? f.min : 0) : n - nstep));
       };
+      nbPlus.onclick = function () {
+        var n = clampNum(nin.value);
+        commitNum((n == null ? (f.min != null ? f.min : 0) : n + nstep));
+      };
+      nf.appendChild(nbMinus);
+      nf.appendChild(nin);
+      nf.appendChild(nbPlus);
+      wrap.appendChild(nf);
+      if (f.hint) wrap.appendChild(el('div', 'hint', esc(f.hint)));
+      return wrap;
 
     } else if (f.type === 'select') {
       input = document.createElement('select');
@@ -1690,6 +1775,9 @@
           var hf = kind.fields.filter(function (f) { return f.k === 'height'; })[0];
           obj.height = hf.def != null ? hf.def : 400;
         }
+        /* 依赖型组件：把「依赖 XX」的短语烘进区块数据（真机据此在原位标注），
+           与有赞一致 —— 面板照搬、但真机不假装可用。 */
+        if (kind.depTag) obj.dep = kind.depTag;
         obj.id = genId();
         arr.push(obj);
         afterListChange(listPath, arr.length - 1);
@@ -1717,19 +1805,48 @@
     toast('已添加，记得保存草稿');
   }
 
+  /* 删除一律即时生效、不弹二次确认（对标有赞装修台）。
+     安全性由草稿机制兜底：只要没点「存至草稿 / 生成代码」，刷新即恢复。
+     删除前留一份快照，供 toast 里的「撤销」一键回退（有赞同样有此能力）。 */
   function removeItem(listPath, index) {
     var arr = getPath(S.cur.data, listPath);
     if (!Array.isArray(arr)) return;
-    if (arr.length <= 1) {
-      if (!confirm('这是最后一项，删除后该列表会为空，确定继续？')) return;
-    } else if (!confirm('确定删除第 ' + (index + 1) + ' 项？')) {
-      return;
-    }
+    if (index < 0 || index >= arr.length) return;
+
+    /* ⚠️ 只暂存「被删的那一项」，不要暂存整个数组：
+       撤销时若把整份数组插回去，会把该列表里其余项一起复制一遍（实测「撤销后区块变多」）。 */
+    var removed = JSON.parse(JSON.stringify(arr[index]));
+    var removedLabel = labelOfItem(listPath, arr[index]);
+    var selBefore = S.sel;
+
     arr.splice(index, 1);
     markDirty();
     if (S.sel.indexOf(listPath + '.') === 0) S.sel = listPath;
     renderTree(); renderInspector(); renderPreview();
-    toast('已删除');
+
+    toast('已删除' + (removedLabel ? '「' + removedLabel + '」' : '') + '，可撤销', {
+      action: '撤销',
+      onAction: function () {
+        var now = getPath(S.cur.data, listPath);
+        if (!Array.isArray(now)) return;
+        /* 期间可能又删了别的项 → 原下标已失效，夹到当前长度内保证「插得进去」而不是抛错 */
+        var at = Math.max(0, Math.min(index, now.length));
+        now.splice(at, 0, removed);
+        S.sel = selBefore;
+        markDirty();
+        renderTree(); renderInspector(); renderPreview();
+        toast('已恢复');
+      }
+    });
+  }
+
+  /* 给删除提示取一个人话名字：区块取类型名，条目取标题/名称，其他回落序号 */
+  function labelOfItem(listPath, it) {
+    if (!it || typeof it !== 'object') return '';
+    if (it.type && PvRender.KIND_LABEL && PvRender.KIND_LABEL[it.type]) return PvRender.KIND_LABEL[it.type];
+    var t = it.title || it.name || it.text || '';
+    if (typeof t === 'string' && t.trim()) return t.trim().slice(0, 12);
+    return '';
   }
 
   function moveItem(listPath, index, dir) {
@@ -3029,7 +3146,26 @@
   $('deviceSel').onchange = function () {
     S.device = Number($('deviceSel').value) || 375;
     $('phone').style.zoom = String(S.device / 375);
+    syncPhoneModel();
   };
+  /* 预览底部那行机型标签（对标有赞的「iPhone 12 (375)」） */
+  function syncPhoneModel() {
+    var sel = $('deviceSel');
+    var opt = sel.options[sel.selectedIndex];
+    if (opt) $('phModel').textContent = opt.textContent.replace('（', ' (').replace('）', ')');
+  }
+
+  /*
+   * 页面布局浮层：有赞里它不是常驻栏，而是预览区右上角一个「页面布局」按钮 + 贴右缘的白色浮层。
+   * 两者互斥显示：收起时只露按钮，展开时只露面板（面板自带 ✕）。
+   */
+  function setLayoutPanel(open) {
+    $('layoutPanel').hidden = !open;
+    $('btnPageLayout').hidden = !!open;
+  }
+  $('btnPageLayout').onclick = function () { setLayoutPanel(true); };
+  $('btnLayoutClose').onclick = function () { setLayoutPanel(false); };
+
   $('modalClose').onclick = closeModal;
   $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
   $('imgPreview').onclick = function () { $('imgPreview').hidden = true; };
@@ -3060,6 +3196,8 @@
   });
 
   /* ----------------------------- 启动 ----------------------------- */
+  syncPhoneModel();
+  setLayoutPanel(false);   // 页面布局默认收起（对标有赞），点预览区右上角按钮展开
   setTopbar('list');
   // 只有令牌没有身份时先补齐，否则首屏会把已登录用户渲染成「未登录」
   hydrateSession().then(function () {
