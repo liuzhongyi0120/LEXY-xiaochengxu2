@@ -200,11 +200,13 @@ await sleep(700);
 const m4 = await run(tab, MEASURE);
 ok(m4.per.every((p) => p.lineBoxes.every((n) => n === 1)), '清理注入样式后恢复如初');
 
-/* 留一张列表截图，方便肉眼复核（跑完可删） */
+/* 留一张列表截图，方便肉眼复核（跑完可删）。
+   ⚠️ CDP 的 /screenshot 是 **GET** 路由：写成 POST 会静默不落盘（探针不检查返回值时最难发现）。 */
 const shot = process.env.SHOT || '';
 if (shot) {
-  await j('/screenshot?target=' + encodeURIComponent(tab) + '&file=' + encodeURIComponent(shot), { method: 'POST', body: '' });
-  console.log('\n截图：' + shot);
+  const say = await fetch(P + '/screenshot?target=' + encodeURIComponent(tab) + '&file=' + encodeURIComponent(shot))
+    .then((r) => r.text()).catch((e) => 'ERR ' + e.message);
+  console.log('\n截图：' + shot + ' ｜ ' + say);
 }
 await j('/close?target=' + encodeURIComponent(tab), { method: 'POST', body: '' });
 
