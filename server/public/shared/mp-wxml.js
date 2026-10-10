@@ -355,20 +355,35 @@
         continue;
       }
 
-      /* ---- wx:if / wx:elif / wx:else ---- */
+      /* ---- wx:if / wx:elif / wx:else ----
+       *
+       * `chainTaken` 的含义是**「本链已经命中过某个分支」**，必须严格按这个语义维护：
+       *   · wx:if   永远开启一条新链（先归零），条件为假时**不能**改 chainTaken ——
+       *             否则后面的 wx:else 会以为「已命中」而被跳过；
+       *   · wx:elif 只在链未命中时才有资格竞争；
+       *   · wx:else 只在链未命中时渲染，一旦走到这里就把链标记为已命中。
+       *
+       * ⚠️ 这段曾经是反的（条件为假时置 chainTaken=true、命中后置 false），后果是
+       *    `a=true` 时 if 与 else **两个分支一起渲染**、`a=false` 时**两个都不渲染**
+       *    —— 预览页上就是「商品图旁边多出一块『暂无图片』」或者「本该显示的兜底文案整块不见了」。
+       *    真机不会这样，等于预览在说谎。改这里请先跑 .tooling/test-mp-render.mjs 的
+       *    「wx:if / wx:elif / wx:else 链」用例。
+       */
       var hasIf = attrs['wx:if'] !== undefined;
       var hasElif = attrs['wx:elif'] !== undefined || attrs['wx:else-if'] !== undefined;
       var hasElse = attrs['wx:else'] !== undefined;
 
       if (hasIf || hasElif || hasElse) {
-        if (hasElse) {
-          if (chainTaken) { chainTaken = false; continue; }
+        if (hasIf) {
           chainTaken = false;
-        } else {
-          var cond = condValue(hasIf ? attrs['wx:if'] : (attrs['wx:elif'] || attrs['wx:else-if']), scope);
-          if (!cond) { chainTaken = true; continue; }
-          chainTaken = false;
+          if (!condValue(attrs['wx:if'], scope)) continue;
+        } else if (hasElif) {
+          if (chainTaken) continue;
+          if (!condValue(attrs['wx:elif'] !== undefined ? attrs['wx:elif'] : attrs['wx:else-if'], scope)) continue;
+        } else if (chainTaken) {
+          continue;
         }
+        chainTaken = true;
         var kept = stripConditional(attrs);
         out += renderNodes([{ type: 'element', tag: node.tag, attrs: kept, children: node.children }], scope, opts);
         continue;

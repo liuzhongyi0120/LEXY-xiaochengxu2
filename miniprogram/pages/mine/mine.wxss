@@ -1,26 +1,107 @@
+/* 「我的」（个人中心）页样式
+ *
+ * 页面本身只有 .page / .version 两条通用样式 —— 内容全部由装修区块渲染。
+ * 下面是**个人中心专属区块**（.cu- 系列）的样式：它们目前只出现在「我的」页，
+ * 但 markup 与首页 / 自定义页共用 templates/blocks.wxml，
+ * 所以类名统一带 `cu-` 前缀，避免与首页区块样式互相污染。
+ */
+
 .page {
   min-height: 100vh;
   padding-bottom: 60rpx;
 }
 
-/* ---------- 用户信息 ---------- */
-.profile {
-  display: flex;
-  align-items: center;
-  padding: 60rpx 32rpx 80rpx;
-  background: var(--color-primary);
+/* ---------- 版本 ---------- */
+.version {
+  padding: 40rpx 0 0;
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
 }
 
-.avatar {
+/* ================= 标题栏 ================= */
+.cu-nav {
+  position: relative;
+  padding: 24rpx 32rpx 20rpx;
+  overflow: hidden;
+}
+
+.cu-nav-bg {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cu-nav-inner {
+  position: relative;
+  z-index: 1;
+}
+
+.cu-nav-title {
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cu-nav-desc {
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ================= 个人信息 ================= */
+.cu-prof {
+  position: relative;
+  padding: 40rpx 32rpx 48rpx;
+  overflow: hidden;
+}
+
+.cu-prof-gd {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cu-prof-gd.gd-white {
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #ffffff);
+}
+
+.cu-prof-gd.gd-black {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0), #000000);
+}
+
+.cu-prof-row {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+}
+
+.cu-avatar {
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.25);
-  border: 2rpx solid rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.3);
+  border: 2rpx solid rgba(255, 255, 255, 0.6);
   flex-shrink: 0;
 }
 
-.profile-info {
+.cu-avatar-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cu-avatar-t {
+  font-size: 44rpx;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.cu-prof-info {
   flex: 1;
   min-width: 0;
   display: flex;
@@ -28,20 +109,36 @@
   margin-left: 24rpx;
 }
 
-.nickname {
+.cu-nick {
   font-size: 36rpx;
   font-weight: 600;
-  color: var(--color-text-inverse);
 }
 
-.profile-tip {
-  margin-top: 12rpx;
-  font-size: 24rpx;
-  color: rgba(255, 255, 255, 0.75);
+.cu-prof-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 10rpx;
 }
 
-.profile-action {
-  padding: 0 32rpx;
+.cu-level {
+  padding: 2rpx 14rpx;
+  font-size: var(--font-xs);
+  color: #7a5230;
+  background: linear-gradient(90deg, #f6e0b5, #e9c98c);
+  border-radius: 20rpx;
+}
+
+.cu-code {
+  margin-left: 16rpx;
+  padding: 4rpx 16rpx;
+  font-size: var(--font-xs);
+  border: 2rpx solid currentColor;
+  border-radius: 24rpx;
+}
+
+.cu-prof-act {
+  flex-shrink: 0;
+  padding: 0 30rpx;
   height: 58rpx;
   line-height: 58rpx;
   font-size: 26rpx;
@@ -50,239 +147,150 @@
   border-radius: 29rpx;
 }
 
-/* ---------- 通用卡片 ---------- */
-.card {
-  margin: -40rpx 24rpx 20rpx;
-  padding: 24rpx;
-  background: var(--color-bg-card);
-  border-radius: 16rpx;
-}
-
-.tool-card,
-.service-card,
-.version {
-  margin-top: 0;
-}
-
-.card-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-bottom: 20rpx;
-}
-
-.card-title {
-  font-size: 30rpx;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.card-more {
-  font-size: 24rpx;
-  color: var(--color-text-secondary);
-}
-
-/* ---------- 订单入口 ---------- */
-.order-tabs {
-  display: flex;
-}
-
-.order-tab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16rpx 0;
-}
-
-.order-tab-hover {
-  opacity: 0.7;
-}
-
-.order-icon {
-  width: 56rpx;
-  height: 56rpx;
-  border-radius: 12rpx;
-  background: var(--color-primary-light);
-  border: 2rpx solid #F5C4B3;
-}
-
-.order-label {
-  margin-top: 14rpx;
-  font-size: 24rpx;
-  color: var(--color-text);
-}
-
-/* ---------- 工具网格 ---------- */
-.tool-grid {
-  display: flex;
-  flex-wrap: wrap;
-}
-
-.tool-item {
-  width: 33.33%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 24rpx 0;
-}
-
-.tool-hover {
-  opacity: 0.7;
-}
-
-.tool-icon {
-  width: 80rpx;
-  height: 80rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg);
-  border-radius: 50%;
-}
-
-.tool-icon-text {
-  font-size: 28rpx;
-  color: var(--color-text-secondary);
-}
-
-.tool-label {
-  margin-top: 14rpx;
-  font-size: 24rpx;
-  color: var(--color-text);
-}
-
-/* ---------- 客服 ---------- */
-.service-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.cell-hover {
-  opacity: 0.75;
-}
-
-.service-text {
-  font-size: 28rpx;
-  color: var(--color-text);
-}
-
-.service-arrow {
-  font-size: 32rpx;
-  color: var(--color-text-placeholder);
-}
-
-/* ---------- 版本 ---------- */
-.version {
-  padding: 40rpx 0 0;
-  text-align: center;
-  font-size: 22rpx;
-  color: var(--color-text-placeholder);
-}
-
-/* ---------- 资产（本期隐藏：积分/余额/会员卡页面未交付，样式先留着） ---------- */
-.asset-card {
-  display: flex;
-  margin-top: 20rpx;
-}
-
-.asset-item {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 32rpx 0;
-}
-
-.asset-hover {
-  background: #fafafa;
-}
-
-.asset-num {
-  font-size: 34rpx;
-  font-weight: 600;
-  color: var(--color-text);
-}
-
-.asset-label {
-  margin-top: 10rpx;
-  font-size: 24rpx;
-  color: #666666;
-}
-
-/* ---------- 头像占位 / 退出按钮 ---------- */
-.avatar-ph {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatar-ph-text {
-  font-size: 44rpx;
-  color: rgba(255, 255, 255, 0.85);
-}
-
-.profile-action.ghost {
+.cu-prof-act.ghost {
   color: rgba(255, 255, 255, 0.9);
   background: transparent;
   border: 2rpx solid rgba(255, 255, 255, 0.5);
 }
 
-/* ---------- 店铺信息 ---------- */
-/* 卡片首屏的 -40rpx 上移只用于第一张卡（与头像区叠压）；后续卡片统一 0，靠上边距自然分隔 */
-.shop-card {
-  margin-top: 0;
+/* 会员栏：三种样式只差「是否有底色 / 圆角 / 上边线」 */
+.cu-prof-bar {
+  position: relative;
+  z-index: 1;
+  margin-top: 28rpx;
+  height: 60rpx;
 }
 
-.shop-row {
+.cu-prof-bar.s1 {
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 30rpx;
+}
+
+.cu-prof-bar.s2 {
+  background: transparent;
+  border-top: 2rpx solid rgba(255, 255, 255, 0.4);
+}
+
+.cu-prof-bar.s3 {
+  background: rgba(0, 0, 0, 0.06);
+  border-radius: 8rpx;
+}
+
+/* ================= 个人资产 ================= */
+.cu-stats {
+  margin: 20rpx 0;
+  padding: 24rpx 16rpx;
+  background: var(--color-bg-card);
+}
+
+.cu-stats-grid {
   display: flex;
-  align-items: center;
+  flex-wrap: wrap;
 }
 
-.shop-logo {
-  width: 96rpx;
-  height: 96rpx;
-  border-radius: 12rpx;
-  background: var(--color-bg);
-  flex-shrink: 0;
-}
-
-.shop-logo-ph {
-  border: 2rpx solid var(--color-border, #eeeeee);
-}
-
-.shop-info {
+.cu-stat {
   flex: 1;
-  min-width: 0;
+  min-width: 25%;
   display: flex;
   flex-direction: column;
-  margin-left: 20rpx;
+  align-items: center;
+  padding: 12rpx 0;
 }
 
-.shop-name {
+.cu-stat-v {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cu-stat-u {
+  margin-left: 4rpx;
+  font-size: var(--font-xs);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.cu-stat-l {
+  margin-top: 10rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ================= 我的订单 ================= */
+.cu-order {
+  margin: 20rpx 0;
+  padding: 24rpx 16rpx;
+  background: var(--color-bg-card);
+}
+
+.cu-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16rpx 20rpx;
+}
+
+.cu-hd-t {
   font-size: 30rpx;
   font-weight: 600;
   color: var(--color-text);
 }
 
-.shop-slogan {
-  margin-top: 8rpx;
-  font-size: 24rpx;
+.cu-hd-more {
+  font-size: var(--font-sm);
   color: var(--color-text-secondary);
 }
 
-.shop-tip {
-  display: block;
-  margin-top: 20rpx;
-  font-size: 22rpx;
-  line-height: 1.6;
-  color: var(--color-text-placeholder);
+.cu-order-grid {
+  display: flex;
+  flex-wrap: wrap;
 }
 
-/* 客服按钮：`<button>` 自带边框与内边距，必须清掉才能与旁边的工具项对齐 */
-.tool-btn {
-  padding: 0;
+.cu-order-it {
+  flex: 1;
+  min-width: 20%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12rpx 0;
+}
+
+.cu-order-ic {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+  color: var(--color-primary);
+  background: var(--color-primary-light);
+  border-radius: 12rpx;
+}
+
+.cu-order-lb {
+  margin-top: 12rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text);
+}
+
+/* ================= 必备工具 ================= */
+.cu-tools {
+  margin: 20rpx 0;
+  padding: 16rpx 8rpx;
+  background: var(--color-bg-card);
+}
+
+.cu-tools-grid {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.cu-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24rpx 0;
+  /* `<button>` 自带边框、内边距与行高，必须清掉才能与旁边的 view 对齐 */
   margin: 0;
   background: transparent;
   border: 0;
@@ -291,7 +299,112 @@
   color: inherit;
 }
 
-.tool-btn::after {
+.cu-tool::after {
   border: 0;
 }
 
+.cu-tool-ic {
+  width: 80rpx;
+  height: 80rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border-radius: 50%;
+}
+
+/* 九宫格版：图标换成圆角方块，底色更浅 */
+.cu-tools.cube .cu-tool-ic {
+  border-radius: 20rpx;
+  background: var(--color-bg-muted);
+}
+
+/* 线框版：去掉底色，只留描边 */
+.cu-tool.line .cu-tool-ic {
+  background: transparent;
+  border: 2rpx solid var(--color-border);
+}
+
+.cu-tool-lb {
+  margin-top: 14rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text);
+}
+
+/* ================= 文本 ================= */
+.cu-text {
+  margin: 12rpx 0;
+}
+
+.cu-text-in {
+  display: flex;
+  padding: 20rpx 24rpx;
+  border-radius: var(--radius-base);
+}
+
+.cu-text-t {
+  flex: 1;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.cu-text-in.s-sm {
+  font-size: var(--font-sm);
+}
+
+.cu-text-in.s-md {
+  font-size: var(--font-base);
+}
+
+.cu-text-in.s-lg {
+  font-size: var(--font-xl);
+}
+
+.cu-split {
+  height: 2rpx;
+  background: var(--color-border);
+}
+
+/* ================= 关联链接 ================= */
+.cu-links {
+  margin: 12rpx 0;
+  background: var(--color-bg-card);
+}
+
+.cu-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 28rpx 24rpx;
+  border-bottom: 2rpx solid var(--color-border);
+}
+
+.cu-link-t {
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.cu-link-a {
+  font-size: 32rpx;
+  color: var(--color-text-placeholder);
+}
+
+/* ================= 关注公众号 / 依赖说明 ================= */
+.cu-oa {
+  margin: 12rpx 0;
+}
+
+.cu-dep {
+  padding: 12rpx 16rpx 0;
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
+}
+
+.cu-empty-chk {
+  padding: 24rpx;
+  text-align: center;
+  font-size: var(--font-sm);
+  color: var(--color-text-placeholder);
+}

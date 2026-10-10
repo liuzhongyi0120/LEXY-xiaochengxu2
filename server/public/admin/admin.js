@@ -132,7 +132,9 @@
     sel: '__root__',
     dirty: false,
     pvBrand: 0,
-    lib: null,          // 组件库（来自后端）
+    lib: null,          // 当前页面在用的组件库（页面级优先，见 usePageLib）
+    globalLib: null,    // 全局组件库（首页 / 自定义页 / 固定结构页用）
+    pageLibs: {},       // 页面级组件库（按页面 key 索引，目前只有「我的」）
     libTab: 'common',
     common: [],         // 常用组件（localStorage 可自定义）
     device: 375,
@@ -372,6 +374,8 @@
       S.custom = d.custom || null;
       if (d.templates && d.templates.length) S.templates = d.templates;
       if (d.lib) {
+        S.globalLib = d.lib;          // 全局组件库（首页 / 自定义页用）
+        S.pageLibs = d.pageLibs || {}; // 页面级组件库（目前只有「我的」）
         S.lib = d.lib;
         if (!S.common.length) {
           var saved = null;
@@ -565,6 +569,7 @@
       S.pvBrand = 0;
       S.pvSlide = {}; // 预览翻页位置是页面级状态，切页要清掉
       showEdit();
+      usePageLib(key);
       $('edName').textContent = d.meta.name;
       $('edPath').textContent = d.meta.path;
       $('phTitle').textContent = d.meta.name;
@@ -701,6 +706,23 @@
     return hit;
   }
 
+  /**
+   * 切到某个页面时选定它该用哪份组件库。
+   *
+   * 「我的」= 个人中心，有赞那边就是**另一份独立清单**（基础 7 / 营销 2 / 其他 11），
+   * 不能和首页那 57 种混在一起 —— 混了运营就会以为个人中心能放电梯导航。
+   * 没声明页面级 lib 的页面（首页 / 自定义页 / 莱克 / 资讯 / 产品）继续用全局组件库。
+   */
+  function usePageLib(key) {
+    var own = (S.pageLibs || {})[key];
+    var next = own || S.globalLib || S.lib;
+    if (!next) return;
+    S.lib = next;
+    // tab 只在「当前这份库」里选；否则从首页切到我的时 libTab 还停在 basic，会渲染成空列表
+    var keys = (next.tabs || []).map(function (t) { return t.key; });
+    if (keys.indexOf(S.libTab) === -1) S.libTab = keys[0] || 'common';
+  }
+
   function renderLib() {
     var lib = S.lib;
     if (!lib) return;
@@ -718,6 +740,10 @@
     var meta = lib.tabs.filter(function (t) { return t.key === S.libTab; })[0] || {};
     var items = [];
 
+    /* 「添加常用组件」只对带「常用组件」tab 的组件库有意义（个人中心没有这一 tab） */
+    var hasCommon = !!(lib.tabs || []).filter(function (t) { return t.key === 'common'; })[0];
+    if ($('btnAddCommon')) $('btnAddCommon').hidden = !hasCommon;
+
     if (S.libTab === 'common') {
       desc.textContent = meta.desc || '';
       S.common.forEach(function (k) {
@@ -728,7 +754,12 @@
     } else {
       var src = lib[S.libTab] || [];
       desc.textContent = (meta.desc || '') + '（共 ' + src.length + ' 个，高亮为本后台已接入、可直接添加）';
-      var useGroups = S.libTab === 'basic' && (lib.groups || []).length;
+      /*
+       * 按分组渲染的条件由**数据声明**（`tabs[i].grouped`），不再写死 tab 名：
+       * 全局组件库只有「基础组件」这一 tab 带分组，个人中心那一个 tab 自带 4 组。
+       * 写死 'basic' 时，个人中心的分组结构整个渲染不出来（只剩空列表）。
+       */
+      var useGroups = !!meta.grouped && (lib.groups || []).length;
       var pushOne = function (x) {
         var kind = x.kind ? (lib.kinds || []).filter(function (y) { return y.kind === x.kind; })[0] : null;
         // 只有「声明了 ok 且 schema 里真有这个 kind」才算已接入，二者缺一不可

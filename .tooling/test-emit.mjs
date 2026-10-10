@@ -53,7 +53,7 @@ const expect = Object.assign({}, orig, {
    漏检的话「改个导航配色把别的字段写坏」这种事故不会被发现。
    注意 nav 页的 from() 会把「replica 里没有 TABBAR」归一成默认值，
    所以原文件没有 TABBAR 时，基准要补上同一份默认值。 */
-const keys = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS', 'PAGE_META', 'TABBAR'];
+const keys = ['SHOP', 'HOME_BLOCKS', 'MINE_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS', 'PAGE_META', 'TABBAR'];
 if (orig.TABBAR === undefined) expect.TABBAR = schema.normalizeTabbar(undefined);
 
 /* 自定义页与别名表：只在「生成侧或原文件侧出现过」时才比 ——

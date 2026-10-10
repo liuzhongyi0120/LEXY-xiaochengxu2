@@ -1,89 +1,23 @@
-<view class="page" style="background: {{pageBg}};">
-  <!-- ---------- 用户信息（个人资料，与店铺信息分开） ---------- -->
-  <view class="profile">
-    <image wx:if="{{profile.avatar}}" class="avatar" src="{{profile.avatar}}" mode="aspectFill" />
-    <view wx:else class="avatar avatar-ph"><text class="avatar-ph-text">我</text></view>
-    <view class="profile-info">
-      <text class="nickname">{{logged ? (profile.nickname || '微信用户') : '未登录'}}</text>
-      <text class="profile-tip">{{logged ? '已登录，可同步订单与购物车' : '登录后可同步订单与购物车'}}</text>
-    </view>
-    <view class="profile-action" bindtap="onTapLogin" wx:if="{{!logged}}">{{logging ? '登录中…' : '登录'}}</view>
-    <view class="profile-action ghost" bindtap="onTapLogout" wx:else>退出</view>
-  </view>
+<!--
+  「我的」（个人中心）—— 装修区块流页面
 
-  <!-- ---------- 订单入口（订单/付款不在本轮整改范围，暂保留原状） ---------- -->
-  <view class="card">
-    <view class="card-head">
-      <text class="card-title">我的订单</text>
-      <text class="card-more" data-status="ALL" bindtap="onTapOrder">全部订单 ›</text>
-    </view>
+  对标有赞「个人中心装修」：整页由 replica.MINE_BLOCKS 的区块驱动，
+  区块渲染与首页 / 自定义页共用 templates/blocks.wxml 一份实现。
 
-    <view class="order-tabs">
-      <view
-        class="order-tab"
-        wx:for="{{orderTabs}}"
-        wx:key="key"
-        data-status="{{item.key}}"
-        bindtap="onTapOrder"
-        hover-class="order-tab-hover"
-      >
-        <view class="order-icon"></view>
-        <text class="order-label">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
+  曾经这里是硬编码页面（头像 + 订单 + 店铺信息 + 常用功能），
+  装修台虽然列出「我的」却加不了任何组件 —— 现在改成区块流后两者合一：
+  结构与文案在装修台里配，登录 / 退出 / 客服 / 订单跳转等**真实交互仍然保留**。
+-->
+<view class="page" style="background: {{meta.bg || '#FFFFFF'}};">
 
-  <!-- ---------- 店铺信息（来自装修后台，与个人资料分开显示） ---------- -->
-  <view class="card shop-card">
-    <view class="card-head">
-      <text class="card-title">店铺信息</text>
-    </view>
-    <view class="shop-row">
-      <image wx:if="{{shop.avatar}}" class="shop-logo" src="{{shop.avatar}}" mode="aspectFill" />
-      <view wx:else class="shop-logo shop-logo-ph"></view>
-      <view class="shop-info">
-        <text class="shop-name">{{shop.name}}</text>
-        <text class="shop-slogan" wx:if="{{shop.slogan}}">{{shop.slogan}}</text>
-      </view>
-    </view>
-    <text class="shop-tip">店铺资料由装修后台维护，修改后需重新发布小程序版本才在真机生效</text>
-  </view>
+  <!-- 装修数据一个区块都没有（运营把区块全删了又还没点「生成代码」时才会出现） -->
+  <empty-state
+    wx:if="{{!blocks.length}}"
+    text="个人中心还没有内容"
+    desc="请到装修台「我的」页面添加区块，然后点「生成代码」写回小程序配置"
+  />
 
-  <!-- ---------- 常用功能（只保留本期真实可用的入口） ---------- -->
-  <view class="card tool-card">
-    <view class="card-head">
-      <text class="card-title">常用功能</text>
-    </view>
-
-    <view class="tool-grid">
-      <!-- 微信客服会话：真实可用的入口，不再用「开发中」占位 -->
-      <button
-        class="tool-item tool-btn"
-        open-type="contact"
-        hover-class="tool-hover"
-        hover-stay-time="80"
-      >
-        <view class="tool-icon">
-          <text class="tool-icon-text">服</text>
-        </view>
-        <text class="tool-label">联系客服</text>
-      </button>
-
-      <view
-        class="tool-item"
-        wx:for="{{tools}}"
-        wx:key="key"
-        data-key="{{item.key}}"
-        bindtap="onTapTool"
-        hover-class="tool-hover"
-      >
-        <view class="tool-icon">
-          <text class="tool-icon-text">{{item.icon}}</text>
-        </view>
-        <text class="tool-label">{{item.label}}</text>
-      </view>
-    </view>
-  </view>
+  <include src="../../templates/blocks.wxml" />
 
   <view class="version">{{shop.name}} · {{version}}</view>
 </view>

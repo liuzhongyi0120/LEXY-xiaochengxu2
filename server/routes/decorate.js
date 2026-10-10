@@ -47,7 +47,10 @@ module.exports = [
         stats: decorate.stats(),
         custom: decorate.customStats(),
         templates: decorate.templates(),
-        lib: schema.componentLib()
+        lib: schema.componentLib(),
+        /* 页面级组件库：目前只有「我的」（个人中心）自带一份独立清单。
+           按 key 下发而不是塞进 list，是为了不把 25 个条目乘上页面数一起灌给前端。 */
+        pageLibs: schema.pageLibs()
       };
     }
   },

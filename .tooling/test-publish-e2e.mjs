@@ -50,6 +50,14 @@ console.log('[1] 读取首页当前状态');
 const page = await api('/api/decorate/page?key=home');
 const beforeBg = page.data.meta.bg;
 const beforeBlocks = page.data.blocks.length;
+
+/* PAGE_META 的期望键集 = 内置 5 页 + 当前 replica 里的自定义页（**不含**店铺导航）。
+   ⚠️ 不写死「5」：自定义页也进 PAGE_META，运营建一个页面这个数字就变。
+      锁「等于内置 + 自定义」才是这条断言要保证的等价关系。 */
+const wantMetaKeys = (R) => ['home', 'lexy', 'news', 'product', 'mine']
+  .concat(Object.keys(R.CUSTOM_PAGES || {}))
+  .sort().join(',');
+const metaKeys = (R) => Object.keys(R.PAGE_META || {}).sort().join(',');
 const beforeVersion = page.versions[0] && page.versions[0].id;
 console.log(`    背景=${beforeBg} 区块=${beforeBlocks} 最新版本=${beforeVersion}`);
 ok(beforeBg === ORIG, '初始背景为 ' + ORIG, beforeBg);
@@ -77,7 +85,7 @@ ok(pub.ok === true, '发布成功，版本 ' + pub.versionId, pub.versionId);
 console.log('[6] 核对 replica.js（发布后）');
 R = readReplica();
 ok(R.PAGE_META.home.bg === TEST, 'PAGE_META.home.bg 写回为 ' + TEST, R.PAGE_META.home.bg);
-ok(Object.keys(R.PAGE_META).length === 5, 'PAGE_META 仍为 5 个页面', Object.keys(R.PAGE_META).join(','));
+ok(metaKeys(R) === wantMetaKeys(R), 'PAGE_META 键集仍为「内置 5 页 + 自定义页」（发布不丢键）', Object.keys(R.PAGE_META).join(','));
 ok(R.HOME_BLOCKS.length === beforeBlocks, 'HOME_BLOCKS 区块数与发布前一致（' + beforeBlocks + '）', String(R.HOME_BLOCKS.length));
 /*
  * 导出字段：6 个内置字段 + PAGE_META + TABBAR（店铺导航）。
@@ -85,10 +93,21 @@ ok(R.HOME_BLOCKS.length === beforeBlocks, 'HOME_BLOCKS 区块数与发布前一�
  * 所以任何一次发布都会把它显式写进 replica.js（详见 decorate/emit.js 的说明）。
  * 这里断言「不多不少」，防止发布链路凭空多出/丢掉字段。
  */
-ok(Object.keys(R).length === 8 &&
-  ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS', 'PAGE_META', 'TABBAR']
-    .every((k) => Object.keys(R).indexOf(k) > -1),
-  'module.exports 恰为 8 个字段（6 内置 + PAGE_META + TABBAR）', Object.keys(R).join(','));
+/*
+ * 导出字段：9 个内置字段 + 可选的自定义页字段。
+ * MINE_BLOCKS 是 2026-10-10 加的（「我的」页升级为区块流页）—— 它在 emit.js 的 need 列表里，
+ * 新增页面时同步改这里，防止发布链路凭空多出/丢掉字段。
+ */
+{
+  const CORE = ['SHOP', 'HOME_BLOCKS', 'MINE_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS', 'PAGE_META', 'TABBAR'];
+  const OPTIONAL = ['CUSTOM_PAGES', 'CUSTOM_PAGE_ALIASES'];
+  const actual = Object.keys(R);
+  const missingCore = CORE.filter((k) => actual.indexOf(k) < 0);
+  const unknown = actual.filter((k) => CORE.indexOf(k) < 0 && OPTIONAL.indexOf(k) < 0);
+  ok(missingCore.length === 0 && unknown.length === 0,
+    'module.exports = 9 个内置字段（含 MINE_BLOCKS）+ 自定义页字段，不多不少',
+    (missingCore.length ? '缺 ' + missingCore.join(',') : '') + (unknown.length ? ' 多出 ' + unknown.join(',') : '') || actual.join(','));
+}
 ok(R.TABBAR && R.TABBAR.items.length >= 2 && R.TABBAR.items.length <= 5,
   'TABBAR 结构合法（2~5 项）', R.TABBAR ? String(R.TABBAR.items.length) : 'undefined');
 
@@ -103,7 +122,7 @@ ok(rb.published && rb.published.ok, '回滚并发布成功 → ' + (rb.published
 console.log('[9] 核对已还原');
 R = readReplica();
 ok(R.PAGE_META.home.bg === ORIG, 'PAGE_META.home.bg 已还原为 ' + ORIG, R.PAGE_META.home.bg);
-ok(Object.keys(R.PAGE_META).length === 5, 'PAGE_META 仍为 5 个页面（回滚不丢键）', Object.keys(R.PAGE_META).join(','));
+ok(metaKeys(R) === wantMetaKeys(R), 'PAGE_META 键集仍为「内置 5 页 + 自定义页」（回滚不丢键）', Object.keys(R.PAGE_META).join(','));
 ok(R.HOME_BLOCKS.length === beforeBlocks, 'HOME_BLOCKS 区块数回滚后仍一致（' + beforeBlocks + '）', String(R.HOME_BLOCKS.length));
 
 const st = JSON.parse(fs.readFileSync('C:/Users/8274282/WorkBuddy/2026-10-07-13-19-01/server/data/decorate/state.json', 'utf8'));

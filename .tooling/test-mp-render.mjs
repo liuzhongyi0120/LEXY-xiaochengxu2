@@ -78,7 +78,13 @@ const html = Wxml.render(Wxml.parse(fixture), Wxml.makeScope({
 }), {});
 ok('wx:for 展开 + wx:for-item/index 起作用', (html.match(/class="item/g) || []).length === 2);
 ok('{{}} 三元表达式在属性里求值（第一条加 first）', /class="item first"/.test(html));
-ok('wx:if / wx:else 同级链只出一条', html.indexOf('/a.jpg') > -1 && html.indexOf('class="ph"') > -1);
+/* ⚠️ 这条曾经是弱断言（只查「两个串都在」）—— 条件链写反时，真机上会出现
+ * 「有图的项既有 <img> 又有占位、无图的项两个都没有」，两个串依然都在，查不出来。
+ * 必须按「每个列表项二选一」的**互斥**口径来锁：有图 1 张、占位 1 个。 */
+const nImg = (html.match(/\/a\.jpg/g) || []).length;
+const nPh = (html.match(/class="ph"/g) || []).length;
+ok('wx:if / wx:else 同级链每个列表项二选一（图 1 张 / 占位 1 个，互斥）',
+  nImg === 1 && nPh === 1, 'img=' + nImg + ' ph=' + nPh);
 ok('含裸 && 的条件表达式不报错且成立于真', html.indexOf('AND') > -1);
 ok('内联样式里的 {{}} 被替换', /background: #fff/.test(html));
 ok('image → img 且 mode 落到 data-mode', /<img[^>]+data-mode="aspectFit"/.test(html));
@@ -89,6 +95,36 @@ ok('模板中的 bindtap / hover-class / data-* 不进产物',
 ok('编译期统计全 0（表达式失败 / 未支持组件 / include 未解析）',
   Wxml.stats.exprFail === 0 && Wxml.stats.unsupportedTag === 0 && Wxml.stats.missingInclude === 0,
   JSON.stringify(Wxml.stats.samples));
+
+/* --------------------- 3b. wx:if / elif / else 三级条件链 ---------------------
+ * 这段逻辑**曾经写反过**：条件为假时把链标记成「已命中」、命中后标记成「未命中」。
+ * 后果是真机上：
+ *   · wx:if 为真 → if 分支与 else 分支**同时**渲染（重复内容）；
+ *   · wx:if 为假 → 两个分支**都不**渲染（整块空白）。
+ * 「必备工具」在 /preview 里整块空白、官方账号区块内容错位，根因就是它。
+ *
+ * 上面那条「每个列表项二选一」的断言是**间接**的（要看 fixture 恰好一真一假才暴露），
+ * 这里用 A/B/C 三态隔离用例把语义直接钉死 —— 否则以后有人再改坏，可能又被绕过去。
+ * ------------------------------------------------------------------------- */
+const stripTags = (h) => h.replace(/<[^>]*>/g, '').trim();
+const chain3 = (a, b) => stripTags(Wxml.render(Wxml.parse(
+  '<view><view wx:if="{{a}}">A</view><view wx:elif="{{b}}">B</view><view wx:else>C</view></view>'
+), Wxml.makeScope({ a: a, b: b }), {}));
+console.log('\n【3b】wx:if / wx:elif / wx:else 三级条件链');
+ok('wx:if 命中 → 只渲染 if 分支（底下的 elif / else 都必须让位）', chain3(1, 0) === 'A', chain3(1, 0));
+ok('wx:elif 命中 → 只渲染 elif 分支', chain3(0, 1) === 'B', chain3(0, 1));
+ok('全部为假 → 只渲染 else 分支（不能整块空白）', chain3(0, 0) === 'C', chain3(0, 0));
+ok('wx:if 与 wx:elif 同时为真 → if 优先，elif 不重复出', chain3(1, 1) === 'A', chain3(1, 1));
+/* 链状态不能跨节点串台：两条各自独立的 wx:if 都必须出（这是最容易写坏的一种） */
+const twoIf = stripTags(Wxml.render(Wxml.parse(
+  '<view><view wx:if="{{a}}">A</view><view wx:if="{{b}}">B</view></view>'
+), Wxml.makeScope({ a: 1, b: 1 }), {}));
+ok('两条独立 wx:if 各自成立 → 两条都渲染（链状态不跨节点串台）', twoIf === 'AB', twoIf);
+/* 兄弟节点混入无关标签后，链仍要正确（真机模板里 if/else 之间常有注释或换行） */
+const withNoise = stripTags(Wxml.render(Wxml.parse(
+  '<view><view wx:if="{{a}}">A</view><view wx:else>C</view><text>Z</text></view>'
+), Wxml.makeScope({ a: 0 }), {}));
+ok('wx:if 为假且链后还有别的节点 → 出 else 分支 + 后续节点', withNoise === 'CZ', withNoise);
 
 /* --------------- 4. 用真机 product.wxss 做端到端对账 --------------- */
 console.log('\n【4】真机 product.wxss → 预览 CSS 端到端对账');

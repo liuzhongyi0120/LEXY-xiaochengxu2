@@ -1605,6 +1605,190 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
 }
 
 /* ---------------------------------------------------------------------------
+ * 15.79 个人中心（「我的」页）装修能力
+ *
+ * 为什么必须有这一组：
+ *   「我的」原来是个**硬编码页面**，装修台里列着它却加不了任何组件 ——
+ *   运营点「使用组件」全都弹「该页面暂不支持添加组件」。这次把它升级成区块流页
+ *   （对标有赞 usercenter-decorate），等于给一条新链路的每个环节都埋了坑：
+ *     · schema 加了 9 种区块 → wxml / blocks.js / pv-render 少一处就是「真机空白」；
+ *     · 新增 replica.MINE_BLOCKS 字段 → emit 三处不同步，发布任意页面都会 5000；
+ *     · 组件库限定 25 个 → 若与 union 的 kinds 不一致，就出现「能加但库里找不到」；
+ *     · 必备工具 21 项 → 图标/是否可跳只存在于服务端，两侧各写一份必然走样。
+ *   所以这一组把「区块类型 ↔ 五处渲染 ↔ 字段落盘 ↔ 组件库范围 ↔ 页面交互」串起来对账。
+ *
+ * 数据来源：2026-10-10 用真实浏览器抓有赞「个人中心装修」页面
+ *   （模板二的 7 个区块、添加组件 20 个分 3 组、必备工具 20 个插件的默认勾选、
+ *     window['__design-value__'] 的逐字段默认值），见 server/decorate/yzUserCenter.js 的文件头。
+ * ------------------------------------------------------------------------- */
+{
+  const UC_KINDS = ['uc_navbar', 'uc_profile', 'uc_stats', 'uc_order', 'uc_tools', 'text', 'link', 'blank', 'follow_oa'];
+  const mineKinds = schemaMod.MINE_BLOCK_KINDS || {};
+  const homeKinds = schemaMod.HOME_BLOCK_KINDS || {};
+  /* 这几个在 15.78 里是**块级 const**（出了那个块就没了），这里按需重新读一次 */
+  const blocksWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+  const pvRendSrc = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+  const adminJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+
+  /* (1) 「我的」= 首页区块 + 9 种个人中心专属区块；且首页那份**不被污染**
+   *     （污染了首页组件库就会冒出「个人信息 / 必备工具」这些只属于个人中心的组件） */
+  const leaked = UC_KINDS.filter((k) => homeKinds[k]);
+  const missingKinds = UC_KINDS.filter((k) => !mineKinds[k]);
+  assert('「我的」页区块类型 = 首页 57 种 + 个人中心专属 9 种，且首页区块表未被污染',
+    leaked.length === 0 && missingKinds.length === 0 && Object.keys(mineKinds).length === Object.keys(homeKinds).length + 9,
+    (leaked.length ? `首页多出：${leaked.join(', ')}` : '') +
+    (missingKinds.length ? ` 我的缺：${missingKinds.join(', ')}` : '') ||
+    `首页 ${Object.keys(homeKinds).length} 种 + 专属 9 种 = ${Object.keys(mineKinds).length} 种`);
+
+  /* (2) 9 种新区块的「五处齐备」：wxml 分支 / blocks.js 派生值 / pv-render 分支 / 中文角标
+   *
+   * ⚠️ 预览那一条必须查 **UC_PARTS 的成员**而不是「源码里出现过 `kind === 'text'`」：
+   *    pvUserCenter 内部本来就是一串 `if (kind === 'x')`，只查这一条的话，
+   *    就算把某个类型从 UC_PARTS 摘掉（= 预览里渲染成空白块），断言照样是绿的。
+   *    这一条**用故意摘掉 UC_PARTS 里的 text 验过能报红**，别再放宽。 */
+  const ucBlocksJs = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+  const noWxml = UC_KINDS.filter((k) => blocksWxml.indexOf(`block.type === '${k}'`) < 0);
+  const noNormalize = UC_KINDS.filter((k) => ucBlocksJs.indexOf(`kind === '${k}'`) < 0);
+  const ucPartsSrc = /var UC_PARTS = \{([\s\S]*?)\};/.exec(pvRendSrc)[1];
+  const noPv = UC_KINDS.filter((k) => ucPartsSrc.indexOf(k + ':') < 0);
+  const noLabel = UC_KINDS.filter((k) => !/var KIND_LABEL = \{([\s\S]*?)\};/.exec(pvRendSrc)[1].includes(k + ':'));
+  assert('个人中心 9 种新区块的渲染分支五处齐备（schema / wxml / blocks.js / pv-render / 中文角标）',
+    noWxml.length + noNormalize.length + noPv.length + noLabel.length === 0 &&
+    /UC_PARTS\[kind\]/.test(pvRendSrc) && /pvUserCenter\(b, kind\)/.test(pvRendSrc),
+    (noWxml.length ? `wxml 缺：${noWxml.join(', ')}` : '') +
+    (noNormalize.length ? ` blocks.js 缺：${noNormalize.join(', ')}` : '') +
+    (noPv.length ? ` 预览未登记：${noPv.join(', ')}` : '') +
+    (noLabel.length ? ` 角标缺：${noLabel.join(', ')}` : '') ||
+    `${UC_KINDS.length} 种新区块四处渲染 + 中文角标全部就位`);
+
+  /* (3) 「我的」页必须是区块流页（has blocks 节点）——
+   *     不是区块流时装修台会整栏收起组件库，等于「这个页还是不能装修」。 */
+  const mineDef = (schemaMod.allPages() || []).filter((p) => p.key === 'mine')[0];
+  assert('「我的」页已升级为区块流页（装修台会展示组件库，而不是整栏收起）',
+    !!mineDef && !!schemaMod.MINE_BLOCKS_NODE && mineDef.root.fields.some((f) => f.k === 'blocks'),
+    mineDef ? `source = ${mineDef.source}` : '找不到 mine 页定义');
+
+  /* (4) 组件库：照有赞「添加组件」= 4 组 25 项（基础 7 / 营销 2 / 其他 11 / 专属 5），
+   *     且**每一项都指向真实存在的 kind**（否则卡片上会挂「未接入」角标）。 */
+  const ucLib = schemaMod.mineComponentLib();
+  const gotUcGroups = (ucLib.groups || []).map((g) => g.name + ':' + g.items.length);
+  const ghostUc = (ucLib.kinds || []).filter((x) => !mineKinds[x.kind]).map((x) => x.label);
+  assert('个人中心组件库 = 有赞实测 4 组 25 项（基础 7 / 营销 2 / 其他 11 / 专属区块 5），且每项都有真实区块类型',
+    gotUcGroups.join('|') === '基础组件:7|营销组件:2|其他:11|专属区块:5' && ghostUc.length === 0 && ucLib.total === 25,
+    ghostUc.length ? `无对应区块类型：${ghostUc.join(', ')}` : `实际 ${gotUcGroups.join(' ')}，共 ${ucLib.total} 项`);
+
+  /* (5) 「页面区块」联合类型的 kinds 必须与组件库严格同集：
+   *     放宽到 66 种 → 区块树里能加出组件库里找不到的组件；收窄 → 默认区块的属性面板打不开。 */
+  const unionKinds = Object.keys(schemaMod.MINE_UNION_KINDS || {});
+  const libKinds = (ucLib.kinds || []).map((x) => x.kind);
+  const onlyUnion = unionKinds.filter((k) => libKinds.indexOf(k) < 0);
+  const onlyLib = libKinds.filter((k) => unionKinds.indexOf(k) < 0);
+  assert('「我的」页区块联合类型与组件库放行清单严格同集（25 种）',
+    onlyUnion.length === 0 && onlyLib.length === 0 && unionKinds.length === 25,
+    (onlyUnion.length ? `联合类型多出：${onlyUnion.join(', ')}` : '') +
+    (onlyLib.length ? ` 组件库多出：${onlyLib.join(', ')}` : '') ||
+    `${unionKinds.length} 种一一对应`);
+
+  /* (6) 默认区块（照有赞模板二）必须全部落在放行清单内，否则一进编辑器就有区块打不开属性面板 */
+  const defBlocks = schemaMod.UC_DEFAULT_BLOCKS || [];
+  const defOut = defBlocks.filter((b) => !mineKinds[b.type]).map((b) => b.type);
+  assert('个人中心默认区块（照有赞模板二 7 个）全部落在放行清单内',
+    defOut.length === 0 && defBlocks.length === 7,
+    defOut.length ? `越界：${defOut.join(', ')}` : `${defBlocks.length} 个默认区块：${defBlocks.map((b) => b.type).join(' → ')}`);
+
+  /* (7) 发布链路：replica.MINE_BLOCKS 必须真的存在、且写回端三处同步
+   *     （emit 的 need / 输出段 / fields 任一漏掉，发布任意页面都会因缺字段抛 5000）。 */
+  const replica = requireFromHere(join(MP_ROOT, 'config', 'replica.js'));
+  const emitSrc = readFileSync(join(__dirname, '..', 'decorate', 'emit.js'), 'utf8');
+  const emitNeed = /const need = \[([^\]]*)\]/.exec(emitSrc)[1];
+  const emitFields = /const fields = \[([^\]]*)\]/.exec(emitSrc)[1];
+  const testEmitSrc = readFileSync(join(__dirname, '..', '..', '.tooling', 'test-emit.mjs'), 'utf8');
+  assert('replica.MINE_BLOCKS 已落盘，且发布器三处（need / 输出 / fields）与往返测试都已同步',
+    Array.isArray(replica.MINE_BLOCKS) && replica.MINE_BLOCKS.length > 0 &&
+    emitNeed.includes("'MINE_BLOCKS'") && emitSrc.indexOf('const MINE_BLOCKS = ') > 0 &&
+    emitFields.includes("'MINE_BLOCKS'") && testEmitSrc.includes("'MINE_BLOCKS'"),
+    `replica.MINE_BLOCKS = ${Array.isArray(replica.MINE_BLOCKS) ? replica.MINE_BLOCKS.length + ' 个区块' : '缺失'}`);
+
+  /* (8) 必备工具：真机图标表(TOOL_META) 与 服务端清单(UC_TOOL_ITEMS) 键集必须一致。
+   *     差一条 = 真机上那一项显示成空白圆点（或反之：服务端有的真机不认识）。 */
+  const blocksLib = requireFromHere(join(MP_ROOT, 'utils', 'blocks.js'));
+  const toolMeta = Object.keys(blocksLib.TOOL_META || {});
+  const ucToolTypes = (schemaMod.UC_TOOL_ITEMS || []).map((t) => t.type);
+  const toolOnlyMeta = toolMeta.filter((k) => ucToolTypes.indexOf(k) < 0);
+  const toolOnlySrv = ucToolTypes.filter((k) => toolMeta.indexOf(k) < 0);
+  assert('必备工具的真机图标表与服务端清单键集一致（差一条＝真机上出现空白项）',
+    toolOnlyMeta.length === 0 && toolOnlySrv.length === 0,
+    (toolOnlyMeta.length ? `真机多出：${toolOnlyMeta.join(', ')}` : '') +
+    (toolOnlySrv.length ? ` 服务端多出：${toolOnlySrv.join(', ')}` : '') ||
+    `两侧各 ${toolMeta.length} 项，逐一对应`);
+
+  /* (8b) 插件条目要把 icon / real / enabled 烘进区块数据 ——
+   *      装修台预览与真机都读数据本身，各写一份表必然出现「预览 21 项、真机 20 项」。 */
+  const plugins = (((replica.MINE_BLOCKS || []).filter((b) => b.type === 'uc_tools')[0] || {}).plugins) || [];
+  const lackMeta = plugins.filter((p) => p.icon === undefined || p.real === undefined || p.enabled === undefined).map((p) => p.type);
+  assert('必备工具条目把 icon / real / enabled 烘进区块数据（装修台与真机共用同一份真源）',
+    plugins.length === ucToolTypes.length && lackMeta.length === 0,
+    lackMeta.length ? `缺字段：${lackMeta.join(', ')}` : `${plugins.length} 个条目字段齐全`);
+
+  /*
+   * (8c) 键集一致还不够 —— **值也必须一致**。
+   *
+   * 真机上 `TOOL_META` 是「本次改动之前发布过的老数据」的兜底表，`UC_TOOL_ITEMS` 是装修台的展示口径。
+   * 曾经这两处的 `real` 就打过架：TOOL_META 说 `accountSettings` 是真的（页面里确实有实现），
+   * 服务端清单却标 `real:false`（后台把它显示成「未接入」）。键集断言查不出这类问题。
+   */
+  const valMismatch = (schemaMod.UC_TOOL_ITEMS || [])
+    .filter((t) => {
+      const m = blocksLib.TOOL_META[t.type];
+      if (!m) return false;
+      return !!m.real !== !!t.real || (m.icon || '') !== (t.icon || '');
+    })
+    .map((t) => {
+      const m = blocksLib.TOOL_META[t.type];
+      return `${t.type}(真机 real=${!!m.real}/icon=${m.icon}，服务端 real=${!!t.real}/icon=${t.icon})`;
+    });
+  assert('必备工具的 real / icon 两处取值一致（键集一致但值打架＝真机说能用、后台标未接入）',
+    valMismatch.length === 0, valMismatch.join('；') || '逐项取值一致');
+
+  /*
+   * (8d) 「客服聊天」默认必须是开启的 —— 这是**功能性回归锁**，不是格式检查。
+   *
+   * 有赞默认 `show:false`（客服不在必备工具里）。但改造前本项目的「我的」页有一个
+   * `<button open-type="contact">联系客服</button>`（见 git 历史），是真入口。
+   * 照搬有赞默认值会静默丢掉这个入口 —— 页面上什么都不会报错，只是客服没了。
+   */
+  const csItem = (schemaMod.UC_TOOL_ITEMS || []).filter((t) => t.type === 'customerServiceChat')[0];
+  assert('「客服聊天」在默认数据里是开启的（改造前的 open-type="contact" 入口不能丢）',
+    !!csItem && csItem.show === true && csItem.enabled !== false && csItem.real === true,
+    csItem ? `show=${csItem.show} real=${csItem.real}` : '清单里没有客服项');
+  const csInData = plugins.filter((p) => p.type === 'customerServiceChat')[0];
+  assert('已发布的 MINE_BLOCKS 里客服项同样是开启的（默认值改了要重灌 replica，否则装修台读到的还是老值）',
+    !!csInData && csInData.show === true && csInData.enabled === true,
+    csInData ? `show=${csInData.show}` : '落盘数据里没有客服项');
+
+  /* (9) 「我的」页的真实交互不能被装修吃掉：
+   *     页面必须走 blockPageBehavior（事件唯一实现），并保留登录 / 退出 / 关于我们 / 账号与安全。 */
+  const mineJs = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.js'), 'utf8');
+  const mineWxml = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.wxml'), 'utf8');
+  const mineJson = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.json'), 'utf8');
+  const keepHandlers = ['onTapUcLogin', 'onTapUcLogout', 'onTapAbout', 'onTapAccountSettings', 'onTapOrderStatus'];
+  const lostHandlers = keepHandlers.filter((h) => mineJs.indexOf(h) < 0);
+  assert('「我的」页改用区块流渲染，同时保留登录 / 退出 / 客服 / 关于我们 / 订单入口等真实交互',
+    /blockPageBehavior/.test(mineJs) && /normalizeBlocks\(RAW_BLOCKS\)/.test(mineJs) &&
+    mineWxml.indexOf('templates/blocks.wxml') > 0 && lostHandlers.length === 0 &&
+    JSON.parse(mineJson).usingComponents && !!JSON.parse(mineJson).usingComponents['empty-state'],
+    lostHandlers.length ? `丢失交互：${lostHandlers.join(', ')}` : '真实交互全部保留');
+
+  /* (10) 组件库按页面下发：装修台必须能按页面切库（否则「我的」页显示的仍是首页那 57 种） */
+  const decorateRoute = readFileSync(join(__dirname, '..', 'routes', 'decorate.js'), 'utf8');
+  assert('装修台组件库按页面下发（pageLibs）并支持分组渲染开关（tabs[].grouped）',
+    /pageLibs/.test(decorateRoute) && /schema\.pageLibs\(\)/.test(decorateRoute) &&
+    /usePageLib/.test(adminJs) && /meta\.grouped/.test(adminJs) &&
+    Object.keys(schemaMod.pageLibs()).join(',') === 'mine',
+    'pageLibs 下发 + usePageLib 切库 + grouped 分组渲染均已就位');
+}
+
+/* ---------------------------------------------------------------------------
  * 15.77 数据落盘「原子写 + 瞬态重试」校验
  *
  * 为什么必须有这一条：

@@ -40,7 +40,7 @@ function emitReplica(data, opt = {}) {
   const p = (v) => String(v).padStart(2, '0');
   const timeText = `${stamp.getFullYear()}-${p(stamp.getMonth() + 1)}-${p(stamp.getDate())} ${p(stamp.getHours())}:${p(stamp.getMinutes())}:${p(stamp.getSeconds())}`;
 
-  const need = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
+  const need = ['SHOP', 'HOME_BLOCKS', 'MINE_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   const missing = need.filter((k) => data[k] === undefined);
   if (missing.length) {
     // 这是「调用方漏传了必填字段」的内部不变量，属于服务端异常（5000），
@@ -60,6 +60,10 @@ function emitReplica(data, opt = {}) {
   L.push('/** ---------------- 首页 ---------------- */');
   L.push('/** h 为设计稿像素高（375 宽基准），wxml 中按 rpx = px * 2 换算 */');
   L.push('const HOME_BLOCKS = ' + jsExpr(data.HOME_BLOCKS) + ';');
+  L.push('');
+  L.push('/** ---------------- 我的（个人中心） ---------------- */');
+  L.push('/** 区块类型比首页多 5 种个人中心专属区块 + 4 种个人中心独有组件（见 server/decorate/yzUserCenter.js） */');
+  L.push('const MINE_BLOCKS = ' + jsExpr(data.MINE_BLOCKS) + ';');
   L.push('');
   L.push('/** ---------------- 莱克（产品系列） ---------------- */');
   L.push('const LEXY_SERIES = ' + jsExpr(data.LEXY_SERIES) + ';');
@@ -122,7 +126,7 @@ function emitReplica(data, opt = {}) {
   }
 
   /* 导出清单按实际写出的字段动态生成，杜绝「导出了不存在的变量」这种低级错误 */
-  const fields = ['SHOP', 'HOME_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
+  const fields = ['SHOP', 'HOME_BLOCKS', 'MINE_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   if (hasCustom) fields.push('CUSTOM_PAGES');
   if (hasAlias) fields.push('CUSTOM_PAGE_ALIASES');
   if (data.PAGE_META !== undefined) fields.push('PAGE_META');

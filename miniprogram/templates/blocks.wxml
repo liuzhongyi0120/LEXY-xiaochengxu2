@@ -655,6 +655,146 @@
     <view wx:if="{{!block.words.length}}" class="cg-empty">还没有配置热词，请到装修台「店铺热搜」里添加</view>
   </view>
 
+  <!--
+    ===== 个人中心（「我的」页）专属区块 =====
+    对标有赞「个人中心装修」：标题栏 / 个人信息 / 个人资产 / 我的订单 / 必备工具，
+    外加个人中心独有的 4 个组件：文本 / 关联链接 / 辅助空白 / 关注公众号。
+    依赖型（个人资产、必备工具里的部分项、关注公众号）如实标注「依赖 XX · 仅占位展示」，
+    与那 34 个依赖型组件同一口径 —— 不假装可用。
+    样式见 pages/mine/mine.wxss 的 .cu- 系列（这些区块目前只出现在「我的」页）。
+  -->
+
+  <!-- ===== 标题栏 ===== -->
+  <view wx:elif="{{block.type === 'uc_navbar'}}" class="cu-nav" style="background: {{block.bgFinal}};">
+    <image wx:if="{{block.hasBgImage}}" class="cu-nav-bg" src="{{block.bgImage}}" mode="aspectFill" />
+    <view class="cu-nav-inner">
+      <view class="cu-nav-title">{{block.title}}</view>
+      <view wx:if="{{block.desc}}" class="cu-nav-desc">{{block.desc}}</view>
+    </view>
+  </view>
+
+  <!-- ===== 个人信息（外观来自装修数据，昵称/头像由页面回填到 block.user） ===== -->
+  <view
+    wx:elif="{{block.type === 'uc_profile'}}"
+    class="cu-prof"
+    style="background: {{block.bgImage ? ('url(' + block.bgImage + ') center / cover no-repeat') : '#FFFFFF'}};"
+  >
+    <view wx:if="{{block.gradientClass}}" class="cu-prof-gd {{block.gradientClass}}"></view>
+    <view class="cu-prof-row" style="justify-content: {{block.justify}};">
+      <image wx:if="{{block.user.avatar}}" class="cu-avatar" src="{{block.user.avatar}}" mode="aspectFill" />
+      <view wx:else class="cu-avatar cu-avatar-ph"><text class="cu-avatar-t">我</text></view>
+      <view class="cu-prof-info">
+        <text class="cu-nick" style="color: {{block.nameFg}};">{{block.user.logged ? (block.user.nickname || '微信用户') : '未登录'}}</text>
+        <view class="cu-prof-meta">
+          <text wx:if="{{block.levelOn && block.user.logged}}" class="cu-level">普通会员</text>
+          <view class="cu-code" style="color: {{block.codeFg}};" data-key="memberCode" catchtap="onTapToolItem">会员码</view>
+        </view>
+      </view>
+      <view wx:if="{{!block.user.logged}}" class="cu-prof-act" catchtap="onTapUcLogin">{{logging ? '登录中…' : '登录'}}</view>
+      <view wx:else class="cu-prof-act ghost" catchtap="onTapUcLogout">退出</view>
+    </view>
+    <view class="cu-prof-bar {{block.bar}}"></view>
+  </view>
+
+  <!-- ===== 个人资产（依赖会员资产数据，本期无数据源 → 统一显示 —） ===== -->
+  <view wx:elif="{{block.type === 'uc_stats'}}" class="cu-stats">
+    <view class="cu-stats-grid">
+      <view class="cu-stat" wx:for="{{block.items}}" wx:key="key">
+        <view class="cu-stat-v">{{item.value}}<text class="cu-stat-u">{{item.unit}}</text></view>
+        <view class="cu-stat-l">{{item.label}}</view>
+      </view>
+    </view>
+    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+  </view>
+
+  <!-- ===== 我的订单 ===== -->
+  <view wx:elif="{{block.type === 'uc_order'}}" class="cu-order">
+    <view class="cu-hd">
+      <text class="cu-hd-t">{{block.title}}</text>
+      <text wx:if="{{block.showAllOn}}" class="cu-hd-more" data-status="ALL" bindtap="onTapUcOrder">全部订单 ›</text>
+    </view>
+    <view class="cu-order-grid">
+      <view
+        class="cu-order-it"
+        wx:for="{{block.items}}"
+        wx:key="key"
+        data-status="{{item.key}}"
+        bindtap="onTapUcOrder"
+        hover-class="hover-lite"
+        hover-stay-time="80"
+      >
+        <view class="cu-order-ic"><text>{{item.icon}}</text></view>
+        <text class="cu-order-lb">{{item.label}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ===== 必备工具（条目来自装修数据；「客服聊天」是真按钮，其余按 real 决定是否可跳） ===== -->
+  <view wx:elif="{{block.type === 'uc_tools'}}" class="cu-tools {{block.mode}}">
+    <view class="cu-tools-grid">
+      <block wx:for="{{block.items}}" wx:key="key" wx:for-item="tl">
+        <button
+          wx:if="{{tl.key === 'customerServiceChat'}}"
+          class="cu-tool {{block.iconMode}}"
+          style="width: {{block.cellW}}%;"
+          open-type="contact"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >
+          <view class="cu-tool-ic"><text>{{tl.icon}}</text></view>
+          <text class="cu-tool-lb">{{tl.label}}</text>
+        </button>
+        <view
+          wx:else
+          class="cu-tool {{block.iconMode}}"
+          style="width: {{block.cellW}}%;"
+          data-key="{{tl.key}}"
+          bindtap="onTapToolItem"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >
+          <view class="cu-tool-ic"><text>{{tl.icon}}</text></view>
+          <text class="cu-tool-lb">{{tl.label}}</text>
+        </view>
+      </block>
+    </view>
+    <view wx:if="{{!block.items.length}}" class="cu-empty-chk">所有工具都被关掉了，请到装修台「必备工具」里打开几项</view>
+    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+  </view>
+
+  <!-- ===== 文本 ===== -->
+  <view wx:elif="{{block.type === 'text'}}" class="cu-text" style="padding: 0 {{block.marginRpx}}rpx;">
+    <view class="cu-text-in {{block.sizeClass}}" style="color: {{block.fg}}; background: {{block.bg}};">
+      <text class="cu-text-t" style="text-align: {{block.textAlign}};" data-link="{{block.link}}" bindtap="onTapBlock">{{block.text}}</text>
+    </view>
+    <view wx:if="{{block.splitLine}}" class="cu-split"></view>
+  </view>
+
+  <!-- ===== 关联链接 ===== -->
+  <view wx:elif="{{block.type === 'link'}}" class="cu-links" style="padding: 0 {{block.marginRpx}}rpx;">
+    <view
+      class="cu-link"
+      wx:for="{{block.items}}"
+      wx:key="label"
+      data-link="{{item.link}}"
+      bindtap="onTapBlock"
+      hover-class="hover-lite"
+    >
+      <text class="cu-link-t">{{item.label}}</text>
+      <text class="cu-link-a">›</text>
+    </view>
+    <view wx:if="{{!block.items.length}}" class="cu-empty-chk">还没有添加关联链接，请到装修台配置</view>
+  </view>
+
+  <!-- ===== 辅助空白 ===== -->
+  <view wx:elif="{{block.type === 'blank'}}" style="height: {{block.hRpx}}rpx;"></view>
+
+  <!-- ===== 关注公众号（微信原生 official-account；非扫码进入时不展示，属平台行为） ===== -->
+  <view wx:elif="{{block.type === 'follow_oa'}}" class="cu-oa" style="padding: 0 {{block.marginRpx}}rpx;">
+    <official-account></official-account>
+    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+  </view>
+
   <view wx:elif="{{block.fam}}" class="c-yz" style="padding: 12rpx {{block.marginRpx}}rpx;">
     <view wx:if="{{block.cardTitle}}" class="yz-hd">{{block.cardTitle}}</view>
     <image

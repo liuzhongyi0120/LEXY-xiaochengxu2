@@ -32,6 +32,9 @@
  */
 
 const customPages = require('./customPages');
+const {
+  UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS
+} = require('./yzUserCenter');
 
 /* ============================ 组件库图标（内联 SVG） ============================ */
 
@@ -63,7 +66,17 @@ const ICONS = {
   service: I('<path d="M5 12a7 7 0 0114 0"/><rect x="3" y="12" width="4" height="7" rx="1.6"/><rect x="17" y="12" width="4" height="7" rx="1.6"/><path d="M17 19c0 1.3-1.4 2-3.2 2" stroke-opacity=".6"/>'),
   content_card: I('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M6 19h12M8 8h6M8 11h4"/>'),
   buy_bar: I('<rect x="3" y="16" width="18" height="5" rx="2.5"/><path d="M7 8.5h10M7 12h6" stroke-opacity=".5"/>'),
-  brand_category: I('<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="12" y="4" width="9" height="7" rx="1.5"/><rect x="12" y="13" width="9" height="7" rx="1.5"/>')
+  brand_category: I('<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="12" y="4" width="9" height="7" rx="1.5"/><rect x="12" y="13" width="9" height="7" rx="1.5"/>'),
+  /* ---- 个人中心专属区块（2026-10-10 新增，见 yzUserCenter.js） ---- */
+  page_head: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 6.5h.01M11 6.5h-1"/>'),
+  profile: I('<circle cx="12" cy="8.5" r="3.2"/><path d="M5.5 19.5c0-3.1 2.9-5 6.5-5s6.5 1.9 6.5 5"/>'),
+  assets: I('<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><circle cx="17" cy="14.5" r="1.3"/>'),
+  order: I('<path d="M6 3.5h12v17l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 11.5h6M9 15h3"/>'),
+  tools: I('<rect x="3.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.6"/><path d="M17 14v6M14 17h6"/>'),
+  text: I('<path d="M4 7h16"/><path d="M4 12h11"/><path d="M4 17h7"/>'),
+  link: I('<path d="M10 13.5a3.5 3.5 0 015 0l2.5-2.5a3.5 3.5 0 00-5-5L11 7.5"/><path d="M14 10.5a3.5 3.5 0 01-5 0L6.5 13a3.5 3.5 0 005 5L13 16.5" stroke-opacity=".85"/>'),
+  blank: I('<rect x="3" y="4" width="18" height="4" rx="1.5"/><rect x="3" y="16" width="18" height="4" rx="1.5"/><path d="M12 10v4M10 12h4" stroke-opacity=".5"/>'),
+  follow: I('<rect x="3" y="4.5" width="18" height="15" rx="2.5"/><circle cx="12" cy="11" r="3.2"/><path d="M9 19.5l3-2.5 3 2.5" stroke-opacity=".6"/>')
 };
 
 /* ============================ 跳转链接（对标有赞「选择链接」） ============================ */
@@ -1069,6 +1082,119 @@ const YZ_ADV = [
   });
 })();
 
+/* ============================ 个人中心页（「我的」）专属区块 ============================ */
+
+/**
+ * 「我的」页的区块类型表 = 首页那 57 种 + 个人中心新增 9 种（5 个专属 + 4 个补缺）。
+ *
+ * 为什么要合成一张新表而不是直接往 HOME_BLOCK_KINDS 里塞：
+ *   `HOME_BLOCK_KINDS` 同时是「首页 / 自定义页」的组件清单，
+ *   把「标题栏 / 个人信息 / 我的订单」这些个人中心专属区块放进去，
+ *   首页的组件库里就会冒出一堆跟首页无关的东西。两张表各自干净。
+ *
+ * 4 个补缺组件（文本 / 关联链接 / 辅助空白 / 关注公众号）也归到这张表：
+ *   它们是有赞「个人中心」组件库独有、首页那 55 个里没有的组件（实测确认）。
+ */
+const MINE_BLOCK_KINDS = Object.assign({}, HOME_BLOCK_KINDS, UC_KINDS);
+
+/**
+ * 个人中心组件库放行的 kind 清单（25 个）。
+ * 「我的」页只开放这 25 个 —— **不外泄首页那 57 种**：
+ * 有赞个人中心的「添加组件」实测就是另一份独立清单（基础 7 / 营销 2 / 其他 11），
+ * 把首页组件混进来会让运营以为「个人中心能放电梯导航 / 品牌分类」。
+ */
+const MINE_LIB_KINDS = [];
+UC_LIB_GROUPS.forEach((g) => {
+  g.items.forEach((it) => { if (MINE_LIB_KINDS.indexOf(it.kind) < 0) MINE_LIB_KINDS.push(it.kind); });
+});
+
+/** 个人中心组件库的 kind 元信息（与 componentLib().kinds 同构，供装修台卡片/图标使用） */
+function mineLibKinds() {
+  return MINE_LIB_KINDS.map((k) => {
+    const d = MINE_BLOCK_KINDS[k] || {};
+    return {
+      kind: k, label: d.label, lib: d.lib,
+      icon: ICONS[d.lib] || ICONS.image_ad,
+      desc: d.desc, dep: d.dep || '', depTag: d.depTag || '',
+      group: d.group || 'uc'
+    };
+  });
+}
+
+/**
+ * 个人中心组件库（分组结构与有赞「添加组件」一致，另加一组「专属区块」，见 yzUserCenter.js）
+ *
+ * ⚠️ 有赞个人中心**只有「添加组件」一个入口**（不像首页装修分常用/基础/高级），
+ *    那 3 组是列表内的标题而不是 tab —— 所以这里用**一个 tab 承载同一份分组结构**
+ *    （tabs 里用 `grouped: true` 声明「本 tab 按 groups 渲染」，装修台据此分流）。
+ */
+function mineComponentLib() {
+  const total = UC_LIB_GROUPS.reduce((n, g) => n + g.items.length, 0);
+  return {
+    tabs: [{
+      key: 'uc', name: '个人中心组件', count: total, grouped: true,
+      desc: '对标有赞「个人中心装修 · 添加组件」实测 20 个（基础 7 / 营销 2 / 其他 11）；' +
+        '另加一组「专属区块」用于恢复被删的系统区块'
+    }],
+    groups: UC_LIB_GROUPS.map((g) => ({
+      name: g.name,
+      count: g.items.length,
+      items: g.items.map((it) => ({
+        n: it.n, ok: 1, kind: it.kind, group: g.name, max: UC_MAX[it.n] || 0,
+        dep: depTagOf((MINE_BLOCK_KINDS[it.kind] || {}).dep || '')
+      }))
+    })),
+    kinds: mineLibKinds(),
+    icons: ICONS,
+    total
+  };
+}
+
+/**
+ * 页面级组件库：只有「页面自己声明了 lib」的页面才有（目前只有「我的」= 个人中心）。
+ * 约定：**一个页面要么用全局组件库、要么用页面自己的，不做合并** ——
+ * 合并会让「个人中心里冒出首页专属组件」，正是这次要避免的事。
+ */
+function pageLibs() {
+  const out = {};
+  allPages().forEach((p) => { if (p && p.lib) out[p.key] = JSON.parse(JSON.stringify(p.lib)); });
+  return out;
+}
+
+/**
+ * 「我的」页「页面区块」列表只认识这 25 种 —— 与组件库严格一致。
+ * （区块树里的「+ 新增」会弹这个清单；若放开成 66 种，就会出现「能加但组件库里找不到」的错乱。）
+ */
+const MINE_UNION_KINDS = MINE_LIB_KINDS.reduce((m, k) => { m[k] = MINE_BLOCK_KINDS[k]; return m; }, {});
+
+/**
+ * 「我的」页的区块字段节点 —— 与首页的同构（list + union），
+ * 只是 kinds 换成个人中心放行的那 25 种，所以装修台的属性面板 / 区块树 / 预览全部可直接复用。
+ */
+const MINE_BLOCKS_NODE = {
+  k: 'blocks', label: '页面区块', type: 'list',
+  item: { type: 'union', kindField: 'type', kinds: MINE_UNION_KINDS },
+  title: (v, i) => {
+    const label = MINE_BLOCK_KINDS[v.type] ? MINE_BLOCK_KINDS[v.type].label : '未知区块';
+    if (!v.height) return label;
+    const unit = ['swiper', 'video', 'line', 'hotspot'].indexOf(v.type) >= 0 ? 'rpx' : 'px';
+    return label + ' · ' + v.height + unit;
+  },
+  sortable: true, addable: true
+};
+
+/**
+ * 「我的」页的初始区块。
+ *
+ * replica 里没有 MINE_BLOCKS 时用它（首次发布前 / 回滚到旧快照）。
+ * 每次都返回**深拷贝**：调用方（装修台）会就地改这份数据，
+ * 直接返回常量会让下一次 from() 拿到被改过的值。
+ */
+function cloneDefaultMineBlocks(existing) {
+  const src = Array.isArray(existing) ? existing : UC_DEFAULT_BLOCKS;
+  return JSON.parse(JSON.stringify(src)).map(upgradeBlock);
+}
+
 /** 默认常用组件（对标有赞「常用组件」tab，用户可自行增删，存 localStorage） */
 const YZ_COMMON = ['title', 'line', 'swiper', 'video', 'notice', 'nav', 'cube', 'hotspot', 'goods', 'shop'];
 
@@ -1101,7 +1227,7 @@ function componentLib() {
   return {
     tabs: [
       { key: 'common', name: '常用组件', count: YZ_COMMON.length, desc: '默认展示的组件，可点「添加常用组件」自行增减' },
-      { key: 'basic', name: '基础组件', count: YZ_BASIC.length, desc: '对标有赞基础组件全量清单（10 组 / ' + YZ_BASIC.length + ' 个）' },
+      { key: 'basic', name: '基础组件', count: YZ_BASIC.length, grouped: true, desc: '对标有赞基础组件全量清单（10 组 / ' + YZ_BASIC.length + ' 个）' },
       { key: 'adv', name: '高级组件', count: YZ_ADV.length, desc: '店铺侧扩展组件（有赞里装了什么就有什么）；已接入的可直接添加' }
     ],
     /** 基础组件的真实分组（装修台左侧按分组显示，与有赞一致） */
@@ -1565,24 +1691,44 @@ const PAGES = [
     }
   },
 
-  /* ---------------------------- 我的 ---------------------------- */
+  /* ---------------------------- 我的（个人中心，可装修） ---------------------------- */
   {
     key: 'mine',
     name: '我的',
     note: '个人中心',
     belongs: '微信小程序主页',
     path: 'pages/mine',
-    desc: '个人中心顶部店铺信息区',
-    source: 'replica.SHOP + replica.PAGE_META',
-    from(R) { return { meta: (R.PAGE_META && R.PAGE_META.mine) || pageMetaDefault('mine'), shop: R.SHOP }; },
+    desc: '个人中心：顶部标题栏 / 个人信息 / 个人资产 / 我的订单 / 必备工具等区块可自由增删排序（对标有赞「个人中心装修」）',
+    source: 'replica.MINE_BLOCKS + replica.SHOP + replica.PAGE_META',
+    /*
+     * 个人中心有自己的组件库（有赞实测 3 组 20 个 + 本项目补的「专属区块」组），
+     * 与首页那 55 个基础组件不是一套 —— 装修台按 `schema.lib` 存在与否切换，
+     * 见 admin.js 的 pageLib()。
+     */
+    lib: mineComponentLib(),
+    from(R) {
+      return {
+        // replica 里没有 MINE_BLOCKS（老版本代码 / 首次发布前）时回落到默认区块，
+        // 让运营一打开编辑器看到的就是「当前生效的那套内容」，而不是一片空白。
+        blocks: cloneDefaultMineBlocks(R && R.MINE_BLOCKS),
+        shop: R.SHOP,
+        meta: (R.PAGE_META && R.PAGE_META.mine) || pageMetaDefault('mine')
+      };
+    },
     to(data, out) {
+      out.MINE_BLOCKS = data.blocks;
       out.SHOP = data.shop;
       setPageMeta(out, 'mine', data.meta);
     },
     root: {
       type: 'object',
       fields: [
-        { k: 'meta', label: '页面设置', type: 'object', fields: PAGE_META_FIELDS },
+        MINE_BLOCKS_NODE,
+        {
+          k: 'meta', label: '页面设置', type: 'object',
+          hint: '页面级设置（写回 replica.PAGE_META），与页面内的区块无关',
+          fields: PAGE_META_FIELDS
+        },
         SHOP_NODE
       ]
     }
@@ -1817,4 +1963,7 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX };
+module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX,
+  /* 个人中心（「我的」页）：区块类型表 / 组件库 / 默认区块 / 字段节点 / 页面级组件库 */
+  MINE_BLOCK_KINDS, MINE_BLOCKS_NODE, MINE_UNION_KINDS, MINE_LIB_KINDS, mineComponentLib, cloneDefaultMineBlocks,
+  pageLibs, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };

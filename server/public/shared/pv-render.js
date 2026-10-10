@@ -149,7 +149,10 @@
     goods_recommend_adv: '人群运营', crowd_image: '人群图片', hot_words: '店铺热搜',
     shop_rank: '店铺榜单', points_goods: '积分兑换商品', member_card: '会员卡片',
     shop_banner_card: '店招信息', course: '课程', paid_column: '知识专栏', paid_content: '知识内容',
-    content_live: '知识直播', paid_member: '知识付费会员', punch: '群打卡', personal_nav: '个性导航'
+    content_live: '知识直播', paid_member: '知识付费会员', punch: '群打卡', personal_nav: '个性导航',
+    // 2026-10-10：个人中心（「我的」页）专属区块 + 个人中心独有组件
+    uc_navbar: '标题栏', uc_profile: '个人信息', uc_stats: '个人资产', uc_order: '我的订单',
+    uc_tools: '必备工具', text: '文本', link: '关联链接', blank: '辅助空白', follow_oa: '关注公众号'
   };
 
   /**
@@ -183,6 +186,168 @@
     if (!list || !list.length) return '';
     var x = list[0];
     return typeof x === 'string' ? x : ((x && (x.image || x.src)) || '');
+  }
+
+  /* ==========================================================================
+   * 个人中心（「我的」页）专属区块的预览
+   *
+   * ⚠️ 只服务**装修台手机壳**（`/preview` 走真机源码编译，不经过这里）。
+   * 口径必须与真机 `templates/blocks.wxml` 的同名分支一致：同样的信息层次、
+   * 同样的「依赖 XX · 仅占位展示」标注、同样的条目筛选规则（show / enabled）。
+   * 字段真源是区块数据本身（icon / real / enabled 已烘入插件条目），
+   * 这里**不再各写一份工具表** —— 写过一次就会走样。
+   * ========================================================================== */
+
+  var UC_PARTS = {
+    uc_navbar: 1, uc_profile: 1, uc_stats: 1, uc_order: 1, uc_tools: 1,
+    text: 1, link: 1, blank: 1, follow_oa: 1
+  };
+
+  /* 与 miniprogram/utils/blocks.js 的 UC_STAT_DEFS / UC_ORDER_DEFS 同源同序 */
+  var UC_STAT_DEFS = [
+    ['showBalance', '余额', '元'], ['showPoints', '积分', ''], ['showCard', '权益卡', '张'],
+    ['showCoupon', '优惠券', '张'], ['showWallet', '钱包', '元'],
+    ['showGiftCard', '礼品卡', '张'], ['showPickupCard', '提货卡', '张']
+  ];
+  var UC_ORDER_DEFS = [
+    ['showPendingPay', '待付款', '付'], ['showPendingShip', '待发货', '发'], ['showShipped', '待收货', '收'],
+    ['showReview', '待评价', '评'], ['showRefund', '退款/售后', '退']
+  ];
+  var UC_SIZE = { sm: '12px', md: '14px', lg: '16px' };
+  var UC_ALIGN = { left: 'left', center: 'center', right: 'right' };
+
+  function ucDep(t) {
+    return t ? '<div style="margin:6px 12px 0;font-size:10px;color:#c8c9cc">依赖 ' + esc(t) + ' · 仅占位展示</div>' : '';
+  }
+
+  function pvUserCenter(b, kind) {
+    var h = '';
+    var margin = b.pageMargin || 12;
+
+    if (kind === 'uc_navbar') {
+      var navBg = b.bgMode === 'custom' ? (b.bgColor || '#FFFFFF') : '#FFFFFF';
+      h += '<div style="position:relative;padding:14px 16px 12px;background:' + navBg + ';overflow:hidden">' +
+        (b.bgImage ? '<img src="' + attr(b.bgImage) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">' : '') +
+        '<div style="position:relative"><div style="font-size:18px;font-weight:600;color:#323233">' + esc(b.title || '个人中心') + '</div>' +
+        (b.desc ? '<div style="margin-top:4px;font-size:12px;color:#969799">' + esc(b.desc) + '</div>' : '') +
+        '</div></div>';
+      return h;
+    }
+
+    if (kind === 'uc_profile') {
+      var gd = b.gradient === 'white' ? 'background:linear-gradient(to bottom,rgba(255,255,255,0),#fff)'
+        : (b.gradient === 'black' ? 'background:linear-gradient(to bottom,rgba(0,0,0,0),#000)' : '');
+      var jf = b.align === 'left' ? 'flex-start' : (b.align === 'right' ? 'flex-end' : 'center');
+      var nickFg = b.nameColor || '#333333';
+      var codeFg = b.codeColor || '#FFFFFF';
+      h += '<div style="position:relative;padding:20px 16px 24px;background:' +
+        (b.bgImage ? ('url(' + attr(b.bgImage) + ') center/cover no-repeat') : '#FFFFFF') + ';overflow:hidden">' +
+        '<div style="position:absolute;inset:0;' + gd + '"></div>' +
+        '<div style="position:relative;display:flex;align-items:center;justify-content:' + jf + '">' +
+        '<div style="width:60px;height:60px;border-radius:50%;background:rgba(0,0,0,.12);border:1px solid rgba(255,255,255,.6);' +
+        'display:flex;align-items:center;justify-content:center;font-size:20px;color:#fff;flex:0 0 auto">我</div>' +
+        '<div style="margin-left:12px;flex:1;min-width:0">' +
+        '<div style="font-size:18px;font-weight:600;color:' + nickFg + '">未登录</div>' +
+        '<div style="margin-top:5px;display:flex;align-items:center">' +
+        (b.showLevel === 'hide' ? '' : '<span style="padding:1px 7px;font-size:10px;color:#7a5230;background:linear-gradient(90deg,#f6e0b5,#e9c98c);border-radius:10px">普通会员</span>') +
+        '<span style="margin-left:8px;padding:1px 8px;font-size:10px;color:' + codeFg + ';border:1px solid currentColor;border-radius:12px">会员码</span>' +
+        '</div></div>' +
+        '<div style="flex:0 0 auto;padding:0 15px;height:29px;line-height:29px;font-size:13px;color:#C8102E;background:#fff;border-radius:15px">登录</div>' +
+        '</div>' +
+        '<div style="position:relative;margin-top:14px;height:30px;border-radius:15px;background:' +
+        (b.barStyle === 's3' ? 'rgba(0,0,0,.06)' : (b.barStyle === 's2' ? 'transparent' : 'rgba(255,255,255,.5)')) + '"></div>' +
+        '</div>';
+      return h;
+    }
+
+    if (kind === 'uc_stats') {
+      var stats = UC_STAT_DEFS.filter(function (d) { return b[d[0]] !== false; });
+      h += '<div style="margin:10px 0;padding:12px 8px;background:#fff">' +
+        '<div style="display:flex;flex-wrap:wrap">' + stats.map(function (d) {
+          return '<div style="flex:1;min-width:25%;text-align:center;padding:6px 0">' +
+            '<div style="font-size:17px;font-weight:600;color:#323233">—<span style="font-size:10px;font-weight:400;color:#969799">' + d[2] + '</span></div>' +
+            '<div style="margin-top:5px;font-size:12px;color:#969799">' + d[1] + '</div></div>';
+        }).join('') + '</div>' +
+        (stats.length ? '' : '<div style="color:#b8bec8;font-size:12px;padding:8px 0;text-align:center">所有资产项都被关掉了</div>') +
+        ucDep(b.dep || '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡）') +
+        '</div>';
+      return h;
+    }
+
+    if (kind === 'uc_order') {
+      var items = UC_ORDER_DEFS.filter(function (d) { return b[d[0]] !== false; });
+      h += '<div style="margin:10px 0;padding:12px 8px;background:#fff">' +
+        '<div style="display:flex;align-items:center;justify-content:space-between;padding:0 8px 10px">' +
+        '<span style="font-size:15px;font-weight:600;color:#323233">' + esc(b.title || '我的订单') + '</span>' +
+        (b.showAll === false ? '' : '<span style="font-size:12px;color:#969799">全部订单 ›</span>') + '</div>' +
+        '<div style="display:flex;flex-wrap:wrap">' + items.map(function (d) {
+          return '<div style="flex:1;min-width:20%;text-align:center;padding:6px 0">' +
+            '<div style="width:28px;height:28px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:13px;color:#C8102E;background:#FDECEE;border-radius:6px">' + d[2] + '</div>' +
+            '<div style="margin-top:6px;font-size:12px;color:#323233">' + d[1] + '</div></div>';
+        }).join('') + '</div></div>';
+      return h;
+    }
+
+    if (kind === 'uc_tools') {
+      var cols = b.mode === 'cube' ? 3 : 4;
+      var cellW = Math.floor(100 / cols * 100) / 100;
+      var tools = (b.plugins || []).filter(function (p) { return p && p.show !== false && p.enabled !== false; });
+      var lineStyle = b.iconMode === 'line'
+        ? 'background:transparent;border:1px solid #EBEDF0'
+        : (b.mode === 'cube' ? 'background:#F2F3F5' : 'background:#F5F5F5');
+      var radius = b.mode === 'cube' ? '10px' : '50%';
+      h += '<div style="margin:10px 0;padding:8px 4px;background:#fff">' +
+        '<div style="display:flex;flex-wrap:wrap">' + tools.map(function (t) {
+          return '<div style="width:' + cellW + '%;text-align:center;padding:12px 0">' +
+            '<div style="width:40px;height:40px;margin:0 auto;display:flex;align-items:center;justify-content:center;' +
+            'font-size:14px;color:#969799;border-radius:' + radius + ';' + lineStyle + '">' + esc(t.icon || '') + '</div>' +
+            '<div style="margin-top:7px;font-size:12px;color:#323233">' + esc(String(t.title || '').trim() || t.type) + '</div></div>';
+        }).join('') + '</div>' +
+        (tools.length ? '' : '<div style="color:#b8bec8;font-size:12px;padding:8px 0;text-align:center">所有工具都被关掉了</div>') +
+        ucDep(b.dep || '部分工具依赖会员、门店、分销等业务数据') +
+        '</div>';
+      return h;
+    }
+
+    if (kind === 'text') {
+      var fs = UC_SIZE[b.size] || UC_SIZE.md;
+      h += '<div style="padding:0 ' + margin + 'px;margin:6px 0">' +
+        '<div style="padding:10px 12px;border-radius:8px;font-size:' + fs + ';text-align:' + (UC_ALIGN[b.align] || 'left') + ';' +
+        'color:' + (b.color || '#000000') + ';background:' + (b.bg || '#FFFFFF') + '">' +
+        (b.text ? esc(b.text) : '<span style="color:#b8bec8">（空文本）</span>') +
+        (b.link ? linkBadge(b.link) : '') + '</div>' +
+        (b.showSplitLine ? '<div style="height:1px;background:#EBEDF0"></div>' : '') + '</div>';
+      return h;
+    }
+
+    if (kind === 'link') {
+      var links = (b.items || []).filter(function (x) { return x && String(x.label || '').trim(); });
+      h += '<div style="padding:0 ' + margin + 'px;margin:6px 0;background:#fff">' +
+        (links.length ? links.map(function (x) {
+          return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 12px;border-bottom:1px solid #EBEDF0">' +
+            '<span style="font-size:14px;color:#323233">' + esc(x.label) + '</span>' +
+            '<span style="font-size:16px;color:#C8C9CC">›</span>' + (x.link ? linkDot(x.link, '跳转') : '') + '</div>';
+        }).join('') : '<div style="color:#b8bec8;font-size:12px;padding:12px">（未添加关联链接）</div>') +
+        '</div>';
+      return h;
+    }
+
+    if (kind === 'blank') {
+      var bh = Math.round((b.height || 30) / 2);
+      h += '<div style="height:' + bh + 'px"></div>';
+      return h;
+    }
+
+    if (kind === 'follow_oa') {
+      h += '<div style="padding:0 ' + margin + 'px;margin:6px 0">' +
+        '<div style="padding:14px 12px;border:1px dashed #EBEDF0;border-radius:6px;text-align:center;font-size:12px;color:#969799">' +
+        '关注公众号（微信原生组件，仅扫码进入小程序时展示）</div>' +
+        ucDep(b.dep || '公众号能力（需在微信小程序后台「设置 · 接口设置」开通）') +
+        '</div>';
+      return h;
+    }
+
+    return h;
   }
 
   /**
@@ -700,6 +865,9 @@
       box += pvGoodsGroup(b);
     } else if (kind === 'hot_words') {
       box += pvHotWords(b);
+    } else if (UC_PARTS[kind]) {
+      // 个人中心（「我的」页）专属区块：预览口径见 pvUserCenter
+      box += pvUserCenter(b, kind);
     } else if (SHELL_PARTS[kind]) {
       box += pvShell(b, kind);
     }
@@ -792,14 +960,28 @@
     return h;
   }
 
+  /**
+   * 「我的」（个人中心）预览。
+   *
+   * 2026-10-10 起「我的」与首页 / 自定义页一样是**区块流页面**（replica.MINE_BLOCKS），
+   * 所以这里改成渲染区块 —— 旧版是硬编码的「店铺卡片 + 四宫格」，
+   * 装修台里明明列着「我的」却什么也加不进去，就是这个原因。
+   * 店铺信息块放在最后（真机也一样：它是页面级字段，不属于区块列表）。
+   */
   function pvMine(d) {
+    var blocks = d.blocks || [];
     var s = d.shop || {};
-    return '<div class="pv-block' + cls('shop') + '" data-path="__shop__" style="padding:20px 0;position:relative">' +
-      '<div class="pv-shop">' + img(s.avatar, 'width:64px;height:64px;border-radius:50%;margin:0 auto 10px') +
-      '<b style="font-size:14px">' + esc(s.name || '') + '</b><br><span>' + esc(s.slogan || '') + '</span></div>' +
-      '<div class="pv-grid g4" style="padding:14px">' +
-      ['我的订单', '优惠券', '我的收藏', '浏览记录'].map(function (t) { return '<div class="pv-cell"><span>' + t + '</span></div>'; }).join('') +
-      '</div></div>';
+    var h = '';
+    if (!blocks.length) {
+      h += '<div class="insp-empty" style="padding:40px 16px;line-height:2">' +
+        '这个页面还是空的<br><span style="color:#b8bec8">从左侧「组件库」点一个组件开始装修</span></div>';
+    } else {
+      blocks.forEach(function (b, i) { h += pvBlock(b, i); });
+    }
+    h += '<div class="pv-shop pv-block' + cls('shop') + '" data-path="__shop__" style="position:relative">' +
+      img(s.avatar, 'width:48px;height:48px;border-radius:50%;margin:0 auto 8px') +
+      '<b>' + esc(s.name || '') + '</b><br><span>' + esc(s.slogan || '') + '</span></div>';
+    return h;
   }
 
   var PAGE_RENDERERS = { home: pvHome, lexy: pvLexy, news: pvNews, product: pvProduct, mine: pvMine };

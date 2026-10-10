@@ -40,6 +40,64 @@ const SHELL_FAMILY = {
   personal_nav: 'card'
 };
 
+/* ================= 个人中心（「我的」页）区块的渲染元信息 =================
+ *
+ * ⚠️ 这些表是 `server/decorate/yzUserCenter.js` 里对应清单的**真机侧最小子集**：
+ *    - `TOOL_META` ⇄ `UC_TOOL_ITEMS`（键集必须逐项一致）
+ *    - `UC_STAT_DEFS` ⇄ `UC_KINDS.uc_stats` 的 7 个开关
+ *    - `UC_ORDER_DEFS` ⇄ `UC_KINDS.uc_order` 的 6 个开关
+ *   `real: false` = 自建商城没有这套业务底座，真机渲染入口但点了给「开发中」提示，
+ *   绝不假装可用（与 34 个依赖型组件同一口径）。
+ */
+
+/** 必备工具：图标 + 是否真的能跳（键集与 UC_TOOL_ITEMS 一致，自检会对账） */
+const TOOL_META = {
+  memberCode: { icon: '码', real: false },
+  taskCenter: { icon: '任', real: false },
+  cart: { icon: '车', real: true },
+  gifts: { icon: '赠', real: false },
+  customerServiceChat: { icon: '服', real: true },
+  deliveryAddress: { icon: '址', real: false },
+  merchantsCall: { icon: '电', real: false },
+  cashBack: { icon: '返', real: false },
+  fxCenter: { icon: '销', real: false },
+  offlineStore: { icon: '店', real: false },
+  purchaseColumnAndContent: { icon: '课', real: false },
+  paidContentCertificate: { icon: '证', real: false },
+  paidContentExamination: { icon: '考', real: false },
+  exchangeGiftCard: { icon: '兑', real: false },
+  paidContentExerciseBook: { icon: '业', real: false },
+  blankLine: { icon: '白', real: false },
+  exhibitionReserve: { icon: '订', real: false },
+  accountSettings: { icon: '号', real: true },
+  restaurantReserve: { icon: '座', real: false },
+  referralRewards: { icon: '邀', real: false },
+  about: { icon: '关', real: true }
+};
+
+/** 个人资产 7 项（与有赞面板的 7 个复选项一一对应；数值来自会员资产，本期无数据源） */
+const UC_STAT_DEFS = [
+  { k: 'showBalance', key: 'balance', label: '余额', unit: '元' },
+  { k: 'showPoints', key: 'points', label: '积分', unit: '' },
+  { k: 'showCard', key: 'card', label: '权益卡', unit: '张' },
+  { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张' },
+  { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元' },
+  { k: 'showGiftCard', key: 'giftCard', label: '礼品卡', unit: '张' },
+  { k: 'showPickupCard', key: 'pickupCard', label: '提货卡', unit: '张' }
+];
+
+/** 我的订单 6 个入口（与有赞面板的 6 个开关一一对应） */
+const UC_ORDER_DEFS = [
+  { k: 'showPendingPay', key: 'PENDING_PAY', label: '待付款', icon: '付' },
+  { k: 'showPendingShip', key: 'PENDING_SHIP', label: '待发货', icon: '发' },
+  { k: 'showShipped', key: 'SHIPPED', label: '待收货', icon: '收' },
+  { k: 'showReview', key: 'FINISHED', label: '待评价', icon: '评' },
+  { k: 'showRefund', key: 'REFUND', label: '退款/售后', icon: '退' }
+];
+
+/** 个人中心相关的 9 个区块类型（供自检与页面判断复用） */
+const UC_KIND_LIST = ['uc_navbar', 'uc_profile', 'uc_stats', 'uc_order', 'uc_tools', 'text', 'link', 'blank', 'follow_oa'];
+
 /** 店铺主题色（按钮「跟随店铺风格」时使用；与 tabBar selectedColor 保持一致） */
 const BRAND = '#C8102E';
 
@@ -351,6 +409,83 @@ function normalizeBlock(b, index) {
         return { title: String(br.title || '').trim(), panels };
       });
     o.navs = o.brands.map((br) => br.title);
+  } else if (kind === 'uc_navbar') {
+    /* 标题栏（个人中心页顶栏）：有赞里「沉浸式」= 标题栏与个人信息区同色融为一体 */
+    o.title = o.title || '个人中心';
+    o.desc = o.desc || '';
+    o.bgFinal = o.bgMode === 'custom' ? (o.bgColor || '#FFFFFF') : '#FFFFFF';
+    o.immersive = o.mode !== 'normal';
+    o.hasBgImage = !!o.bgImage;
+  } else if (kind === 'uc_profile') {
+    /*
+     * 个人信息：头像 / 昵称 / 会员码 / 等级。
+     * 昵称头像属于「人」，由页面 JS 在装配 data 时回填到 `block.user`（见 pages/mine/mine.js），
+     * 不在装修数据里 —— 装修台配的只有外观。
+     */
+    o.gradientClass = o.gradient === 'white' ? 'gd-white' : (o.gradient === 'black' ? 'gd-black' : '');
+    o.justify = o.align === 'left' ? 'flex-start' : (o.align === 'right' ? 'flex-end' : 'center');
+    o.nameFg = o.nameColor || '#333333';
+    o.codeFg = o.codeColor || '#FFFFFF';
+    o.levelOn = o.showLevel !== 'hide';
+    o.bar = ['s1', 's2', 's3'].indexOf(o.barStyle) >= 0 ? o.barStyle : 's1';
+    o.user = { logged: false, nickname: '', avatar: '' };
+  } else if (kind === 'uc_stats') {
+    /* 个人资产：7 个开关只决定「展示哪几项」，数值来自会员资产（本期无数据源，统一显示 —） */
+    o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false).map((d) => ({ key: d.key, label: d.label, unit: d.unit, value: '—' }));
+    o.dep = String(o.dep || '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡）');
+  } else if (kind === 'uc_order') {
+    o.title = o.title || '我的订单';
+    o.showAllOn = o.showAll !== false;
+    o.items = UC_ORDER_DEFS.filter((d) => o[d.k] !== false);
+    o.cols = o.items.length || 1;
+  } else if (kind === 'uc_tools') {
+    /*
+     * 必备工具：条目来自装修数据（有赞侧是固定插件清单，只能改名 / 开关 / 可见范围）。
+     * `enabled === false`（如「邀请有礼」）与 `show === false` 都不渲染。
+     */
+    o.mode = o.mode === 'cube' ? 'cube' : 'grid';
+    o.iconMode = o.iconMode === 'line' ? 'line' : 'fill';
+    const tCols = o.mode === 'cube' ? 3 : 4;
+    o.cols = tCols;
+    o.cellW = Math.floor(100 / tCols * 100) / 100;
+    o.items = (o.plugins || [])
+      .filter((p) => p && p.show !== false && p.enabled !== false)
+      .map((p) => {
+        /* icon / real 优先取区块数据里的值（装修数据里已烘入，是唯一真源）；
+           TOOL_META 只作为「本次改动之前发布过的老数据」的兜底。 */
+        const meta = TOOL_META[p.type] || { icon: '', real: false };
+        return {
+          key: p.type,
+          label: String(p.title || '').trim() || p.type,
+          icon: p.icon || meta.icon,
+          real: p.real === undefined ? !!meta.real : !!p.real,
+          scope: p.scope === 'fx' ? 'fx' : 'all'
+        };
+      })
+      .filter((x) => x.label);
+    o.dep = String(o.dep || '部分工具依赖会员、门店、分销等业务数据');
+  } else if (kind === 'text') {
+    /* 文本（对标有赞「文本」组件） */
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.text = String(o.text || '');
+    o.sizeClass = SIZE_CLASS[o.size] || 's-md';
+    o.fg = o.color || '#000000';
+    o.bg = o.bg || '#FFFFFF';
+    o.justify = o.align === 'center' ? 'center' : (o.align === 'right' ? 'flex-end' : 'flex-start');
+    o.textAlign = o.align === 'center' ? 'center' : (o.align === 'right' ? 'right' : 'left');
+    o.splitLine = o.showSplitLine === true;
+  } else if (kind === 'link') {
+    /* 关联链接：一串「文字 → 跳转」，文字为空的那条不显示 */
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.items = (o.items || [])
+      .filter((x) => x && String(x.label || '').trim())
+      .map((x) => ({ label: String(x.label).trim(), link: x.link || '' }));
+  } else if (kind === 'blank') {
+    /* 辅助空白：高度是 375 基准 px，×2 转 rpx */
+    o.hRpx = px2rpx(o.height || 30);
+  } else if (kind === 'follow_oa') {
+    o.marginRpx = px2rpx(o.pageMargin);
+    o.dep = String(o.dep || '公众号能力（需在微信小程序后台「设置 · 接口设置」开通）');
   } else if (SHELL_FAMILY[kind]) {
     /*
      * 有赞基础/高级组件余下的 37 项（依赖型 + 展示型）。
@@ -562,4 +697,27 @@ function loadGoodsData(blocks) {
   });
 }
 
-module.exports = { normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, sanitizeRich, SIZE_CLASS };
+/**
+ * 把「人」的信息（登录态 / 昵称 / 头像）回填到个人信息区块。
+ *
+ * 与 applyShopAvatar 同一模式：装修数据里只有**外观**（背景、渐变、颜色、样式），
+ * 「人」的信息属于运行态，只能由页面 JS 在装配 data 时补。
+ */
+function applyUserProfile(blocks, user) {
+  const u = user || {};
+  (blocks || []).forEach((b) => {
+    if (b && b.type === 'uc_profile') {
+      b.user = {
+        logged: !!u.logged,
+        nickname: u.nickname || '',
+        avatar: u.avatar || ''
+      };
+    }
+  });
+  return blocks;
+}
+
+module.exports = {
+  normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, applyUserProfile, sanitizeRich, SIZE_CLASS,
+  SHELL_FAMILY, UC_KIND_LIST, TOOL_META, UC_STAT_DEFS, UC_ORDER_DEFS
+};

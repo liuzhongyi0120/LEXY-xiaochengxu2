@@ -99,6 +99,260 @@ const HOME_BLOCKS = [
   }
 ];
 
+/** ---------------- 我的（个人中心） ---------------- */
+/** 区块类型比首页多 5 种个人中心专属区块 + 4 种个人中心独有组件（见 server/decorate/yzUserCenter.js） */
+const MINE_BLOCKS = [
+  {
+    type: "uc_navbar",
+    title: "个人中心",
+    desc: "",
+    bgMode: "default",
+    bgColor: "#FFFFFF",
+    bgImage: "",
+    mode: "immersive"
+  },
+  {
+    type: "uc_profile",
+    bgImage: "",
+    gradient: "none",
+    align: "center",
+    nameColor: "#333333",
+    codeColor: "#FFFFFF",
+    showLevel: "show",
+    barStyle: "s1"
+  },
+  {
+    type: "uc_stats",
+    showBalance: true,
+    showPoints: true,
+    showCard: true,
+    showCoupon: true,
+    showWallet: true,
+    showGiftCard: false,
+    showPickupCard: false
+  },
+  {
+    type: "swiper",
+    mode: "poster",
+    height: 400,
+    radius: "round",
+    images: [],
+    interval: 4500,
+    indicator: "dots",
+    pageMargin: 12,
+    imageGap: 0
+  },
+  {
+    type: "uc_order",
+    title: "我的订单",
+    showAll: true,
+    showPendingPay: true,
+    showPendingShip: true,
+    showShipped: true,
+    showReview: true,
+    showRefund: true
+  },
+  {
+    type: "uc_tools",
+    mode: "grid",
+    iconMode: "fill",
+    plugins: [
+      {
+        type: "memberCode",
+        title: "会员码",
+        show: false,
+        scope: "all",
+        icon: "码",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "taskCenter",
+        title: "任务中心",
+        show: true,
+        scope: "all",
+        icon: "任",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "cart",
+        title: "购物车",
+        show: true,
+        scope: "all",
+        icon: "车",
+        real: true,
+        enabled: true
+      },
+      {
+        type: "gifts",
+        title: "赠品",
+        show: true,
+        scope: "all",
+        icon: "赠",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "customerServiceChat",
+        title: "客服聊天",
+        show: true,
+        scope: "all",
+        icon: "服",
+        real: true,
+        enabled: true
+      },
+      {
+        type: "deliveryAddress",
+        title: "收货地址",
+        show: true,
+        scope: "all",
+        icon: "址",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "merchantsCall",
+        title: "拨打商家电话",
+        show: false,
+        scope: "all",
+        icon: "电",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "cashBack",
+        title: "返现",
+        show: false,
+        scope: "all",
+        icon: "返",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "fxCenter",
+        title: "分销员中心",
+        show: true,
+        scope: "fx",
+        icon: "销",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "offlineStore",
+        title: "线下门店",
+        show: true,
+        scope: "all",
+        icon: "店",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "purchaseColumnAndContent",
+        title: "课程",
+        show: false,
+        scope: "all",
+        icon: "课",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "paidContentCertificate",
+        title: "证书",
+        show: false,
+        scope: "all",
+        icon: "证",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "paidContentExamination",
+        title: "考试",
+        show: false,
+        scope: "all",
+        icon: "考",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "exchangeGiftCard",
+        title: "兑换礼品卡",
+        show: false,
+        scope: "all",
+        icon: "兑",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "paidContentExerciseBook",
+        title: "作业本",
+        show: false,
+        scope: "all",
+        icon: "业",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "blankLine",
+        title: "留白",
+        show: false,
+        scope: "all",
+        icon: "白",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "exhibitionReserve",
+        title: "活动预订",
+        show: false,
+        scope: "all",
+        icon: "订",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "accountSettings",
+        title: "账号与安全",
+        show: true,
+        scope: "all",
+        icon: "号",
+        real: true,
+        enabled: true
+      },
+      {
+        type: "restaurantReserve",
+        title: "预约订座",
+        show: false,
+        scope: "all",
+        icon: "座",
+        real: false,
+        enabled: true
+      },
+      {
+        type: "referralRewards",
+        title: "邀请有礼",
+        show: false,
+        scope: "all",
+        icon: "邀",
+        real: false,
+        enabled: false
+      },
+      {
+        type: "about",
+        title: "关于我们",
+        show: true,
+        scope: "all",
+        icon: "关",
+        real: true,
+        enabled: true
+      }
+    ]
+  },
+  {
+    type: "follow_oa"
+  }
+];
+
 /** ---------------- 莱克（产品系列） ---------------- */
 const LEXY_SERIES = [
   {
@@ -911,6 +1165,7 @@ const TABBAR = {
 module.exports = {
   SHOP,
   HOME_BLOCKS,
+  MINE_BLOCKS,
   LEXY_SERIES,
   NEWS,
   PRODUCT_NAV_LOGO,

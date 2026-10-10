@@ -12,10 +12,20 @@
  */
 
 const { openLink } = require('./link');
-const { loadGoodsData } = require('./blocks');
+const { loadGoodsData, TOOL_META } = require('./blocks');
 
 const GOODS_LIST = '/packageGoods/list/list';
 const GOODS_DETAIL = '/packageGoods/detail/detail';
+
+/**
+ * 「必备工具」里**真能跳**的工具 → 页面路径。
+ * 与 `TOOL_META` 的 `real` 标记配套：两者都对上才跳，任一处没标就走「开发中」提示。
+ * ⚠️ 路径必须是 app.json 里真实存在的页面，别写「将来会有」的地址 —— 那只会变成一次转圈。
+ */
+const TOOL_ROUTE = {
+  cart: '/pages/cart/cart',
+  search: '/pages/category/category'
+};
 
 const blockPageBehavior = {
   /**
@@ -253,6 +263,43 @@ const blockPageBehavior = {
       this._audioIdx = null;
       this._audioPlaying = false;
     }
+  },
+
+  /* ------------------------- 个人中心（「我的」页）区块 ------------------------- */
+
+  /**
+   * 「我的订单」点某个状态入口（含「全部订单」）。
+   *
+   * 真正的跳转由页面实现（`onTapOrderStatus`）—— 订单列表页还没交付，
+   * 页面里给的是「订单中心开发中」提示；页面一旦交付，只改页面那一处。
+   */
+  onTapUcOrder(e) {
+    const status = String((e.currentTarget.dataset || {}).status || 'ALL');
+    if (typeof this.onTapOrderStatus === 'function') return this.onTapOrderStatus(status);
+    wx.showToast({ title: '订单中心开发中', icon: 'none' });
+  },
+
+  /**
+   * 「必备工具」点某一项。
+   *
+   * 只有 TOOL_META 里标了 `real: true` 的工具才真的跳转，其余**如实提示「开发中」**——
+   * 与那 34 个依赖型组件同一口径：装修台里能配，真机不假装可用。
+   * 「客服聊天」在 WXML 里用 `<button open-type="contact">` 落地，不走这里。
+   */
+  onTapToolItem(e) {
+    const key = String((e.currentTarget.dataset || {}).key || '');
+    if (!key) return;
+    const meta = TOOL_META[key] || { real: false };
+
+    // 关于我们 / 账号与安全由页面自己实现（都是页面级能力，不在公用行为里硬编码文案）
+    if (key === 'about' && typeof this.onTapAbout === 'function') return this.onTapAbout();
+    if (key === 'accountSettings' && typeof this.onTapAccountSettings === 'function') return this.onTapAccountSettings();
+
+    if (meta.real && TOOL_ROUTE[key]) {
+      wx.navigateTo({ url: TOOL_ROUTE[key], fail: () => wx.showToast({ title: '页面暂未开放', icon: 'none' }) });
+      return;
+    }
+    wx.showToast({ title: '该功能开发中', icon: 'none' });
   }
 };
 
