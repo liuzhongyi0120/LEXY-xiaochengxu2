@@ -2334,6 +2334,33 @@ assert('图表图例样式有明确归属（`.bars .lb` 存在，说明撞车对
 assert('页面遮挡哨兵脚本存在（真浏览器兜底，防「撞车式黑屏」复发）',
   existsSync(join(__dirname, '..', '..', '.tooling', 'test-page-occlusion.mjs')));
 
+/* ---- 控制台 → 装修台：所有入口都必须在**当前页**打开，不得有新窗口入口 ----
+ *
+ * 装修台（/admin）是单页应用：点页面行的「装修」会在本页切到三栏编辑器，本来就不需要另开窗口。
+ * 曾经「店铺装修」视图右上角是 `<a href="/admin" target="_blank">在新窗口打开 ↗</a>`，
+ * 「店铺设置」里的「去装修台修改」同样是 target="_blank" —— 点下去弹出一个与当前页脱节的窗口，
+ * 在里面改的草稿回到控制台完全看不到（用户反馈：「店铺装修，点页面装修都在新窗口打开而不是在当前页显示」）。
+ */
+const adminBlankHref = /<a[^>]*(?:href="\/admin"[^>]*target="_blank"|target="_blank"[^>]*href="\/admin")/;
+/* 断言前必须剥掉 JS 注释：上面那段说明文字里就原样引用了那行旧代码，
+ * 不剥的话「自己写的注释」会把断言判红（这类假红比不检查更浪费时间）。 */
+const consoleJsNoComment = consoleJs
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+assert('控制台里没有指向装修台（/admin）的新窗口入口',
+  !adminBlankHref.test(consoleJsNoComment),
+  adminBlankHref.test(consoleJsNoComment) ? '仍有 <a href="/admin" target="_blank">' : '一律在当前页打开');
+assert('「店铺装修」视图把装修台内嵌在当前页（iframe src="/admin"）',
+  /class="frame-wrap"><iframe src="\/admin"/.test(consoleModSrc));
+assert('「店铺装修」视图给的是「刷新装修台」（重设 iframe 的 src）而不是新窗口',
+  /data-frame-reload/.test(consoleModSrc) && /f\.src\s*=\s*'\/admin'/.test(consoleModSrc));
+assert('「店铺设置」的「去装修台修改」在当前页切视图（data-goto-decorate → App.go(\'decorate\')）',
+  /data-goto-decorate/.test(consoleCoreSrc) && /App\.go\('decorate'\)/.test(consoleCoreSrc));
+/* 高度写错=装修台底部的「生成代码」被顶出屏幕（运营点不到发布按钮），所以连数值一起锁 */
+assert('内嵌装修台的 iframe 高度按整页占位计算（52 顶栏 + 56 body 内边距 + 45 卡片头 + 2 边框 = 155）',
+  /\.frame-wrap\s*\{\s*height:\s*calc\(100vh\s*-\s*155px\)/.test(consoleCssNoComment),
+  '写成 52+32（漏掉卡片标题栏）会让 iframe 比可视区高');
+
 /* ---------------------------------------------------------------------------
  * 15.10 装修台预览（共享渲染核心）与 /preview（真机源码编译）
  *
@@ -2633,15 +2660,44 @@ assert('点击导航项时不立刻在组件里改高亮（否则与目标页 on
   navCtbSrc.indexOf('onTap(') > 0 && !/setData\s*\(/.test(navOnTapSrc),
   'onTap 内只 wx.switchTab，高亮交给目标页同步');
 
-/* ---- D. 兜底值三处一致（后端 schema / 小程序组件 / 预览渲染） ---- */
+/* ---- D. 兜底值三处一致（后端 schema / 小程序组件 / 预览渲染） ----
+ *
+ * 「兜底」是个明确口径：replica.js 里**还没有** TABBAR（一次都没发布过导航）时，
+ * 三处必须给出同一份默认值，否则就会出现「装修台一个样、真机另一个样」。
+ *
+ * ⚠️ 量组件时必须把 replica.TABBAR 剥掉，不能直接透传 replica：
+ * 组件的 readConfig() 优先用 replica.TABBAR（运营在装修台发布过的真实配置），
+ * 直接透传量到的是「线上配了什么」而不是「兜底值是什么」——
+ * 只要运营没改过导航就一直是绿的，运营一改文案就误报「三处不一致」。
+ * 2026-10-10 实测踩到：运营把底部导航的「我的」改成「个人」并生成代码，这条断言立刻变红，
+ * 而真机 / 装修台 / 预览三处表现完全正常 —— 是断言问错了问题（假红）。
+ */
 const NAV_PV = pvRequire(join(PUB, 'shared', 'pv-tabbar.js')).PvTabbar;
 // 组件文件需要 Component / wx 全局，直接 require 跑不起来 —— 用 vm 跑一遍，取出它内部算好的初始渲染数据
 const navVm = await import('node:vm');
 const navMakeRequire = (await import('node:module')).createRequire;
-const navCtbDef = {};
-const navSandbox = { console, require: navMakeRequire(join(NAV_CTB, 'index.js')), Component: (d) => { navCtbDef.value = d; } };
-navVm.createContext(navSandbox);
-navVm.runInContext(navCtbSrc, navSandbox, { filename: 'custom-tab-bar/index.js' });
+const navCtbRequire = navMakeRequire(join(NAV_CTB, 'index.js'));
+/** 在 vm 里跑一遍 custom-tab-bar；dropTabbar=true 时把 replica.TABBAR 剥掉，量到的就是兜底值 */
+function navRunComponent(dropTabbar) {
+  const def = {};
+  const sandbox = {
+    console,
+    require: (id) => {
+      const m = navCtbRequire(id);
+      if (!dropTabbar) return m;
+      if (/(^|\/)config\/replica(\.js)?$/.test(String(id))) {
+        const clone = Object.assign({}, m);
+        delete clone.TABBAR;
+        return clone;
+      }
+      return m;
+    },
+    Component: (d) => { def.value = d; }
+  };
+  navVm.createContext(sandbox);
+  navVm.runInContext(navCtbSrc, sandbox, { filename: 'custom-tab-bar/index.js' });
+  return ((def.value || {}).data) || {};
+}
 const navCanon = (c) => JSON.stringify({
   color: c.color, selectedColor: c.selectedColor, background: c.background,
   borderColor: c.borderColor, iconMode: c.iconMode,
@@ -2649,7 +2705,7 @@ const navCanon = (c) => JSON.stringify({
 });
 const navTrio = {
   '后端 schema': NAV_SCHEMA.tabbarDefault(),
-  '小程序组件': ((navCtbDef.value || {}).data) || {},
+  '小程序组件': navRunComponent(true),
   '预览渲染': NAV_PV.normalize(null)
 };
 const navTrioVals = Object.keys(navTrio).map((k) => [k, navCanon(navTrio[k])]);
@@ -2657,8 +2713,83 @@ const navTrioUniq = Array.from(new Set(navTrioVals.map((x) => x[1])));
 assert('底部导航兜底值三处一致（后端 schema / 小程序组件 / 预览渲染 pv-tabbar.js）',
   navTrioVals[1][1].indexOf('"items":[]') < 0 && navTrioUniq.length === 1,
   navTrioUniq.length === 1
-    ? `${navTrioVals.length} 处一致（当前 replica.js 尚未发布过导航，组件正是靠这份兜底渲染）：${navTrioUniq[0].slice(0, 72)}…`
+    ? `${navTrioVals.length} 处一致（已剥掉 replica.TABBAR 的兜底口径）：${navTrioUniq[0].slice(0, 72)}…`
     : navTrioVals.map((x) => x[0] + '=' + x[1]).join(' ｜ '));
+
+/*
+ * ---- B. 反向三条：replica.js 里**有** TABBAR 时，组件必须用运营发布的那份 ----
+ * （「运营改了导航文案，真机纹丝不动」是这类配置最典型的故障，所以必须反向锁一条。）
+ *
+ * ⚠️ 前两条一律喂**合成配置**，不要拿 replica.js 里运营当前的值去逐字符比：
+ *   组件会做归一化（截 5 字 / 同页面去重 / 空文案回落页面名），而 replica 原文是
+ *   「运营写什么就是什么」；直接和原文比，运营只要把文案写成 6 个字或带个前导空格，
+ *   断言就会红，而真机完全正常。
+ *   2026-10-10 实测踩到：同一条断言、同一份代码，第一遍跑红、第二遍跑绿 ——
+ *   数据驱动的断言一旦不稳定，比不检查更糟（会把真问题淹没）。
+ *   合成输入只测「有没有采用配置 / 归一化口径对不对」这两件事，与运营数据无关，永远稳定。
+ */
+function navRunWithTabbar(tabbar) {
+  const def = {};
+  const sandbox = {
+    console,
+    require: (id) => (/(^|\/)config\/replica(\.js)?$/.test(String(id))
+      ? { TABBAR: tabbar }
+      : navCtbRequire(id)),
+    Component: (d) => { def.value = d; }
+  };
+  navVm.createContext(sandbox);
+  navVm.runInContext(navCtbSrc, sandbox, { filename: 'custom-tab-bar/index.js' });
+  return ((def.value || {}).data) || {};
+}
+const navPairsOf = (items) => (items || []).map((i) => i.path + '|' + i.text).join(',');
+const navStyleOf = (c) => [c.color, c.selectedColor, c.background, c.borderColor, c.iconMode].join(',');
+
+const navSynth = navRunWithTabbar({
+  color: '#111111', selectedColor: '#222222', background: '#333333', borderColor: '#444444',
+  iconMode: 'never',
+  items: [
+    { path: '/pages/news/news', text: '资讯栏' },
+    { path: '/pages/index/index', text: '首页面' }
+  ]
+});
+assert('有导航配置时组件原样采用（顺序 / 文案 / 四色 / 图标模式全听装修台的，不走兜底）',
+  navSynth.iconMode === 'never' && navStyleOf(navSynth) === '#111111,#222222,#333333,#444444,never' &&
+    navPairsOf(navSynth.items) === '/pages/news/news|资讯栏,/pages/index/index|首页面',
+  `${navStyleOf(navSynth)} ｜ ${navPairsOf(navSynth.items)}`);
+
+const navSynth2 = navRunWithTabbar({
+  items: [
+    { path: '/pages/news/news', text: '资讯' },
+    { path: '/pages/news/news', text: '同一页面配两次' },
+    { path: '/pages/mine/mine', text: '   我的个人中心页  ' },
+    { path: '/pages/lexy/lexy', text: '' },
+    { path: '/pages/product/product', text: '产品' },
+    { path: '/pages/index/index', text: '第六项' },
+    /* 最后两项只能被「项数收敛到 5」截掉 —— 去重后正好 5 个内置页，
+       不补两项的话这条断言其实测不到上限（第一版就是这么写的，跑出 5 项才发现）。 */
+    { path: '/pages/a/a', text: '第七项' },
+    { path: '/pages/b/b', text: '第八项' }
+  ]
+});
+assert('组件归一化与后端 / 预览同口径（同页面去重 · 先 trim 再截 5 字 · 空文案回落页面名 · 项数收敛到 5）',
+  navPairsOf(navSynth2.items) ===
+    '/pages/news/news|资讯,/pages/mine/mine|我的个人中,/pages/lexy/lexy|莱克,/pages/product/product|产品,/pages/index/index|第六项',
+  navPairsOf(navSynth2.items));
+
+/*
+ * 第三条跑**运营当前那份真实配置**，但比的是「组件渲染结果 vs 预览渲染结果」，
+ * 而不是「组件 vs replica 原文」—— 两侧都过各自的归一化再对账，才是「口径一致」这个真问题。
+ * （和 replica 原文比会把归一化本身误判成不一致，见上面的教训。）
+ * 只比 path / 文案 / 四色 / 图标模式，**不比图标 URL**：组件侧会过 utils/asset.js 的
+ * resolveAssets 补 BASE_URL（真机要绝对地址），预览侧是浏览器同源相对路径 —— 有意不同，不是缺陷。
+ * replica 里没有 TABBAR 时两侧各自回落默认值，这条同样成立（预览的 DEFAULT = 组件的 FALLBACK）。
+ */
+const navReplicaTabbar = navCtbRequire('../config/replica').TABBAR;
+const navLive = navRunComponent(false);
+const navPvLive = NAV_PV.normalize(navReplicaTabbar);
+assert('运营当前那份导航，组件渲染与预览渲染同口径（装修台看到的就是真机上的）',
+  navPairsOf(navLive.items) === navPairsOf(navPvLive.items) && navStyleOf(navLive) === navStyleOf(navPvLive),
+  `组件=${navStyleOf(navLive)} ｜${navPairsOf(navLive.items)} ｜ 预览=${navStyleOf(navPvLive)} ｜${navPairsOf(navPvLive.items)}`);
 
 /* ---- E. 装修链路：列表 / 字段结构 / 校验边界（写入类断言跑完即丢弃草稿） ---- */
 const navPagesRes = await call('GET', '/api/decorate/pages', { auth: false });

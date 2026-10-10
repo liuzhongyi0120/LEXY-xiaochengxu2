@@ -1055,7 +1055,13 @@ App.views.settings = {
         '改完要在装修台点「生成代码」，并上传发布小程序新版本，用户端才会更新。' +
         '</div>' +
         '<div class="btn-group" style="margin-top:10px">' +
-          '<a class="btn primary" href="/admin" target="_blank">去装修台修改</a>' +
+          /*
+           * 这里原来是一个 `<a href="/admin" target="_blank">`：点一下弹出新窗口，
+           * 而控制台本身已经有一个内嵌装修台的「店铺装修」视图 —— 两处重复，且新窗口里改的草稿
+           * 在控制台里完全看不到。改成在当前页切视图（App.go 走 hash 路由，不刷新页面、不丢上下文）。
+           */
+          '<button class="btn primary" data-goto-decorate>去装修台修改</button>' +
+          '<span class="sub" style="align-self:center">切到控制台的「店铺装修」，在当前页打开，不会另开窗口</span>' +
         '</div>' +
       '</div></div>' +
 
@@ -1110,6 +1116,14 @@ App.views.settings = {
         payExpireMinutes: Math.round(Number(g('payExpireMinutes') || 0))
       };
     };
+
+    /*
+     * 「去装修台修改」→ 切到本页的「店铺装修」视图（内嵌装修台），而不是新开窗口。
+     * 店铺名称 / 头像 / 标语的真源是装修台写回的 replica.SHOP，
+     * 运营改完要顺手点「生成代码」，所以在当前页切过去最省事、也最不容易改错地方。
+     */
+    const gotoDeco = body.querySelector('[data-goto-decorate]');
+    if (gotoDeco) gotoDeco.addEventListener('click', () => App.go('decorate'));
 
     body.querySelector('[data-save]').addEventListener('click', async () => {
       if (!needRole('owner', '保存店铺设置')) return;

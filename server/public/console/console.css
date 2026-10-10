@@ -541,9 +541,18 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 .pager { display: flex; align-items: center; gap: 8px; padding: 12px 14px; justify-content: flex-end; color: var(--sub); font-size: 12px; }
 .pager .btn { min-width: 30px; justify-content: center; }
 
-/* iframe 视图 */
-.frame-wrap { height: calc(100vh - 52px - 32px); }
-.frame-wrap iframe { width: 100%; height: 100%; border: 0; border-radius: var(--radius); background: #fff; }
+/*
+ * iframe 视图 —— 目前只有「店铺装修」（装修台内嵌在当前页）。
+ *
+ * 高度必须按「整页减掉固定占位」算，不能写死：
+ *   顶栏 52 + .body 上下内边距 (16+40) + 卡片标题栏 ~45 + 卡片上下边框 2 ≈ 155
+ * 之前写的是 52+32，卡片标题栏那一截没算进去 → iframe 比可视区高，
+ * 装修台底部的「生成代码」按钮被顶出屏幕（运营反馈过「按钮点不到」）。
+ * min-height 保证窗口很矮时也不会缩成一条线（宁可让页面出现滚动条）。
+ */
+.frame-wrap { height: calc(100vh - 155px); min-height: 420px; }
+/* 卡片下沿有圆角、.card-b.tight 又是 0 内边距，iframe 只圆下面两角才能贴住卡片 */
+.frame-wrap iframe { width: 100%; height: 100%; border: 0; border-radius: 0 0 var(--radius) var(--radius); background: #fff; }
 
 /* 空态 */
 .empty-state { text-align: center; color: var(--sub); padding: 40px 16px; }

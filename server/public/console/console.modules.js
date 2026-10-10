@@ -1278,13 +1278,29 @@ App.views.media = {
 };
 
 /* ============================== 视图：店铺装修（内嵌装修台） ============================== */
-
+/*
+ * 装修台以 iframe 内嵌在**当前页**，这是控制台里唯一的装修入口。
+ *
+ * 这里曾经是一个 `<a href="/admin" target="_blank">在新窗口打开 ↗</a>` —— 点下去会弹出一个
+ * 与当前页完全脱节的窗口：在里面改的草稿回到控制台看不到，「点页面行的『装修』」也只在那个新窗口里生效。
+ * 用户反馈「店铺装修，点页面装修都在新窗口打开而不是在当前页显示」，因此：
+ *   · 去掉一切新窗口入口，改为「↻ 刷新装修台」（重设 iframe 的 src）
+ *   · iframe 占满整张卡，让装修台的三栏编辑器在控制台里就够宽
+ * 装修台本身是单页应用：在 iframe 里点某页的「装修」会在**本页**切到三栏编辑器，本来就不需要另开窗口。
+ */
 App.views.decorate = {
   async render(body) {
     body.innerHTML =
-      '<div class="card" style="margin-bottom:10px"><div class="card-h"><h2>店铺装修</h2><div class="grow"></div>' +
-        '<span class="hint">可视化编辑小程序页面，改完点「发布」写回 replica.js</span>' +
-        '<a class="btn" href="/admin" target="_blank">在新窗口打开 ↗</a></div>' +
-      '<div class="card-b" style="padding:0"><div class="frame-wrap"><iframe src="/admin" title="店铺装修台"></iframe></div></div></div>';
+      '<div class="card"><div class="card-h"><h2>店铺装修</h2><div class="grow"></div>' +
+        '<span class="hint">在下面点页面行的「装修」直接在本页打开编辑器，改完点「生成代码」写回 replica.js</span>' +
+        '<button class="btn" data-frame-reload title="重新加载装修台（未保存的界面状态会丢失，草稿不受影响）">↻ 刷新装修台</button>' +
+      '</div>' +
+      '<div class="card-b tight"><div class="frame-wrap"><iframe src="/admin" title="店铺装修台"></iframe></div></div></div>';
+
+    body.querySelector('[data-frame-reload]').addEventListener('click', () => {
+      const f = body.querySelector('.frame-wrap iframe');
+      if (f) f.src = '/admin';   // 重设 src 即重新加载（不新开窗口）
+      toast('装修台已重新加载');
+    });
   }
 };

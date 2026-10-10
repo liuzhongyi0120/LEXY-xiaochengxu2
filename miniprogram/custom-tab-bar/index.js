@@ -45,6 +45,18 @@ function cutText(v) {
 }
 
 /**
+ * 空文案回落页面名 —— 与后端 schema.tabbarItem / 预览 pv-tabbar.js 的 `cutText(o.text) || pageName(path)` 同口径。
+ * 名字表就用下面的 FALLBACK（正是那 5 个内置 tab 页），不另外写死一份。
+ * 漏了这条会出现「有图标、没文字」的空白 tab —— 装修台预览与真机长得不一样。
+ */
+function pageName(path) {
+  for (let i = 0; i < FALLBACK.items.length; i++) {
+    if (FALLBACK.items[i].path === path) return FALLBACK.items[i].text;
+  }
+  return '';
+}
+
+/**
  * 读一份「一定能渲染」的导航配置。
  * 这里再做一遍兜底（而不是直接信任 replica）：装修数据是运营配的，
  * 隔一层防御就能保证「配错了也不会白屏 / 不会出现空导航条」。
@@ -65,7 +77,7 @@ function readConfig() {
     const activeIcon = resolveAssets(it.activeIcon || it.icon || '');
     items.push({
       path: it.path,
-      text: cutText(it.text),
+      text: cutText(it.text) || pageName(it.path),
       icon: icon,
       activeIcon: activeIcon,
       hasIcon: !!(icon || activeIcon)
