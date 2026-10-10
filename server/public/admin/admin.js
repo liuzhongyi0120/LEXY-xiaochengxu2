@@ -263,7 +263,7 @@
       p.then(function (who) {
         toast('已登录：' + ((who && who.name) || '管理员'));
         closeModal();
-        loadPages();
+        loadPagesThenMaybeOpenEdit();   // 带 ?edit=xxx 进来的窗口，登录完直接续上那个页面
       })['catch'](function (e) {
         if (tk) clearSession();   // 令牌填错就把刚写进去的清掉，否则后续每个请求都 401
         ok.disabled = false;
@@ -346,7 +346,42 @@
     else tb.classList.add('mode-list');
   }
 
+  /*
+   * 「点装修 → 在新窗口打开编辑器」要求地址栏能表达「打开哪个页面」：
+   * 新标签页加载 /admin?edit=<key> 时必须**直接进那个页面的编辑器**，
+   * 否则运营点十个页面就要在十个新窗口里各点一次「装修」，比同页切换还费事。
+   *
+   * 反过来，编辑器里点「返回列表」要把参数摘掉 —— 否则刷新一下又弹回编辑器。
+   * 用 replaceState 而不是 pushState：装修台自己不是浏览器历史的主要角色，
+   * 堆历史会让「后退」变成在装修台内部来回跳，反而回不到控制台。
+   */
+  function editKeyFromUrl() {
+    try { return new URLSearchParams(location.search).get('edit') || ''; } catch (e) { return ''; }
+  }
+  function syncUrl(key) {
+    try {
+      history.replaceState(null, '', key ? ('/admin?edit=' + encodeURIComponent(key)) : '/admin');
+    } catch (e) { /* 非 http 环境：地址栏不同步，不影响功能 */ }
+  }
+
+  /**
+   * 列表加载完之后，若地址栏带 ?edit=<key> 就直接进编辑器。
+   *
+   * 这条路径承担两件事：① 「装修」按钮新窗口打开 /admin?edit=xxx 时直达编辑器；
+   * ② 未登录被 401 拦下、登录成功后**自动续上**原本要打开的那个页面 ——
+   *    否则运营在新窗口里登完录却停在列表页，还得再点一次「装修」。
+   */
+  function loadPagesThenMaybeOpenEdit() {
+    var k = editKeyFromUrl();
+    var p = loadPages();
+    if (!k || !p || !p.then) return p;
+    return p.then(function () {
+      if (me()) openPage(k);   // 未登录时先不开：登录成功后本函数会再跑一次
+    });
+  }
+
   function showList() {
+    syncUrl('');
     $('viewList').hidden = false;
     $('viewEdit').hidden = true;
     S.cur = null;
@@ -461,7 +496,16 @@
         '<div class="nv-chips">' + (chips || '<span class="dim">—</span>') + '</div>' +
       '</div>' +
       '<div class="nv-ops">' +
-        '<button class="btn primary" data-open="nav" title="配置小程序底部导航栏">设置底部导航</button>' +
+        /*
+         * 「装修」类入口一律 <a target="_blank"> 在新窗口打开：
+         *   · 装修是「对着真机效果反复调」的活，运营常常要同时开着控制台 / 商品页对照，
+         *     挤在同一个标签页里切来切去，一按返回还把编辑器里的状态丢了；
+         *   · 用真链接而不是 window.open，中键 / 右键「在新标签页打开」也能用，
+         *     也不会被浏览器当弹窗拦掉。
+         * href 上的 ?edit=<key> 让新窗口**直达**那个页面的编辑器（见 editKeyFromUrl）。
+         */
+        '<a class="btn primary" href="/admin?edit=nav" target="_blank" rel="noopener"' +
+          ' title="配置小程序底部导航栏（在新窗口打开）">设置底部导航 ↗</a>' +
         '<button class="btn sm" data-vers="nav" title="历史版本与回滚">版本</button>' +
       '</div>';
   }
@@ -514,7 +558,8 @@
       tr.innerHTML =
         '<td>' +
           '<div class="pname-row">' +
-            '<span class="pname" data-open="' + attr(p.key) + '">' + esc(p.name) + '</span>' + typeHtml +
+            '<a class="pname" href="/admin?edit=' + attr(encodeURIComponent(p.key)) + '"' +
+              ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">' + esc(p.name) + '</a>' + typeHtml +
           '</div>' +
           '<div class="psub" title="' + attr(subParts.join(' · ')) + '">' +
             esc(subParts.join(' · ')) + '</div>' +
@@ -528,7 +573,8 @@
           (p.note ? '<span title="' + attr(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dim">—</span>') +
         '</td>' +
         '<td><div class="ops">' +
-          '<button class="btn sm" data-open="' + attr(p.key) + '" title="进入可视化编辑器">装修</button>' +
+          '<a class="btn sm" href="/admin?edit=' + attr(encodeURIComponent(p.key)) + '"' +
+            ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修 ↗</a>' +
           '<button class="btn sm" data-diff="' + attr(p.key) + '" title="查看草稿与已发布内容的差异">查看变更</button>' +
           '<button class="btn sm" data-vers="' + attr(p.key) + '" title="历史版本与回滚">版本</button>' +
           '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +
@@ -569,6 +615,7 @@
       S.pvBrand = 0;
       S.pvSlide = {}; // 预览翻页位置是页面级状态，切页要清掉
       showEdit();
+      syncUrl(key); // 让地址栏 = /admin?edit=<key>：这个窗口被刷新 / 被收藏都能回到同一个编辑器
       usePageLib(key);
       $('edName').textContent = d.meta.name;
       $('edPath').textContent = d.meta.path;
@@ -3143,15 +3190,18 @@
    * 沿用旧写法会点了没反应（按钮有、事件收不到，最难查的一类 bug）。
    * 改用 closest 取最近的命中元素：按钮里的文字节点也能点中。
    * 用「列表视图可见」做闸门，避免编辑器视图里的同名 data-* 属性被误处理。
+   *
+   * 这里**不再处理 data-open**（进入编辑器）：「装修」/ 页面名 / 「设置底部导航」都是
+   * <a href="/admin?edit=xxx" target="_blank">，链接自己就会开新窗口。
+   * 若同时留着这段委托，点一下会既在这里切视图、又在新窗口打开一份（双份效果，最容易忽略）。
    */
   document.addEventListener('click', function (e) {
     if ($('viewList').hidden) return;
     var t = e.target && e.target.closest
-      ? e.target.closest('[data-open],[data-diff],[data-vers],[data-discard],[data-rename],[data-del]')
+      ? e.target.closest('[data-diff],[data-vers],[data-discard],[data-rename],[data-del]')
       : null;
     if (!t) return;
-    var key = t.getAttribute('data-open'); if (key) { openPage(key); return; }
-    key = t.getAttribute('data-diff'); if (key) { showDiff(key); return; }
+    var key = t.getAttribute('data-diff'); if (key) { showDiff(key); return; }
     key = t.getAttribute('data-vers'); if (key) { showVersions(key); return; }
     key = t.getAttribute('data-discard'); if (key) { discardDraft(key); return; }
     key = t.getAttribute('data-rename'); if (key) { renamePageDialog(key); return; }
@@ -3233,7 +3283,7 @@
   // 只有令牌没有身份时先补齐，否则首屏会把已登录用户渲染成「未登录」
   hydrateSession().then(function () {
     renderWho();
-    loadPages();
+    loadPagesThenMaybeOpenEdit();   // 首屏就认 ?edit=<key>：新窗口打开编辑器直达
   });
 
   window.__admin = {

@@ -96,6 +96,22 @@ code { font-family: Consolas, Monaco, "Courier New", monospace; background: var(
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn:disabled:hover { border-color: var(--line); color: var(--ink-2); }
 
+/*
+ * 「装修 / 设置底部导航」这类入口是 <a target="_blank"> 而不是 <button>：
+ * 真链接才支持中键 / 右键「在新标签页打开」，也不会被浏览器当弹窗拦掉。
+ * 但 <a> 的默认盒模型与文字装饰跟 <button> 不一样，必须显式对齐 ——
+ *   · a 默认 content-box：同样 height:26px + 1px 边框，实际会比 button 高 2px；
+ *   · a 默认带下划线。
+ * 少这两条时表现是「同一行按钮高矮不齐、装修二字下面有下划线」。
+ */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  text-decoration: none;
+}
+
 .tag {
   display: inline-block;
   padding: 0 7px;
@@ -206,6 +222,9 @@ td.td-empty { text-align: center; color: var(--gray-2); padding: 30px 14px; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* 页面名现在是 <a target="_blank">（与新窗口里的编辑器同一个入口），去掉链接默认下划线：
+   保持 .pname 原本的「蓝色加粗、悬停才划线」观感 */
+a.pname { text-decoration: none; }
 .pname:hover { text-decoration: underline; }
 .psub {
   font-size: 11px;

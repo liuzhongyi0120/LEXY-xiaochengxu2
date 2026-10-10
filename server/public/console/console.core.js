@@ -1056,12 +1056,12 @@ App.views.settings = {
         '</div>' +
         '<div class="btn-group" style="margin-top:10px">' +
           /*
-           * 这里原来是一个 `<a href="/admin" target="_blank">`：点一下弹出新窗口，
-           * 而控制台本身已经有一个内嵌装修台的「店铺装修」视图 —— 两处重复，且新窗口里改的草稿
-           * 在控制台里完全看不到。改成在当前页切视图（App.go 走 hash 路由，不刷新页面、不丢上下文）。
+           * 走新窗口（<a target="_blank">）：这三项的真源在装修台，进来是要**动手改**的，
+           * 在当前页切视图会把运营手上的「店铺设置」页挤掉，改完还得自己找回来。
+           * 新窗口里改完点「生成代码」再回来，两边互不打扰。
            */
-          '<button class="btn primary" data-goto-decorate>去装修台修改</button>' +
-          '<span class="sub" style="align-self:center">切到控制台的「店铺装修」，在当前页打开，不会另开窗口</span>' +
+          '<a class="btn primary" href="/admin" target="_blank" rel="noopener">去装修台修改 ↗</a>' +
+          '<span class="sub" style="align-self:center">在新窗口打开装修台；改完点「生成代码」写回 replica.SHOP</span>' +
         '</div>' +
       '</div></div>' +
 
@@ -1118,12 +1118,10 @@ App.views.settings = {
     };
 
     /*
-     * 「去装修台修改」→ 切到本页的「店铺装修」视图（内嵌装修台），而不是新开窗口。
-     * 店铺名称 / 头像 / 标语的真源是装修台写回的 replica.SHOP，
-     * 运营改完要顺手点「生成代码」，所以在当前页切过去最省事、也最不容易改错地方。
+     * 这里**不再**为「去装修台修改」绑 JS —— 它是 <a href="/admin" target="_blank">，
+     * 真链接自己就开新窗口（中键 / 右键也能用）。若还留着 App.go('decorate') 的绑定，
+     * 点一下会既在当前页切视图、又在新窗口打开装修台，变成两处入口打架。
      */
-    const gotoDeco = body.querySelector('[data-goto-decorate]');
-    if (gotoDeco) gotoDeco.addEventListener('click', () => App.go('decorate'));
 
     body.querySelector('[data-save]').addEventListener('click', async () => {
       if (!needRole('owner', '保存店铺设置')) return;

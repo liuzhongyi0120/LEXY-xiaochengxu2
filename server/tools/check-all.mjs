@@ -2334,28 +2334,67 @@ assert('图表图例样式有明确归属（`.bars .lb` 存在，说明撞车对
 assert('页面遮挡哨兵脚本存在（真浏览器兜底，防「撞车式黑屏」复发）',
   existsSync(join(__dirname, '..', '..', '.tooling', 'test-page-occlusion.mjs')));
 
-/* ---- 控制台 → 装修台：所有入口都必须在**当前页**打开，不得有新窗口入口 ----
+/* ---- 装修入口：点「装修」必须在**新窗口**打开编辑器（2026-10-10 用户确认口径）----
  *
- * 装修台（/admin）是单页应用：点页面行的「装修」会在本页切到三栏编辑器，本来就不需要另开窗口。
- * 曾经「店铺装修」视图右上角是 `<a href="/admin" target="_blank">在新窗口打开 ↗</a>`，
- * 「店铺设置」里的「去装修台修改」同样是 target="_blank" —— 点下去弹出一个与当前页脱节的窗口，
- * 在里面改的草稿回到控制台完全看不到（用户反馈：「店铺装修，点页面装修都在新窗口打开而不是在当前页显示」）。
+ * ⚠️ 这条口径被改过两次，务必按当前版本理解，别照着旧注释改回去：
+ *   · 最初：/admin 的「装修」是同页切 #viewList / #viewEdit，控制台里的装修台是 iframe 内嵌；
+ *   · 中间一版（错的）：按「不要新窗口」把控制台的新窗口入口也一起去掉了；
+ *   · 现在（用户确认）：**点「装修」= 在新窗口打开编辑器**。装修是「对着真机效果反复调」的活，
+ *     运营要同时开着控制台 / 商品页做对照；挤在同一个标签页里切来切去，一按返回还会把
+ *     编辑器里的未保存状态一起丢掉。
+ *
+ * 两条硬要求，任一条被改回去都会让运营多绕一圈：
+ *   ① 入口必须是真 <a target="_blank">（不是 window.open，也不是同页按钮）——
+ *      真链接才支持中键 / 右键「在新标签页打开」，也不会被浏览器当弹窗拦掉；
+ *   ② 新窗口加载的 /admin?edit=<key> 必须**直达**那个页面的编辑器，
+ *      否则运营每开一个页面都要在新窗口里再点一次「装修」，比同页切换还费事。
  */
-const adminBlankHref = /<a[^>]*(?:href="\/admin"[^>]*target="_blank"|target="_blank"[^>]*href="\/admin")/;
-/* 断言前必须剥掉 JS 注释：上面那段说明文字里就原样引用了那行旧代码，
- * 不剥的话「自己写的注释」会把断言判红（这类假红比不检查更浪费时间）。 */
+const decoJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+const decoCss = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.css'), 'utf8');
+/* 断言前必须剥注释：下面说明里会原样引用旧写法（<button data-open> / App.go('decorate')），
+ * 不剥的话「自己写的注释」会把断言判红 —— 这类假红比不检查更浪费时间。 */
+const decoJsNoComment = decoJs
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+const decoCssNoComment = decoCss.replace(/\/\*[\s\S]*?\*\//g, '');
+/* 上面那段说明文字里本身就引用了旧代码，同样要剥掉再断言 */
 const consoleJsNoComment = consoleJs
   .replace(/\/\*[\s\S]*?\*\//g, '')
   .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-assert('控制台里没有指向装修台（/admin）的新窗口入口',
-  !adminBlankHref.test(consoleJsNoComment),
-  adminBlankHref.test(consoleJsNoComment) ? '仍有 <a href="/admin" target="_blank">' : '一律在当前页打开');
-assert('「店铺装修」视图把装修台内嵌在当前页（iframe src="/admin"）',
-  /class="frame-wrap"><iframe src="\/admin"/.test(consoleModSrc));
-assert('「店铺装修」视图给的是「刷新装修台」（重设 iframe 的 src）而不是新窗口',
-  /data-frame-reload/.test(consoleModSrc) && /f\.src\s*=\s*'\/admin'/.test(consoleModSrc));
-assert('「店铺设置」的「去装修台修改」在当前页切视图（data-goto-decorate → App.go(\'decorate\')）',
-  /data-goto-decorate/.test(consoleCoreSrc) && /App\.go\('decorate'\)/.test(consoleCoreSrc));
+/* ---- 装修台（/admin）侧：三个「进入编辑器」的入口都必须是新窗口真链接 ---- */
+assert('装修台的「装修」按钮是在新窗口打开的真链接（<a target="_blank"> + /admin?edit=<key>）',
+  /<a class="btn sm" href="\/admin\?edit='\s*\+\s*attr\(encodeURIComponent\(p\.key\)\)[\s\S]{0,130}?target="_blank"/.test(decoJsNoComment),
+  '退回 <button data-open> 就又是「在当前页切换」');
+assert('装修台的页面名也是新窗口链接（与「装修」按钮同一个入口，不能一个同页一个新窗口）',
+  /<a class="pname" href="\/admin\?edit='\s*\+\s*attr\(encodeURIComponent\(p\.key\)\)[\s\S]{0,130}?target="_blank"/.test(decoJsNoComment));
+assert('「设置底部导航」同样在新窗口打开（/admin?edit=nav）',
+  /href="\/admin\?edit=nav"[\s\S]{0,60}?target="_blank"/.test(decoJsNoComment));
+assert('列表点击委托里不再处理进入编辑器（data-open 已摘掉，免得分页切换与新窗口各来一份）',
+  !/data-open/.test(decoJsNoComment));
+assert('装修台支持 URL 直达编辑器（读 ?edit= → 列表加载后直接开那个页面；新窗口才不用再点一次「装修」）',
+  /function editKeyFromUrl/.test(decoJsNoComment) &&
+  /URLSearchParams\(location\.search\)\.get\('edit'\)/.test(decoJsNoComment) &&
+  /loadPagesThenMaybeOpenEdit/.test(decoJsNoComment) &&
+  /history\.replaceState\(null, '', key \? \('\/admin\?edit='/.test(decoJsNoComment));
+assert('编辑器把当前页面同步进地址栏（新窗口被刷新 / 收藏后仍回到同一个页面）',
+  /function syncUrl/.test(decoJsNoComment) && /syncUrl\(key\);/.test(decoJsNoComment));
+assert('「装修」类链接有样式兜底（a.btn 去下划线 + 对齐盒模型 · a.pname 去下划线）',
+  /a\.btn\s*\{/.test(decoCssNoComment) && /a\.pname\s*\{/.test(decoCssNoComment),
+  '缺了会出现「同一行按钮高矮不齐 / 装修二字带下划线」');
+
+/* ---- 控制台侧：至少要留一条「新窗口打开装修台」的路 ---- */
+assert('控制台有指向装修台（/admin）的新窗口入口',
+  /<a class="btn primary" href="\/admin" target="_blank"/.test(consoleJsNoComment),
+  '一个都没有的话，运营只能靠手输地址');
+assert('「店铺设置」的「去装修台修改」是新窗口链接（不再在当前页切视图，也不再绑 App.go）',
+  /href="\/admin" target="_blank"[\s\S]{0,90}?去装修台修改/.test(consoleJsNoComment) &&
+  !/data-goto-decorate/.test(consoleJsNoComment));
+assert('控制台侧栏的「装修台 /admin」也是新窗口入口（点它不该把控制台从当前标签页挤走）',
+  /<a href="\/admin" target="_blank"/.test(readFileSync(join(__dirname, '..', 'public', 'console', 'index.html'), 'utf8')));
+assert('「店铺装修」视图仍内嵌装修台（一眼看到页面列表 / 草稿状态）且保留「刷新」按钮',
+  /class="frame-wrap"><iframe src="\/admin"/.test(consoleModSrc) && /data-frame-reload/.test(consoleModSrc));
+assert('「店铺装修」视图的入口文案写明是「新窗口」打开（口径要写在运营看得到的地方）',
+  /在新窗口<\/b>打开编辑器|在新窗口打开装修台/.test(consoleModSrc));
 /* 高度写错=装修台底部的「生成代码」被顶出屏幕（运营点不到发布按钮），所以连数值一起锁 */
 assert('内嵌装修台的 iframe 高度按整页占位计算（52 顶栏 + 56 body 内边距 + 45 卡片头 + 2 边框 = 155）',
   /\.frame-wrap\s*\{\s*height:\s*calc\(100vh\s*-\s*155px\)/.test(consoleCssNoComment),
@@ -2913,8 +2952,8 @@ assert('装修台手机壳与 /preview 都留有底部导航容器（#phTabbar�
   '#phTabbar 两处均存在');
 assert('装修台已删掉写死的文字导航条，底部导航改为独立可配置入口（列表上方 navCard）',
   !/\.tabbar\s*[,{]/.test(adminCss) && !/\.tabbar\s*[,{]/.test(readFileSync(join(PUB, 'preview', 'preview.css'), 'utf8')) &&
-  /id="navCard"/.test(navAdminHtml) && /data-open="nav"/.test(adminSrc),
-  'admin.css / preview.css 已无 .tabbar 规则；列表页 navCard + data-open="nav"');
+  /id="navCard"/.test(navAdminHtml) && /href="\/admin\?edit=nav"/.test(adminSrc),
+  'admin.css / preview.css 已无 .tabbar 规则；列表页 navCard + 新窗口入口 /admin?edit=nav');
 
 /* 15.95 把本次自检消耗掉的库存补回（与 0.5 节呼应，保证可重复运行） */
 if (stockBefore.length) {

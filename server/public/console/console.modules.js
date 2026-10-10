@@ -1279,27 +1279,32 @@ App.views.media = {
 
 /* ============================== 视图：店铺装修（内嵌装修台） ============================== */
 /*
- * 装修台以 iframe 内嵌在**当前页**，这是控制台里唯一的装修入口。
+ * 口径（2026-10-10 与用户确认）：**点「装修」= 在新窗口打开编辑器**。
+ * 装修是「对着真机效果反复调」的活，运营常常要同时开着控制台 / 商品页做对照；
+ * 挤在同一个标签页里切来切去，一按返回还会把编辑器里的未保存状态一起丢掉。
+ * 所以下面两处都是开**新标签页**：
+ *   · iframe 里点页面行的「装修」—— 装修台自己把入口写成 <a href="/admin?edit=xxx" target="_blank">；
+ *   · 卡片右上角的「在新窗口打开 ↗」。
  *
- * 这里曾经是一个 `<a href="/admin" target="_blank">在新窗口打开 ↗</a>` —— 点下去会弹出一个
- * 与当前页完全脱节的窗口：在里面改的草稿回到控制台看不到，「点页面行的『装修』」也只在那个新窗口里生效。
- * 用户反馈「店铺装修，点页面装修都在新窗口打开而不是在当前页显示」，因此：
- *   · 去掉一切新窗口入口，改为「↻ 刷新装修台」（重设 iframe 的 src）
- *   · iframe 占满整张卡，让装修台的三栏编辑器在控制台里就够宽
- * 装修台本身是单页应用：在 iframe 里点某页的「装修」会在**本页**切到三栏编辑器，本来就不需要另开窗口。
+ * 为什么还留 iframe：控制台里能一眼看到装修台的全貌（页面列表 / 草稿状态 / 谁有未发布的改动），
+ * 不用为了看一眼状态再开一个窗口。它只承担「看」，真正的编辑都在新窗口里做。
+ *
+ * 链接必须写成真 <a target="_blank"> 而不是 window.open：真链接支持中键 / 右键「在新标签页打开」，
+ * 也不会被浏览器当弹窗拦掉。
  */
 App.views.decorate = {
   async render(body) {
     body.innerHTML =
       '<div class="card"><div class="card-h"><h2>店铺装修</h2><div class="grow"></div>' +
-        '<span class="hint">在下面点页面行的「装修」直接在本页打开编辑器，改完点「生成代码」写回 replica.js</span>' +
-        '<button class="btn" data-frame-reload title="重新加载装修台（未保存的界面状态会丢失，草稿不受影响）">↻ 刷新装修台</button>' +
+        '<span class="hint">在下面点页面行的「装修」会在<b>新窗口</b>打开编辑器，改完点「生成代码」写回 replica.js</span>' +
+        '<a class="btn primary" href="/admin" target="_blank" rel="noopener" title="在新窗口打开装修台">在新窗口打开 ↗</a>' +
+        '<button class="btn" data-frame-reload title="重新加载装修台（未保存的界面状态会丢失，草稿不受影响）">↻ 刷新</button>' +
       '</div>' +
       '<div class="card-b tight"><div class="frame-wrap"><iframe src="/admin" title="店铺装修台"></iframe></div></div></div>';
 
     body.querySelector('[data-frame-reload]').addEventListener('click', () => {
       const f = body.querySelector('.frame-wrap iframe');
-      if (f) f.src = '/admin';   // 重设 src 即重新加载（不新开窗口）
+      if (f) f.src = '/admin';   // 重设 src 即重新加载
       toast('装修台已重新加载');
     });
   }
