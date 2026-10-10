@@ -790,7 +790,7 @@ const HOME_BLOCK_KINDS = {
           { k: 'itemBorderColor', label: '导航模式下边框色', type: 'color', def: '', hint: '仅「单图布局 = 导航」时生效，留空不画' },
           { k: 'itemTitleColor', label: '分类标题色', type: 'color', def: '#323233', hint: '默认 #323233。置空会退化成继承父级色，预览与真机都算「未设置」' },
           { k: 'itemGapX', label: '分类图左右间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 0 },
-          { k: 'itemGapY', label: '分类图下间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 5 },
+          { k: 'itemGapY', label: '分类图下间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 10, hint: '图与下方标题之间的间距。实测有赞线上为 10px（标题自身的 margin-top），不是格子下边距' },
           { k: 'itemRadius', label: '分类图圆角', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 0 },
           { k: 'itemTitleSize', label: '分类标题大小', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 14 },
           {
@@ -844,6 +844,12 @@ const HOME_BLOCK_KINDS = {
           {
             k: 'moduleBgFill', label: '模块背景图片填充', type: 'radiobutton', def: 'cover',
             options: [{ value: 'cover', label: '填充' }, { value: 'contain', label: '适应' }, { value: 'repeat', label: '平铺' }]
+          },
+          {
+            k: 'heightMode', label: '高度模式', type: 'radiobutton', def: 'auto',
+            options: [{ value: 'auto', label: '随内容撑开' }, { value: 'screen', label: '占满一屏' }],
+            hint: '「占满一屏」= 组件高度取一屏，左右两栏各自内部滚动（左栏导航固定可见）。' +
+              '有赞线上的品牌分类页即为这一形态；做「产品型号导航」这类整屏橱窗时选它'
           },
           { k: 'reserveTabbar', label: '预留底部导航位置', type: 'switch', def: false, hint: '开启后底部留出 tabBar 高度的空白' },
           {

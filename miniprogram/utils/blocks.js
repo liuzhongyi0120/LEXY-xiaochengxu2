@@ -329,10 +329,17 @@ function normalizeBlock(b, index) {
     o.navLineColor = col(o.navBorderLine, '#DDDDDD');           // 风格 D 的分隔线
 
     const gx = px2rpx(nv(o.itemGapX, 0));
-    const gy = px2rpx(nv(o.itemGapY, 5));
+    const gy = px2rpx(nv(o.itemGapY, 10));   // 实测有赞：图与标题之间 10px
     o.itemGapXRpx = gx;
     o.itemHalfGapRpx = Math.round(gx / 2);
     o.itemGapYRpx = gy;
+    /* 网格**行间距** = 5px：有赞实测「第 2 行起的条目额外有 `margin-top:5px`」，
+       所以下面按「条目所在行号」逐条算，挂在条目自身的 margin-top 上。
+    ⚠️ 不要改成「格子 padding-bottom + 容器负 margin-bottom」这种写法：
+       容器的负 margin-bottom 会**穿透折叠**到小组容器的 13px 下边距上，
+       两者按「正负相加」= 13 + (-5) = 8px → 后面每一块都整体上移 5px，
+       量出来是「整页越往下越偏」。flex 条目自身的 margin-top 不参与折叠，才是对的。 */
+    o.gapRowRpx = px2rpx(5);
     o.itemRadiusRpx = px2rpx(nv(o.itemRadius, 0));
     o.itemFsRpx = px2rpx(nv(o.itemTitleSize, 14));
     o.itemWeight = String(nv(o.itemTitleWeight, 400));
@@ -374,6 +381,16 @@ function normalizeBlock(b, index) {
     o.effectDurMs = Math.round(Math.min(3, Math.max(0.2, nv(o.effectSpeed, 1))) * 1000);
     o.effectDelayMs = Math.round(Math.min(1, Math.max(0, nv(o.effectDelay, 0.2))) * 1000);
 
+    // 左上角 Logo 的跳转：字段在 schema 里由 linkField('Logo 跳转') 生成，键名就是 link
+    o.navLogoLink = o.link || '';
+    /*
+     * 高度模式：有赞「品牌分类E」在页面里是**整屏橱窗** —— 组件占满一屏，
+     * 左右两栏各自内部滚动（模板用 scroll-view，只有 screen 模式才开 scroll-y）。
+     * 高度本身写在 WXSS 的 `.bc-navcol.screen / .bc-main.screen` 里，
+     * **不能**走模板 inline style：inline 的 100vh 不经过 mp-wxss 的 vh→px 换算。
+     */
+    o.screenMode = o.heightMode === 'screen';
+
     o.activeBrand = 0;
     // 只保留有内容的品牌，并给每个条目补上动画延迟（模板里不做乘法）
     o.brands = (o.brands || [])
@@ -396,6 +413,9 @@ function normalizeBlock(b, index) {
                 desc: it.desc || '',
                 link: it.link || '',
                 hot: it.linkMode === 'hot',
+                /* 网格第 2 行起的条目要往下让 5px（有赞实测的行间距）。
+                   导航模式是「一行一条 + margin-bottom」，不吃这个值。 */
+                gapTopRpx: (!isNav && ii >= cols) ? o.gapRowRpx : 0,
                 delayMs: ii * o.effectDelayMs
               }));
             return {

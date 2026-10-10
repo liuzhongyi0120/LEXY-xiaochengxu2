@@ -3439,6 +3439,241 @@ function emitReport() {
   console.log('='.repeat(72));
   console.log(' ' + pad('#', 4) + pad('方法', 7) + pad('路径 / 断言', 44) + pad('HTTP', 6) + pad('业务码', 8) + '结果');
   console.log('-'.repeat(72));
+  /* =====================================================================
+   * 品牌分类（对标有赞「高级组件 · 品牌分类E」）：实测口径对账
+   *
+   * 来源：2026-10-10 用真实浏览器打开有赞移动端店铺页
+   *   https://shop46010558.m.youzan.com/v2/feature/NimpMk7rIc?kdt_id=45818390
+   *   逐节点读 computedStyle + getBoundingClientRect，底稿 .tooling/_yz-fine.json
+   *
+   * 该页**就是**用「品牌分类E」搭的（左上整栏宽 Logo + 左栏 26% 品牌导航 + 右栏图文流，
+   * 整屏橱窗、两栏各自滚动）。那次复刻逐像素量出 6 处与实现不一致的细节，全部已改，
+   * 这里逐条锁死 —— 每一条都是「不改就与真机差 4~6px 或整屏高度错掉」的硬约束。
+   * ------------------------------------------------------------------- */
+  {
+    const yzBcatCss = readFileSync(join(MP_ROOT, 'pages', 'index', 'index.wxss'), 'utf8');
+    const yzBcatWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    const yzBcatJs = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+    const yzBcatPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+    const yzBcatSchema = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+
+    /* (1) 左栏标题的文字缩进：实测有赞 `padding: 0 10px`（文字从栏内边缘缩进 10px）。
+     *     曾经写成 12rpx（6px），差 4px。 */
+    const naviPad = (/\.bc-navi\s*\{([\s\S]*?)\}/.exec(yzBcatCss) || [])[1] || '';
+    assert('品牌分类：左栏标题容器缩进 = 20rpx（实测有赞 10px）',
+      /padding:\s*0\s+20rpx/.test(naviPad),
+      naviPad ? 'padding 取自 .bc-navi：' + (/padding:[^;]+/.exec(naviPad) || ['(未写)'])[0] : '未找到 .bc-navi 规则');
+
+    /* (2) 左上 Logo 是**整栏宽的一条**（实测 98 × 60.34，无内边距）。
+     *     曾经给 .bc-logo 加了 12rpx 内边距，图缩到 85.5 宽，与真机差 6px。 */
+    const logoRule = (/\.bc-logo\s*\{([\s\S]*?)\}/.exec(yzBcatCss) || [])[1] || '';
+    assert('品牌分类：左上 Logo 整栏宽（.bc-logo padding: 0）',
+      /padding:\s*0\s*;/.test(logoRule),
+      logoRule ? 'width 口径见 miniprogram/pages/index/index.wxss 的 .bc-logo' : '未找到 .bc-logo 规则');
+
+    /* (3) 图与标题之间的间距挂在**标题的 margin-top** 上（实测有赞 `p{margin-top:10px}`），
+     *     格子自身不留 margin-bottom。挂错位置会让行距变成
+     *     「图 + 间距 + 文字 + 间距」，比真机高出一截。 */
+    assert('品牌分类：图与标题的间距在标题 margin-top 上，格子自身不留下边距',
+      /class="bc-it"[\s\S]{0,200}?margin-top:\s*\{\{block\.itemGapYRpx\}\}rpx/.test(yzBcatWxml) &&
+      !/margin-bottom:\s*\{\{block\.itemGapYRpx\}\}rpx/.test(yzBcatWxml),
+      /margin-bottom:\s*\{\{block\.itemGapYRpx\}\}rpx/.test(yzBcatWxml)
+        ? 'blocks.wxml 里仍然把 itemGapY 挂在格子的 margin-bottom 上'
+        : '间距位置正确');
+
+    /* (4) itemGapY 的默认值三处必须同值：装修台表单 / 真机 normalize / 预览渲染。
+     *     实测有赞为 10px（曾三处都是 5）。 */
+    const yzG1 = (/k:\s*'itemGapY'[^}]*?def:\s*(\d+)/.exec(yzBcatSchema) || [])[1];
+    const yzG2 = (/nv\(o\.itemGapY,\s*(\d+)\)/.exec(yzBcatJs) || [])[1];
+    const yzG3 = (/pvNum\(b\.itemGapY,\s*(\d+)\)/.exec(yzBcatPv) || [])[1];
+    assert('品牌分类：itemGapY 默认值三处一致且为 10（实测有赞 10px）',
+      yzG1 === '10' && yzG2 === '10' && yzG3 === '10',
+      `schema=${yzG1} ｜ blocks.js=${yzG2} ｜ pv-render=${yzG3}`);
+
+    /* (5) 高度模式：有赞线上是**整屏橱窗**（组件占满一屏、左右两栏各自内部滚动）。
+     *     真机用 scroll-view + WXSS 的 100vh；缺任何一处就退化成「整页一起滚」。 */
+    assert('品牌分类：整屏模式三处齐备（heightMode 字段 / scroll-view / WXSS 100vh）',
+      /k:\s*'heightMode'/.test(yzBcatSchema) &&
+      /scroll-y="\{\{block\.screenMode\}\}"/.test(yzBcatWxml) &&
+      /\.bc-navcol\.screen,\s*\n\.bc-main\.screen\s*\{\s*height:\s*100vh;/.test(yzBcatCss),
+      `字段=${/k:\s*'heightMode'/.test(yzBcatSchema)} scroll-view=${/scroll-y="\{\{block\.screenMode\}\}"/.test(yzBcatWxml)} 100vh=${/height:\s*100vh;/.test(yzBcatCss)}`);
+
+    /* (6) ⚠️ 模板的 inline style 里**不许出现 vh 单位**。
+     *
+     * mp-wxss 的 vh→px 换算只处理 .wxss 文件，inline 的 `100vh` 会原样进浏览器，
+     * 预览页里取到的是**浏览器窗口**高度（实测 935px）而不是手机屏高（718px）——
+     * 整个橱窗高出一截、滚动条位置也不对。这条踩过一次，必须锁死。 */
+    const yzInlineVh = yzBcatWxml.match(/style="[^"]*\d+(?:\.\d+)?vh[^"]*"/g) || [];
+    assert('品牌分类：blocks.wxml 的 inline style 里不出现 vh 单位（inline 的 vh 不经过 mp-wxss 换算）',
+      yzInlineVh.length === 0,
+      yzInlineVh.length ? '发现 ' + yzInlineVh.length + ' 处：' + yzInlineVh[0].slice(0, 60) : '无');
+
+    /* (7) 左上 Logo 的跳转：字段在 schema 里叫 link（「Logo 跳转」），
+     *     真机侧必须派生成 navLogoLink 才点得动 —— 曾经漏掉这一行，Logo 是死的。 */
+    assert('品牌分类：Logo 跳转派生 navLogoLink（装修台配了「Logo 跳转」真机要生效）',
+      /o\.navLogoLink\s*=\s*o\.link/.test(yzBcatJs),
+      /o\.navLogoLink/.test(yzBcatJs) ? '已派生' : 'blocks.js 里没有 navLogoLink');
+
+    /* ---------------------------------------------------------------------
+     * 源码文本断言必须先**剥掉注释**。
+     *
+     * 这一组改动都带详细说明注释，而注释里为了讲清「为什么不能这么写」，
+     * 几乎必然会**引用被禁的写法原文**（例如「容器 margin-bottom:-5px」）。
+     * 不剥注释，说明文字就会被当成违规 —— 已经因此白红过两次
+     * （网格行距、以及预览端那句 margin-bottom 说明），每次都要回头查半天。
+     * ------------------------------------------------------------------- */
+    /* ⚠️ 先统一换行再匹配：这些源文件是 **CRLF**，正则里写 `\n  }\n` 永远不中，
+     *    会得到「函数体为空」的假红（已经踩过一次）。 */
+    const yzDecommentJs = (s) => s
+      .replace(/\r\n/g, '\n')                     // CRLF → LF
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')          // /* … */
+      .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1 ');   // // …（避开 https:// 里的 //）
+    const yzPv = yzDecommentJs(yzBcatPv);
+    const yzCss = yzDecommentJs(yzBcatCss);
+    const yzWxml = yzDecommentJs(yzBcatWxml.replace(/<!--[\s\S]*?-->/g, ' '));
+    /* 只取 pvBrandCategory 的函数体：pv-render.js 里别的区块也用 object-fit 等写法，
+     * 整文件扫会把它们误判成「品牌分类的回归」。 */
+    const yzPvFn = (/function pvBrandCategory\(b\)\s*\{([\s\S]*?)\n  \}\n/.exec(yzPv) || [])[1] || '';
+
+    /* (8) 预览端与真机同口径：导航文字缩进 10px、**网格模式**的格子无 margin-bottom、
+     *     整屏高度取装修台手机壳的屏高变量（叫 --phone-screen-h，不是 --mp-screen-h）。
+     *
+     * ⚠️ 只查**网格格子的模板本身**，两个都踩过的坑：
+     *    ① 导航模式（小图 + 文字的横排）本来就有自己的 margin-bottom →
+     *       一开始整文件扫 `margin-bottom: gapY`，把导航模式误判成回归，白红了一次；
+     *    ② 收窄成「从 `var cols = …` 到 `var navCol = ''`」还是太大 —— 中间夹着
+     *       `return '<div style="margin-bottom:' + pGap + 'px">' …` 那行**小组容器的块间距**
+     *       （pGap=13，实测有赞就是 13px，本该存在）→ 又白红一次。
+     *    现在直接锚到网格 `.map(...)` 的收尾 `}).join('') + '</div>';`，只覆盖格子模板。 */
+    const yzGridSeg = (/var cols = Math\.max\(1, Math\.round\(pvNum\(layout, 2\)\)\);([\s\S]*?)\}\)\.join\(''\) \+ '<\/div>';/.exec(yzPv) || [])[1] || '';
+    /* 正反两面都要查，否则「把 margin-bottom 挪到别处」也能骗过纯否定式断言：
+     *   反面：格子里不该有 margin-bottom（有 → 行距变成「图+间距+字+间距」，比真机高一截）
+     *   正面：间距必须落在标题的 margin-top 上（与真机 .bc-it 的 p{margin-top} 同口径） */
+    const yzCellNoMb = yzGridSeg.length > 0 && !/margin-bottom:/.test(yzGridSeg);
+    const yzCellMtTop = /margin-top:' \+ gapY \+ 'px/.test(yzGridSeg);
+    assert('品牌分类：预览端与真机同口径（缩进 10px / 网格格子无下边距且间距在标题 margin-top / 整屏取 --phone-screen-h）',
+      /padding:0 10px;overflow:hidden/.test(yzPv) &&
+      yzCellNoMb && yzCellMtTop &&
+      /--phone-screen-h/.test(yzPv),
+      `缩进10px=${/padding:0 10px;overflow:hidden/.test(yzPv)} 格子段=${yzGridSeg.length}字 格子无下边距=${yzCellNoMb} 间距在标题margin-top=${yzCellMtTop} 屏高变量=${/--phone-screen-h/.test(yzPv)}`);
+
+    /* ---------------------------------------------------------------------
+     * (9)~(13) 2026-10-10 第二轮逐像素复刻量出来的差异，逐条锁死。
+     *
+     * 手法：把有赞页与复刻页各截一张「只含 375 宽真机区」的图，逐像素比。
+     *   对账脚本 .tooling/_cmp/compare.py（并排图 + 差异热力图 + 错位带）
+     *              .tooling/_cmp/shift2.py（逐行最佳纵向位移，只看高置信行）
+     *   量出来的 5 处，其中前 3 处是**肉眼可见或预览/真机不一致**的，必须锁：
+     *     · 图盒底色：有赞 computed `rgba(0,0,0,0)`，我们铺了 --color-bg-muted；
+     *       而 H5 的 260×224 型号图有 **92.2% 像素 alpha=0** → 真机与预览都透出灰底。
+     *     · 网格图片高度：真机 `mode="widthFix"` 按原图比例（260×224 → 119.54 高、
+     *       417×360 → 119.78 高，与有赞实测 119.537 / 119.775 **逐位吻合**），
+     *       而装修台预览写成 `padding-top:100%` + `object-fit:cover` → 138.75 高的正方。
+     *     · 标题行盒：有赞 computed `line-height: 18px`（字号 14px），
+     *       我们没写 → `normal`（实测 20px），且 normal 随引擎变化、三端不一致。
+     *   另外两处（网格行距 5px、导航模式行距）一并锁，避免以后互相改坏。
+     * ------------------------------------------------------------------- */
+
+    /* (9) 图盒底色：网格模式必须透明，兜底底色只留给导航模式的小方图。
+     *     ⚠️ 预览端只查**网格那段**（yzGridSeg）：导航模式的小方图仍带 #f5f6f8，
+     *        那是刻意保留的 —— 真机 `.bc-pic.square` 同样铺 --color-bg-muted。 */
+    const yzPicRule = (/\.bc-pic\s*\{([\s\S]*?)\}/.exec(yzCss) || [])[1] || '';
+    const yzPicSq = (/\.bc-pic\.square\s*\{([\s\S]*?)\}/.exec(yzCss) || [])[1] || '';
+    assert('品牌分类：网格图盒不铺底色（有赞是透明盒；带透明通道的型号图会透出灰底）',
+      yzPicRule.length > 0 && !/background/.test(yzPicRule) &&
+      /background:\s*var\(--color-bg-muted\)/.test(yzPicSq) &&
+      yzGridSeg.length > 0 && !/background:#f5f6f8/.test(yzGridSeg),
+      `真机 .bc-pic 有 background=${/background/.test(yzPicRule)} ｜ .bc-pic.square 有兜底=${/background:\s*var\(--color-bg-muted\)/.test(yzPicSq)} ｜ 预览网格段残留 #f5f6f8=${/background:#f5f6f8/.test(yzGridSeg)}`);
+
+    /* (10) 标题行盒显式 18px，真机与装修台预览同值。 */
+    assert('品牌分类：标题行盒显式 18px（有赞实测；不写就是 normal，三端各不相同）',
+      /\.bc-it\s*\{[\s\S]*?line-height:\s*18px/.test(yzCss) &&
+      /line-height:18px/.test(yzPvFn),
+      `真机 .bc-it=${/\.bc-it\s*\{[\s\S]*?line-height:\s*18px/.test(yzCss)} ｜ 预览=${/line-height:18px/.test(yzPvFn)}`);
+
+    /* (11) 网格行距 5px（有赞：第 2 行起的条目多 5px `margin-top`）。
+     *      必须挂在**条目自身的 margin-top** 上，且真机/预览同口径。
+     *
+     * ⚠️ 三条「不许用」都要锁，因为它们各自会以不同方式坏掉：
+     *   · 容器负 margin-bottom → 穿透折叠到小组容器的 13px 下边距（13-5=8），
+     *     后面每一块整体上移 5px，差异带从 8 段涨到 16 段（实测过）；
+     *   · 格子 padding-bottom（不补偿）→ 最后一行的 padding 把下一块往下推 5px；
+     *   · flex 的 row-gap → 老 iOS WebKit 静默失效（本项目 WXSS 从未用过 gap）。 */
+    const yzGapOk = /o\.gapRowRpx = px2rpx\(5\)/.test(yzBcatJs) &&
+      /gapTopRpx: \(!isNav && ii >= cols\) \? o\.gapRowRpx : 0/.test(yzBcatJs) &&
+      /margin-top: \{\{it\.gapTopRpx\}\}rpx/.test(yzWxml) &&
+      /var rowTop = ii >= cols \? 5 : 0;/.test(yzPvFn) &&
+      /margin-top:' \+ rowTop \+ 'px/.test(yzPvFn);
+    const yzGapBad = /\.bc-cell:not\(\.nav\)\s*\{[\s\S]*?padding-bottom:/.test(yzCss) ||
+      /\.bc-grid\s*\{[\s\S]*?margin-bottom:\s*-/.test(yzCss) ||
+      /row-gap/.test(yzCss) ||
+      /margin:0 -' \+ \(gapX \/ 2\) \+ 'px -5px/.test(yzPvFn);
+    assert('品牌分类：网格行距 5px 挂在条目 margin-top 上（真机/预览同口径；禁用负 margin / padding / row-gap）',
+      yzGapOk && !yzGapBad,
+      `四处齐备=${yzGapOk} ｜ 未用禁用写法=${!yzGapBad}` + (yzGapBad ? '（发现负margin/padding/row-gap 之一）' : ''));
+
+    /* (12) 导航模式的行距不能被上面那条顺手删掉：图与标题左右并排，
+     *      标题的 margin-top 会被 .bc-cell.nav .bc-it 归零，
+     *      所以行距只能挂在格子自身的 margin-bottom 上（按模式取 itemGapY / 0）。
+     *      —— 这正是一开始「网格行距双倍」那轮改动的漏网之鱼。 */
+    assert('品牌分类：导航模式行距仍挂在格子 margin-bottom（网格模式才是 0）',
+      /margin-bottom:\s*\{\{pn\.isNav \? block\.itemGapYRpx : 0\}\}rpx/.test(yzWxml) &&
+      /\.bc-cell\.nav \.bc-it\s*\{[\s\S]*?margin-top:\s*0/.test(yzCss) &&
+      /;margin-bottom:' \+ gapY \+ 'px/.test(yzPvFn),
+      `模板分模式=${/margin-bottom:\s*\{\{pn\.isNav \? block\.itemGapYRpx : 0\}\}rpx/.test(yzWxml)} 真机 nav 标题归零=${/\.bc-cell\.nav \.bc-it\s*\{[\s\S]*?margin-top:\s*0/.test(yzCss)} 预览 nav margin=${/;margin-bottom:' \+ gapY \+ 'px/.test(yzPvFn)}`);
+
+    /* (13) 装修台预览的网格图必须按原图比例撑高（对齐真机 widthFix），
+     *      不能是正方 + cover。
+     *      ⚠️ 只看网格那段（yzGridSeg）：导航模式的小方图**必须**用
+     *         `aspectFill`/cover —— 真机那边是 `pn.isNav ? 'aspectFill' : 'widthFix'`。 */
+    assert('品牌分类：装修台预览的网格图按原图比例撑高（对齐真机 widthFix，不是正方 cover）',
+      /<img src="' \+ attr\(it\.image\) \+ '" style="width:100%;display:block">/.test(yzGridSeg) &&
+      !/object-fit:cover/.test(yzGridSeg) &&
+      !/padding-top:100%;border-radius:' \+ itemRadius/.test(yzGridSeg),
+      `widthFix 写法=${/<img src="' \+ attr\(it\.image\) \+ '" style="width:100%;display:block">/.test(yzGridSeg)} 网格段 cover=${/object-fit:cover/.test(yzGridSeg)} 正方图盒残留=${/padding-top:100%;border-radius:' \+ itemRadius/.test(yzGridSeg)}`);
+
+    /* (14) 「占满一屏」的左右两栏必须带 `data-scroll-y`。
+     *      这不是装饰：真机上这两栏是 scroll-view，它的滚动条是**滚动时才浮出的临时条**，
+     *      不占布局宽；装修台手机壳里这两栏却是 pv-render 手写的 div，只能靠这个标记
+     *      命中 MpWxss.scrollViewCss 的那条规则。漏了它，浏览器默认滚动条会**实打实吃掉 8px** ——
+     *      右栏内容 277.5 被压成 269.5，比真机（/preview）和有赞都窄 4px（实测过）。 */
+    const yzScrollAttr = /var scrollAttr = screenMode \? ' data-scroll-y' : '';/.test(yzPv);
+    const yzScrollAttrUse = (yzPv.match(/<div' \+ scrollAttr \+ /g) || []).length;
+    assert('品牌分类：整屏两栏带 data-scroll-y（命中共享的滚动条浮层化规则）',
+      yzScrollAttr && yzScrollAttrUse === 2,
+      `标记变量=${yzScrollAttr} ｜ 用它的栏数=${yzScrollAttrUse}（应为 2）`);
+
+    /* (15) 滚动条口径**只有一份定义**，装修台复用同一份，pv-render 不许自写第二份。
+     *      两份实现必然走样 —— 这次就是 /preview（走 MpWxss.runtimeCss）有、
+     *      装修台（走 pv-render）没有，同一个组件在两个入口宽度差 8px。 */
+    const yzWxssSrc = readFileSync(join(__dirname, '..', 'public', 'shared', 'mp-wxss.js'), 'utf8');
+    const yzScrollDefCount = (yzWxssSrc.match(/\[data-scroll-y\]\{/g) || []).length;
+    const yzScrollSingle =
+      /function scrollViewCss\(prefix\)/.test(yzWxssSrc) &&      // 定义
+      yzWxssSrc.indexOf('scrollViewCss: scrollViewCss') >= 0 &&  // 导出
+      /scrollViewCss\(prefix\),/.test(yzWxssSrc) &&             // runtimeCss 复用它
+      yzScrollDefCount === 1 &&                                  // 规则字面量只出现一次
+      !/::-webkit-scrollbar/.test(yzPv) &&                       // pv-render 不自写第二份
+      /MpWxss\.scrollViewCss\('\.phone-screen'\)/.test(yzPv); // 装修台注入的是这一份
+    assert('品牌分类：滚动条浮层化只有一份实现（MpWxss.scrollViewCss），装修台复用它',
+      yzScrollSingle,
+      `定义=${/function scrollViewCss\(prefix\)/.test(yzWxssSrc)} 导出=${yzWxssSrc.indexOf('scrollViewCss: scrollViewCss') >= 0} ` +
+      `runtimeCss 复用=${/scrollViewCss\(prefix\),/.test(yzWxssSrc)} 规则份数=${yzScrollDefCount} ` +
+      `pv-render 自写=${/::-webkit-scrollbar/.test(yzPv)} 复用前缀=${/MpWxss\.scrollViewCss\('\.phone-screen'\)/.test(yzPv)}`);
+
+    /* (16) 装修台必须**先加载** mp-wxss.js（pv-render 注入时要取它），
+     *      且手机壳的实际类名要与注入前缀 `.phone-screen` 对得上。
+     *      改名或漏加载都**不会报错** —— 只剩 console 里一句 warn，预览又悄悄窄 8px。 */
+    const yzAdHtml = readFileSync(join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8');
+    const yzAdLoadOk = yzAdHtml.indexOf('/shared/mp-wxss.js') >= 0 &&
+      yzAdHtml.indexOf('/shared/mp-wxss.js') < yzAdHtml.indexOf('/shared/pv-render.js');
+    const yzShellOk = /class="[^"]*phone-screen[^"]*"[^>]*id="preview"/.test(yzAdHtml);
+    assert('品牌分类：装修台先加载 mp-wxss.js 且手机壳类名与注入前缀一致（改名/漏加载都只会静默窄 8px）',
+      yzAdLoadOk && yzShellOk,
+      `加载顺序=${yzAdLoadOk}（mp-wxss 在 pv-render 之前）手机壳 .phone-screen + #preview=${yzShellOk}`);
+
+  }
+
   results.forEach((r) => {
     const flag = r.passed ? '✓' : '✗';
     const tag = r.note ? `  [${r.note}]` : r.method === '—' ? '  [断言]' : '';

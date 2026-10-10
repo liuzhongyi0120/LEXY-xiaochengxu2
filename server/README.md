@@ -77,7 +77,7 @@ PORT=8080 node server/index.js
 
 | 文件 | 作用 |
 |---|---|
-| `mp-wxss.js` | WXSS → CSS：`rpx→px`、`vh/vw→px`、`page{}`→`.mp-root` 作用域隔离、裸标签 `image→img`、内置组件默认外观补丁 |
+| `mp-wxss.js` | WXSS → CSS：`rpx→px`、`vh/vw→px`、`page{}`→`.mp-root` 作用域隔离、裸标签 `image→img`、内置组件默认外观补丁。**`scrollViewCss(prefix)` 单列导出** —— 内置 `scroll-view` 的滚动条口径（浮层、不占布局宽）只有这一份定义，`runtimeCss` 与装修台的 `pv-render` 都复用它 |
 | `mp-wxml.js` | WXML → HTML：`wx:for` / `wx:if/elif/else` / `include` / `{{}}`（含裸 `&&`）/ `mode`→`data-mode`；带编译期统计 |
 | `mp-runtime.js` | 无头小程序运行时：CommonJS 加载器 + `Page/Component/Behavior/App` 桩 + `wx.*` 桩（`request`→fetch、`getStorageSync`→localStorage） |
 
@@ -97,6 +97,13 @@ PORT=8080 node server/index.js
 手机壳底部的**底部导航**是这条链路的例外：它**不属于区块渲染**，与 `/preview` 共用
 `server/public/shared/pv-tabbar.js` 一份实现（结构 + 样式都在里面，两边都不许再写第二份）。
 编辑「店铺导航」时它直接吃**草稿**数据，所以运营每改一个字都能当场看到效果。
+
+`scroll-view` 的**滚动条**也是同类例外：真机滚动条是滚动时才浮出的临时条、**不占布局宽**，
+而浏览器里 `overflow-y:auto` 会实打实吃掉 **8px**（`admin.css` 顶部那条全局 `::-webkit-scrollbar{width:8px}`
+是给后台面板用的，一旦漏进手机壳就成了帮凶）。所以：
+`pv-render.js` 的 `ensureScrollCss()` 把 `MpWxss.scrollViewCss('.phone-screen')` 注入一次，
+「占满一屏」的左右两栏打上 `data-scroll-y` —— **`admin/index.html` 必须先于 `pv-render.js` 加载 `mp-wxss.js`**。
+漏了这条不报错，只是手机壳里右栏内容悄悄从 277.5 变 269.5（三条断言 490~492 已锁死）。
 
 ### 接口调试台（/debug）
 

@@ -1,6 +1,6 @@
 # 后端点位连通性报告
 
-> 生成时间：2026/10/10 15:12:56　｜　目标服务：`http://127.0.0.1:3000`
+> 生成时间：2026/10/10 17:41:33　｜　目标服务：`http://127.0.0.1:3000`
 > 生成方式：`node server/tools/check-all.mjs`（真实 HTTP 请求，非静态扫描）
 
 ## 一、总览
@@ -10,8 +10,8 @@
 | 已注册点位 | 92 |
 | 已实测点位 | 92 |
 | 未覆盖点位 | 0 |
-| 实测请求/断言 | 476 |
-| 通过 | 472 |
+| 实测请求/断言 | 492 |
+| 通过 | 488 |
 | 失败 | 4 |
 | 服务健康检查 | up |
 | 微信能力模式 | 登录 mock / 支付 mock |
@@ -177,7 +177,7 @@
 | 155 | — | `伪装成 png 的文本被拒（按文件头校验）` | PASS | 0 | ✅ | 断言 |
 | 156 | POST | `/api/media/delete` | 200 | 1001 | ✅ | 预期失败：路径穿越被拦　要求 HTTP 200 + code 1001 |
 | 157 | — | `素材删除接口拦住 ../ 穿越` | PASS | 0 | ✅ | 断言 |
-| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261010-y5cnjn.png"],"targetCount":1}）：202610/20261010-y5cnjn.png，文件可能正被占用，请稍后重试 |
+| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261010-eyjjrp.png"],"targetCount":1}）：202610/20261010-eyjjrp.png，文件可能正被占用，请稍后重试 |
 | 159 | — | `素材删除成功（自检产生的文件已回收）` | FAIL | - | ❌ | 断言 |
 | 160 | POST | `/api/media/delete` | 200 | 2000 | ✅ | 预期失败：商品图删除被拒　要求 HTTP 200 + code 2000 |
 | 161 | — | `商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用` | PASS | 0 | ✅ | 断言 |
@@ -496,6 +496,22 @@
 | 474 | — | `14 · 三条被拒请求一条都没写进数据（地址数回到原值）` | PASS | 0 | ✅ | 断言 |
 | 475 | — | `15 · 判定函数：服务端异常（HTTP 5xx / code 5000）在任何情况下都不得被判为通过` | PASS | 0 | ✅ | 断言 |
 | 476 | — | `自检汇总口径 = 全部断言的终值（覆盖度与失败数均在最后现算，不漏报本节之后的断言）` | PASS | 0 | ✅ | 断言 |
+| 477 | — | `品牌分类：左栏标题容器缩进 = 20rpx（实测有赞 10px）` | PASS | 0 | ✅ | 断言 |
+| 478 | — | `品牌分类：左上 Logo 整栏宽（.bc-logo padding: 0）` | PASS | 0 | ✅ | 断言 |
+| 479 | — | `品牌分类：图与标题的间距在标题 margin-top 上，格子自身不留下边距` | PASS | 0 | ✅ | 断言 |
+| 480 | — | `品牌分类：itemGapY 默认值三处一致且为 10（实测有赞 10px）` | PASS | 0 | ✅ | 断言 |
+| 481 | — | `品牌分类：整屏模式三处齐备（heightMode 字段 / scroll-view / WXSS 100vh）` | PASS | 0 | ✅ | 断言 |
+| 482 | — | `品牌分类：blocks.wxml 的 inline style 里不出现 vh 单位（inline 的 vh 不经过 mp-wxss 换算）` | PASS | 0 | ✅ | 断言 |
+| 483 | — | `品牌分类：Logo 跳转派生 navLogoLink（装修台配了「Logo 跳转」真机要生效）` | PASS | 0 | ✅ | 断言 |
+| 484 | — | `品牌分类：预览端与真机同口径（缩进 10px / 网格格子无下边距且间距在标题 margin-top / 整屏取 --phone-screen-h）` | PASS | 0 | ✅ | 断言 |
+| 485 | — | `品牌分类：网格图盒不铺底色（有赞是透明盒；带透明通道的型号图会透出灰底）` | PASS | 0 | ✅ | 断言 |
+| 486 | — | `品牌分类：标题行盒显式 18px（有赞实测；不写就是 normal，三端各不相同）` | PASS | 0 | ✅ | 断言 |
+| 487 | — | `品牌分类：网格行距 5px 挂在条目 margin-top 上（真机/预览同口径；禁用负 margin / padding / row-gap）` | PASS | 0 | ✅ | 断言 |
+| 488 | — | `品牌分类：导航模式行距仍挂在格子 margin-bottom（网格模式才是 0）` | PASS | 0 | ✅ | 断言 |
+| 489 | — | `品牌分类：装修台预览的网格图按原图比例撑高（对齐真机 widthFix，不是正方 cover）` | PASS | 0 | ✅ | 断言 |
+| 490 | — | `品牌分类：整屏两栏带 data-scroll-y（命中共享的滚动条浮层化规则）` | PASS | 0 | ✅ | 断言 |
+| 491 | — | `品牌分类：滚动条浮层化只有一份实现（MpWxss.scrollViewCss），装修台复用它` | PASS | 0 | ✅ | 断言 |
+| 492 | — | `品牌分类：装修台先加载 mp-wxss.js 且手机壳类名与注入前缀一致（改名/漏加载都只会静默窄 8px）` | PASS | 0 | ✅ | 断言 |
 
 ## 三、覆盖结论
 
@@ -503,10 +519,10 @@
 
 ## 四、失败明细
 
-- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261010-y5cnjn.png"],"targetCount":1}）：202610/20261010-y5cnjn.png，文件可能正被占用，请稍后重试
+- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261010-eyjjrp.png"],"targetCount":1}）：202610/20261010-eyjjrp.png，文件可能正被占用，请稍后重试
 - `— 素材删除成功（自检产生的文件已回收）` → HTTP FAIL / code -：-
-- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1601 → 1603
-- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 28（自检前 27）
+- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1785 → 1787
+- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 69（自检前 68）
 
 ## 五、前后端点位一致性
 

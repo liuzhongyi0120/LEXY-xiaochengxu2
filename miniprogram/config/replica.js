@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-10 13:11:45（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-10 17:40:28（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1072,6 +1072,740 @@ const CUSTOM_PAGES = {
       desc: "",
       bg: "#F5F6F8"
     }
+  },
+  p236: {
+    name: "产品型号导航",
+    blocks: [
+      {
+        id: "bcatmv235a76",
+        type: "brand_category",
+        brands: [
+          {
+            title: "莱克",
+            panels: [
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-w2n50v.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-3h98p4.png",
+                    title: "S10系列",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g1003972"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-jsgepc.png",
+                    title: "S9 Max",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524125208_wq8k"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-zmdyzh.png",
+                    title: "S8",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524127132_x80v"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-530r6z.png",
+                    title: "H5",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524128415_kzuh"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-shnp8z.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-4onc2w.png",
+                    title: "U7",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  },
+                  {
+                    image: "/uploads/202610/20261010-4onc2w.png",
+                    title: "U5",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  },
+                  {
+                    image: "/uploads/202610/20261010-4onc2w.png",
+                    title: "U3",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-wmoqh5.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-vmk5wc.jpg",
+                    title: "F701",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524130973_p3ef"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-dok1v7.jpg",
+                    title: "F503",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524132427_2qfp"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-lizj1f.png",
+                    title: "F402",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524133315_td5e"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-to74nd.jpg",
+                    title: "F305",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524134837_8p5n"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-8t9716.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-zam1ia.png",
+                    title: "DH650",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524135926_wlaa"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-7jl369.png",
+                    title: "DH350",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524137197_hkrw"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-ih55bg.png",
+                    title: "DH200",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524138043_aoax"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-hc5231.png",
+                    title: "DH180",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524139121_ncpv"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-a1e1lq.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-9z0qop.png",
+                    title: "K9Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524140352_i4vk"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-vmaa8n.png",
+                    title: "K8Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524141704_f4t7"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-c9ys81.png",
+                    title: "K6Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524142815_7yl4"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-seamte.png",
+                    title: "K5Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524144256_yrms"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-8vaz9h.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-1je762.jpg",
+                    title: "F8",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524145595_a9bk"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-s76aia.jpg",
+                    title: "F6",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524146881_26zx"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-e71oxw.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-oo12ns.jpg",
+                    title: "M9",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524148642_qnms"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-q4nm2m.png",
+                    title: "M7",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524150427_1dge"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-pgozvw.png",
+                    title: "C80",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524151699_5edx"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-aoaolc.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-vyr5b9.jpg",
+                    title: "N7 Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524153433_n1ds"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-vyr5b9.jpg",
+                    title: "N7",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524155048_ogys"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-vyr5b9.jpg",
+                    title: "N5 Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524155625_dtkq"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-vyr5b9.jpg",
+                    title: "N5",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524156197_qowf"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-dir49a.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-shyjj5.png",
+                    title: "HU801",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524159269_1bb0"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-ho89rh.png",
+                    title: "HU701",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524160227_a92h"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-k1lzn6.png",
+                    title: "HU301",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524161202_op43"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            title: "碧云泉",
+            panels: [
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-glo64x.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-phapi0.png",
+                    title: "RT801",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524603243_sdtu"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-6eddbr.jpg",
+                    title: "RT702",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524604590_5gfg"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-t3d20z.jpg",
+                    title: "T5 系列",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524605600_4j67"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-4jmax4.png",
+                    title: "T5Max",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524606775_fenp"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-i00qil.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-0ut2yn.png",
+                    title: "R803",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524608116_wqip"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-w63jav.png",
+                    title: "G5",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524609541_iy4o"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-be5zox.jpg",
+                    title: "R702",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  },
+                  {
+                    image: "/uploads/202610/20261010-acxaif.png",
+                    title: "C5Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524613616_h0om"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-yftf26.png",
+                    title: "C5Plus",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524615445_sfdd"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-fipgfy.png",
+                    title: "V6",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524617189_d46y"
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-c5cugg.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-ararf0.png",
+                    title: "JSC-RL801",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524619964_isv4"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-7bz4wt.png",
+                    title: "JSC-UL301",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524621509_zpqe"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            title: "吉米",
+            panels: [
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-m4clvg.jpg",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-vxwopl.png",
+                    title: "M7Ultra",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524623060_z6sb"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-b6ib73.png",
+                    title: "M7 Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524624571_zeay"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-z5bo0y.png",
+                    title: "B6 Pro",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524625909_jbbs"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-r0l35c.png",
+                    title: "M5",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524626874_vd4p"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            title: "咖博士",
+            panels: [
+              {
+                title: "",
+                link: "",
+                layout: "1",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-2mpggx.png",
+                    title: "",
+                    desc: "",
+                    linkMode: "whole",
+                    link: ""
+                  }
+                ]
+              },
+              {
+                title: "",
+                link: "",
+                layout: "2",
+                items: [
+                  {
+                    image: "/uploads/202610/20261010-sx0cap.png",
+                    title: "Grace 200",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524628569_nvh7"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-4shaim.png",
+                    title: "H1S",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524629713_aa7s"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-yfsdnl.png",
+                    title: "HOT 300",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524631618_c674"
+                  },
+                  {
+                    image: "/uploads/202610/20261010-1d1o9m.png",
+                    title: "HOT 100",
+                    desc: "",
+                    linkMode: "whole",
+                    link: "/packageGoods/detail/detail?id=g_1791524632667_du0l"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        navLogo: "/uploads/202610/20261010-5drbld.png",
+        link: "",
+        switchMode: "page",
+        navWidth: 26,
+        contentPadX: 0,
+        navStyle: "B",
+        navBg: "#F1F1F1",
+        navColor: "#050505",
+        navColorActive: "#FFFFFF",
+        navBgActive: "#000000",
+        navBgIdle: "#F9F9F9",
+        navBorderColor: "",
+        navBorderLine: "#DDDDDD",
+        navHeight: 45,
+        navMargin: 1,
+        navBorderH: 10,
+        navBorderW: 1,
+        navFontSize: 15,
+        navWeight: "300",
+        navWeightActive: "450",
+        navAlign: "left",
+        itemShadow: "none",
+        itemBorderColor: "",
+        itemTitleColor: "#323233",
+        itemGapX: 0,
+        itemGapY: 10,
+        itemRadius: 0,
+        itemTitleSize: 14,
+        itemTitleWeight: "400",
+        itemTitleAlign: "center",
+        panelTitleColor: "#323233",
+        panelTitleSize: 16,
+        panelTitleWeight: "700",
+        panelTitleAlign: "left",
+        panelTitleGapX: 0,
+        panelTitleGapY: 0,
+        panelGap: 13,
+        contentPadBottom: 0,
+        effect: "none",
+        effectSpeed: 1,
+        effectDelay: 0.2,
+        searchMode: "hide",
+        bg: "#FFFFFF",
+        moduleBgImage: "",
+        moduleBgFill: "cover",
+        reserveTabbar: false,
+        navSticky: "off",
+        heightMode: "screen"
+      }
+    ],
+    meta: {
+      desc: "",
+      bg: "#F5F6F8"
+    }
   }
 };
 
@@ -1102,6 +1836,10 @@ const PAGE_META = {
     bg: "#F5F6F8"
   },
   p159: {
+    desc: "",
+    bg: "#F5F6F8"
+  },
+  p236: {
     desc: "",
     bg: "#F5F6F8"
   }

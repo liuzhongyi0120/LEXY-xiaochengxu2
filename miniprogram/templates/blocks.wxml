@@ -463,8 +463,17 @@
   <view wx:elif="{{block.type === 'brand_category'}}" class="c-bcat" style="background: {{block.bgFinal}}; {{block.modBgStyle}};">
 
     <view class="bc-wrap">
-      <!-- 左栏：品牌导航。风格 C 的竖条是绝对定位的 <view>，所以外层要 relative -->
-      <view class="bc-navcol" style="width: {{block.navWidthPct}}%; background: {{block.navBgBase}};">
+      <!--
+        左栏：品牌导航。风格 C 的竖条是绝对定位的节点，所以外层要 relative。
+        用 <scroll-view> 而不是 <view>：有赞「品牌分类E」在页面里是**整屏橱窗**
+        （组件高度 = 一屏，左右两栏各自内部滚动），普通 view 在小程序里无法滚动。
+        高度模式 auto 时 scroll-y 传 false、高度留空 —— 行为与原来的 view 完全一致。
+      -->
+      <scroll-view
+        class="bc-navcol {{block.screenMode ? 'screen' : ''}}"
+        scroll-y="{{block.screenMode}}"
+        style="width: {{block.navWidthPct}}%; background: {{block.navBgBase}};"
+      >
         <view
           wx:if="{{block.navLogo}}"
           class="bc-logo"
@@ -497,10 +506,14 @@
             <text class="bc-navt">{{navText}}</text>
           </view>
         </view>
-      </view>
+      </scroll-view>
 
-      <!-- 右栏：内容。背景图铺在底部，标题与分类图浮在它上面 -->
-      <view class="bc-main" style="padding: 0 {{block.padXRpx}}rpx {{block.padBRpx}}rpx;">
+      <!-- 右栏：内容。背景图铺在底部，标题与分类图浮在它上面（同样是可独立滚动的 scroll-view） -->
+      <scroll-view
+        class="bc-main {{block.screenMode ? 'screen' : ''}}"
+        scroll-y="{{block.screenMode}}"
+        style="padding: 0 {{block.padXRpx}}rpx {{block.padBRpx}}rpx;"
+      >
         <view
           wx:if="{{block.bgImage}}"
           class="bc-bgimg"
@@ -529,13 +542,22 @@
               >{{pn.title}}</view>
 
               <view class="bc-grid" style="margin: 0 -{{block.itemHalfGapRpx}}rpx;">
+                <!--
+                  每个格子只有「图 + 标题」。三种竖向间距各归各位，别混：
+                    · 图 ↔ 标题：标题的 margin-top = itemGapY（有赞 p{margin-top:10px}）；
+                    · 网格行 ↔ 行：**第 2 行起的条目**自己在 margin-top 上让 gapRowRpx
+                      （有赞实测 5px；挂在条目上而不是格子 padding+容器负 margin，
+                       后者会穿透折叠到小组的 13px 下边距，把后面每一块整体上提 5px）；
+                    · 导航模式：图与标题左右并排，标题的 margin-top 会被
+                      .bc-cell.nav .bc-it 归零，行距只能挂在格子自身的 margin-bottom 上。
+                -->
                 <view
                   wx:for="{{pn.items}}"
                   wx:key="index"
                   wx:for-item="it"
                   wx:for-index="ii"
                   class="bc-cell {{pn.isNav ? 'nav' : ''}} {{block.effectClass}}"
-                  style="width: {{pn.isNav ? 100 : pn.cellW}}%; padding: 0 {{block.itemHalfGapRpx}}rpx; margin-bottom: {{block.itemGapYRpx}}rpx; animation-duration: {{block.effectDurMs}}ms; animation-delay: {{it.delayMs}}ms;"
+                  style="width: {{pn.isNav ? 100 : pn.cellW}}%; padding: 0 {{block.itemHalfGapRpx}}rpx; margin-top: {{it.gapTopRpx}}rpx; margin-bottom: {{pn.isNav ? block.itemGapYRpx : 0}}rpx; animation-duration: {{block.effectDurMs}}ms; animation-delay: {{it.delayMs}}ms;"
                   data-link="{{it.hot ? '' : it.link}}"
                   bindtap="onTapBlock"
                   hover-class="{{!it.hot && it.link ? 'hover-lite' : 'none'}}"
@@ -564,7 +586,7 @@
                     <view
                       wx:if="{{it.title}}"
                       class="bc-it"
-                      style="font-size: {{block.itemFsRpx}}rpx; font-weight: {{block.itemWeight}}; text-align: {{block.itemAlign}}; --bc-ifg: {{block.itemFg}};"
+                      style="margin-top: {{block.itemGapYRpx}}rpx; font-size: {{block.itemFsRpx}}rpx; font-weight: {{block.itemWeight}}; text-align: {{block.itemAlign}}; --bc-ifg: {{block.itemFg}};"
                     >{{it.title}}</view>
                     <view wx:if="{{it.desc}}" class="bc-id" style="text-align: {{block.itemAlign}};">{{it.desc}}</view>
                   </view>
@@ -577,7 +599,7 @@
           <!-- 品牌还没配内容：给运营一句能照着做的提示，而不是空白一片 -->
           <view wx:if="{{!block.brands.length}}" class="bc-empty">该组件还没有品牌，请到装修台「内容设置」里添加</view>
         </view>
-      </view>
+      </scroll-view>
     </view>
   </view>
 

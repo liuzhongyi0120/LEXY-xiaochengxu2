@@ -600,10 +600,24 @@
   flex: 0 0 auto;
   overflow: hidden;
 }
+/*
+ * 高度模式 = 占满一屏：左右两栏取一屏高，各自内部滚动（有赞线上品牌分类页的形态）。
+ *
+ * ⚠️ 必须写在 WXSS 里，**不能**写成模板的 inline style ——
+ *    inline 的 `100vh` 不经过 mp-wxss 的 vh→px 换算（那一步只处理 .wxss 文件），
+ *    预览页里会直接取**浏览器窗口**高度，整个盒子高出一截、滚动条位置也不对。
+ *    真机上 `100vh` = 页面可视区高度，这里写的就是要换算的那一个。
+ */
+.bc-navcol.screen,
+.bc-main.screen {
+  height: 100vh;
+}
 
-/* 左栏顶部：Logo / 搜索框 */
+/* 左栏顶部：Logo / 搜索框
+   实测有赞的 Logo 就是**整栏宽**的一条（98 × 60.34），没有内边距 ——
+   曾经写成 padding: 12rpx（6px），图会缩到 85.5 宽，与真机差 6px。 */
 .bc-logo {
-  padding: 12rpx;
+  padding: 0;
 }
 .bc-logo image {
   width: 100%;
@@ -633,7 +647,9 @@
   position: relative;
   display: flex;
   align-items: center;
-  padding: 0 12rpx;
+  /* 20rpx = 10px：实测有赞「品牌分类E」的标题容器 padding 为 `0 10px`，
+     文字因此从栏内左边缘缩进 10px。曾经写成 12rpx（6px），差 4px。 */
+  padding: 0 20rpx;
   overflow: hidden;
   background: var(--bc-bg, transparent);
   color: var(--bc-fg, #050505);
@@ -699,13 +715,28 @@
 .bc-cell {
   box-sizing: border-box;
 }
+/*
+ * 网格行间距 = 5px（有赞实测：第 2 行起的条目额外有 `margin-top:5px`），
+ * 由模板按「条目所在行号」逐条挂在条目自身的 `margin-top` 上 —— 见 blocks.wxml。
+ * ⚠️ 不要用「格子 padding-bottom + 容器负 margin-bottom」来做行距：
+ *    容器的负 margin-bottom 会**穿透折叠**到小组容器的 13px 下边距上，
+ *    正负相加 = 13 + (-5) = 8px → 后面每一块整体上移 5px，
+ *    现象是「越往下偏得越多」，量出来的差异带会比不改还多。
+ *    也**不要**用 flex 的 row-gap：本项目 WXSS 从未用过 `gap`，而 flex `gap`
+ *    要 iOS 14.1+ 的 WebKit 才支持，老系统上是**静默失效**（不是降级）。
+ */
 
 /* 分类图：网格模式按原图比例撑高（widthFix），导航模式固定方形 */
 .bc-pic {
   position: relative;
   overflow: hidden;
-  background: var(--color-bg-muted);
 }
+/*
+ * ⚠️ 网格模式的图盒**不铺底色**：有赞的图盒是透明的（computed `rgba(0,0,0,0)`）。
+ * 型号图里有相当一部分是**带透明通道**的（如 H5 的 260×224 PNG，92% 像素 alpha=0），
+ * 铺一层 --color-bg-muted 就会在真机上透出一块灰底，而有赞那里是白的 ——
+ * 一个像素级可见的差异。兜底底色只留给导航模式的小方图（见 .bc-pic.square）。
+ */
 .bc-pic.shadow {
   box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .16);
 }
@@ -718,6 +749,7 @@
   width: 96rpx;
   height: 96rpx;
   border: 1rpx solid var(--bc-ibd, transparent);
+  background: var(--color-bg-muted);
 }
 .bc-pic.square image {
   height: 100%;
@@ -732,9 +764,21 @@
 .bc-txt {
   min-width: 0;
 }
+/* 图与标题之间的间距由模板的 inline `margin-top: itemGapY` 提供
+   （实测有赞为 10px —— p{margin-top:10px}），这里不再写死值。
+   `.bc-cell` 上**不能**再挂 margin-bottom：那会让每行底部多出一段，
+   行距变成「图 + 间距 + 文字 + 间距」，与有赞对不上。 */
 .bc-it {
-  margin-top: 8rpx;
   color: var(--bc-ifg, var(--color-text));
+  /*
+   * 标题行盒高度按有赞的**绝对值 18px**（实测：字号 14px 时 computed
+   * line-height = 18px，条目高 119.54+10+18 = 147.54）。
+   * 不写这一条时是 `line-height: normal`，实测行盒 20px —— 而且 `normal`
+   * 随字体/引擎变化（真机、装修台预览、/preview 三者可能各不相同），
+   * 会让「后台看到的行距」与真机不一致。有赞这个值也是固定的 18px，
+   * 不跟着字号走，这里保持同样口径（字号调大时同样可能被裁，与有赞一致）。
+   */
+  line-height: 18px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

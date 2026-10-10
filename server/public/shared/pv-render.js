@@ -501,13 +501,13 @@
         'padding:' + padY + 'px 0;cursor:pointer;background:' + bg + ';' + border + line + '">' + bar +
         '<div style="height:' + innerH + 'px;border-radius:' + radius + 'px;display:flex;align-items:center;justify-content:' + just + ';' +
         'font-size:' + fs + 'px;font-weight:' + (on ? (b.navWeightActive || '450') : (b.navWeight || '300')) + ';' +
-        'color:' + (on ? navFgOn : navFg) + ';padding:0 6px;overflow:hidden">' +
+        'color:' + (on ? navFgOn : navFg) + ';padding:0 10px;overflow:hidden">' +
         '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.25">' +
         esc(br.title || '未命名品牌') + '</span></div></div>';
     }).join('');
 
     var gapX = pvNum(b.itemGapX, 0);
-    var gapY = pvNum(b.itemGapY, 5);
+    var gapY = pvNum(b.itemGapY, 10);
     var itemRadius = pvNum(b.itemRadius, 0);
     var itemFs = pvNum(b.itemTitleSize, 14);
     var itemWeight = b.itemTitleWeight || '400';
@@ -563,16 +563,42 @@
         }).join('') + '</div>';
       } else {
         var cols = Math.max(1, Math.round(pvNum(layout, 2)));
-        body = '<div style="display:flex;flex-wrap:wrap;margin:0 -' + (gapX / 2) + 'px">' + list.map(function (it) {
-          return '<div style="width:' + (100 / cols) + '%;box-sizing:border-box;padding:0 ' + (gapX / 2) + 'px;margin-bottom:' + gapY + 'px">' +
+        /*
+         * 图片盒必须与真机**同口径**：真机写的是 `mode="widthFix"`（宽度撑满、
+         * 高度按原图比例）→ 这里对应 `<img style="width:100%;display:block">`。
+         *
+         * 曾经写成 `padding-top:100%` + `position:absolute` + `object-fit:cover`，
+         * 结果是「装修台里图是 138.75 高的正方、真机里只有 119.54 高」——
+         * 型号图各自比例不同（260×224 → 119.54，417×360 → 119.78），
+         * 正方盒还会在下方多留 19px 空档，运营在后台看到的行距与真机完全不是一回事。
+         *
+         * 图盒也不铺底色：有赞的图盒是透明的（computed `rgba(0,0,0,0)`），
+         * 而型号图里有带透明通道的（H5 的 PNG 有 92% 像素 alpha=0），
+         * 铺一层 #f5f6f8 会在真机/预览里都透出一块灰底。
+         *
+         * 行距：网格**第 2 行起**的条目自己在 margin-top 上让 5px
+         * （有赞实测：第 2 行起的 `a` 多 `margin-top:5px`），与真机
+         * miniprogram/utils/blocks.js 的 `gapTopRpx` 同口径。
+         *
+         * ⚠️ 不要改成「格子 padding-bottom:5px + 容器 margin-bottom:-5px」——
+         *    容器的负 margin-bottom 会**穿透折叠**到小组容器的 13px 下边距上
+         *    （正负相加 = 13-5 = 8px），后面每一块都整体上移 5px，
+         *    实测差异带反而从 8 段涨到 16 段。flex 条目自身的 margin-top 不折叠，才对。
+         */
+        body = '<div style="display:flex;flex-wrap:wrap;margin:0 -' + (gapX / 2) + 'px">' + list.map(function (it, ii) {
+          var rowTop = ii >= cols ? 5 : 0;
+          return '<div style="width:' + (100 / cols) + '%;box-sizing:border-box;padding:0 ' + (gapX / 2) + 'px;margin-top:' + rowTop + 'px">' +
             '<div style="position:relative">' +
-            '<div style="position:relative;padding-top:100%;border-radius:' + itemRadius + 'px;overflow:hidden;background:#f5f6f8;' + shadow + '">' +
+            '<div style="position:relative;border-radius:' + itemRadius + 'px;overflow:hidden;' + shadow + '">' +
             (it.image
-              ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">'
-              : '<div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#8a919e;font-size:12px">未设图</div>') +
+              ? '<img src="' + attr(it.image) + '" style="width:100%;display:block">'
+              : '<div style="position:relative;padding-top:100%">' +
+                '<div style="position:absolute;left:0;top:0;right:0;bottom:0;display:flex;align-items:center;justify-content:center;color:#8a919e;font-size:12px">未设图</div></div>') +
             '</div>' +
+            /* 标题行盒 18px：与真机 `.bc-it { line-height: 18px }` 同值
+               （有赞实测：字号 14px 时 computed line-height 就是 18px） */
             (it.title ? '<div style="font-size:' + itemFs + 'px;font-weight:' + itemWeight + ';text-align:' + itemAlign +
-              ';color:' + itemFg + ';margin-top:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
+              ';color:' + itemFg + ';line-height:18px;margin-top:' + gapY + 'px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
             (it.desc ? '<div style="font-size:11px;color:#8a919e;text-align:' + itemAlign +
               ';overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.desc) + '</div>' : '') +
             (it.link && it.linkMode !== 'hot' ? linkBadge(it.link) : '') +
@@ -585,8 +611,11 @@
 
     var navCol = '';
     if (b.navLogo) {
-      navCol += '<div style="padding:6px;position:relative">' + img(b.navLogo, 'width:100%;display:block') +
-        (b.navLogoLink ? linkBadge(b.navLogoLink) : '') + '</div>';
+      /* 实测有赞的 Logo 就是**整栏宽**的一条（98×60.34，无内边距），
+         所以这里不能加 padding —— 加了图会缩到 85.5 宽，与真机差 6px。
+         跳转字段是区块级的 `link`（装修台里叫「Logo 跳转」）。 */
+      navCol += '<div style="position:relative">' + img(b.navLogo, 'width:100%;display:block') +
+        ((b.navLogoLink || b.link) ? linkBadge(b.navLogoLink || b.link) : '') + '</div>';
     }
     if ((b.searchMode || 'hide') === 'show') {
       navCol += '<div style="margin:6px;height:28px;border-radius:14px;background:rgba(0,0,0,.06);display:flex;' +
@@ -608,6 +637,24 @@
 
     var tips = '';
     if (b.navSticky === 'top') tips += '<div style="font-size:10px;color:#8a919e;padding:2px 8px">左侧栏目吸顶</div>';
+    /*
+     * 高度模式 = 占满一屏：两栏取手机屏可视区高、各自内部滚动。
+     * 真机写的是 WXSS 里的 `height: 100vh`（见 miniprogram/pages/index/index.wxss），
+     * 这里没有 100vh 可用，所以直接取**装修台手机壳的屏高变量** ——
+     * 它和 /preview 的 --mp-screen-h（718）刻意同值，见 admin.css 的注释。
+     * 早前写成 var(--mp-screen-h,718px) 是错的：装修台这个变量叫 --phone-screen-h。
+     */
+    var screenMode = b.heightMode === 'screen';
+    if (screenMode) tips += '<div style="font-size:10px;color:#8a919e;padding:2px 8px">占满一屏（左右两栏各自滚动）</div>';
+    var colH = 'height:var(--phone-screen-h,686px);overflow-y:auto;';
+    var navOverflow = screenMode ? colH : 'overflow:hidden;';
+    var mainOverflow = screenMode ? colH : '';
+    /*
+     * data-scroll-y 不是装饰：两栏靠它命中 MpWxss.scrollViewCss
+     * （overflow-x:hidden + 滚动条浮层化），与真机 scroll-view 同口径。
+     * 非整屏模式仍是普通 div，不打这个标记。
+     */
+    var scrollAttr = screenMode ? ' data-scroll-y' : '';
     if (effect !== 'none') {
       tips += '<div style="font-size:10px;color:#8a919e;padding:2px 8px">缓动：' +
         ({ right: '右入', up: '上滑', zoom: '放大', fade: '淡入' }[effect] || effect) +
@@ -616,8 +663,8 @@
 
     return '<div style="position:relative;background:' + pvColor(b.bg, '#FFFFFF') + ';' + modBg + '">' + tips +
       '<div style="display:flex;align-items:stretch">' +
-      '<div style="width:' + navW + '%;flex:0 0 ' + navW + '%;background:' + navBg + ';overflow:hidden">' + navCol + navItems + '</div>' +
-      '<div style="flex:1;min-width:0;position:relative;padding:0 ' + pvNum(b.contentPadX, 0) + 'px ' + pvNum(b.contentPadBottom, 0) + 'px">' +
+      '<div' + scrollAttr + ' style="width:' + navW + '%;flex:0 0 ' + navW + '%;background:' + navBg + ';' + navOverflow + '">' + navCol + navItems + '</div>' +
+      '<div' + scrollAttr + ' style="flex:1;min-width:0;position:relative;padding:0 ' + pvNum(b.contentPadX, 0) + 'px ' + pvNum(b.contentPadBottom, 0) + 'px;' + mainOverflow + '">' +
       bgImage + '<div style="position:relative">' +
       (rightHtml || '<div style="color:#b8bec8;font-size:12px;padding:12px 0">（该品牌还没有内容，在左栏选中它后用「+ 新增」加一个小组）</div>') +
       '</div></div></div>' +
@@ -987,6 +1034,33 @@
   var PAGE_RENDERERS = { home: pvHome, lexy: pvLexy, news: pvNews, product: pvProduct, mine: pvMine };
 
   /**
+   * 手机壳内「占满一屏」的两栏要模拟内置 scroll-view 的滚动条口径：**浮层、不占布局宽**。
+   *
+   * 浏览器里 `overflow-y:auto` 默认会实打实吃掉 8px 布局宽 —— 装修台实测右栏内容
+   * 277.5 被压成 269.5，比真机（/preview）与有赞都窄 8px；运营照着偏窄的样板去调，
+   * 只会越调越不像。规则本身**只有一份定义**：/shared/mp-wxss.js 的 MpWxss.scrollViewCss
+   * （预览页把 WXML 的 scroll-view 编成 HTML 时用的就是同一条）。
+   * 两处必须同口径 —— 即 .workbuddy/memory/PITFALLS.md 的 O5「预览端与真机必须逐项同口径」。
+   */
+  var SCROLL_CSS_FLAG = 'data-pv-scrollcss';
+  function ensureScrollCss(doc) {
+    if (!doc || !doc.documentElement || doc.documentElement.hasAttribute(SCROLL_CSS_FLAG)) return;
+    var css = (root.MpWxss && root.MpWxss.scrollViewCss) ? root.MpWxss.scrollViewCss('.phone-screen') : '';
+    if (!css) {
+      // 宁可吵一声，也不要静默地少 8px：少这条装修台预览就会比真机窄
+      if (root.console && root.console.warn) {
+        root.console.warn('[pv-render] 未加载 /shared/mp-wxss.js：手机壳内的滚动条会占掉 8px，预览比真机窄');
+      }
+      return;
+    }
+    var style = doc.createElement('style');
+    style.setAttribute(SCROLL_CSS_FLAG, '');
+    style.textContent = css;
+    (doc.head || doc.documentElement).appendChild(style);
+    doc.documentElement.setAttribute(SCROLL_CSS_FLAG, '');
+  }
+
+  /**
    * 渲染一个页面
    *
    * @param {string} key   页面标识（home / lexy / news / product / mine / 自定义页标识）
@@ -998,6 +1072,8 @@
    */
   function render(key, data, opts) {
     configure(opts);
+    // 每次渲染都调，靠 flag 保证只注入一次（装修台切页面会反复进这里）
+    ensureScrollCss(typeof document !== 'undefined' ? document : null);
     data = data || {};
     var fn = PAGE_RENDERERS[key];
     // 非内置页：装修台的页面带 meta.custom 标记；预览页只知道 key，

@@ -197,6 +197,11 @@
 <div id="toast"></div>
 <div id="imgPreview" class="img-preview" hidden><img alt=""></div>
 
+<!-- 内置组件口径（scroll-view 的滚动条是浮层、不占布局宽）：手机壳里 pv-render 手写的「占满一屏」两栏
+     复用它（MpWxss.scrollViewCss），必须先于 pv-render.js 加载，否则右栏会白吃 8px -->
+<!-- 内置组件口径（scroll-view 的滚动条是浮层、不占布局宽）：手机壳里 pv-render 手写的「占满一屏」两栏
+     复用它（MpWxss.scrollViewCss），必须先于 pv-render.js 加载，否则右栏会白吃 8px -->
+<script src="/shared/mp-wxss.js"></script>
 <!-- 预览渲染核心：装修台（编辑态）与前端预览页（/preview）共用同一份实现，必须先于 admin.js 加载 -->
 <script src="/shared/pv-render.js"></script>
 <!-- 底部导航渲染：装修台手机壳与 /preview 共用同一份（样式也由它自带注入） -->

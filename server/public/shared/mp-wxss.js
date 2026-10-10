@@ -186,6 +186,29 @@
   }
 
   /**
+   * 内置 scroll-view 的滚动条口径：**浮层，不占布局宽**。
+   *
+   * 真机上滚动条是「滚动时才浮出的临时指示条」（截图里根本看不到），**绝不挤压内容宽度**；
+   * 浏览器里 `overflow-y:auto` 默认却会实打实吃掉 8px 布局宽，所以预览必须显式抹掉。
+   *
+   * 之所以抽成独立函数而不是塞在 runtimeCss 里：这条口径有**两处消费**，且必须同口径 ——
+   *   ① 预览页 /preview：WXML 的 `scroll-view` 被编成 HTML，由 runtimeCss 带上（见下）；
+   *   ② 装修台手机壳 /admin：「占满一屏」的左右两栏是 pv-render 手写的 div（不经过 WXML 编译），
+   *      由 pv-render 的 ensureScrollCss 注入 —— 两边都用这一份，不许各写一份。
+   * 装修台漏掉它的实测后果：右栏内容 277.5 被压成 269.5（白吃 8px），
+   * 运营照着偏窄的样板去调，只会越调越不像真机。
+   */
+  function scrollViewCss(prefix) {
+    prefix = prefix || '.mp-root';
+    return [
+      prefix + ' [data-scroll-y]{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
+      prefix + ' [data-scroll-x]{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
+      prefix + ' [data-scroll-y]::-webkit-scrollbar{display:none;width:0;height:0}',
+      prefix + ' [data-scroll-x]::-webkit-scrollbar{display:none;width:0;height:0}'
+    ].join('\n');
+  }
+
+  /**
    * 小程序内置组件的默认外观补丁
    *
    * WXML 编译成 HTML 之后，`image` / `scroll-view` / `swiper` 变成了普通标签，
@@ -203,11 +226,9 @@
       prefix + ' img[data-mode="widthFix"]{height:auto}',
 
       /* scroll-view：scroll-y 纵向滚、scroll-x 横向滚；滚动条一律不常驻
-         （真机是滚动时才浮出的临时滚动条，截图里看不到；常态挂一根灰条就不像真机了） */
-      prefix + ' [data-scroll-y]{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
-      prefix + ' [data-scroll-x]{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
-      prefix + ' [data-scroll-y]::-webkit-scrollbar{display:none;width:0;height:0}',
-      prefix + ' [data-scroll-x]::-webkit-scrollbar{display:none;width:0;height:0}',
+         （真机是滚动时才浮出的临时滚动条，截图里看不到；常态挂一根灰条就不像真机了）
+         → 规则本身定义在 scrollViewCss，装修台手机壳也复用它，只此一份。 */
+      scrollViewCss(prefix),
 
       /* swiper：默认高度 150px，只显示当前页 */
       prefix + ' [data-swiper]{position:relative;overflow:hidden;display:block}',
@@ -224,6 +245,7 @@
   root.MpWxss = {
     compile: compile,
     runtimeCss: runtimeCss,
+    scrollViewCss: scrollViewCss,
     parseImports: parseImports,
     stripImports: stripImports,
     rpx2px: rpx2px,
