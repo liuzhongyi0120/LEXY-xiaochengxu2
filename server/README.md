@@ -1096,7 +1096,19 @@ ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
 > 这类失败**在装修台的手机预览里看不出来** —— 预览页由本机服务同源喂图，必然显示得出来；
 > `/preview` 同理。只有开发者工具与真机才暴露。
 > 体检入口：`node .tooling/sync-incremental.mjs --verify`（把页面与商品引用到的
-> `/uploads/…` 全部逐张 GET，取不到就报红并给出修法）。
+> `/uploads/…` 全部逐张 GET，取不到就报红并给出修法；顺带告警**素材库里的自检夹具残留**）。
+>
+> ⚠️ **线上多出来的文件默认不删**（可能是运营在线上后台上传的素材）。确实要清时才加
+> `--prune`，它会打印完整删除清单：`node .tooling/sync-incremental.mjs --only=server/data/uploads --apply --prune`。
+>
+> **素材库里出现 `selfcheck-*.png` / `selfcheck-*.mp4`？（自检夹具残留）**
+> `check-all.mjs` 会真的造上传夹具，收尾删除被环境层批量删除护栏挡住时会连同索引条目一起留下，
+> 并随索引同步上线 → 出现在运营的素材管理列表里。清理（**搬家，不删除**）：
+> ```bash
+> node .tooling/sweep-selfcheck.mjs            # 先看有多少、都是什么
+> node .tooling/sweep-selfcheck.mjs --apply    # 移到 .tooling/_fixtures-quarantine/ 并清索引
+> ```
+> 判定口径只认 `orig` 以 `selfcheck-` 开头（**别放宽成 `test`/`xx`**：有赞导入的素材原始名里大量含 `xx`）。
 
 ### 冒烟与回滚
 

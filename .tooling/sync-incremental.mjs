@@ -368,6 +368,34 @@ async function verifyUploadRefs() {
   return false;
 }
 
+/**
+ * 素材库里的「自检夹具残留」——`orig` 以 `selfcheck-` 开头的上传测试文件。
+ *
+ * 为什么会在体检里出现这一条：
+ *   `server/tools/check-all.mjs` 为了验上传/删除链路，会**真的**造 2×2 png /
+ *   248 B mp4 这类夹具上传。设计上测完即删，但环境层的批量删除护栏
+ *   （`[SAFE_DELETE_BULK_CONFIRM_REQUIRED]`，同一窗口删除动作超阈值即拦）
+ *   会把收尾删除挡掉，夹具于是**登记进素材索引留了下来**。
+ *   实测累积 190 条（`selfcheck-folder.png` / `selfcheck-clip.mp4` / `selfcheck-2x2.png`），
+ *   而且索引会被同步上线 —— 直接出现在运营的素材管理列表里，名字还很扎眼。
+ *
+ * 为什么只告警、不算失败：
+ *   残留是「跑过自检」的副作用（跑完立刻体检必然命中），把它算失败会让体检
+ *   永远红。所以这里只报数 + 给一行修法，不影响退出码。
+ */
+function checkFixtureResidue() {
+  const p = path.join(ROOT, 'server/data/uploads/index.json');
+  if (!fs.existsSync(p)) return;
+  let items = [];
+  try { items = JSON.parse(fs.readFileSync(p, 'utf8')).items || []; } catch (e) { return; }
+  const fx = items.filter((x) => /^selfcheck-/i.test(String(x.orig || '')));
+  if (!fx.length) { okMsg('素材库没有被自检夹具污染'); return; }
+  warn(`素材索引里有 ${fx.length} 条自检夹具残留（运营在素材管理列表里看得到）：`);
+  fx.slice(0, 3).forEach((x) => info(`  ${x.name}  (orig=${x.orig})`));
+  if (fx.length > 3) info(`  …另外 ${fx.length - 3} 条`);
+  info('  修法：node .tooling/sweep-selfcheck.mjs --apply（移出素材目录并清索引，不删文件）');
+}
+
 async function verify() {
   step('线上验证');
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -382,6 +410,7 @@ async function verify() {
    * 省得看到「商品数一致」就以为没事。
    */
   const mediaOk = await verifyUploadRefs();
+  checkFixtureResidue();
 
   const catalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'server/data/catalog.json'), 'utf8'));
   const localGoods = (catalog.goods || []).length;

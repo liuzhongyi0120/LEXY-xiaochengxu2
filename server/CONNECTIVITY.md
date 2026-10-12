@@ -1,6 +1,6 @@
 # 后端点位连通性报告
 
-> 生成时间：2026/10/12 09:15:58　｜　目标服务：`http://127.0.0.1:3000`
+> 生成时间：2026/10/12 09:29:29　｜　目标服务：`http://127.0.0.1:3000`
 > 生成方式：`node server/tools/check-all.mjs`（真实 HTTP 请求，非静态扫描）
 
 ## 一、总览
@@ -177,7 +177,7 @@
 | 155 | — | `伪装成 png 的文本被拒（按文件头校验）` | PASS | 0 | ✅ | 断言 |
 | 156 | POST | `/api/media/delete` | 200 | 1001 | ✅ | 预期失败：路径穿越被拦　要求 HTTP 200 + code 1001 |
 | 157 | — | `素材删除接口拦住 ../ 穿越` | PASS | 0 | ✅ | 断言 |
-| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-7u6j04.png"],"targetCount":1}）：202610/20261012-7u6j04.png，文件可能正被占用，请稍后重试 |
+| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-twr2l7.png"],"targetCount":1}）：202610/20261012-twr2l7.png，文件可能正被占用，请稍后重试 |
 | 159 | — | `素材删除成功（自检产生的文件已回收）` | FAIL | - | ❌ | 断言 |
 | 160 | POST | `/api/media/delete` | 200 | 2000 | ✅ | 预期失败：商品图删除被拒　要求 HTTP 200 + code 2000 |
 | 161 | — | `商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用` | PASS | 0 | ✅ | 断言 |
@@ -532,10 +532,10 @@
 
 ## 四、失败明细
 
-- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-7u6j04.png"],"targetCount":1}）：202610/20261012-7u6j04.png，文件可能正被占用，请稍后重试
+- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-twr2l7.png"],"targetCount":1}）：202610/20261012-twr2l7.png，文件可能正被占用，请稍后重试
 - `— 素材删除成功（自检产生的文件已回收）` → HTTP FAIL / code -：-
-- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1797 → 1799
-- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 73（自检前 72）
+- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1598 → 1600
+- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 6（自检前 5）
 
 ## 五、前后端点位一致性
 
