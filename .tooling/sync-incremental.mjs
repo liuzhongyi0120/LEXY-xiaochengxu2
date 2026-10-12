@@ -18,6 +18,16 @@
  *   node .tooling/sync-incremental.mjs --fast     配合 --apply：验证只做健康检查 + 商品数
  *   node .tooling/sync-incremental.mjs --prune    额外删除「服务器有、本机没有」的文件
  *   node .tooling/sync-incremental.mjs --verify   只验证线上，不比对不传输
+ *   node .tooling/sync-incremental.mjs --only=server/data/uploads --apply
+ *                                                只同步该前缀下的文件（最常用：只推素材）。
+ *                                                命中前缀时不重启服务（素材无进程内缓存），
+ *                                                验证改为「把刚推的文件逐个 GET 一遍」。
+ *
+ * ── 什么时候必须用 --only=server/data/uploads ──────────────────────
+ *   装修台在**本机**上传的图，物理文件只落在本机 `server/data/uploads/`，
+ *   而小程序端 `ENV='server'` 读的是云服务器 —— 不推上去，小程序里就是
+ *   「图片加载失败」（线上 404）。这类失败在装修台的手机预览里**看不出来**
+ *   （预览页由本机服务直接喂图，同源必然能显示），只有真机 / 开发者工具才暴露。
  *
  * ── 安全约定 ───────────────────────────────────────────────────────
  * ① **默认不删任何东西**。服务器上「本机没有」的文件不一定是垃圾 ——
@@ -56,6 +66,10 @@ const APPLY = process.argv.includes('--apply');
 const PRUNE = process.argv.includes('--prune');
 const FAST = process.argv.includes('--fast');
 const MODE_VERIFY = process.argv.includes('--verify');
+/** --only=<相对路径前缀>：只同步该前缀下的文件（例：--only=server/data/uploads） */
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').slice('--only='.length);
+const ONLY_UPLOADS = ONLY.startsWith('server/data/uploads');
+const inScope = (rel) => !ONLY || rel.startsWith(ONLY);
 
 /* ---------------- 受管范围与排除规则 ---------------- */
 const ROOTS = ['server', 'miniprogram'];
@@ -114,6 +128,7 @@ function scanLocal() {
       if (e.isDirectory()) { rec(p); continue; }
       const rel = path.relative(ROOT, p).split(path.sep).join('/');
       if (isExcluded(rel)) continue;
+      if (!inScope(rel)) continue;
       const buf = fs.readFileSync(p); // 单文件最大 46MB（资讯视频），逐个读并即刻释放
       out.set(rel, { size: buf.length, hash: crypto.createHash('md5').update(buf).digest('hex') });
     }
@@ -132,6 +147,7 @@ function scanRemote() {
     if (!m) return;
     const rel = m[2].replace(/^\.\//, '');
     if (isExcluded(rel)) return;
+    if (!inScope(rel)) return;
     map.set(rel, { hash: m[1] });
   });
   return map;
@@ -175,18 +191,34 @@ function push(toSend) {
   sh('scp', ['-i', SSH_KEY, '-o', 'ConnectTimeout=15', '-C', REL_TAR, `${HOST}:${REMOTE_PATCH}`]);
   okMsg(`传输完成，用时 ${((Date.now() - t1) / 1000).toFixed(1)}s`);
 
-  step('停服务 → 解包 → 起服务（停服务是必须的：catalogStore 有内存缓存）');
-  const out = ssh(`set -e
-cp -a ${APP_DIR}/server/data/catalog.json ${APP_DIR}/server/data/catalog.json.bak.$(date +%Y%m%d-%H%M%S)
-systemctl stop lexy-mall
-tar -xf ${REMOTE_PATCH} -C ${APP_DIR}
-systemctl start lexy-mall
-sleep 3
-echo "SVC=$(systemctl is-active lexy-mall)"
-node -e "const c=require('${APP_DIR}/server/data/catalog.json');console.log('GOODS='+(c.goods||[]).length)"
-node -e "const i=require('${APP_DIR}/server/data/uploads/index.json');console.log('ITEMS='+(i.items||[]).length)"
-rm -f ${REMOTE_PATCH}
-df -h /opt | tail -1`, { quiet: true });
+  /*
+   * 只推素材时不重启服务：`media.js` 与 `/uploads` 静态服务都不带进程内缓存，
+   * 文件落地即刻生效；而 `systemctl restart` 会白白打断线上一小会儿。
+   * 其余情况（碰了 catalog.json / 代码）**必须**停服解包 ——
+   * `catalogStore.js` 有进程内内存缓存，只覆盖文件不重启，下一次任何写操作
+   * 都会把旧数据原样盖回来（第 29 批「导入 49 个商品线上还是 1 个」的根因）。
+   */
+  const needRestart = !ONLY;
+  const lines = ['set -e'];
+  if (needRestart) {
+    lines.push(`cp -a ${APP_DIR}/server/data/catalog.json ${APP_DIR}/server/data/catalog.json.bak.$(date +%Y%m%d-%H%M%S)`);
+    lines.push('systemctl stop lexy-mall');
+  }
+  lines.push(`tar -xf ${REMOTE_PATCH} -C ${APP_DIR}`);
+  if (needRestart) {
+    lines.push('systemctl start lexy-mall', 'sleep 3', 'echo "SVC=$(systemctl is-active lexy-mall)"');
+  } else {
+    lines.push('echo "SVC=$(systemctl is-active lexy-mall)（--only 未重启）"');
+  }
+  lines.push(
+    `node -e "const c=require('${APP_DIR}/server/data/catalog.json');console.log('GOODS='+(c.goods||[]).length)"`,
+    `node -e "const i=require('${APP_DIR}/server/data/uploads/index.json');console.log('ITEMS='+(i.items||[]).length)"`,
+    `rm -f ${REMOTE_PATCH}`,
+    'df -h /opt | tail -1',
+  );
+
+  step(needRestart ? '停服务 → 解包 → 起服务（停服务是必须的：catalogStore 有内存缓存）' : `解包到 ${APP_DIR}（--only：不重启服务）`);
+  const out = ssh(lines.join('\n'), { quiet: true });
 
   out.split('\n').forEach((l) => {
     const s = l.trim();
@@ -222,6 +254,120 @@ rm -f ${REMOTE_LIST}`, { quiet: true });
 }
 
 /* ---------------- ⑤ 验证（与小程序同路径） ---------------- */
+/**
+ * 素材专项验证：把刚推上去的文件**按小程序端的真实 URL 逐个 GET**。
+ *
+ * 为什么不复用 verify()：verify() 判的是「商品数一致 / 型号能点开」，
+ * 素材推不上去它照样全绿 —— 而「图片加载失败」恰恰是素材缺失的典型症状
+ * （小程序端 ENV='server'，图走 https://<host>/mall-api/uploads/…）。
+ * 判据必须落在**真的能取到字节**上，且长度与本机文件一致。
+ */
+async function verifyUploads(list) {
+  step('素材验证（线上逐张 GET，比对本机字节数）');
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  /*
+   * ⚠️ `/uploads` 静态路由**只放行图片与视频扩展名**（见 server/routes/media.js：
+   *    其它类型一律 403「不支持的素材类型」）—— `uploads/index.json` 是素材索引，
+   *    本来就不该也不能通过 HTTP 取。所以它只能走 SSH 比哈希，不能进 GET 清单，
+   *    否则每次都会报一个假的 403 失败（真踩过）。
+   */
+  const MEDIA = /\.(png|jpe?g|webp|gif|mp4|mov|webm)$/i;
+  const media = list.filter((f) => MEDIA.test(f.rel));
+  const others = list.filter((f) => !MEDIA.test(f.rel));
+
+  let bad = 0;
+  const CONC = 8;
+  for (let i = 0; i < media.length; i += CONC) {
+    await Promise.all(media.slice(i, i + CONC).map(async (f) => {
+      const url = BASE + '/' + f.rel.replace(/^server\/data\//, '');  // server/data/uploads/x → /uploads/x
+      try {
+        const r = await fetch(url);
+        const len = (await r.arrayBuffer()).byteLength;
+        if (r.status !== 200 || (f.size && len !== f.size)) {
+          bad++;
+          badMsg(`${r.status} ${url}（线上 ${len}B / 本机 ${f.size}B）`);
+        }
+      } catch (e) { bad++; badMsg(`${url} ⇒ ${e.message}`); }
+    }));
+  }
+  if (media.length && !bad) okMsg(`${media.length} 个图片/视频全部可取（字节数与本机一致）`);
+
+  if (others.length) {
+    // 非媒体文件（index.json 等）：SSH 比 md5，判据同样是「内容一致」而非「文件在」
+    const localMd5 = new Map(others.map((f) => [f.rel, crypto.createHash('md5').update(fs.readFileSync(path.join(ROOT, f.rel))).digest('hex')]));
+    const out = ssh(`cd ${APP_DIR} && md5sum ${others.map((f) => `'${f.rel}'`).join(' ')}`, { quiet: true });
+    const remoteMd5 = new Map();
+    out.split('\n').forEach((l) => { const m = l.match(/^([0-9a-f]{32})\s+(.+?)\s*$/); if (m) remoteMd5.set(m[2], m[1]); });
+    const diffFiles = others.filter((f) => remoteMd5.get(f.rel) !== localMd5.get(f.rel));
+    if (diffFiles.length) { bad += diffFiles.length; diffFiles.slice(0, 5).forEach((f) => badMsg(`${f.rel} 线上内容与本机不一致`)); }
+    else okMsg(`${others.length} 个非媒体文件（素材索引等）内容一致（SSH 比 md5）`);
+  }
+  return bad === 0;
+}
+
+/**
+ * 收集「小程序端真的会去取」的素材地址。
+ *
+ * 三个来源缺一不可（与「删除素材先查引用」同一份口径，见 .workbuddy/memory/PITFALLS.md）：
+ *   ① `miniprogram/config/replica.js` —— 已发布的页面内容（首页区块、自定义页、店铺头像、导航图标）
+ *   ② `server/data/catalog.json`       —— 商品主图 / 图集 / 图文详情长图
+ *   ③ `server/data/decorate/state.json`—— 还没发布、但运营马上要发布的草稿
+ * 只扫 replica 会漏掉商品图；只扫 catalog 会漏掉页面区块图。
+ */
+function collectUploadRefs() {
+  const files = [
+    'miniprogram/config/replica.js',
+    'server/data/catalog.json',
+    'server/data/decorate/state.json',
+  ];
+  const set = new Set();
+  for (const f of files) {
+    const p = path.join(ROOT, f);
+    if (!fs.existsSync(p)) continue;
+    const txt = fs.readFileSync(p, 'utf8');
+    for (const m of txt.match(/\/uploads\/[0-9A-Za-z_/.\-]+\.(?:png|jpe?g|webp|gif|mp4|mov|webm)/g) || []) set.add(m);
+  }
+  return [...set];
+}
+
+/**
+ * 逐个 GET 校验素材线上可取。
+ *
+ * 为什么必须是「线上逐张取」而不是「检查本机有没有这个文件」：
+ *   小程序端 `ENV='server'`，图一律走 `https://<host>/mall-api/uploads/…`。
+ *   素材物理文件只落在**本机** `server/data/uploads/`（装修台在本机跑），
+ *   没推上线时本机一切正常 —— 装修台的手机预览由本机服务同源喂图，必然显示得出来，
+ *   `/preview` 同理。**只有开发者工具 / 真机才暴露「图片加载失败」**。
+ *   所以判据只能落在「这个 URL 现在能不能取到字节」。
+ */
+async function verifyUploadRefs() {
+  /*
+   * 全量扫一遍是把这 1000 多张图**真的下载一次**（约 270 MB、几分钟），
+   * 所以 `--fast` 只等距抽 40 张 —— 语义仍是「线上取得到吗」，只是把
+   * 「少了一张图」的检出概率从 100% 降到「按比例抽样」。默认（不带 --fast）全查。
+   */
+  const refs = collectUploadRefs();
+  step(`素材可达性（${FAST ? `等距抽样 ${Math.min(40, refs.length)} / ` : ''}${refs.length} 个引用逐个 GET）`);
+  if (!refs.length) { info('（没有引用到任何 /uploads 素材）'); return true; }
+  const list = FAST && refs.length > 40
+    ? Array.from({ length: 40 }, (_, i) => refs[Math.floor((i * refs.length) / 40)])
+    : refs;
+  const miss = [];
+  const CONC = 16;
+  for (let i = 0; i < list.length; i += CONC) {
+    await Promise.all(list.slice(i, i + CONC).map(async (p) => {
+      try { const r = await fetch(BASE + p); if (r.status !== 200) miss.push(`${r.status} ${p}`); }
+      catch (e) { miss.push(`${e.message} ${p}`); }
+    }));
+  }
+  if (!miss.length) { okMsg(`${list.length} 个素材线上全部可取（实下载校验）`); return true; }
+  badMsg(`${miss.length}/${list.length} 个素材线上取不到 —— 小程序端会显示「图片加载失败」：`);
+  miss.slice(0, 10).forEach((m) => info(`  ${m}`));
+  if (miss.length > 10) info(`  …另外 ${miss.length - 10} 个`);
+  info('  修法：node .tooling/sync-incremental.mjs --only=server/data/uploads --apply');
+  return false;
+}
+
 async function verify() {
   step('线上验证');
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -230,6 +376,13 @@ async function verify() {
   if (!health || health.code !== 0) { badMsg('健康检查不通'); return false; }
   okMsg(`服务在跑，点位 ${health.data.routes} 个，DEBUG_PAGE=${health.data.debugPage}`);
 
+  /*
+   * 素材可达性放在最前面：它是「小程序里图片加载失败」的唯一直接判据，
+   * 而本机（装修台预览 / /preview）永远看不出来 —— 先报这一条，
+   * 省得看到「商品数一致」就以为没事。
+   */
+  const mediaOk = await verifyUploadRefs();
+
   const catalog = JSON.parse(fs.readFileSync(path.join(ROOT, 'server/data/catalog.json'), 'utf8'));
   const localGoods = (catalog.goods || []).length;
   const list = await fetch(BASE + '/api/goods/list?page=1&size=100').then((r) => r.json()).catch(() => null);
@@ -237,7 +390,7 @@ async function verify() {
   if (total === localGoods) okMsg(`商品数与本机一致（${total} 个）`);
   else badMsg(`商品数不一致：线上 ${total} / 本机 ${localGoods}`);
 
-  if (FAST) { info('（--fast：跳过逐个型号验证）'); return total === localGoods; }
+  if (FAST) { info('（--fast：跳过逐个型号验证）'); return mediaOk && total === localGoods; }
 
   // 产品页型号必须真的能点开 —— 这是「详情页空白」事故的直接判据
   const reg = require_(path.join(ROOT, 'miniprogram/config/replica.js'));
@@ -267,7 +420,7 @@ async function verify() {
     badMsg(`${open}/${models.length} 可打开，${dead.length} 个打不开：`);
     dead.slice(0, 10).forEach((d) => info(`  ${d}`));
   }
-  return dead.length === 0 && total === localGoods;
+  return mediaOk && dead.length === 0 && total === localGoods;
 }
 
 /* ---------------- 主流程 ---------------- */
@@ -322,7 +475,7 @@ async function verify() {
   if (toSend.length) push(toSend);
   if (PRUNE && toDelete.length) pruneRemote(toDelete);
 
-  const passed = await verify();
+  const passed = ONLY_UPLOADS && toSend.length ? await verifyUploads(toSend) : await verify();
   console.log('');
   if (passed) console.log(`${C.g}${C.b}增量同步完成。${C.x}`);
   else console.log(`${C.r}${C.b}同步存在问题，请按上面的 ✗ 排查。${C.x}`);

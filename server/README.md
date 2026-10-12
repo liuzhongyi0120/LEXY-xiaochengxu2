@@ -919,7 +919,7 @@ node server/tools/check-all.mjs
 | 后台页面资源可达性 | 按**无尾斜杠 URL** 真实解析每个页面 HTML 里的 `src`/`href` 并请求一次 —— 专抓「相对路径 404 → 脚本不执行 → 页面白屏」 |
 | 示例参数一致性 | `samples.js` 每个 key 都命中已注册点位（防写错路径静默失效），且每个点位都有示例（防加点位忘写示例） |
 | 预览渲染链路 | `/mp-src` 放行文本类型 / 拒绝非文本（403）/ 拦截路径穿越（400，含 `%2F`、`%2e`、`%5C` 三种编码形态）；预览页必须加载三件套且顺序正确、不得引 `admin.css`；`preview.js` 里不得出现 `PvRender.render(` 或第二份手写渲染 —— 专抓「预览又变成另一个实现，跟真机对不上」 |
-| 店铺导航（`check-all.mjs` 第 15.11 节） | 候选页面与 `app.json` 的 `tabBar.list` 逐项一致（选错了真机点不动且不报错）/ `tabBar.custom:true` 且 list 仍完整 / custom-tab-bar 四件套齐全 / **5 个 tab 页的 json 都声明 `usingComponents`**（漏了底部导航整体不渲染）/ **5 个 tab 页都在 `onShow` 里同步高亮**、且同步逻辑只有 `utils/tabbar.js` 一处、按路径匹配、`onTap` 不 `setData` / 兜底值三处哈希一致 / `validate('nav')` 的四条边界 / 发布器接线 / 装修台与 `/preview` 只共用 `pv-tabbar.js` 一份实现 |
+| 店铺导航（`check-all.mjs` 第 15.11 节） | 候选页面与 `app.json` 的 `tabBar.list` 逐项一致（选错了真机点不动且不报错）/ `tabBar.custom:true` 且 list 仍完整 / custom-tab-bar 四件套齐全 / **5 个 tab 页的 json 都声明 `usingComponents`**（漏了底部导航整体不渲染）/ **5 个 tab 页都在 `onShow` 里同步高亮**、且同步逻辑只有 `utils/tabbar.js` 一处、按路径匹配、`onTap` 不 `setData` / 兜底值三处哈希一致 / `validate('nav')` 的四条边界 / 发布器接线 / 装修台与 `/preview` 只共用 `pv-tabbar.js` 一份实现 / **自定义页也能当导航目标**（第 41 批）：自定义页地址字面四处同源、目标判定只有一份实现且 `store.js` 复用 `schema.isTabbarPath`（第 41 批的 502 就是 store.js 自己又写了一份候选集合）、**把组件真跑起来点一次**（内置页 → `switchTab`／自定义页 → `navigateTo`／已在自定义页容器内 → `redirectTo`）、被选中的自定义页自渲染一份导航、**空文案回落页面名三处消费方同结果**（组件一度只认 5 个内置页 → 真机空白 tab） |
 
 外加一组**装修链条对账**（`check-all.mjs` 第 15.78 节），把四个环节串起来比对，任一处漏接都会红：
 
@@ -1082,6 +1082,21 @@ ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
 > 串起来（少任何一步都会得到「传完了还是旧的」的假象：`catalogStore` 是进程内内存缓存），
 > 并做与小程序同路径的验证（商品数比对 + **逐个型号真的打一次详情接口** + 主图可访问）。
 > 背景、真实事故与排查口诀见 `deploy/README.md` 的「同步业务数据到线上」。
+
+> **只想把素材推上线（最常见）**：
+> ```bash
+> node .tooling/sync-incremental.mjs --only=server/data/uploads            # 先看要传多少个
+> node .tooling/sync-incremental.mjs --only=server/data/uploads --apply    # 执行
+> ```
+> 只推 `server/data/uploads/` 下的差异文件，**不重启服务**（素材没有进程内缓存），
+> 推完把每个文件按小程序端的真实 URL 逐个 GET 一遍验字节数。
+>
+> ⚠️ **装修台在本机上传的图，物理文件只落在本机** `server/data/uploads/`。
+> 小程序端 `ENV='server'` 读的是云服务器，不推上去就是**「图片加载失败」**（线上 404）。
+> 这类失败**在装修台的手机预览里看不出来** —— 预览页由本机服务同源喂图，必然显示得出来；
+> `/preview` 同理。只有开发者工具与真机才暴露。
+> 体检入口：`node .tooling/sync-incremental.mjs --verify`（把页面与商品引用到的
+> `/uploads/…` 全部逐张 GET，取不到就报红并给出修法）。
 
 ### 冒烟与回滚
 
