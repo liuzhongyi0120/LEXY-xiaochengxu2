@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 09:15:06（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 10:16:29（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1856,32 +1856,32 @@ const TABBAR = {
     {
       path: "/pages/index/index",
       text: "首页",
-      icon: "",
-      activeIcon: ""
+      icon: "/images/tabbar/home.png",
+      activeIcon: "/images/tabbar/home-active.png"
     },
     {
       path: "/pages/lexy/lexy",
       text: "莱克",
-      icon: "",
-      activeIcon: ""
+      icon: "/images/tabbar/lexy.png",
+      activeIcon: "/images/tabbar/lexy-active.png"
     },
     {
       path: "/pages/news/news",
       text: "资讯",
-      icon: "",
-      activeIcon: ""
+      icon: "/images/tabbar/news.png",
+      activeIcon: "/images/tabbar/news-active.png"
     },
     {
       path: "/pages/custom/index?key=p236",
       text: "产品",
-      icon: "",
-      activeIcon: ""
+      icon: "/images/tabbar/product.png",
+      activeIcon: "/images/tabbar/product-active.png"
     },
     {
       path: "/pages/mine/mine",
       text: "个人",
-      icon: "",
-      activeIcon: ""
+      icon: "/images/tabbar/mine.png",
+      activeIcon: "/images/tabbar/mine-active.png"
     }
   ]
 };

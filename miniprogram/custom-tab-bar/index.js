@@ -23,7 +23,16 @@
 const replica = require('../config/replica');
 const { resolveAssets } = require('../utils/asset');
 
-/** 兜底配置：replica 里还没有 TABBAR（装修台没发布过导航）时使用，与后端 schema 的默认值一致 */
+/**
+ * 兜底配置：replica 里还没有 TABBAR（装修台没发布过导航）时使用，
+ * 与后端 schema.tabbarDefault() 的默认值一致。
+ *
+ * 兜底项**自带图标** —— 图标是**包内资源**（miniprogram/images/tabbar/），
+ * 复刻自有赞「店铺导航」配置页的图标字体 yz-tabbar-icon-v2
+ * （未选中 / 选中是同一个字形、两种颜色），生成脚本 `.tooling/make-tabbar-icons.py`。
+ * 放包内而不是素材库的理由：① 微信原生 tabBar 的 iconPath 只认包内路径；
+ * ② 底部导航是每个页面都要立刻显示的界面骨架，不该依赖「素材已同步到线上」。
+ */
 const FALLBACK = {
   color: '#8A8A8A',
   selectedColor: '#C8102E',
@@ -31,11 +40,11 @@ const FALLBACK = {
   borderColor: '#EEEEEE',
   iconMode: 'always',
   items: [
-    { path: '/pages/index/index', text: '首页' },
-    { path: '/pages/lexy/lexy', text: '莱克' },
-    { path: '/pages/news/news', text: '资讯' },
-    { path: '/pages/product/product', text: '产品' },
-    { path: '/pages/mine/mine', text: '我的' }
+    { path: '/pages/index/index', text: '首页', icon: '/images/tabbar/home.png', activeIcon: '/images/tabbar/home-active.png' },
+    { path: '/pages/lexy/lexy', text: '莱克', icon: '/images/tabbar/lexy.png', activeIcon: '/images/tabbar/lexy-active.png' },
+    { path: '/pages/news/news', text: '资讯', icon: '/images/tabbar/news.png', activeIcon: '/images/tabbar/news-active.png' },
+    { path: '/pages/product/product', text: '产品', icon: '/images/tabbar/product.png', activeIcon: '/images/tabbar/product-active.png' },
+    { path: '/pages/mine/mine', text: '我的', icon: '/images/tabbar/mine.png', activeIcon: '/images/tabbar/mine-active.png' }
   ]
 };
 
@@ -115,6 +124,8 @@ function readConfig() {
     /* 同一页面只保留第一次出现 —— 与后端 normalizeTabbar / 预览 pv-tabbar 同口径。
        重复项会让底部出现两处同时高亮（手改 replica.js 时很容易写出来）。 */
     seen[it.path] = true;
+    /* 图标取值直接来自数据（发布时已写进 replica.TABBAR）；
+       activeIcon 空则沿用未选中图标 —— 运营只传了一张图时，两态用同一张。 */
     const icon = resolveAssets(it.icon || '');
     const activeIcon = resolveAssets(it.activeIcon || it.icon || '');
     items.push({

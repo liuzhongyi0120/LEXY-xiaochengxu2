@@ -1229,6 +1229,36 @@ a.pname { text-decoration: none; }
 .imgf .mid input { width: 100%; height: var(--yz-ctl-h); padding: 0 10px; border: 1px solid var(--yz-border); border-radius: var(--yz-radius); }
 .imgf .mid .btns { display: flex; gap: 6px; margin-top: 6px; }
 
+/* 内置图标快捷选择（图片字段声明了 presets 时出现在缩略图下方）。
+   底部导航图标是包内资源（/images/tabbar/…），运营通常只在这几个之间换，
+   点一下即可，不用手打路径 —— 手打还容易漏掉 `-active` 后缀。 */
+.imgf + .presets,
+.presets {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.presets .plabel { font-size: 11px; color: var(--gray-2); flex: 0 0 auto; }
+.presets .preset {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  width: 46px;
+  padding: 4px 0;
+  border: 1px solid var(--yz-border);
+  border-radius: var(--yz-radius);
+  background: #fff;
+  cursor: pointer;
+  transition: .15s;
+}
+.presets .preset:hover { border-color: var(--blue-border); background: #fafcff; }
+.presets .preset.on { border-color: var(--blue); background: var(--blue-light); }
+.presets .preset img { width: 22px; height: 22px; object-fit: contain; display: block; }
+.presets .preset em { font-style: normal; font-size: 10px; color: var(--gray-2); line-height: 1; }
+
 /* 列表管理 */
 .ins-list-head {
   display: flex;

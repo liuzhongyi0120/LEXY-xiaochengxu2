@@ -1628,6 +1628,28 @@
       box.appendChild(thumb);
       box.appendChild(mid);
       wrap.appendChild(box);
+      /*
+       * 内置图标快捷选择（字段声明里的 presets）。
+       * 底部导航的图标默认就是内置的（包内资源 /images/tabbar/…），运营十有八九
+       * 只需要在**这几个**之间换，不该被逼着手打 `/images/tabbar/xxx-active.png` 这种路径 ——
+       * 手打还极易漏掉 `-active` 后缀，于是选中态跟未选中长得一样，且完全看不出哪里错了。
+       */
+      if (f.presets && f.presets.length) {
+        var pre = el('div', 'presets');
+        pre.appendChild(el('span', 'plabel', '内置图标'));
+        f.presets.forEach(function (p) {
+          var b = el('button', 'preset' + (val === p.value ? ' on' : ''));
+          b.title = p.label + '：' + p.value;
+          b.innerHTML = '<img src="' + attr(p.value) + '" alt=""><em>' + esc(p.label) + '</em>';
+          b.onclick = function () {
+            write(fullPath, p.value);
+            renderInspector();
+            toast('已套用内置图标：' + p.label);
+          };
+          pre.appendChild(b);
+        });
+        wrap.appendChild(pre);
+      }
       if (f.hint) wrap.appendChild(el('div', 'hint', esc(f.hint)));
       return wrap;
 

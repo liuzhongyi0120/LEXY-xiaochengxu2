@@ -3189,6 +3189,136 @@ assert('空文案回落页面名：后端 / 小程序组件 / 预览渲染对同
   navBlankTexts['小程序组件'][0] !== '',
   navBlankVals.map((x) => x[0] + '=' + x[1]).join(' ｜ '));
 
+/* ---- H. 内置导航图标：包内资源 + /images/ 只读路由（第 43 批复刻有赞「店铺导航」图标） ----
+ *
+ * 为什么图标必须放**代码包内**（miniprogram/images/tabbar/）而不是素材库：
+ *   ① 微信原生 tabBar 的 iconPath 只认包内路径，网络地址不认 —— 底部导航图标天然属于包内资源；
+ *   ② 底部导航是每个页面都要立刻显示的界面骨架，不能依赖「素材已同步到线上」
+ *      （第 42 批的整页图片加载失败就是素材没推线上造成的）；
+ *   ③ 后端没起、离线打开时导航仍完整。
+ *   素材复刻自有赞「店铺导航」配置页的图标字体 yz-tabbar-icon-v2（未选中 / 选中是同一字形、
+ *   两种颜色），逐字形导出成 PNG，脚本 .tooling/make-tabbar-icons.py。
+ *
+ * 浏览器那两处（装修台手机壳 / /preview）取的是**同一张图**：后端加了 /images/ 只读路由，
+ * 与应用内的路径**同一约定** —— 所以装修台预览与真机不会各拿一份。
+ *
+ * 这一组锁三件事：
+ *   A. 10 张图标真的在包里，且是**真 PNG**（按魔数，不看扩展名）、3 倍图尺寸正确；
+ *   B. 三处默认值（schema / 组件 / pv-tabbar）里的图标路径都指向这些真文件，且两态成对；
+ *   C. /images/ 只读路由的行为与安全边界（200 + no-store / 非位图 403 / 穿越拦截 /
+ *      与装修后台同受 DEBUG_PAGE）。
+ */
+const NAV_ICON_DIR = join(MP_ROOT, 'images', 'tabbar');
+const NAV_ICON_NAMES = ['home', 'lexy', 'news', 'product', 'mine'];
+const NAV_ICON_FILES = [];
+NAV_ICON_NAMES.forEach((n) => { NAV_ICON_FILES.push(n + '.png'); NAV_ICON_FILES.push(n + '-active.png'); });
+const NAV_ICON_MISSING = NAV_ICON_FILES.filter((f) => !existsSync(join(NAV_ICON_DIR, f)));
+assert('内置导航图标 10 张全部在代码包里（微信 iconPath 只认包内路径；少了真机底部图标直接空白）',
+  NAV_ICON_MISSING.length === 0,
+  NAV_ICON_MISSING.length ? '缺失：' + NAV_ICON_MISSING.join(', ') : NAV_ICON_FILES.join(' '));
+
+/** 读 PNG 头部：魔数 + IHDR 宽高/位深/颜色类型（不信任扩展名） */
+function navPngInfo(buf) {
+  const isPng = buf.length > 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+  if (!isPng) return null;
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20), depth: buf[24], color: buf[25] };
+}
+const NAV_ICON_BAD = [];
+const navIconBufs = {};
+NAV_ICON_FILES.forEach((f) => {
+  const p = join(NAV_ICON_DIR, f);
+  if (!existsSync(p)) { NAV_ICON_BAD.push(f + ': 文件不存在'); return; }
+  const buf = readFileSync(p);
+  navIconBufs[f] = buf;
+  const info = navPngInfo(buf);
+  if (!info) { NAV_ICON_BAD.push(f + ': 不是 PNG'); return; }
+  /* 3 倍图：真机显示 22px（与 custom-tab-bar/index.wxss 的图标区同口径）→ 66×66。
+     尺寸写错不会报错，只会让图标在大屏上发虚或被拉伸。 */
+  if (info.w !== 66 || info.h !== 66) NAV_ICON_BAD.push(`${f}: ${info.w}×${info.h}（应为 66×66 = 22px 的 3 倍图）`);
+  if (info.depth !== 8 || info.color !== 6) NAV_ICON_BAD.push(`${f}: bitDepth=${info.depth} colorType=${info.color}（应为 8 / 6 = 8bit RGBA，图标要带透明通道）`);
+});
+assert('10 张图标都是 8bit RGBA 的 66×66 PNG（3 倍图 · 带透明通道 —— 错了不报错，只是真机上发虚或被拉伸）',
+  NAV_ICON_BAD.length === 0,
+  NAV_ICON_BAD.length ? NAV_ICON_BAD.join(' | ') : '66×66 · bitDepth=8 · colorType=6');
+
+/* 值级：三处默认值里的图标必须落在 /images/tabbar/ 下且**两态文件都存在**
+   ⚠️ 键必须逐字照抄 navTrio 的键（'后端 schema' / '小程序组件' / '预览渲染'）——
+      写错键会拿到 undefined 并在 `.items` 上抛异常，把整轮自检直接打断。 */
+const NAV_TRIO_ICON_BAD = [];
+Object.keys(navTrio).forEach((k) => {
+  const items = (navTrio[k] || {}).items || [];
+  if (!items.length) NAV_TRIO_ICON_BAD.push(`${k}: 默认项为空`);
+  items.forEach((it) => {
+    [['icon', it.icon], ['activeIcon', it.activeIcon]].forEach((pair) => {
+      const u = pair[1];
+      if (typeof u !== 'string' || u.indexOf(NAV_SCHEMA.TABBAR_ICON_DIR) !== 0 || !existsSync(join(MP_ROOT, u.slice(1)))) {
+        NAV_TRIO_ICON_BAD.push(`${k}.${pair[0]}=${JSON.stringify(u)}`);
+      }
+    });
+    if (it.activeIcon !== it.icon.replace(/\.png$/, '-active.png')) {
+      NAV_TRIO_ICON_BAD.push(`${k} 两态不成对：${it.icon} → ${it.activeIcon}`);
+    }
+  });
+});
+assert('三处默认值的图标路径都指向包内真实文件，且每项两态成对（缺哪一处，真机与装修台预览就会长得不一样）',
+  NAV_TRIO_ICON_BAD.length === 0,
+  NAV_TRIO_ICON_BAD.length ? NAV_TRIO_ICON_BAD.join(' | ')
+    : `${Object.keys(navTrio).length} 处 × 5 项 × 2 态路径全部命中真文件`);
+
+const NAV_ICON_MAP = NAV_SCHEMA.TABBAR_ICON_FILES || {};
+const NAV_ICON_MAP_VALS = Object.keys(NAV_ICON_MAP).map((k) => NAV_ICON_MAP[k]);
+assert('图标名映射表与内置页面表一一对应、无重名（多 / 少 / 两项同图都会让默认值静默缺图标）',
+  NAV_ICON_MAP_VALS.length === NAV_SCHEMA_PATHS.length &&
+  new Set(NAV_ICON_MAP_VALS).size === NAV_ICON_MAP_VALS.length &&
+  NAV_SCHEMA_PATHS.every((p) => NAV_ICON_MAP[p] && NAV_ICON_NAMES.indexOf(NAV_ICON_MAP[p]) >= 0),
+  Object.keys(NAV_ICON_MAP).map((k) => k + '=' + NAV_ICON_MAP[k]).join(' '));
+
+/* 装修台的「内置图标」快捷按钮：取值必须是上面那 10 张，否则一点按钮就换成线上还没同步的图 */
+const NAV_PRESET_VALS = (NAV_SCHEMA.TABBAR_PRESET_OFF || []).concat(NAV_SCHEMA.TABBAR_PRESET_ON || []);
+assert('装修台「内置图标」快捷按钮的取值全部指向包内真文件，且就是默认项自身（不会各写一份后走样）',
+  NAV_PRESET_VALS.length === NAV_ICON_FILES.length &&
+  NAV_PRESET_VALS.every((p) => existsSync(join(MP_ROOT, String(p.value).slice(1)))) &&
+  (NAV_SCHEMA.TABBAR_PRESET_OFF || []).every((p, i) => p.value === NAV_SCHEMA.tabbarDefault().items[i].icon) &&
+  (NAV_SCHEMA.TABBAR_PRESET_ON || []).every((p, i) => p.value === NAV_SCHEMA.tabbarDefault().items[i].activeIcon),
+  NAV_PRESET_VALS.map((p) => p.label + '=' + p.value).join(' '));
+
+/* 静态源断言（与 /mp-src 那条同一口径）：/images/ 必须与装修后台同进同退 */
+const NAV_IMG_GUARD_IDX = idxSrcForMp.indexOf('function tryMpImg(');
+assert('/images/ 只读路由与装修后台同受 DEBUG_PAGE 约束（关掉管理页时包内图标也不该裸奔）',
+  NAV_IMG_GUARD_IDX > -1 && /DEBUG_PAGE/.test(idxSrcForMp.slice(NAV_IMG_GUARD_IDX, NAV_IMG_GUARD_IDX + 500)),
+  NAV_IMG_GUARD_IDX > -1 ? 'tryMpImg 内已判定 DEBUG_PAGE，关闭时返回 403' : '未找到 tryMpImg');
+
+let navImgGet = null;
+try {
+  const r = await fetch(BASE + NAV_SCHEMA.TABBAR_ICON_DIR + 'home.png');
+  const buf = Buffer.from(await r.arrayBuffer());
+  navImgGet = {
+    status: r.status, type: r.headers.get('content-type'), cc: r.headers.get('cache-control'),
+    same: buf.length > 0 && buf.equals(navIconBufs['home.png'] || Buffer.alloc(0))
+  };
+} catch (e) { navImgGet = { error: e.message }; }
+assert('/images/ 只读路由能取到包内图标，且与包内文件**字节一致**（装修台预览 / /preview / 真机拿到的是同一张图）',
+  !!navImgGet && navImgGet.status === 200 && navImgGet.type === 'image/png' && navImgGet.same === true,
+  JSON.stringify(navImgGet));
+assert('/images/ 图标响应带 no-store（换图后装修台与预览页立刻看到新的，不吃浏览器缓存）',
+  !!navImgGet && navImgGet.cc === 'no-store', navImgGet && navImgGet.cc);
+
+const navImgProbe = [];
+for (const [p, why] of [
+  ['/images/tabbar/__no_such__.png', '不存在的图'],
+  ['/images/tabbar/index.wxml', '非位图扩展名'],
+  ['/images/tabbar/home.js', '脚本文件'],
+  ['/images/../app.js', '路径穿越'],
+  ['/images/', '目录本身']
+]) {
+  let st = 0;
+  try { st = (await fetch(BASE + p)).status; } catch (e) { st = -1; }
+  navImgProbe.push({ p, why, st, ok: st === 403 || st === 404 || st === 400 });
+}
+assert('/images/ 路径安全边界：不存在的图 / 非位图 / 脚本 / 穿越 / 目录本身，一律拿不到内容',
+  navImgProbe.every((x) => x.ok),
+  navImgProbe.map((x) => `${x.p}(${x.why})=${x.st}`).join(' '));
+
 /* 15.95 把本次自检消耗掉的库存补回（与 0.5 节呼应，保证可重复运行） */
 if (stockBefore.length) {
   const stockAfter = (await readGoodsStock()) || [];

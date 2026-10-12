@@ -185,6 +185,72 @@ function tryMpSrc(path, res) {
 }
 
 /**
+ * 小程序**包内图片**（只读）：GET /images/<miniprogram/images 下的相对路径>
+ *
+ * 为什么需要这条路由：
+ *   底部导航图标是**包内资源**（微信原生 tabBar 的 iconPath 只能是包内路径，
+ *   网络地址一律不认），所以图标文件放在 miniprogram/images/tabbar/ 并随代码包发布。
+ *   小程序端写 `/images/tabbar/home.png` 就能直接读到。
+ *   但装修台手机预览与 /preview 是**在浏览器里**渲染的 —— 同一个 `/images/...`
+ *   会打到本站，没有这条路由就是一片裂图。
+ *   让两个世界共用**同一个 URL**，预览链路（pv-tabbar / 装修台缩略图）就一行都不用改写，
+ *   也就不会出现「装修台显示的是另一套图标」这种走样。
+ *
+ * 安全：
+ *   - 跟随 DEBUG_PAGE（与 /mp-src、/admin、/preview 同进同退）。它是**预览专用**，
+ *     不是小程序线上内容 —— 真机读的是代码包里的那份，根本不走 HTTP；
+ *   - 只放行位图扩展名；源码文本仍只走 /mp-src，两条路由的放行范围**不重叠**；
+ *   - 根目录就是 miniprogram/images，因此只可能有「images 下的位图」被命中；
+ *   - 拒绝 `..` / 反斜杠 / 绝对路径，防目录穿越。
+ */
+const MP_IMG_DIR = nodePath.join(__dirname, '..', 'miniprogram', 'images');
+const MP_IMG_MIME = {
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif'
+};
+
+function tryMpImg(path, req, res) {
+  if (path.indexOf('/images/') !== 0) return false;
+
+  if (!DEBUG_PAGE) {
+    fail(res, '管理页面已关闭（设置 DEBUG_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
+    return true;
+  }
+
+  let rel = '';
+  try { rel = decodeURIComponent(path.slice('/images/'.length)); } catch (e) { rel = ''; }
+  if (!rel || rel.indexOf('..') !== -1 || rel.startsWith('/') || rel.indexOf('\\') !== -1) {
+    fail(res, '图标路径不合法', ERR.PARAM, 400);
+    return true;
+  }
+
+  const type = MP_IMG_MIME[nodePath.extname(rel).toLowerCase()];
+  if (!type) {
+    fail(res, '仅支持包内图片（png / jpg / webp / gif）', ERR.FORBIDDEN, 403);
+    return true;
+  }
+
+  const file = nodePath.join(MP_IMG_DIR, rel);
+  fs.readFile(file, (err, buf) => {
+    if (err) {
+      console.error('[error] 读取包内图片失败', rel, err.code);
+      return fail(res, '图片不存在：' + rel, ERR.NOT_FOUND, 404);
+    }
+    // 改图立刻可见（不缓存）：这是预览用的资源，缓存只会让「换了图没生效」变成新的排查题
+    res.writeHead(200, {
+      'Content-Type': type,
+      'Content-Length': buf.length,
+      'Cache-Control': 'no-store'
+    });
+    res.end(buf);
+  });
+  return true;
+}
+
+/**
  * 素材静态服务：GET /uploads/<yyyyMM>/<file>
  *
  * 与调试台 / 装修台不同，这里**不受 DEBUG_PAGE 开关影响**——
@@ -356,6 +422,9 @@ const server = http.createServer(async (req, res) => {
 
   /* 小程序源码只读：/mp-src/…（预览页直接编译真机 WXML + WXSS 用） */
   if (method === 'GET' && tryMpSrc(path, res)) return;
+
+  /* 小程序包内图片只读：/images/…（底部导航图标等；装修台预览与 /preview 用） */
+  if (method === 'GET' && tryMpImg(path, req, res)) return;
 
   /* 素材库图片：/uploads/…（不受管理页面开关影响） */
   if (method === 'GET' && tryUploads(path, req, res)) return;

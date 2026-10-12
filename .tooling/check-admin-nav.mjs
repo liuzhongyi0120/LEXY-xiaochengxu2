@@ -7,8 +7,9 @@
  *   2. 进入导航编辑器：三栏布局变成「无组件库」、页面标签=全局配置
  *   3. 区块树点第 3 项 → 手机壳底部导航高亮跟到「资讯」
  *   4. 改「导航名称」为 8 个字 → 实时截断成 5 个字（装修台预览 = 发布后的口径）
- *   5. 图标样式「纯文字」+ 配了图标 → 手机壳里 0 个图标框；默认「图标+文字」→ 1 个
- *   6. /preview：首页高亮第 1 项，切到产品页后高亮第 4 项，图片无破损
+ *   5. 内置图标：5 项都渲染包内图标（高亮项取 -active）；点「内置图标」快捷按钮能写进字段；
+ *      自传外链图标照样生效；「纯文字」模式 → 0 个图标框
+ *   6. /preview：首页高亮第 1 项，切到产品页后高亮第 4 项，图片无破损（含底部 5 张包内图标）
  *
  * 前置：
  *   1) node server/index.js                （后端）
@@ -108,19 +109,25 @@ async function ensureLoggedIn(tab) {
   return 'list-empty:' + lg;
 }
 
-/** 手机壳底部导航的可观测状态：每项文案 + 是否高亮；再带上图标框数量与选中色 */
+/** 手机壳底部导航的可观测状态：每项文案 + 是否高亮；再带上图标框数量、图片地址与选中色 */
 const BAR = `(() => {
   const bar = document.getElementById('phTabbar');
   if (!bar) return JSON.stringify({ err: 'no #phTabbar' });
-  const items = [...bar.querySelectorAll('.pvtb-item')].map((n) => ({
-    text: (n.querySelector('.pvtb-text') || {}).textContent || '',
-    on: n.classList.contains('on'),
-    color: n.style.color,
-    ico: !!n.querySelector('.pvtb-ico')
-  }));
+  const items = [...bar.querySelectorAll('.pvtb-item')].map((n) => {
+    const box = n.querySelector('.pvtb-ico');
+    const im = box ? box.querySelector('img') : null;
+    return {
+      text: (n.querySelector('.pvtb-text') || {}).textContent || '',
+      on: n.classList.contains('on'),
+      color: n.style.color,
+      ico: !!box,
+      src: im ? (im.getAttribute('src') || '') : ''
+    };
+  });
   return JSON.stringify({
     count: items.length,
     icoCount: items.filter((x) => x.ico).length,
+    srcs: items.map((x) => x.src),
     texts: items.map((x) => x.text + (x.on ? '★' : '')).join(' / '),
     onText: (items.filter((x) => x.on)[0] || {}).text || '',
     onColor: (items.filter((x) => x.on)[0] || {}).color || ''
@@ -158,7 +165,10 @@ let tab = await open(SITE + '/admin/');
       navCard: !!c && !c.hidden,
       navCardText: c ? c.innerText.replace(/\\s+/g, ' ') : '',
       pageRows: document.querySelectorAll('#pageRows tr').length,
-      rowKeys: [...new Set([...document.querySelectorAll('#pageRows [data-open]')].map((x) => x.getAttribute('data-open')))],
+      /* 「装修」/页面名都是 <a href="/admin?edit=<key>">（新窗口直达编辑器），
+         没有 data-open 了 —— 从 href 里取 key，别再去找那个已下线的属性。 */
+      rowKeys: [...new Set([...document.querySelectorAll('#pageRows a.pname')]
+        .map((a) => decodeURIComponent((String(a.getAttribute('href') || '').split('edit=')[1] || ''))))],
       customKeys: [...document.querySelectorAll('#pageRows [data-del]')].map((x) => x.getAttribute('data-del'))
     });
   })()`));
@@ -179,8 +189,16 @@ let tab = await open(SITE + '/admin/');
 }
 
 console.log('\n[2] 进入导航编辑器');
-await run(tab, `document.querySelector('[data-open="nav"]').click(); 'ok'`);
-await sleep(1400);
+/*
+ * 编辑器是「新窗口直达」形式：列表里的「装修」/ 页面名 / 「设置底部导航」都是
+ * <a href="/admin?edit=nav" target="_blank">，链接自己开新窗口（见 admin.js 的注释：
+ * 同时留着 data-open 委托会「既切视图又开新窗口」出现双份效果）。
+ * 所以这里**不要模拟点击**，直接开编辑器地址；带 ?edit= 时页面登录完会自己续上。
+ */
+await close(tab);
+tab = await open(SITE + '/admin/?edit=nav');
+await ensureLoggedIn(tab);
+await sleep(1800);
 {
   const st = JSON.parse(await run(tab, `(() => JSON.stringify({
     navMode: !!document.querySelector('.view.edit.nav-mode'),
@@ -222,21 +240,61 @@ await sleep(900);
   ok(await run(tab, `document.body.innerText.indexOf('未保存') >= 0 ? 'y' : 'n'`) === 'y', '改动进入「未保存」状态（不会偷偷写盘）');
 }
 
-console.log('\n[5] 图标样式 / 图标字段');
-await run(tab, `(() => { const i = [...document.querySelectorAll('#inspector input[type=text]')]
-  .find((x) => /图片地址/.test(x.placeholder || ''));
-  i.value = 'https://example.test/i.png'; i.dispatchEvent(new Event('input', { bubbles: true })); if (i.onchange) i.onchange(); return 'ok'; })()`);
-await sleep(1000);
+console.log('\n[5] 内置图标 / 自定义图标');
 {
+  /*
+   * 底部导航图标是**包内资源**（/images/tabbar/…，复刻自有赞「店铺导航」的图标字体），
+   * 由发布写进 replica.TABBAR，所以 5 项默认都有图标。这里同时验三件事：
+   *   · 图标地址是包内路径（不是 /uploads）—— 真机 iconPath 只认包内路径；
+   *   · 高亮项取「选中图标」、其余取「未选中图标」（-active 后缀切换正确）；
+   *   · 预览页能取到这些图（/images/… 有只读路由，见 [6] 的图片破损检查）。
+   */
   const bar = JSON.parse(await run(tab, BAR));
-  ok(bar.icoCount === 1, '未选中图标填入后，该导航项出现图标框（默认「图标+文字」）', `${bar.icoCount} 个`);
+  ok(bar.icoCount === 5 && bar.srcs.every((s) => s.indexOf('/images/tabbar/') === 0),
+    '5 项都渲染出内置图标，且地址都是包内路径 /images/tabbar/…', bar.srcs.join(' '));
+  ok(bar.srcs[2] === '/images/tabbar/news-active.png' && bar.srcs[0] === '/images/tabbar/home.png',
+    '高亮项用「选中图标」(-active)、其余用未选中图标', `资讯=${bar.srcs[2]} 首页=${bar.srcs[0]}`);
+}
+{
+  // 「内置图标」快捷选择：点一下就把地址填进字段（运营不用手打 -active 路径）
+  const clicked = await run(tab, `(() => {
+    const strips = [...document.querySelectorAll('#inspector .presets')];
+    if (strips.length < 2) return 'no-presets:' + strips.length;
+    const btn = [...strips[1].querySelectorAll('.preset')]
+      .find((b) => (b.querySelector('em') || {}).textContent === '我的');
+    if (!btn) return 'no-mine-button';
+    btn.click();
+    return 'clicked';
+  })()`);
+  await sleep(900);
+  const bar = JSON.parse(await run(tab, BAR));
+  ok(clicked === 'clicked' && bar.srcs[2] === '/images/tabbar/mine-active.png',
+    '点「选中图标」里的内置「我的」→ 该字段立刻变成 mine-active.png 且手机壳跟着变',
+    `click=${clicked} src=${bar.srcs[2]} strip=${(await run(tab, `document.querySelectorAll('#inspector .presets').length`))}`);
+  const field = await run(tab, `(() => {
+    const strips = [...document.querySelectorAll('#inspector .presets')];
+    const inputs = [...document.querySelectorAll('#inspector input[type=text]')]
+      .filter((x) => /图片地址/.test(x.placeholder || ''));
+    return inputs[1] ? inputs[1].value : '(no-input)';
+  })()`);
+  ok(field === '/images/tabbar/mine-active.png', '字段值同步为内置路径（不只是预览变了）', field);
+}
+{
+  // 自传图标仍然可用：把该字段换成外链，预览跟着换
+  await run(tab, `(() => { const i = [...document.querySelectorAll('#inspector input[type=text]')]
+    .filter((x) => /图片地址/.test(x.placeholder || ''))[1];
+    i.value = 'https://example.test/i.png'; i.dispatchEvent(new Event('input', { bubbles: true })); if (i.onchange) i.onchange(); return 'ok'; })()`);
+  await sleep(1000);
+  const bar = JSON.parse(await run(tab, BAR));
+  ok(bar.srcs[2] === 'https://example.test/i.png' && bar.icoCount === 5,
+    '改成外链图标后该项跟着换，其余 4 项仍是内置图标', bar.srcs.join(' '));
 }
 
 // 换「纯文字」：图标框应全部消失（用新标签页避免触发「返回」的离开确认）
 await close(tab);
-tab = await open(SITE + '/admin/');
-await run(tab, `document.querySelector('[data-open="nav"]').click(); 'ok'`);
-await sleep(1400);
+tab = await open(SITE + '/admin/?edit=nav');
+await ensureLoggedIn(tab);
+await sleep(1800);
 await run(tab, `(() => { const b = [...document.querySelectorAll('#inspector .rbg button')].find((x) => x.textContent === '纯文字'); b.click(); return 'ok'; })()`);
 await sleep(900);
 {
@@ -254,16 +312,75 @@ tab = await open(SITE + '/preview/', 2800);
   const a = JSON.parse(await run(tab, BAR));
   ok(a.count === 5 && a.onText === '首页' && a.onColor === 'rgb(200, 16, 46)',
     '首页：第 1 项高亮且用选中色 #C8102E', `${a.texts} · ${a.onColor}`);
-  await run(tab, `(() => { const n = [...document.querySelectorAll('#pvPages .pv-item')];
-    const hit = n.find((x) => /产品/.test(x.textContent)); if (hit) hit.click(); return 'ok'; })()`);
-  await sleep(2000);
-  const b = JSON.parse(await run(tab, BAR));
-  ok(b.onText === '产品', '切到产品页后高亮跟到第 4 项「产品」', b.texts);
+  await run(tab, `(() => {
+    const hit = [...document.querySelectorAll('#pvPages .pv-item')].find((x) => /资讯/.test(x.textContent));
+    if (hit) hit.click(); return 'ok';
+  })()`);
+  await sleep(1800);
+  {
+    const b = JSON.parse(await run(tab, BAR));
+    ok(b.onText === '资讯', '切到「资讯」页后高亮跟到第 3 项（按路径匹配，不是按序号）', b.texts);
+  }
+
+  /*
+   * 导航项指向**自定义页**时（当前第 4 项「产品」→ 微页面），光看内置页验不出来：
+   * 预览里的「产品」页是 /pages/product/product，与第 4 项的目标路径不是同一个 ——
+   * 点它**理应不高亮**。所以这里从**已发布的导航数据**里读出那条自定义页目标，
+   * 打开它对应的预览页，高亮必须跟过去。
+   * 这就是「指定微页面被选为底部导航跳转页时也展示底部导航」那件事的端到端验证。
+   */
+  const navData = await (await fetch(SITE + '/api/decorate/page?key=nav',
+    { headers: { Authorization: 'Bearer ' + ADMIN_TOKEN } })).json();
+  const customItem = (((navData.data || {}).published || {}).items || [])
+    .filter((it) => String(it.path).indexOf('/pages/custom/index?key=') === 0)[0];
+  if (customItem) {
+    const hit = await run(tab, `(() => {
+      const row = [...document.querySelectorAll('#pvPages .pv-item')]
+        .find((x) => ((x.querySelector('small') || {}).textContent || '') === ${JSON.stringify(customItem.path)});
+      if (!row) return 'no-row';
+      row.click(); return 'clicked';
+    })()`);
+    await sleep(1800);
+    const d = JSON.parse(await run(tab, BAR));
+    ok(hit === 'clicked' && d.onText === customItem.text,
+      '导航项指向自定义页时，打开那个微页面高亮跟到对应项（' + customItem.text + ' → ' + customItem.path + '）',
+      `click=${hit} onText=${d.onText} · ${d.texts}`);
+    // 反过来：点内置「产品」页不高亮任何项（它的路径不是第 4 项的目标）—— 这正是易错处
+    await run(tab, `(() => {
+      const row = [...document.querySelectorAll('#pvPages .pv-item')]
+        .find((x) => ((x.querySelector('small') || {}).textContent || '') === '/pages/product/product');
+      if (row) row.click(); return 'ok';
+    })()`);
+    await sleep(1500);
+    const e = JSON.parse(await run(tab, BAR));
+    ok(e.onText === '', '内置「产品」页不高亮任何导航项（第 4 项指向的是微页面，不是这个页面）', e.texts);
+  } else {
+    console.log('    （当前导航没有指向自定义页的项，跳过那两条断言）');
+  }
+
   const img = JSON.parse(await run(tab, `(() => JSON.stringify({
     n: document.querySelectorAll('#preview img').length,
     broken: [...document.querySelectorAll('#preview img')].filter((i) => i.complete && i.naturalWidth === 0).length
   }))()`));
   ok(img.n > 0 && img.broken === 0, '预览页图片全部可用（无破损）', `${img.n} 张 / 破损 ${img.broken}`);
+
+  /*
+   * 底部导航的图标是**包内资源**（/images/tabbar/…），小程序端从代码包里读；
+   * 但预览页是在**浏览器**里渲染的 —— 靠后端那条 /images/ 只读路由才取得到。
+   * 这条断言就是那条约定的哨兵：路由一没，预览页底部立刻变成 5 个裂图。
+   */
+  const tb = JSON.parse(await run(tab, `(() => {
+    const bar = document.getElementById('phTabbar');
+    const ims = bar ? [...bar.querySelectorAll('.pvtb-ico img')] : [];
+    return JSON.stringify({
+      n: ims.length,
+      broken: ims.filter((i) => i.complete && i.naturalWidth === 0).length,
+      srcs: ims.map((i) => i.getAttribute('src') || '')
+    });
+  })()`));
+  ok(tb.n === 5 && tb.broken === 0 && tb.srcs.every((s) => s.indexOf('/images/tabbar/') === 0),
+    '预览页底部导航 5 张包内图标全部加载成功（浏览器侧靠 /images/ 只读路由）',
+    `${tb.n} 张 / 破损 ${tb.broken} · ${tb.srcs.join(' ')}`);
 }
 await close(tab);
 

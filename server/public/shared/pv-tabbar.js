@@ -90,13 +90,27 @@
     return false;
   }
 
+  /*
+   * 兜底配置：replica 里还没有 TABBAR（装修台从没发布过导航）时用它。
+   *
+   * ⚠️ 必须与后端 `schema.tabbarDefault()`、小程序 `custom-tab-bar/index.js` 的 FALLBACK
+   *    **逐字段一致**（自检锁死）。默认项**自带图标** —— 图标是包内资源
+   *    （miniprogram/images/tabbar/，复刻自有赞「店铺导航」的图标字体），
+   *    所以「没配过导航」的站点底部也是有图标的，与真机一致。
+   */
   var DEFAULT = {
     color: '#8A8A8A',
     selectedColor: '#C8102E',
     background: '#FFFFFF',
     borderColor: '#EEEEEE',
     iconMode: 'always',
-    items: PAGES.map(function (p) { return { path: p.path, text: p.name, icon: '', activeIcon: '' }; })
+    items: [
+      { path: '/pages/index/index', text: '首页', icon: '/images/tabbar/home.png', activeIcon: '/images/tabbar/home-active.png' },
+      { path: '/pages/lexy/lexy', text: '莱克', icon: '/images/tabbar/lexy.png', activeIcon: '/images/tabbar/lexy-active.png' },
+      { path: '/pages/news/news', text: '资讯', icon: '/images/tabbar/news.png', activeIcon: '/images/tabbar/news-active.png' },
+      { path: '/pages/product/product', text: '产品', icon: '/images/tabbar/product.png', activeIcon: '/images/tabbar/product-active.png' },
+      { path: '/pages/mine/mine', text: '我的', icon: '/images/tabbar/mine.png', activeIcon: '/images/tabbar/mine-active.png' }
+    ]
   };
 
   function esc(s) {
@@ -116,6 +130,10 @@
    *   非法 path 回落第一个候选页 / 空文案回落页面名 / 同页面去重 /
    *   文案截 5 字 / 项数收敛到 2~5 / 色值大写 / 多余字段丢掉。
    * 为什么必须逐条对齐：装修台是拿草稿（还没经过后端归一化）直接渲染预览的。
+   *
+   * 注意**不在这里补默认图标**：图标是数据的一部分（发布时写进 replica.TABBAR），
+   * 归一化补了就会与后端结果字段级不一致 —— 那样自检报的「装修台口径 ≠ 后端口径」
+   * 就成了真问题，而不是噪音。
    */
   function normalize(cfg) {
     var src = (cfg && typeof cfg === 'object') ? cfg : {};

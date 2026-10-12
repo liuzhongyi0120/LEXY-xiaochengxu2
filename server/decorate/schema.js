@@ -1409,10 +1409,66 @@ const TABBAR_DEFAULTS = {
   iconMode: 'always'        // always 图标+文字 / active 仅选中显示图标 / never 纯文字
 };
 
-/** 默认 5 个导航项 = 当前 app.json 里的样子（纯文字、按内置顺序） */
-const TABBAR_DEFAULT_ITEMS = TABBAR_PAGES.map((p) => ({
-  path: p.path, text: p.name, icon: '', activeIcon: ''
-}));
+/**
+ * 内置导航图标 —— 按**页面路径**预置的一套图标（未选中 / 选中各一张）。
+ *
+ * 素材来源：有赞「店铺导航」配置页（store.youzan.com/v4/deco/retail-shopnav-config）的
+ * **图标字体** `yz-tabbar-icon-v2` —— 它的 `-active` 类与未选中共用同一个码点，
+ * 也就是「同一个字形、两种颜色」。逐字形复刻成 PNG 后放进代码包
+ * `miniprogram/images/tabbar/`（10 张，共约 33KB），生成脚本 `.tooling/make-tabbar-icons.py`。
+ *
+ * 为什么放**代码包内**、而不是素材库（/uploads）：
+ *   ① 微信原生 tabBar 的 `iconPath` 只认**包内路径**，网络地址一律不认 ——
+ *      底部导航图标本来就是包内资源这一类；
+ *   ② 底部导航是每个页面都要立刻显示的**界面骨架**，一旦依赖「素材已同步到线上」
+ *      就会重演「素材没上线 → 小程序里整页图片加载失败」那类事故（见 PITFALLS 第 42 批）。
+ *      包内资源天然没有这个问题，离线 / 后端没起时导航也完整；
+ *   ③ 想换成自传的图仍然可以 —— 「未选中 / 选中图标」填素材库地址（/uploads/…）即可覆盖。
+ *
+ * ⚠️ 这三张表**必须逐字段一致**（自检锁死，漏一处的现象是「装修台一个样、真机另一个样」）：
+ *      server/decorate/schema.js          → TABBAR_DEFAULT_ITEMS
+ *      server/public/shared/pv-tabbar.js  → DEFAULT.items
+ *      miniprogram/custom-tab-bar/index.js → FALLBACK.items
+ *    本文件是**唯一出处**，另外两处照抄（它们分别是预览与真机的兜底）。
+ */
+const TABBAR_ICON_DIR = '/images/tabbar/';
+const TABBAR_ICON_FILES = {
+  '/pages/index/index': 'home',      // 房子
+  '/pages/lexy/lexy': 'lexy',        // 标签
+  '/pages/news/news': 'news',        // 报纸
+  '/pages/product/product': 'product', // 罗盘
+  '/pages/mine/mine': 'mine'         // 笑脸
+};
+
+/** 页面路径 → 图标文件名（不带目录、不带扩展名）；不是内置 tab 页则返回 '' */
+function tabbarIconName(path) {
+  return TABBAR_ICON_FILES[path] || '';
+}
+
+/**
+ * 默认 5 个导航项 = 当前 app.json 里的样子（按内置顺序），**自带图标**。
+ * 这样「从没配过导航」的站点底部也是有图标的，与真机一致。
+ */
+const TABBAR_DEFAULT_ITEMS = TABBAR_PAGES.map((p) => {
+  const n = tabbarIconName(p.path);
+  return {
+    path: p.path,
+    text: p.name,
+    icon: n ? TABBAR_ICON_DIR + n + '.png' : '',
+    activeIcon: n ? TABBAR_ICON_DIR + n + '-active.png' : ''
+  };
+});
+
+/**
+ * 装修台「未选中 / 选中图标」两格的**快捷选择**项（点一下就填好，不用手打路径）。
+ * 每项同时给出两侧地址，字段声明时各取一边 —— 免得装修台再去拼 `-active` 后缀，
+ * 多一处拼法就多一处对不上的可能。
+ *
+ * ⚠️ 自定义页（例如把第 4 项指到「全系」微页面）没有默认图标，只能从这里挑一个，
+ *    或自己传图 —— 图标与**页面**绑定，认不出自定义页该配哪个图标，不硬塞。
+ */
+const TABBAR_PRESET_OFF = TABBAR_DEFAULT_ITEMS.map((it) => ({ label: it.text, value: it.icon }));
+const TABBAR_PRESET_ON = TABBAR_DEFAULT_ITEMS.map((it) => ({ label: it.text, value: it.activeIcon }));
 
 const TABBAR_ICON_MODES = ['always', 'active', 'never'];
 const TABBAR_HEX_RE = /^#[0-9a-fA-F]{6}$/;
@@ -1530,8 +1586,16 @@ const TABBAR_NODE = {
             hint: '可选小程序内置 5 页，或装修台新建的自定义页。自定义页不在微信的 tabBar 名单里，'
               + '小程序端会自己再渲染一份底部导航（与有赞「微页面被选为底部导航跳转页时也会展示底部导航」同一做法）'
           },
-          { k: 'icon', label: '未选中图标', type: 'image', hint: '建议 80×80 透明底 PNG' },
-          { k: 'activeIcon', label: '选中图标', type: 'image', hint: '留空则选中态沿用未选中图标（配合选中色显示）' }
+          {
+            k: 'icon', label: '未选中图标', type: 'image', presets: TABBAR_PRESET_OFF,
+            hint: '点下面的「内置图标」一键套用（已复刻有赞那套线条图标），也可以从素材库选 / 本地上传替换。'
+              + '留空 = 这一项不显示图标。要整个导航都不要图标，把上面的「图标样式」改成「纯文字」'
+          },
+          {
+            k: 'activeIcon', label: '选中图标', type: 'image', presets: TABBAR_PRESET_ON,
+            hint: '留空 = 选中态沿用上面那张（同一张图、不换色）。'
+              + '内置图标是「同一字形、两种颜色」，建议未选中 / 选中各选一张'
+          }
         ]
       },
       hint: '最少 2 项、最多 5 项（微信限制）。拖动可排序，顺序即底部导航从左到右的顺序'
@@ -2016,7 +2080,7 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
+module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, TABBAR_ICON_DIR, TABBAR_ICON_FILES, TABBAR_PRESET_OFF, TABBAR_PRESET_ON, tabbarIconName, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
   /* 个人中心（「我的」页）：区块类型表 / 组件库 / 默认区块 / 字段节点 / 页面级组件库 */
   MINE_BLOCK_KINDS, MINE_BLOCKS_NODE, MINE_UNION_KINDS, MINE_LIB_KINDS, mineComponentLib, cloneDefaultMineBlocks,
   pageLibs, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };

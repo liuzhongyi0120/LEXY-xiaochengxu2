@@ -1,24 +1,30 @@
 /**
  * 底部导航（店铺导航 / custom tabBar）专项单测
  *
- * 覆盖六组，全部在内存里跑纯函数 / 真实源码，不写文件、不连后端：
+ * 覆盖七组，全部在内存里跑纯函数 / 真实源码，不写文件、不连后端：
  *   [1] 兜底值三处一致：后端 schema / 小程序组件 / 预览渲染 pv-tabbar.js
  *   [2] schema.normalizeTabbar 的边界与幂等（发布链路的无损校验依赖幂等）
- *   [3] store.validate('nav') 的边界（微信硬限制：2~5 项 · 页面白名单）
+ *   [3] store.validate('nav') 的边界（微信硬限制：2~5 项 · 目标页面白名单）
  *   [4] emit 生成器：有 TABBAR 时写出并列入导出清单；无则整段省略
  *   [5] 小程序组件行为（用 vm 跑**真实组件源码**）：setActive 按路径、未命中 -1、
- *       onTap 只 switchTab、readConfig 的过滤 / 截断 / 兜底
+ *       onTap 的分流（内置页 switchTab / 自定义页 navigateTo / 容器内 redirectTo）、
+ *       readConfig 的过滤 / 截断 / 兜底
  *   [6] 共享渲染 pv-tabbar.js 的渲染规则（DOM 桩）：项数 / 选中配色 /
  *       「仅选中显示图标」的占位 / 纯文字模式 / 隐藏 / 转义
+ *   [7] 内置导航图标：三处兜底项逐项一致 + 10 张图标文件真的在代码包里
  *
  * 为什么要跑真实组件源码：custom-tab-bar 是「每个 tab 页各一份实例」的特殊组件，
  * 它读不到真实自定义属性，只能靠 replica.TABBAR + 内部兜底 —— 这三处兜底值
  * 一旦有一处被单独改动，真机外观就会和装修台预览/预览页不一致，且只有真机才发现。
  *
+ * ⚠️ 验「内置兜底」时必须喂一份**没有 TABBAR 的替身 replica**。
+ *    `loadComponent(null)` 读的是**真实 replica**（已发布数据，运营会把某一项指到微页面、
+ *    把文案改成「个人」），拿它比兜底必然不一致 —— 本文件曾因此出现假红。
+ *
  * 跑法：node .tooling/test-tabbar.mjs
  */
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import vm from 'node:vm';
@@ -58,7 +64,9 @@ const CTB_REQ = createRequire(CTB_FILE);
  */
 function loadComponent(replicaOverride) {
   const def = {};
-  const calls = { switchTab: [], toast: [] };
+  const calls = { switchTab: [], toast: [], navigateTo: [], redirectTo: [] };
+  /* 页面栈：onTap 里读 getCurrentPages() 决定用 navigateTo 还是 redirectTo（在自定义页容器内时） */
+  const stack = { list: [{ route: 'pages/index/index' }] };
   const req = replicaOverride
     ? (spec) => (spec === '../config/replica' ? replicaOverride : CTB_REQ(spec))
     : CTB_REQ;
@@ -66,14 +74,17 @@ function loadComponent(replicaOverride) {
     console,
     require: req,
     Component: (d) => { def.value = d; },
+    getCurrentPages: () => stack.list,
     wx: {
       switchTab: (o) => { calls.switchTab.push(o.url); },
+      navigateTo: (o) => { calls.navigateTo.push(o.url); },
+      redirectTo: (o) => { calls.redirectTo.push(o.url); },
       showToast: (o) => { calls.toast.push(o.title); }
     }
   };
   vm.createContext(sandbox);
   vm.runInContext(CTB_SRC, sandbox, { filename: 'custom-tab-bar/index.js' });
-  return { def: def.value, calls };
+  return { def: def.value, calls, stack };
 }
 
 /** 造一个组件实例（只实现 setActive / onTap 需要的那点宿主能力） */
@@ -90,7 +101,10 @@ function makeInst(def) {
 
 console.log('[1] 兜底值三处一致（后端 schema / 小程序组件 / 预览渲染）');
 {
-  const { def } = loadComponent(null); // replica 里还没有 TABBAR → 组件只能走内置兜底
+  /* 喂一份**没有 TABBAR 的替身 replica**：组件才会走内置兜底。
+     传 null 会读到真实 replica 的**已发布数据**（运营把第 4 项指到了微页面、
+     第 5 项文案改成「个人」），那是「发布结果」不是「兜底值」，比出来必然不一致。 */
+  const { def } = loadComponent({ CUSTOM_PAGES: {} });
   const trio = {
     '后端 schema': schema.tabbarDefault(),
     '小程序组件': def.data,
@@ -197,8 +211,14 @@ console.log("[3] store.validate('nav')：微信硬限制");
   ok(v(schema.tabbarDefault()) === '', '默认配置通过校验', v(schema.tabbarDefault()));
   ok(/至少需要 2 项/.test(v({ items: [{ path: '/pages/index/index', text: 'A' }] })), '1 项被拦（微信下限 2）');
   ok(/最多 5 项/.test(v({ items: new Array(6).fill({ path: '/pages/index/index', text: 'A' }) })), '6 项被拦（微信上限 5）');
-  ok(/不在小程序底部导航候选/.test(v({ items: [{ path: '/pages/index/index' }, { path: '/pages/custom/index' }] })),
-    '非 tabBar 页面被拦（自定义页不能塞进底部导航）');
+  ok(/不能作为底部导航目标/.test(v({ items: [{ path: '/pages/index/index' }, { path: '/pages/cart/cart' }] })),
+    '分类 / 购物车这类「既不是内置 tab 页、也不是自定义页」的路径被拦（真机 switchTab 打不开，也没地方渲染导航）',
+    v({ items: [{ path: '/pages/index/index' }, { path: '/pages/cart/cart' }] }));
+  ok(v({ items: [{ path: '/pages/index/index' }, { path: '/pages/custom/index?key=p236' }] }) === '',
+    '自定义页（带 ?key=）可以当底部导航目标 —— 小程序端改走 navigateTo 并在页内自渲染导航');
+  ok(/不能作为底部导航目标/.test(v({ items: [{ path: '/pages/index/index' }, { path: '/pages/custom/index' }] })),
+    '/pages/custom/index 少了 ?key= 仍被拦（认不出是哪一页，真机也打不开）',
+    v({ items: [{ path: '/pages/index/index' }, { path: '/pages/custom/index' }] }));
   ok(/同一个页面只能出现一次/.test(v({ items: [
     { path: '/pages/index/index', text: '首页' }, { path: '/pages/lexy/lexy', text: '莱克' },
     { path: '/pages/news/news', text: '资讯' }, { path: '/pages/lexy/lexy', text: '莱克又一次' }
@@ -258,7 +278,9 @@ console.log('[4] emit：TABBAR 的条件输出与导出清单');
 
 console.log('[5] 小程序组件行为（vm 跑真实组件源码）');
 {
-  const { def, calls } = loadComponent(null);
+  /* 同上：验兜底要喂没有 TABBAR 的替身 replica（否则 items 是「已发布数据」，
+     第 4 项指向微页面、高亮按路径自然找不到） */
+  const { def, calls, stack } = loadComponent({ CUSTOM_PAGES: {} });
   const inst = makeInst(def);
 
   inst.setActive('/pages/product/product');
@@ -285,11 +307,37 @@ console.log('[5] 小程序组件行为（vm 跑真实组件源码）');
   inst.onTap({ currentTarget: { dataset: { index: 99 } } });
   ok(calls.switchTab.length === before + 1 && calls.toast.length === 0, '越界索引不崩、不误跳、不误报错');
 
+  /* 目标页面是「自定义页」时必须换一条路：微信只允许 switchTab 打开 tabBar.list 里的页面，
+     自定义页共用 pages/custom/index 且靠 ?key= 区分 —— switchTab 既进不去、也传不了参数。 */
+  const cp = loadComponent({
+    TABBAR: { items: [
+      { path: '/pages/index/index', text: '首页' },
+      { path: '/pages/custom/index?key=p236', text: '全系' }
+    ] },
+    CUSTOM_PAGES: { p236: { name: '全系' } }
+  });
+  const instCp = makeInst(cp.def);
+  instCp.setActive('/pages/index/index');
+  instCp.onTap({ currentTarget: { dataset: { index: 1 } } });
+  ok(cp.calls.navigateTo.length === 1 && cp.calls.navigateTo[0] === '/pages/custom/index?key=p236',
+    '点自定义页项用 navigateTo（switchTab 打不开，也传不了 ?key=）', cp.calls.navigateTo.join(','));
+  ok(cp.calls.switchTab.length === 0 && cp.calls.redirectTo.length === 0,
+    '自定义页目标绝不误用 switchTab / redirectTo', `switchTab=${cp.calls.switchTab.length} redirectTo=${cp.calls.redirectTo.length}`);
+
+  /* 已经在自定义页容器里 → redirectTo 替换当前页。
+     不这么做时「自定义页 A → B → C…」会把页面栈越堆越深（微信上限 10 层），返回也要连按多次。 */
+  cp.stack.list.push({ route: 'pages/custom/index' });
+  instCp.setActive('/pages/index/index');
+  instCp.onTap({ currentTarget: { dataset: { index: 1 } } });
+  ok(cp.calls.redirectTo.length === 1 && cp.calls.navigateTo.length === 1,
+    '已在自定义页容器内再点自定义页项 → redirectTo（换成 navigateTo 会把页面栈越堆越深）',
+    `navigateTo=${cp.calls.navigateTo.join(',')} redirectTo=${cp.calls.redirectTo.join(',')}`);
+
   const { def: d2 } = loadComponent({ TABBAR: {
     iconMode: '乱写', color: '#123456',
     items: [
       { text: '没有 path 的项' },
-      { path: '/pages/mine/mine', text: '一二三四五六七八' },
+      { path: '/pages/mine/mine', text: '一二三四五六七八', icon: '/images/tabbar/mine.png' },
       { path: '/pages/index/index', text: '首页' }
     ]
   } });
@@ -297,7 +345,15 @@ console.log('[5] 小程序组件行为（vm 跑真实组件源码）');
   ok(d2.data.items[0].text === '一二三四五', '超 5 字截断', JSON.stringify(d2.data.items[0].text));
   ok(d2.data.iconMode === 'always', '非法 iconMode 回落默认 always', d2.data.iconMode);
   ok(d2.data.color === '#123456', '自定义配色生效', d2.data.color);
-  ok(d2.data.items[0].hasIcon === false && d2.data.items[0].icon === '', '没配图标的项 hasIcon=false');
+  ok(d2.data.items[1].hasIcon === false && d2.data.items[1].icon === '',
+    '没配图标的项 hasIcon=false / icon 为空（装修台「纯文字」与真机同口径）',
+    JSON.stringify([d2.data.items[1].hasIcon, d2.data.items[1].icon]));
+  ok(d2.data.items[0].icon === '/images/tabbar/mine.png' && d2.data.items[0].activeIcon === '/images/tabbar/mine.png',
+    '运营只配一张图时两态用同一张（activeIcon 空 → 沿用未选中图标）',
+    JSON.stringify([d2.data.items[0].icon, d2.data.items[0].activeIcon]));
+  /* 包内图标（站内路径）不能被 resolveAssets 拼上域名，否则真机取不到图 */
+  ok(d2.data.items[0].icon.indexOf('http') < 0,
+    '站内路径 /images/… 原样保留，不被 resolveAssets 拼域名', d2.data.items[0].icon);
 }
 
 /* ------------------- [6] 共享渲染 pv-tabbar.js 的渲染规则 ------------------- */
@@ -397,6 +453,67 @@ console.log('[6] 共享渲染 pv-tabbar.js（装修台手机壳 + /preview 共�
   PvTabbar.apply(bH2, { iconMode: 'never', items: schema.TABBAR_PAGES.map((p) => ({ path: p.path, text: p.name })) }, '', false);
   ok(count(bH2.innerHTML, 'class="pvtb-item') === 5, '5 个候选页全用上时渲染 5 项',
     String(count(bH2.innerHTML, 'class="pvtb-item')));
+}
+
+/* ------------------------ [7] 内置导航图标（包内资源） ------------------------ */
+
+console.log('[7] 内置导航图标：包内文件与三处默认值对得上');
+{
+  /* 图标为什么必须在**代码包内**：微信原生 tabBar 的 iconPath 只认包内路径，
+     且底部导航是每个页面都要立刻显示的界面骨架，不能依赖「素材已同步到线上」。
+     目录：miniprogram/images/tabbar/（复刻自有赞图标字体 yz-tabbar-icon-v2，
+     生成脚本 .tooling/make-tabbar-icons.py） */
+  const DIR = join(MP, 'images', 'tabbar');
+  const NAMES = ['home', 'lexy', 'news', 'product', 'mine'];
+  const WANT = [];
+  NAMES.forEach((n) => { WANT.push(n + '.png'); WANT.push(n + '-active.png'); });
+
+  const missing = WANT.filter((f) => !existsSync(join(DIR, f)));
+  ok(missing.length === 0, '10 张图标文件都在代码包里（少了真机底部图标直接空白）', missing.join(','));
+
+  /* 按魔数校验：空文件 / 被截断 / 改名的文本文件在真机上都是「整条导航空白」，不报错 */
+  const bad = WANT.filter((f) => {
+    const p = join(DIR, f);
+    if (!existsSync(p)) return true;
+    const b = readFileSync(p);
+    return !(b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4E && b[3] === 0x47);
+  });
+  ok(bad.length === 0, '每张都真的是 PNG（按文件头魔数校验，不信任扩展名）', bad.join(','));
+
+  // 三处默认值里的图标路径：必须落在 /images/tabbar/ 下、成对出现、且**两态文件**都真的存在
+  const trioDefs = { schema: schema.tabbarDefault(), pv: PvTabbar.normalize(null) };
+  ['schema', 'pv'].forEach((k) => {
+    const items = trioDefs[k].items;
+    const allIn = items.every((it) =>
+      [it.icon, it.activeIcon].every((u) =>
+        typeof u === 'string' && u.indexOf(schema.TABBAR_ICON_DIR) === 0 && existsSync(join(MP, u.slice(1)))));
+    ok(allIn, `「${k}」默认项的选中 / 未选中图标都指向包内已存在的文件`,
+      items.map((i) => i.icon + '→' + i.activeIcon).join(','));
+    const paired = items.every((it) => it.activeIcon === it.icon.replace(/\.png$/, '-active.png'));
+    ok(paired, `「${k}」每项选中图标 = 未选中图标加 -active（两态必须成对，否则选中时借不到别的字形）`,
+      items.map((i) => i.icon + '→' + i.activeIcon).join(','));
+  });
+
+  ok(schema.TABBAR_PAGES.every((p) => !!schema.tabbarIconName(p.path)),
+    '5 个内置 tab 页在 TABBAR_ICON_FILES 里都有对应图标名（漏一个 → 该页默认项没图标）',
+    schema.TABBAR_PAGES.map((p) => p.path + '=' + (schema.tabbarIconName(p.path) || '✗')).join(' '));
+  const iconVals = Object.keys(schema.TABBAR_ICON_FILES).map((k) => schema.TABBAR_ICON_FILES[k]);
+  ok(new Set(iconVals).size === iconVals.length && iconVals.length === schema.TABBAR_PAGES.length,
+    '图标名映射表与内置页面表一一对应且无重名（多一项 / 少一项 / 两项同图都会让默认值静默出错）',
+    iconVals.join(','));
+  ok(schema.TABBAR_ICON_DIR === '/images/tabbar/',
+    '图标目录是唯一约定（装修台预览与 /preview 靠后端 /images/ 只读路由取同一张图，不另写一份）',
+    schema.TABBAR_ICON_DIR);
+
+  /* 图标快捷按钮（装修台字段下的「内置图标」）：值必须就是上面那 10 张，
+     否则运营一点按钮就把导航改成了一张线上还没同步的图。 */
+  const presetVals = schema.TABBAR_PRESET_OFF.concat(schema.TABBAR_PRESET_ON).map((p) => p.value);
+  ok(presetVals.length === 10 && presetVals.every((v) => existsSync(join(MP, String(v).slice(1)))),
+    '装修台「内置图标」快捷按钮的 10 个取值都指向包内真实文件',
+    presetVals.join(','));
+  ok(schema.TABBAR_PRESET_OFF.every((p, i) => p.value === schema.tabbarDefault().items[i].icon) &&
+      schema.TABBAR_PRESET_ON.every((p, i) => p.value === schema.tabbarDefault().items[i].activeIcon),
+    '快捷按钮的取值就是默认项自身（改默认项时按钮跟着变，不会各写一份后走样）');
 }
 
 console.log('');
