@@ -2905,13 +2905,13 @@ assert('店铺导航的字段结构 = 图标样式 / 导航项 / 配色组（由
   navOpen.ok && navFields.length === 3 && navFields[0].k === 'iconMode' && navFields[1].k === 'items' &&
   navFields[2].type === 'group',
   navOpen.ok ? navFields.map((f) => f.k || ('group:' + f.label)).join(' / ') : navOpen.json.msg);
-assert('导航项的「跳转页面」是下拉选择，选项恰为 app.json 的 5 个 tabBar 页面',
-  (() => {
-    const items = navFields.filter((f) => f.k === 'items')[0];
-    const pathField = items && items.item && (items.item.fields || []).filter((f) => f.k === 'path')[0];
-    return !!pathField && pathField.type === 'select' && (pathField.options || []).length === NAV_APP_PATHS.length;
-  })(),
-  'items.item.fields.path → select（5 个候选页面）');
+const navPathField = (() => {
+  const items = navFields.filter((f) => f.k === 'items')[0];
+  return items && items.item && (items.item.fields || []).filter((f) => f.k === 'path')[0];
+})();
+assert('导航项的「跳转页面」用专用控件 tabbarPage（不是普通 select），静态候选恰为 app.json 的 5 个内置页',
+  !!navPathField && navPathField.type === 'tabbarPage' && (navPathField.options || []).length === NAV_APP_PATHS.length,
+  `items.item.fields.path → ${navPathField && navPathField.type}（${(navPathField && navPathField.options || []).length} 个内置候选；自定义页由装修台从 link-options 实时并入）`);
 
 const navDiff0 = await call('GET', '/api/decorate/diff', { auth: false, query: { key: 'nav' } });
 if (navDiff0.data && navDiff0.data.hasDraft) {
@@ -2926,12 +2926,17 @@ if (navDiff0.data && navDiff0.data.hasDraft) {
     expectFail, expectHttp: expectFail ? 200 : null, expectCode: expectCode || null
   });
 
+  /*
+   * 反面用例必须挑一个**永远不可能**当导航目标的路径：
+   *   /pages/cart/cart   —— 既不在 tabBar.list 里，也不是自定义页容器（switchTab 打不开、也没地方自渲染导航）
+   * ⚠️ 不能再用 `/pages/custom/index`（无 key）当反例的原型来写「必须是 5 个 tabBar 页」——
+   *    自定义页现在**合法**了，那句话已经不是现行口径（第 41 批改的就是它）。
+   */
   const navBadPath = await navDraft(Object.assign({}, navBase, { items: [
-    { path: '/pages/product/product', text: '产品' }, { path: '/pages/custom/index', text: '自定义页' }
-  ] }), '跳转页面必须是 app.json 里声明过的 tabBar 页面', 1001);
-  assert('导航项挑了非 tabBar 页面时被拦（否则真机上点了没反应，而开发者工具不报错）',
-    navBadPath.json.code !== 0 && /微信限制|不在小程序底部导航候选/.test(navBadPath.json.msg || ''),
-    navBadPath.json.msg);
+    { path: '/pages/index/index', text: '首页' }, { path: '/pages/cart/cart', text: '购物车' }
+  ] }), '跳转页面不能作为底部导航目标', 1001);
+  assert('导航项挑了「既不是内置 tab 页、也不是自定义页」的路径时被拦（否则真机上点了没反应，而开发者工具不报错）',
+    navBadPath.json.code !== 0 && /不能作为底部导航目标/.test(navBadPath.json.msg || ''), navBadPath.json.msg);
 
   const navFew = await navDraft(Object.assign({}, navBase, {
     items: [{ path: '/pages/index/index', text: '首页' }]
@@ -3013,6 +3018,176 @@ assert('装修台已删掉写死的文字导航条，底部导航改为独立可
   !/\.tabbar\s*[,{]/.test(adminCss) && !/\.tabbar\s*[,{]/.test(readFileSync(join(PUB, 'preview', 'preview.css'), 'utf8')) &&
   /id="navCard"/.test(navAdminHtml) && /href="\/admin\?edit=nav"/.test(adminSrc),
   'admin.css / preview.css 已无 .tabbar 规则；列表页 navCard + 新窗口入口 /admin?edit=nav');
+
+/* ---- G. 自定义页也能当底部导航目标（对标有赞「微页面被选为导航跳转页时也会展示底部导航」，第 41 批） ----
+ *
+ * 为什么需要它：微信的 tabBar 页面**必须静态声明在 app.json**（编译期固定），
+ * 而且 `wx.switchTab` **不能带参数**；自定义页共用 pages/custom/index（靠 `?key=` 区分），
+ * 两条路都走不通。有赞的解法就是「指定微页面被选为底部导航跳转页时，也会展示底部导航」——
+ * 本项目等价的做法：目标是自定义页时小程序端改走 `navigateTo`，由目标页自己再渲染一份底部导航。
+ *
+ * 这一组锁四件事（都是「错了会静默失效」的类型）：
+ *   ① 自定义页地址字面**四处同源**（后端 schema / 小程序组件 / 预览渲染 / 自定义页 pagePath）；
+ *   ② 判定只有**一份实现**，且 store.js 复用 schema.isTabbarPath（候选集合就地再写一遍 = 第 41 批的真实故障）；
+ *   ③ 点下去**真的走对分支**（源码文本断言锁不住这种东西，必须把组件跑起来点一下）；
+ *   ④ 「空文案 → 页面名」三处消费方对同一份输入给出**同一个名字**（自定义页也要认得）。
+ */
+const NAV_REPLICA = requireFromHere(REPLICA_FILE);
+const NAV_CP = NAV_SCHEMA.CUSTOM_PAGE_PREFIX;
+const NAV_CUSTOM_PAGE_SRC = readFileSync(join(MP_ROOT, 'pages', 'custom', 'index.js'), 'utf8');
+const NAV_PV_SRC = readFileSync(join(PUB, 'shared', 'pv-tabbar.js'), 'utf8');
+const NAV_CTB_PREFIX = /CUSTOM_PAGE_PREFIX = '([^']+)'/.exec(navCtbSrc);
+const NAV_PV_PREFIX = /CUSTOM_PAGE_PREFIX = '([^']+)'/.exec(NAV_PV_SRC);
+const NAV_PAGEPATH = /function pagePath\(key\)[\s\S]*?return '([^']+)' \+ key;/.exec(NAV_CUSTOM_PAGE_SRC);
+
+assert('自定义页地址字面四处同源（后端 schema / 小程序组件 / 预览渲染 / 自定义页 pagePath）',
+  NAV_CP === '/pages/custom/index?key=' &&
+  !!NAV_CTB_PREFIX && NAV_CTB_PREFIX[1] === NAV_CP &&
+  !!NAV_PV_PREFIX && NAV_PV_PREFIX[1] === NAV_CP &&
+  !!NAV_PAGEPATH && NAV_PAGEPATH[1] === NAV_CP,
+  [NAV_CP, NAV_CTB_PREFIX && NAV_CTB_PREFIX[1], NAV_PV_PREFIX && NAV_PV_PREFIX[1], NAV_PAGEPATH && NAV_PAGEPATH[1]].join(' ｜ '));
+
+assert('底部导航目标判定：内置 tab 页 ∪ 装修台自定义页；分类 / 购物车 / 商品详情 / 无 key 的容器路径一律不行',
+  [
+    ['/pages/index/index', true], ['/pages/product/product', true], [NAV_CP + 'pX', true],
+    ['/pages/cart/cart', false], ['/pages/custom/index', false], [NAV_CP, false],
+    ['/pages/goods/detail?id=g1', false], ['', false], [null, false]
+  ].every((p) => NAV_SCHEMA.isTabbarPath(p[0]) === p[1]),
+  '内置 5 页与 /pages/custom/index?key=xxx 放行，其余拒绝（含缺 key 的容器路径本身）');
+
+assert('自定义页 key 抽取：只有带 key 的容器地址才算自定义页（/pages/custom/index 本身不算）',
+  NAV_SCHEMA.customKeyOf(NAV_CP + 'p236') === 'p236' && NAV_SCHEMA.customKeyOf('/pages/custom/index') === '' &&
+  NAV_SCHEMA.customKeyOf('/pages/index/index') === '' && NAV_SCHEMA.customKeyOf(null) === '',
+  `customKeyOf('${NAV_CP}p236')='p236' ｜ customKeyOf('/pages/custom/index')=''`);
+
+const NAV_SAMPLE_KEY = Object.keys(NAV_REPLICA.CUSTOM_PAGES || {})[0] || '';
+const NAV_SAMPLE_NAME = NAV_SAMPLE_KEY ? (NAV_REPLICA.CUSTOM_PAGES[NAV_SAMPLE_KEY].name || '') : '';
+assert('导航项显示名：自定义页译成页面名；页面已被删时如实说「已不存在」（不静默显示成别的页面）',
+  NAV_SCHEMA.tabbarPageName('/pages/index/index') === '首页' &&
+  (!NAV_SAMPLE_KEY || (!!NAV_SAMPLE_NAME && NAV_SCHEMA.tabbarPageName(NAV_CP + NAV_SAMPLE_KEY) === NAV_SAMPLE_NAME)) &&
+  /已不存在/.test(NAV_SCHEMA.tabbarPageName(NAV_CP + '__no_such_page__')),
+  (NAV_SAMPLE_KEY ? `${NAV_CP}${NAV_SAMPLE_KEY} → ${NAV_SAMPLE_NAME}` : '（当前无自定义页，只校验删除后的兜底）') +
+  ' ｜ 已删除的页面 → ' + NAV_SCHEMA.tabbarPageName(NAV_CP + '__no_such_page__'));
+
+const NAV_MIX_KEY = NAV_CP + (NAV_SAMPLE_KEY || 'pX');
+const NAV_NORM_MIX = NAV_SCHEMA.normalizeTabbar({ items: [
+  { path: NAV_MIX_KEY, text: '全系' }, { path: '/pages/cart/cart', text: '购物车' }, { path: '/pages/news/news', text: '资讯' }
+] });
+assert('归一化输出必定落在「可作为导航目标」的集合内（非法路径回落内置页，绝不原样写进 replica.js），且幂等',
+  NAV_NORM_MIX.items.every((i) => NAV_SCHEMA.isTabbarPath(i.path)) &&
+  !NAV_NORM_MIX.items.some((i) => i.path === '/pages/cart/cart') &&
+  NAV_NORM_MIX.items.filter((i) => i.path === NAV_MIX_KEY).length === 1 &&
+  JSON.stringify(NAV_SCHEMA.normalizeTabbar(NAV_NORM_MIX)) === JSON.stringify(NAV_NORM_MIX),
+  NAV_NORM_MIX.items.map((i) => i.text + '@' + i.path).join(' / '));
+
+const NAV_STORE_SRC = readFileSync(join(__dirname, '..', 'decorate', 'store.js'), 'utf8');
+const NAV_SCHEMA_SRC = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+assert('导航目标校验只有一处口径：schema 归一化与 store.js 的保存校验都走 isTabbarPath，不许就地再写一份候选集合',
+  /isTabbarPath\(o\.path\)/.test(NAV_SCHEMA_SRC) &&
+  /schema\.isTabbarPath\(/.test(NAV_STORE_SRC) &&
+  !/schema\.TABBAR_PAGES/.test(NAV_STORE_SRC),
+  'schema.tabbarItem 与 store.js 的 nav 校验都调 isTabbarPath（第 41 批的 502 故障就是 store.js 自己硬写了一份候选集合）');
+
+/* 行为级：把组件真跑起来点一下，看它走哪条跳转分支 —— 只读源码文本是会骗人的 */
+function navRunOnTap(items, selected, route) {
+  const def = {};
+  const calls = [];
+  const sandbox = {
+    console,
+    require: navCtbRequire,
+    Component: (d) => { def.value = d; },
+    wx: {
+      switchTab: (o) => calls.push('switchTab ' + o.url),
+      navigateTo: (o) => calls.push('navigateTo ' + o.url),
+      redirectTo: (o) => calls.push('redirectTo ' + o.url),
+      showToast: () => calls.push('toast')
+    },
+    getCurrentPages: () => (route ? [{ route }] : [])
+  };
+  navVm.createContext(sandbox);
+  navVm.runInContext(navCtbSrc, sandbox, { filename: 'custom-tab-bar/index.js' });
+  const inst = Object.create(def.value);
+  inst.data = { items, selected };
+  def.value.methods.onTap.call(inst, { currentTarget: { dataset: { index: 1 } } });
+  return calls.join(' ｜ ');
+}
+const NAV_TAP_BUILTIN = [
+  { path: '/pages/index/index', text: '首页' }, { path: '/pages/product/product', text: '产品' }
+];
+const NAV_TAP_CUSTOM = [
+  { path: '/pages/index/index', text: '首页' }, { path: NAV_CP + 'pX', text: '全系' }
+];
+const navTapBuiltin = navRunOnTap(NAV_TAP_BUILTIN, 0, 'pages/index/index');
+const navTapCustom = navRunOnTap(NAV_TAP_CUSTOM, 0, 'pages/index/index');
+const navTapCustomAgain = navRunOnTap(NAV_TAP_CUSTOM, 0, 'pages/custom/index');
+assert('点导航项：内置页走 switchTab；自定义页走 navigateTo（switchTab 打不开带参数的地址）',
+  navTapBuiltin === 'switchTab /pages/product/product' && navTapCustom === 'navigateTo ' + NAV_CP + 'pX',
+  `内置页 → ${navTapBuiltin} ｜ 自定义页 → ${navTapCustom}`);
+assert('已经在自定义页容器里再点另一个自定义页时改用 redirectTo（否则页面栈越堆越深，微信上限 10 层）',
+  navTapCustomAgain === 'redirectTo ' + NAV_CP + 'pX', `当前页 pages/custom/index → ${navTapCustomAgain}`);
+
+const NAV_CUSTOM_WXML = readFileSync(join(MP_ROOT, 'pages', 'custom', 'index.wxml'), 'utf8');
+const NAV_CUSTOM_JSON = JSON.parse(readFileSync(join(MP_ROOT, 'pages', 'custom', 'index.json'), 'utf8'));
+assert('被选为导航目标的那个自定义页自己再渲染一份底部导航（挂的是同一份组件，不是抄一遍）',
+  /<tab-bar[^>]*\/>/.test(NAV_CUSTOM_WXML) && /wx:if="\{\{showTabbar\}\}"/.test(NAV_CUSTOM_WXML) &&
+  (NAV_CUSTOM_JSON.usingComponents || {})['tab-bar'] === '/custom-tab-bar/index' &&
+  /tabbarShowsFor/.test(NAV_CUSTOM_PAGE_SRC) && /items\[i\]\.path === want/.test(NAV_CUSTOM_PAGE_SRC) &&
+  /pagePath\(key\)/.test(NAV_CUSTOM_PAGE_SRC),
+  'showTabbar → <tab-bar>（json 指 /custom-tab-bar/index）；命中判定按带 ?key= 的**完整路径**');
+assert('没被导航引用的自定义页底部保持干净（默认不显示，只有被选为导航目标的那一页才挂）',
+  /showTabbar:\s*false/.test(NAV_CUSTOM_PAGE_SRC) && /showTabbar:\s*tabbarShowsFor\(asked\)/.test(NAV_CUSTOM_PAGE_SRC),
+  'data 默认 false，onLoad 里由 tabbarShowsFor(asked) 决定');
+
+assert('装修台「跳转页面」下拉：先填内置 5 页（立即可用），link-options 回来后并入「自定义页」分组（与跳转链接选择器同源）',
+  /fillTabbarPages\(input, f\.options, null, /.test(adminSrc) &&
+  /fillTabbarPages\(sel, fallback, opts, cur\)/.test(adminSrc) &&
+  /group\('自定义页'\)/.test(adminSrc) && /loadLinkOptions\(\)/.test(adminSrc) &&
+  /PvTabbar\.setCustomPages\(LINK_OPTS\.pages\)/.test(adminSrc),
+  'admin.js：tabbarPage 控件 = 静态兜底 + link-options 补分组；并把自定义页名表注入预览渲染');
+
+/* 预览渲染端（pvtb）也要认得自定义页 —— 值级，不看文本 */
+NAV_PV.setCustomPages(NAV_SAMPLE_KEY
+  ? [{ path: NAV_CP + NAV_SAMPLE_KEY, name: NAV_SAMPLE_NAME }]
+  : []);
+const navPvNorm = NAV_PV.normalize({ items: [{ path: NAV_MIX_KEY, text: '全系' }, { path: '/pages/cart/cart', text: '购物车' }] });
+assert('预览渲染认得自定义页：isPage 放行、normalize 不把自定义页回落成首页（装修台预览与真机才不会长得不一样）',
+  NAV_PV.isPage(NAV_CP + 'pX') === true && NAV_PV.isPage(NAV_CP) === false &&
+  NAV_PV.isPage('/pages/cart/cart') === false && NAV_PV.isPage('/pages/index/index') === true &&
+  navPvNorm.items.length === 2 && navPvNorm.items[0].path === NAV_MIX_KEY,
+  navPvNorm.items.map((i) => i.text + '@' + i.path).join(' / '));
+
+/* 空文案回落页面名：三处消费方必须给出同一个名字 —— 自定义页那一条曾经只有后端/预览认得 */
+const NAV_BLANK_CFG = { items: [{ path: NAV_MIX_KEY, text: '' }, { path: '/pages/index/index', text: '' }] };
+function navRunConfig(cfg) {
+  const def = {};
+  const sandbox = {
+    console,
+    require: (id) => {
+      const m = navCtbRequire(id);
+      if (/(^|\/)config\/replica(\.js)?$/.test(String(id))) {
+        return Object.assign({}, m, { TABBAR: cfg, CUSTOM_PAGES: NAV_REPLICA.CUSTOM_PAGES || {} });
+      }
+      return m;
+    },
+    Component: (d) => { def.value = d; }
+  };
+  navVm.createContext(sandbox);
+  navVm.runInContext(navCtbSrc, sandbox, { filename: 'custom-tab-bar/index.js' });
+  return (def.value && def.value.data) || {};
+}
+NAV_PV.setCustomPages(NAV_SAMPLE_KEY
+  ? [{ path: NAV_CP + NAV_SAMPLE_KEY, name: NAV_SAMPLE_NAME }]
+  : []);
+const navBlankTexts = {
+  '后端 schema': NAV_SCHEMA.normalizeTabbar(NAV_BLANK_CFG).items.map((i) => i.text),
+  '小程序组件': (navRunConfig(NAV_BLANK_CFG).items || []).map((i) => i.text),
+  '预览渲染': NAV_PV.normalize(NAV_BLANK_CFG).items.map((i) => i.text)
+};
+const navBlankVals = Object.keys(navBlankTexts).map((k) => [k, JSON.stringify(navBlankTexts[k])]);
+assert('空文案回落页面名：后端 / 小程序组件 / 预览渲染对同一份输入给出同一个名字（自定义页也要认得）',
+  navBlankVals[0][1] === navBlankVals[1][1] && navBlankVals[1][1] === navBlankVals[2][1] &&
+  navBlankTexts['小程序组件'][0] !== '',
+  navBlankVals.map((x) => x[0] + '=' + x[1]).join(' ｜ '));
 
 /* 15.95 把本次自检消耗掉的库存补回（与 0.5 节呼应，保证可重复运行） */
 if (stockBefore.length) {

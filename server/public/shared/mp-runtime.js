@@ -368,9 +368,39 @@
     });
   }
 
+  /**
+   * 由预览的 chrome 层负责渲染的组件 —— **不展开它的模板和样式**。
+   *
+   * 目前只有底部导航（页面 json 里注册为 tab-bar，真源是 /custom-tab-bar/index）：
+   * /preview 与装修台手机壳都由 PvTabbar 在手机壳底部渲染一份
+   * （见 preview.js 的 applyChrome、admin.js 的 renderTabbar）。
+   *
+   * 这里若再展开一次组件模板，会同时出两个问题：
+   *   ① **两条底部导航**叠在一起；
+   *   ② 组件那份渲染不出东西 —— 本模块只提取 properties，而导航的 items 在
+   *      组件的 data 里，展开后是一条「有背景、有顶边框、却是空的」固定定位白条，
+   *      正好压在 PvTabbar 上面，看起来就是底部被糊住。
+   * 页面里 wx:if="{{showTabbar}}" 的**占位（.tabbar-hold）仍然照常生效**，
+   * 所以预览里内容底部留白的高度与真机一致。
+   */
+  var CHROME_RENDERED = { 'tab-bar': true };
+
+  /**
+   * usingComponents 的值 → 组件基础路径（不带扩展名）。
+   * 例如 '/components/empty-state/empty-state'、'/custom-tab-bar/index'。
+   * 早期这里把路径硬编码成 /components/<name>/<name>，只要组件不在 components/
+   * 目录下就静默取到空模板 —— 页面看上去只是「少了一块」，不报错，很难查。
+   */
+  function componentBase(name, spec) {
+    var s = (typeof spec === 'string') ? spec.trim() : '';
+    if (!s) return '/components/' + name + '/' + name;
+    if (s.charAt(0) !== '/') s = '/' + s;   // 本项目一律写绝对路径；相对写法按根目录兜底
+    return s.replace(/\.(wxml|js|json|wxss)$/, '');
+  }
+
   /** 自定义组件：模板 + 样式 + 属性默认值 */
-  function loadComponent(name) {
-    var base = '/components/' + name + '/' + name;
+  function loadComponent(name, spec) {
+    var base = componentBase(name, spec);
     return Promise.all([fetchText(base + '.wxml'), fetchText(base + '.js'), fetchText(base + '.wxss')])
       .then(function (r) {
         var props = {};
@@ -432,8 +462,12 @@
       var using = pageJson.usingComponents || {};
       var names = Object.keys(using);
       return Promise.all(names.map(function (n) {
-        // 组件路径形如 /components/empty-state/empty-state
-        return loadComponent(n).then(function (c) { return [n, c]; });
+        // 由 chrome 层渲染的组件（底部导航）不展开 —— 否则会和 PvTabbar 打架
+        if (CHROME_RENDERED[n]) {
+          return Promise.resolve([n, { name: n, nodes: [], props: {}, wxss: '', chrome: true }]);
+        }
+        // 组件路径取自页面 json 的 usingComponents，形如 /components/goods-card/goods-card
+        return loadComponent(n, using[n]).then(function (c) { return [n, c]; });
       })).then(function (pairs) {
         var components = {};
         var compCss = [];

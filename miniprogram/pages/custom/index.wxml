@@ -13,6 +13,20 @@
     desc="这个页面还没有添加任何区块"
   />
 
-  <!-- 11 种装修区块的渲染见 templates/blocks.wxml（首页与自定义页共用一份，避免两边走样） -->
+  <!-- 装修区块的渲染见 templates/blocks.wxml（首页与自定义页共用一份，避免两边走样） -->
   <include src="../../templates/blocks.wxml" />
+
+  <!--
+    被装修台配成**底部导航项**的自定义页，底部再渲染一份导航。
+    对标有赞「店铺导航」：『指定微页面被选为底部导航跳转页时，也会展示底部导航』。
+
+    为什么是手动挂：微信只给 app.json 的 tabBar.list 里那 5 个页面自动挂 tabBar，
+    自定义页不在名单里（switchTab 也打不开带参数的地址），点导航进来后底部本来是空的。
+    这里挂的是**同一份组件**（/custom-tab-bar/index），不是抄一遍 ——
+    否则「运营在装修台改的配色 / 图标」在自定义页上就不生效了。
+    标签名用 tab-bar 而不是 custom-tab-bar，避开微信对那个保留名的自动挂载机制；
+    实例靠 id 取（见 pages/custom/index.js 的 syncActive）。
+  -->
+  <view class="tabbar-hold" wx:if="{{showTabbar}}"></view>
+  <tab-bar wx:if="{{showTabbar}}" id="tabbar" />
 </view>

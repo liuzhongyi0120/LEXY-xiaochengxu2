@@ -45,12 +45,47 @@
     { path: '/pages/mine/mine', name: '我的' }
   ];
 
+  /* 自定义页在导航项 path 里的写法 —— 与后端 schema.CUSTOM_PAGE_PREFIX、
+     小程序 custom-tab-bar 里的同名字面**必须一致**。 */
+  var CUSTOM_PAGE_PREFIX = '/pages/custom/index?key=';
+
+  /*
+   * 装修台新建的自定义页（path → 页面名），由 setCustomPages 注入。
+   *
+   * 为什么需要：**草稿里的导航文案是允许为空的**（运营刚加一项、还没起名），
+   * 空文案要回落成页面名。预览端手上没有 replica 的完整自定义页表，
+   * 认不出自定义页名就会渲染成空文字 —— 而后端 schema.tabbarItem 是认得的，
+   * 发布后真机上显示的是页面名。两边不一致 = 运营照着错的预览去配。
+   */
+  var CUSTOM = {};
+
+  function setCustomPages(list) {
+    CUSTOM = {};
+    (list || []).forEach(function (p) {
+      var path = p && p.path;
+      if (typeof path === 'string' && path.indexOf(CUSTOM_PAGE_PREFIX) === 0) {
+        CUSTOM[path] = String(p.name || '');
+      }
+    });
+  }
+
   function pageName(path) {
     for (var i = 0; i < PAGES.length; i++) { if (PAGES[i].path === path) return PAGES[i].name; }
+    if (CUSTOM[path] !== undefined) return CUSTOM[path] || String(path == null ? '' : path);
     return String(path == null ? '' : path);
   }
 
+  /**
+   * 能当底部导航目标的路径：内置 5 个 tab 页 + 自定义页。
+   * 与后端 schema.isTabbarPath 同一口径 —— 分类 / 购物车 / 全部商品都不算。
+   *
+   * ⚠️ 自定义页只按**字面形式**放行，不依赖 CUSTOM 表是否已注入：
+   *    否则装修台少调一次 setCustomPages，所有自定义页就会被判成非法、
+   *    静默回落成「首页」——预览显示的是首页、保存后真机也是首页，很难查。
+   */
   function isPage(path) {
+    if (typeof path === 'string' && path.indexOf(CUSTOM_PAGE_PREFIX) === 0 &&
+        path.length > CUSTOM_PAGE_PREFIX.length) return true;
     for (var i = 0; i < PAGES.length; i++) { if (PAGES[i].path === path) return true; }
     return false;
   }
@@ -145,7 +180,10 @@
    * @param {Element} container 手机壳里的底部导航容器（会被整体接管 class / style / innerHTML）
    * @param {object}  cfg       replica.TABBAR 或装修台草稿里的导航配置
    * @param {string}  activePath 当前高亮页面的路径（如 /pages/product/product）；空串则都不高亮
-   * @param {boolean} hidden     是否隐藏（自定义页没有底部导航，真机上也没有）
+   * @param {boolean} hidden     是否隐藏。**自定义页不再一律隐藏** ——
+   *   被装修台配成某个导航项的自定义页，真机上底部是有一条导航的
+   *   （对标有赞「指定微页面被选为底部导航跳转页时，也会展示底部导航」），
+   *   预览里也必须显示，否则运营按着「没有导航」的样子去排版，真机上会被盖住。
    */
   function apply(container, cfg, activePath, hidden) {
     if (!container) return;
@@ -185,6 +223,10 @@
     apply: apply,
     normalize: normalize,
     ensureStyle: ensureStyle,
+    setCustomPages: setCustomPages,
+    isPage: isPage,
+    pageName: pageName,
+    CUSTOM_PAGE_PREFIX: CUSTOM_PAGE_PREFIX,
     DEFAULT: DEFAULT,
     PAGES: PAGES,
     MAX_ITEMS: MAX_ITEMS,

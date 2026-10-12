@@ -11,8 +11,11 @@
  *   1. 组件实例是「每个 tab 页各一份」，切页时微信**不会**自动改高亮，
  *      必须由页面在 onShow 里调 utils/tabbar.js 的 syncTabBar(this) 主动同步 ——
  *      漏掉哪个页面，就会出现「切过去了还高亮着上一个」。
- *   2. app.json 的 tabBar.list 仍要完整声明（微信用它识别哪些是 tab 页），
- *      所以底部导航只能放这 5 个内置页面，不能塞自定义页（微信限制）。
+ *   2. app.json 的 tabBar.list 仍要完整声明这 5 个内置页（微信用它识别哪些是 tab 页）。
+ *      自定义页**不在** list 里，switchTab 打不开它 —— 所以点自定义页项时改用
+ *      navigateTo，并由 pages/custom/index 自己再渲染一份本组件。
+ *      这正是对标有赞「店铺导航」：它的跳转目标可以是「微页面」，而且明确写着
+ *      「指定微页面被选为底部导航跳转页时，也会展示底部导航」。
  *   3. 点击时**不要**在组件里立刻 setData 改高亮 —— 官方示例验证过，
  *      这样会和目标页 onShow 的同步打架，出现高亮闪烁。交给目标页同步即可。
  */
@@ -39,6 +42,32 @@ const FALLBACK = {
 const ICON_MODES = ['always', 'active', 'never'];
 const MAX_ITEMS = 5;
 
+/**
+ * 自定义页在导航项 path 里的统一写法 ——
+ * 与后端 schema.CUSTOM_PAGE_PREFIX / 装修台 linkOptions 生成的字面**必须一致**。
+ */
+const CUSTOM_PAGE_PREFIX = '/pages/custom/index?key=';
+
+/** 这 5 个是真 tab 页（在 app.json 的 tabBar.list 里），只能用 wx.switchTab 打开 */
+const TAB_PATHS = FALLBACK.items.map(function (it) { return it.path; });
+
+function isTabPath(path) {
+  return TAB_PATHS.indexOf(path) >= 0;
+}
+
+/**
+ * 取导航项里的自定义页 key；不是自定义页则返回空串。
+ *
+ * 为什么要单独判一次：**微信只允许 wx.switchTab 打开 tabBar.list 里声明的页面**，
+ * 而自定义页共用 pages/custom/index（靠 ?key= 区分），既不在 list 里、
+ * switchTab 也传不了参数。所以「底部导航能选自定义页」只能靠这条替代路径：
+ *   navigateTo 打开 → 目标页自己再渲染一份底部导航（见 pages/custom/index）。
+ */
+function customKeyOf(path) {
+  const s = String(path == null ? '' : path);
+  return s.indexOf(CUSTOM_PAGE_PREFIX) === 0 ? s.slice(CUSTOM_PAGE_PREFIX.length) : '';
+}
+
 /** 文案截断口径与后端 schema.tabbarItem / 预览 pv-tabbar.js 字面一致：trim → slice(5) → trim */
 function cutText(v) {
   return String(v === undefined || v === null ? '' : v).trim().slice(0, 5).trim();
@@ -48,10 +77,23 @@ function cutText(v) {
  * 空文案回落页面名 —— 与后端 schema.tabbarItem / 预览 pv-tabbar.js 的 `cutText(o.text) || pageName(path)` 同口径。
  * 名字表就用下面的 FALLBACK（正是那 5 个内置 tab 页），不另外写死一份。
  * 漏了这条会出现「有图标、没文字」的空白 tab —— 装修台预览与真机长得不一样。
+ *
+ * ⚠️ 自定义页（/pages/custom/index?key=xxx）也要认得 —— 名字取自 replica.CUSTOM_PAGES，
+ *    与后端 `schema.tabbarPageName()` 同源。
+ *    只认那 5 个内置页的话：运营给「全系」这种自定义页**留空文案**（合法，后端会回落成页面名）
+ *    时，装修台预览显示「全系」、真机却渲染成一个**只有高亮色、没有文字的空白 tab**。
+ *    三处（schema / 本组件 / pv-tabbar）对同一份输入必须给出同一个名字。
+ *    注意**不要**在这里做 5 字截断：后端是 `text || tabbarPageName(path)`，
+ *    回落出来的页面名不参与截断（页面名可以比 5 个字长），三处口径保持一致。
  */
 function pageName(path) {
   for (let i = 0; i < FALLBACK.items.length; i++) {
     if (FALLBACK.items[i].path === path) return FALLBACK.items[i].text;
+  }
+  const ck = customKeyOf(path);
+  if (ck) {
+    const p = (replica.CUSTOM_PAGES || {})[ck];
+    if (p && p.name) return String(p.name);
   }
   return '';
 }
@@ -125,10 +167,29 @@ Component({
       if (!item || !item.path) return;
       // 点的是当前页就不跳，避免无意义的 switchTab 闪动
       if (index === this.data.selected) return;
-      wx.switchTab({
-        url: item.path,
-        fail: () => wx.showToast({ title: '页面打开失败', icon: 'none' })
-      });
+
+      const fail = () => wx.showToast({ title: '页面打开失败', icon: 'none' });
+
+      if (isTabPath(item.path)) {
+        wx.switchTab({ url: item.path, fail });
+        return;
+      }
+
+      /* 自定义页：switchTab 打不开（不在 tabBar.list 里，且 tab 跳转不支持带参数）。
+         用 navigateTo 压栈打开 —— 这也正是「底部导航项点进去后，底部导航还在」的原因：
+         目标页 pages/custom/index 会自己再渲染一份本组件。 */
+      if (customKeyOf(item.path)) {
+        const pages = getCurrentPages();
+        const cur = pages.length ? (pages[pages.length - 1].route || '') : '';
+        /* 已经在自定义页容器里 → 用 redirectTo 替换当前页。
+           不然「自定义页 A → 自定义页 B → …」会把页面栈越堆越深（微信上限 10 层），
+           而且用户连按返回要按很多次才回得到 tab 页。 */
+        const go = cur === 'pages/custom/index' ? wx.redirectTo : wx.navigateTo;
+        go({ url: item.path, fail });
+        return;
+      }
+
+      fail();
     }
   }
 });

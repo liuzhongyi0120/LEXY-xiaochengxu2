@@ -17,6 +17,7 @@ const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
 const { normalizeBlocks, applyShopAvatar } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
+const { syncTabBar } = require('../../utils/tabbar');
 
 /** 店铺头像可能是后台上传的 /uploads/… 相对路径，必须过一遍素材地址解析（首页同理） */
 const SHOP = resolveAssets(replica.SHOP || {});
@@ -25,13 +26,43 @@ const CUSTOM_PAGES = replica.CUSTOM_PAGES || {};
 /** 旧标识 → 新标识（装修台改标识时登记，随发布写进 replica） */
 const ALIASES = replica.CUSTOM_PAGE_ALIASES || {};
 
+/**
+ * 本页的完整路径（底部导航项里存的就是这个字面，用于高亮匹配）。
+ * 不能只写 /pages/custom/index —— 所有自定义页共用这一个页面文件，
+ * 不带 key 的话分不出是哪一页。
+ */
+function pagePath(key) {
+  return '/pages/custom/index?key=' + key;
+}
+
+/**
+ * 这个自定义页要不要在底部显示导航。
+ *
+ * 对标有赞「店铺导航」的规则 ——「指定微页面被选为底部导航跳转页时，
+ * 也会展示底部导航」：只有被装修台配成了某一个导航项的页面才显示，
+ * 其他自定义页（从首页区块跳进来的）保持干净，底部不凭空多一条导航。
+ *
+ * 为什么必须由本页自己渲染：微信只给 app.json 的 tabBar.list 里那 5 个页面
+ * 自动挂 tabBar，自定义页不在其中，navigateTo 进来后底部是空的。
+ */
+function tabbarShowsFor(key) {
+  const items = (replica.TABBAR && replica.TABBAR.items) || [];
+  const want = pagePath(key);
+  for (let i = 0; i < items.length; i++) {
+    if (items[i] && items[i].path === want) return true;
+  }
+  return false;
+}
+
 Page(Object.assign({}, blockPageBehavior, {
   data: {
     key: '',
     title: '',
     meta: { bg: '#F5F6F8' },
     blocks: [],
-    missing: false
+    missing: false,
+    /* 被底部导航选中的自定义页 → 底部再渲染一份导航（见 tabbarShowsFor） */
+    showTabbar: false
   },
 
   onLoad(query) {
@@ -59,13 +90,30 @@ Page(Object.assign({}, blockPageBehavior, {
       key: asked,
       title: page.name || '活动页',
       meta: page.meta || { bg: '#F5F6F8' },
-      blocks: blocks
+      blocks: blocks,
+      showTabbar: tabbarShowsFor(asked)
     }, () => {
       // 商品区块要实时数据，装修时存的是快照（与首页共用同一份实现）
       this.loadGoodsBlocks();
+      // 底部导航这一刻才真正挂到 DOM 上，selectComponent 要等它挂好
+      this.syncActive();
     });
 
     wx.setNavigationBarTitle({ title: page.name || '活动页' });
+  },
+
+  onShow() {
+    this.syncActive();
+  },
+
+  /**
+   * 同步底部导航的高亮项。
+   * 传完整路径（带 key）—— 组件是按 path 匹配的，只给 route 的话
+   * 5 个自定义页全都长一样，匹配不上就整条导航都不高亮。
+   */
+  syncActive() {
+    if (!this.data.showTabbar || !this.data.key) return;
+    syncTabBar(this, pagePath(this.data.key));
   },
 
   /** 离开页面时释放语音播放器（区块事件见 utils/blockPage.js） */

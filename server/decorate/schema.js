@@ -1362,6 +1362,37 @@ const TABBAR_PAGES = [
   { path: '/pages/mine/mine', name: '我的' }
 ];
 
+/**
+ * 自定义页在「底部导航 / 跳转字段」里的统一写法 —— 与 linkOptions() 里
+ * 生成的自定义页地址**必须是同一个字面**，否则两处选出来的路径对不上。
+ */
+const CUSTOM_PAGE_PREFIX = '/pages/custom/index?key=';
+
+/** 取出路径里的自定义页 key；不是自定义页则返回空串 */
+function customKeyOf(path) {
+  const s = typeof path === 'string' ? path : '';
+  return s.indexOf(CUSTOM_PAGE_PREFIX) === 0 ? s.slice(CUSTOM_PAGE_PREFIX.length) : '';
+}
+
+/**
+ * 这个路径能不能作为**底部导航**的目标。
+ *
+ * 两类可以：
+ *   ① 小程序内置 tab 页 —— app.json 的 tabBar.list 里那 5 个，wx.switchTab 直接打开；
+ *   ② 自定义页（/pages/custom/index?key=xxx）—— **不在** tabBar.list 里，switchTab 打不开，
+ *      小程序端改用 wx.navigateTo 打开，并在页面内部**自己再渲染一份底部导航**。
+ *
+ * 这就是对标有赞「店铺导航」的做法：有赞的跳转目标可以是「微页面」，并且它页面上明确写着
+ * 「指定微页面被选为底部导航跳转页时，也会展示底部导航」——两者是同一件事。
+ *
+ * ⚠️ 分类页 / 购物车 / 商品列表**不能**放进来：它们既不在 tabBar.list 里，
+ *    也不是「页面容器」，switchTab 打不开、也没地方自己渲染底部导航。
+ */
+function isTabbarPath(path) {
+  if (TABBAR_PAGES.some((p) => p.path === path)) return true;
+  return customKeyOf(path) !== '';
+}
+
 /** 「跳转页面」下拉选项（value 用页面路径，与 replica 里存的一致） */
 const TABBAR_PAGE_OPTIONS = TABBAR_PAGES.map((p) => ({ value: p.path, label: p.name }));
 
@@ -1391,10 +1422,22 @@ function tabbarDefault() {
   return Object.assign({}, TABBAR_DEFAULTS, { items: clone(TABBAR_DEFAULT_ITEMS) });
 }
 
-/** 页面路径 → 中文名（装修台列表项标题用） */
+/**
+ * 页面路径 → 中文名（装修台列表项标题用）。
+ * 自定义页要能译成它自己的名字 —— 否则导航项列表头会显示一串
+ * `/pages/custom/index?key=p236`，运营根本认不出是哪个页面。
+ */
 function tabbarPageName(path) {
   const hit = TABBAR_PAGES.filter((p) => p.path === path)[0];
-  return hit ? hit.name : String(path || '未选择');
+  if (hit) return hit.name;
+  const ck = customKeyOf(path);
+  if (ck) {
+    const cp = customPages.list().filter((c) => c.key === ck)[0];
+    /* 页面被删掉之后，路径仍可能留在草稿里 —— 归一化是纯函数，不替运营删数据。
+       这里如实说明，别静默把它显示成别的页面名。 */
+    return cp ? cp.name : '自定义页（已不存在）';
+  }
+  return String(path || '未选择');
 }
 
 /** 归一化色值：非法值回落默认，绝不把 undefined / 脏值写进 replica.js */
@@ -1406,7 +1449,7 @@ function tabbarColor(v, def) {
 /** 归一化一个导航项 */
 function tabbarItem(it) {
   const o = (it && typeof it === 'object') ? it : {};
-  const path = TABBAR_PAGES.some((p) => p.path === o.path) ? o.path : TABBAR_PAGES[0].path;
+  const path = isTabbarPath(o.path) ? String(o.path) : TABBAR_PAGES[0].path;
   const raw = o.text === undefined || o.text === null ? '' : String(o.text);
   /*
    * 先 trim 再截断 —— 反过来写的话，粘贴进来的前导空格会**吃掉字数配额**
@@ -1482,7 +1525,11 @@ const TABBAR_NODE = {
         title: (v) => (v.text || '未命名') + ' → ' + tabbarPageName(v.path),
         fields: [
           { k: 'text', label: '导航名称', type: 'text', hint: '最多 ' + TABBAR_TEXT_MAX + ' 个字（超出自动截断）' },
-          { k: 'path', label: '跳转页面', type: 'select', options: TABBAR_PAGE_OPTIONS, hint: '只能选小程序底部导航自带的 5 个页面（微信限制）' },
+          {
+            k: 'path', label: '跳转页面', type: 'tabbarPage', options: TABBAR_PAGE_OPTIONS,
+            hint: '可选小程序内置 5 页，或装修台新建的自定义页。自定义页不在微信的 tabBar 名单里，'
+              + '小程序端会自己再渲染一份底部导航（与有赞「微页面被选为底部导航跳转页时也会展示底部导航」同一做法）'
+          },
           { k: 'icon', label: '未选中图标', type: 'image', hint: '建议 80×80 透明底 PNG' },
           { k: 'activeIcon', label: '选中图标', type: 'image', hint: '留空则选中态沿用未选中图标（配合选中色显示）' }
         ]
@@ -1969,7 +2016,7 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX,
+module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
   /* 个人中心（「我的」页）：区块类型表 / 组件库 / 默认区块 / 字段节点 / 页面级组件库 */
   MINE_BLOCK_KINDS, MINE_BLOCKS_NODE, MINE_UNION_KINDS, MINE_LIB_KINDS, mineComponentLib, cloneDefaultMineBlocks,
   pageLibs, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };

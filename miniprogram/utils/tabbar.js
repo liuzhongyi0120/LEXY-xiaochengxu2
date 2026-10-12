@@ -11,28 +11,45 @@
  *
  * 用法：
  *   const { syncTabBar } = require('../../utils/tabbar');
+ *   // tab 页（微信自动挂 tabBar）
  *   Page({ onShow() { syncTabBar(this); } })
+ *   // 自定义页（导航是页面自己手动挂的，必须传完整路径）
+ *   Page({ onShow() { syncTabBar(this, '/pages/custom/index?key=' + this.data.key); } })
  */
 
 /**
  * 把当前页面的高亮同步给自定义 tabBar。
+ *
+ * 两条取组件实例的路，按页面类型自动选：
+ *   · tab 页（首页 / 莱克 / 资讯 / 产品 / 我的）—— 微信自动挂载，用 page.getTabBar()
+ *   · 自定义页 —— 它不在 tabBar.list 里，微信不会给它挂 tabBar，
+ *     导航是页面自己在 wxml 里手动挂的（id="tabbar"），只能用 selectComponent 取。
+ *
  * @param {object} page 页面实例（传 this）
+ * @param {string} [path] 要高亮的导航项路径。自定义页必须传完整路径
+ *                        （/pages/custom/index?key=xxx）—— 用 route 只会得到
+ *                        /pages/custom/index，匹配不上任何一项，底部就全不高亮。
  */
-function syncTabBar(page) {
-  if (!page || typeof page.getTabBar !== 'function') return;
+function syncTabBar(page, path) {
+  if (!page) return;
+
+  const target = path || ('/' + (page.route || page.__route__ || ''));
+  if (target === '/') return;
 
   let bar = null;
-  try {
-    bar = page.getTabBar();
-  } catch (e) {
-    return;
+  if (typeof page.getTabBar === 'function') {
+    try {
+      bar = page.getTabBar();
+    } catch (e) {
+      bar = null;
+    }
+  }
+  if (!bar && typeof page.selectComponent === 'function') {
+    bar = page.selectComponent('#tabbar');
   }
   if (!bar || typeof bar.setActive !== 'function') return;
 
-  // page.route 不带开头的斜杠（pages/index/index），配置里存的是 /pages/index/index
-  const route = page.route || page.__route__ || '';
-  if (!route) return;
-  bar.setActive('/' + route);
+  bar.setActive(target);
 }
 
 module.exports = { syncTabBar };

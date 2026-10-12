@@ -329,9 +329,18 @@ const REQUIRED = {
     if (items.length < schema.TABBAR_MIN) return `底部导航至少需要 ${schema.TABBAR_MIN} 项（微信限制）`;
     if (items.length > schema.TABBAR_MAX) return `底部导航最多 ${schema.TABBAR_MAX} 项（微信限制）`;
     for (let i = 0; i < items.length; i++) {
-      if (!schema.TABBAR_PAGES.some((p) => p.path === items[i].path)) {
-        return `第 ${i + 1} 个导航项的跳转页面不在小程序底部导航候选里：${items[i].path}` +
-          '（只能选 app.json 里已声明的 5 个 tabBar 页面，微信限制）';
+      /*
+       * 跳转目标有两类：小程序内置 tab 页（app.json 的 tabBar.list）
+       * 和装修台新建的自定义页。判定统一走 schema.isTabbarPath —— 只有一处口径。
+       *
+       * ⚠️ 这里早先硬写着「必须在 TABBAR_PAGES 里」。结果是：装修台的下拉里
+       *    明明能选到自定义页，一点「存至草稿」就被这条校验拦下，报的还是一句
+       *    听起来像平台限制的「微信限制」——运营和开发都很难意识到是代码漏改。
+       *    凡是「候选集合」这类判断，一律复用 schema 里的那个函数，不要就地再写一遍。
+       */
+      if (!schema.isTabbarPath(items[i].path)) {
+        return `第 ${i + 1} 个导航项的跳转页面不能作为底部导航目标：${items[i].path}` +
+          '（可选小程序内置的 5 个 tab 页，或装修台新建的自定义页）';
       }
       /*
        * 同一个页面只能出现一次。

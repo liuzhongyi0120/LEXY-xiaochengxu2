@@ -216,15 +216,34 @@
   }
 
   /**
-   * 展示态真机观感：底部导航按 replica.TABBAR 渲染，高亮当前页。
-   * 自定义页不属于 tabBar，真机上也确实没有底部导航 —— 直接隐藏。
+   * 真机观感：底部导航按 replica.TABBAR 渲染，高亮当前页。
+   *
+   * 自定义页分两种，不能一刀切隐藏：
+   *   · 被「店铺导航」选为跳转页的 → **有**底部导航（真机上由页面自己渲染一份），
+   *     这里要显示出来并高亮它自己那一项；
+   *   · 没被选中的 → 隐藏（真机上确实没有）。
+   * 对标有赞「指定微页面被选为底部导航跳转页时，也会展示底部导航」。
    *
    * 渲染实现与装修台手机壳共用 PvTabbar（各写一份必然走样）。
    */
   function applyChrome() {
     var t = CUR.target || {};
     var isTab = typeof t.tab === 'number' && t.tab >= 0;
-    window.PvTabbar.apply($('phTabbar'), CUR.tabbar, isTab ? (t.path || '') : '', !isTab);
+    var active = '';
+    var hidden = true;
+
+    if (isTab) {
+      active = t.path || '';
+      hidden = false;
+    } else if (t.query && t.query.key) {
+      var self = window.PvTabbar.CUSTOM_PAGE_PREFIX + t.query.key;
+      var norm = window.PvTabbar.normalize(CUR.tabbar);
+      for (var i = 0; i < norm.items.length; i++) {
+        if (norm.items[i].path === self) { active = self; hidden = false; break; }
+      }
+    }
+
+    window.PvTabbar.apply($('phTabbar'), CUR.tabbar, active, hidden);
   }
 
   function renderStatus() {

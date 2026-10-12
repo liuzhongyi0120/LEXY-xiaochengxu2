@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-10 17:40:28（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 09:15:06（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1074,7 +1074,7 @@ const CUSTOM_PAGES = {
     }
   },
   p236: {
-    name: "产品型号导航",
+    name: "全系",
     blocks: [
       {
         id: "bcatmv235a76",
@@ -1872,7 +1872,7 @@ const TABBAR = {
       activeIcon: ""
     },
     {
-      path: "/pages/product/product",
+      path: "/pages/custom/index?key=p236",
       text: "产品",
       icon: "",
       activeIcon: ""

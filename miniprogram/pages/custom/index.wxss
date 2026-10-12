@@ -2,3 +2,13 @@
 @import "../../pages/index/index.wxss";
 
 /* 空态统一走 components/empty-state，本页不再自写一套 */
+
+/*
+ * 底部导航占位：本页被配成导航项时，底部会多挂一条固定定位的 tabBar
+ * （见 custom-tab-bar/index.wxss 的 .tb，高度 50px + 安全区），
+ * 内容不垫高的话，页面最后一块区块会被导航盖住一截。
+ * 高度口径必须与 .tb 一致 —— 两处不同步，就会「差一点点盖住」或「留一条白缝」。
+ */
+.tabbar-hold {
+  height: calc(50px + env(safe-area-inset-bottom));
+}

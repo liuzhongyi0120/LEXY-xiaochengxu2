@@ -653,11 +653,21 @@
    * 所以编辑别的页面时这里显示的就是线上状态（与真机一致）。
    * 渲染实现与 /preview 共用 PvTabbar：各写一份必然走样，这个项目已经踩过这种坑。
    */
+  /** 导航配置里有没有哪一项指向这个路径（按归一化后的结果比，草稿里可能有非法 / 重复项） */
+  function hasTabbarPath(cfg, path) {
+    var norm = window.PvTabbar.normalize(cfg);
+    for (var i = 0; i < norm.items.length; i++) {
+      if (norm.items[i].path === path) return true;
+    }
+    return false;
+  }
+
   function renderTabbar() {
     var meta = (S.cur && S.cur.meta) || null;
     var isCustom = !!(meta && meta.custom);
     var cfg = S.tabbar;
     var active = '';
+    var hidden = false;
 
     if (meta && meta.nav) {
       /*
@@ -670,11 +680,22 @@
         var item = ((S.cur.data || {}).items || [])[Number(m[1])];
         if (item && item.path) active = item.path;
       }
-    } else if (!isCustom) {
+    } else if (isCustom) {
+      /*
+       * 正在编辑一个**自定义页**：只有当「店铺导航」里有某一项指向它时，底部才有导航 ——
+       * 对标有赞「指定微页面被选为底部导航跳转页时，也会展示底部导航」。
+       * 没被选中的自定义页保持干净（真机上也确实没有导航）。
+       * ⚠️ 这里不能一刀切隐藏：被选中的页面在真机上会被导航盖住底部，
+       *    预览里藏掉就等于让运营按着错的样子排版。
+       */
+      var self = window.PvTabbar.CUSTOM_PAGE_PREFIX + (meta.key || '');
+      if (hasTabbarPath(cfg, self)) active = self;
+      else hidden = true;
+    } else {
       active = TAB_PATH[(meta && meta.key) || ''] || '';
     }
 
-    window.PvTabbar.apply($('phTabbar'), cfg, active, isCustom);
+    window.PvTabbar.apply($('phTabbar'), cfg, active, hidden);
   }
 
   /** 拉一次「店铺导航」的已发布配置（全局配置，缓存住；回到列表页时清缓存以便发布后刷新） */
@@ -689,9 +710,10 @@
   }
 
   /**
-   * 自定义页与内置页在编辑器里的外观差异：
-   * 自定义页是独立落地页，不属于 tabBar 的 5 个主页面，预览里把底部导航隐藏掉，
-   * 免得运营误以为它会出现在 tabBar 上（真机上也没有）。
+   * 页面标识：内置页 / 自定义页 / 全局配置（店铺导航）三种，标签与左栏差异不同。
+   *
+   * ⚠️ 底部导航显不显示**不在这里决定**：自定义页被配成导航项时预览里要显示（见 renderTabbar），
+   * 早先这里一刀切隐藏，已经过期了。
    */
   function applyPageChrome(meta) {
     var isCustom = !!(meta && meta.custom);
@@ -1413,6 +1435,25 @@
       input.value = val == null ? '' : String(val);
       input.onchange = function () { write(fullPath, input.value); };
 
+    } else if (f.type === 'tabbarPage') {
+      /* 底部导航的「跳转页面」——候选 = 小程序内置 tab 页 + 装修台新建的自定义页。
+       *
+       * 候选来源与「跳转链接」选择器**完全同源**（/api/decorate/link-options），
+       * 免得出现「链接选择器里选得到、这里却没有」这种两套口径。
+       *
+       * 与普通 select 的区别只有一个：**选项要等接口回来才全**。
+       * 所以先用 schema 给的静态兜底（内置 5 页）把下拉填出来（立即可用、不闪），
+       * 接口回来后补上「自定义页」分组，并保持当前选中值不变。 */
+      input = document.createElement('select');
+      fillTabbarPages(input, f.options, null, val == null ? '' : String(val));
+      input.onchange = function () { write(fullPath, input.value); renderInspector(); };
+      (function (sel, cur, fallback) {
+        loadLinkOptions().then(function (opts) {
+          if (!sel.parentNode) return;   // 面板已被换掉，别再动它
+          fillTabbarPages(sel, fallback, opts, cur);
+        });
+      })(input, input.value, f.options);
+
     } else if (f.type === 'radiobutton') {
       var rb = el('div', 'rbg');
       (f.options || []).forEach(function (o) {
@@ -1832,7 +1873,9 @@
       case 'slider': return node.def != null ? node.def : (node.min != null ? node.min : 0);
       case 'color': return node.def || '';
       case 'radiobutton': case 'template': return node.def != null ? node.def : ((node.options || [])[0] ? node.options[0].value : '');
-      case 'select': return (node.options || [])[0] ? ((node.options[0].value !== undefined) ? node.options[0].value : node.options[0]) : '';
+      /* tabbarPage 与 select 的兜底默认值一样（取第一项）——
+         底部导航的候选页里第一项就是「首页」，与后端 tabbarItem 的非法回落一致 */
+      case 'select': case 'tabbarPage': return (node.options || [])[0] ? ((node.options[0].value !== undefined) ? node.options[0].value : node.options[0]) : '';
       case 'group': return undefined;   // UI 分组不产生数据
       case 'object': {
         var o = {};
@@ -2478,6 +2521,10 @@
     return api('GET', '/api/decorate/link-options').then(function (d) {
       LINK_OPTS = d || { pages: [], goods: [], news: [] };
       PvRender.setLinkOptions(LINK_OPTS); // 预览里的跳转角标要靠它把路径翻成人话
+      /* 自定义页名册同样喂给底部导航预览：草稿里的导航文案可以为空，
+         空文案要回落成页面名，认不出名字就会渲染成空白条（真机上是页面名）。 */
+      window.PvTabbar.setCustomPages(LINK_OPTS.pages);
+      renderTabbar();
       return LINK_OPTS;
     }).catch(function () {
       LINK_OPTS = { pages: [], goods: [], news: [] };
@@ -2488,6 +2535,70 @@
 
   /** 把存下来的跳转路径翻译成人看得懂的名字（属性面板与预览角标共用 —— 实现在共享模块里） */
   function linkLabel(link) { return PvRender.linkLabel(link); }
+
+  /* =========================================================================
+   * 底部导航「跳转页面」下拉
+   *
+   * 只放**真的能当底部导航目标**的页面，与后端 schema.isTabbarPath 同一口径：
+   *   · 内置页 → 只有 5 个 tab 页（分类 / 购物车 / 全部商品 switchTab 打不开）
+   *   · 自定义页 → path 形如 /pages/custom/index?key=xxx
+   *
+   * ⚠️ 当前值不在候选里时要**补一个选项把它显示出来**（页面被删 / 没发布过）：
+   *    不补的话浏览器会把 select 落到第一项，运营看着没问题、一保存就把配置改坏了。
+   * ========================================================================= */
+  function fillTabbarPages(sel, fallback, opts, keep) {
+    var cur = keep == null ? sel.value : keep;
+    sel.innerHTML = '';
+
+    var builtin = [], custom = [];
+    if (opts && opts.pages && opts.pages.length) {
+      opts.pages.forEach(function (p) {
+        if (p.tab) builtin.push({ path: p.path, name: p.name });
+        else if (String(p.path || '').indexOf('/pages/custom/index?key=') === 0) {
+          custom.push({ path: p.path, name: p.name });
+        }
+      });
+    }
+    if (!builtin.length) {
+      (fallback || []).forEach(function (o) { builtin.push({ path: o.value, name: o.label }); });
+    }
+
+    function group(label) {
+      var g = document.createElement('optgroup');
+      g.label = label;
+      return g;
+    }
+    function fill(g, list) {
+      list.forEach(function (p) {
+        var op = document.createElement('option');
+        op.value = p.path;
+        op.textContent = p.name;
+        g.appendChild(op);
+      });
+    }
+
+    var gb = group('小程序内置页');
+    fill(gb, builtin);
+    sel.appendChild(gb);
+
+    if (custom.length) {
+      var gc = group('自定义页');
+      fill(gc, custom);
+      sel.appendChild(gc);
+    }
+
+    var has = false;
+    for (var i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === cur) { has = true; break; }
+    }
+    if (!has && cur) {
+      var orphan = document.createElement('option');
+      orphan.value = cur;
+      orphan.textContent = cur + '（已不存在）';
+      sel.appendChild(orphan);
+    }
+    sel.value = cur || (sel.options[0] ? sel.options[0].value : '');
+  }
 
   /** 打开链接选择器：o.value 当前值，o.onPick(路径) 回调 */
   function linkPicker(o) {
