@@ -1523,6 +1523,21 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
       'panelTitleGapX', 'panelTitleGapY', 'panelGap', 'contentPadBottom',
       'effect', 'effectSpeed', 'effectDelay',      // 样式设置 · 右侧内容
       'navLogo', 'searchMode', 'bg', 'moduleBgImage', 'moduleBgFill', 'reserveTabbar', 'navSticky' // 扩展设置
+    ],
+    // 混合排列（对标有赞店铺侧三方扩展「混合排列A」extension-masswx-hpitemsa）。
+    // 这 33 个字段是按有赞三页签（基本设置 / 标题设置 / 扩展设置）逐项抄下来的，
+    // 少一个 = 属性面板少一项、运营就复刻不出这个组件。
+    mixed_grid: [
+      'subTitle', 'title',                        // 标题设置 · 文案
+      'titleAlign', 'titleSize', 'subSize', 'titleWeight', 'subWeight',
+      'titleColor', 'subColor', 'titleGapTop', 'titleGapBottom',   // 标题设置 · 样式
+      'layout', 'items',                          // 基本设置 · 布局与卡片
+      'image', 'title', 'link',                   // 卡片条目
+      'cardStyle', 'cardBg', 'cardBgAlpha',       // 样式设置 · 卡片外观
+      'radius', 'cardRadius', 'imgRatio',
+      'gap', 'paddingInner', 'paddingX', 'paddingY',
+      'itemTitleColor', 'itemTitleSize', 'itemTitleWeight', 'itemTitleAlign', 'itemTitleLines',
+      'bg', 'anim'                                // 扩展设置
     ]
   };
   /**
@@ -3977,6 +3992,128 @@ function emitReport() {
       yzAdLoadOk && yzShellOk,
       `加载顺序=${yzAdLoadOk}（mp-wxss 在 pv-render 之前）手机壳 .phone-screen + #preview=${yzShellOk}`);
 
+  }
+
+  /* ---------------------------------------------------------------------
+   * 混合排列（对标有赞店铺侧三方扩展「混合排列A」extension-masswx-hpitemsa）
+   *
+   * 为什么单独锁一组：这个组件是**用真实浏览器在真移动视口下逐项量出来的**
+   * （2026-10-12，375 宽；对账脚本 `.tooling/_yz2-compare.mjs`，并排图 `.tooling/_cmp/yz2-side.png`）。
+   * 它的取值里有 4.5px / 7.5px 这种半像素、有 133.33% 这种「百分比撑高」、
+   * 还有「同一排内依次延迟 0.16s」这种算法 —— 任何一处被顺手改掉，
+   * 肉眼看到的只是「卡片好像高了一点」，但再也对不回有赞。所以逐条锁死。
+   * ------------------------------------------------------------------- */
+  {
+    const mgSchema = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+    const mgJs = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+    const mgWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    const mgCss = readFileSync(join(MP_ROOT, 'pages', 'index', 'index.wxss'), 'utf8');
+    const mgPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+    /* 源码文本断言必须先剥注释：这一组的注释里为了讲清「为什么不能写 margin-top」，正文里就有 margin-top */
+    const mgStrip = (s) => s
+      .replace(/\r\n/g, '\n')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:\\])\/\/[^\n]*/g, '$1 ');
+    const mgJsC = mgStrip(mgJs);
+    const mgWxmlC = mgStrip(mgWxml.replace(/<!--[\s\S]*?-->/g, ' '));
+    const mgCssC = mgStrip(mgCss);
+    const mgPvC = mgStrip(mgPv);
+    /* 只取 pvBlock 里 mixed_grid 的那一段，避免别的区块的同名写法误判 */
+    const mgPvSeg = (/kind === 'mixed_grid'\)\s*\{([\s\S]*?)\n    \} else if \(kind === 'buy_bar'\)/.exec(mgPvC) || [])[1] || '';
+    const mgJsSeg = (/kind === 'mixed_grid'\)\s*\{([\s\S]*?)\n  \} else if \(kind === 'buy_bar'\)/.exec(mgJsC) || [])[1] || '';
+    const mgWxmlSeg = (/block\.type === 'mixed_grid'([\s\S]*?)\n  <\/view>/ .exec(mgWxmlC) || [])[1] || '';
+
+    /* (1) 半像素值必须原样保留：4.5px / 7.5px 是有赞面板的原值，
+     *     ×2 转 rpx 后正好是 9rpx / 15rpx（无损）。四舍五入到整数就不是这个组件了。 */
+    const mgHalfOk = /k:\s*'gap'[^}]*def:\s*4\.5/.test(mgSchema) &&
+      /k:\s*'paddingX'[^}]*def:\s*7\.5/.test(mgSchema) &&
+      /o\.gapRpx = px2rpx\(mgNum\(o\.gap, 4\.5\)\)/.test(mgJsC) &&
+      /o\.padXRpx = px2rpx\(mgNum\(o\.paddingX, 7\.5\)\)/.test(mgJsC) &&
+      /pvNum\(b\.gap, 4\.5\)/.test(mgPvSeg) &&
+      /pvNum\(b\.paddingX, 7\.5\)/.test(mgPvSeg);
+    assert('混合排列：半像素值 4.5px / 7.5px 三处原样保留（转 rpx 后是 9 / 15，取整不会丢精度）',
+      mgHalfOk,
+      `schema 默认值=${/k:\s*'gap'[^}]*def:\s*4\.5/.test(mgSchema) && /k:\s*'paddingX'[^}]*def:\s*7\.5/.test(mgSchema)} ` +
+      `真机 normalize=${/o\.gapRpx = px2rpx\(mgNum\(o\.gap, 4\.5\)\)/.test(mgJsC)} 预览=${/pvNum\(b\.gap, 4\.5\)/.test(mgPvSeg)}`);
+
+    /* (2) 图片容器用 padding-top 撑比例：3:4 → 133.33%（不是 1333.3、更不是 1.33）。
+     *     写成 1.33% 的卡片会被压成一条线，而且只有真浏览器才看得出来（jsdom 不做布局）。 */
+    const mgRatioOk = /o\.padTopPct = Math\.round\(10000 \/ mgNum\(o\.imgRatio, 0\.75\)\) \/ 100/.test(mgJsC) &&
+      /mgPadTop = Math\.round\(10000 \/ pvNum\(b\.imgRatio, 0\.75\)\) \/ 100/.test(mgPvSeg) &&
+      /padding-top: \{\{block\.padTopPct\}\}%/.test(mgWxmlC) &&
+      /padding-top:' \+ mgPadTop \+ '%/.test(mgPvSeg);
+    assert('混合排列：图片比例算法四处同一份（3:4 → 133.33%，真机/预览/模板都对得上）',
+      mgRatioOk,
+      `真机=${/o\.padTopPct = Math\.round\(10000 \/ mgNum\(o\.imgRatio, 0\.75\)\) \/ 100/.test(mgJsC)} ` +
+      `预览=${/mgPadTop = Math\.round\(10000 \/ pvNum\(b\.imgRatio, 0\.75\)\) \/ 100/.test(mgPvSeg)} ` +
+      `wxml=${/padding-top: \{\{block\.padTopPct\}\}%/.test(mgWxmlC)}`);
+
+    /* (3) 「首行 2 张，之后每行 3 张」的列数映射必须真机 / 预览同口径，
+     *     且**行由 flex-wrap 自然形成**（模板里不许再出现「行」这一层）。 */
+    const mgLayoutOk = /layout === '1-3' \? \(i === 0 \? 1 : 3\) : \(i < 2 \? 2 : 3\)/.test(mgJsC) &&
+      /mgLayout === '1-3' \? \(i === 0 \? 1 : 3\) : \(i < 2 \? 2 : 3\)/.test(mgPvSeg) &&
+      /flex-wrap: wrap/.test(mgCssC) &&
+      /cellW: Math\.floor\(100 \/ c \* 100\) \/ 100/.test(mgJsC);
+    assert('混合排列：布局「首行2张」的列数映射真机/预览同口径，行由 flex-wrap 自然形成',
+      mgLayoutOk,
+      `真机映射=${/\(i < 2 \? 2 : 3\)/.test(mgJsC)} 预览映射=${/\(i < 2 \? 2 : 3\)/.test(mgPvSeg)} flex-wrap=${/flex-wrap: wrap/.test(mgCssC)}`);
+
+    /* (4) ⚠️ 标题上间距**必须用 padding-top，不许用 margin-top**。
+     *
+     * 有赞那边标题块的父层是 flex 容器，margin-top 45px 老老实实留在内部（模块高 747.9）；
+     * 我们是普通 block，`.mg-head` 的 margin-top 会**穿透父元素**（外边距折叠）——
+     * 模块顶部灰底少 45px、整块内容上移，并排量出来 Δy 就是 45（已实测过，见 `.tooling/_cmp/yz2-side.png` 的上一版）。
+     * 正反两面都查：模板与预览都不许再出现 margin-top，且必须出现 padding-top。 */
+    const mgHeadMt = /margin-top: \{\{block\.titleGapTopRpx\}\}/.test(mgWxmlC) ||
+      /mgPadTop\b[\s\S]{0,200}?margin-top:'.*?titleGapTop/.test(mgPvSeg) ||
+      /margin-top:' \+ pvNum\(b\.titleGapTop/.test(mgPvSeg);
+    const mgHeadPt = /padding-top: \{\{block\.titleGapTopRpx\}\}/.test(mgWxmlC) &&
+      /padding-top:' \+ pvNum\(b\.titleGapTop/.test(mgPvSeg);
+    assert('混合排列：标题上间距用 padding-top（margin-top 会被外边距折叠穿透父元素，模块顶部灰底少 45px）',
+      mgHeadPt && !mgHeadMt,
+      `模板/预览都用 padding-top=${mgHeadPt} ｜ 仍有 margin-top=${mgHeadMt}`);
+
+    /* (5) 卡片底色的 rgba 口径两处同一份：`Math.round(alpha) / 100`。
+     *     写成 0.33 还是 0.3 肉眼可辨（有赞原值就是 rgba(248,248,248,0.33)），
+     *     两处不一致就会出现「装修台浅灰底、真机纯白底」。 */
+    const mgAlphaOk = /function hexToRgba\(hex, alphaPct, defHex\)/.test(mgJsC) &&
+      /Math\.round\(a\) \/ 100/.test(mgJsC) &&
+      /function pvRgba\(hex, alphaPct, defHex\)/.test(mgPvC) &&
+      /Math\.round\(Math\.min\(100, Math\.max\(0, n\)\)\) \/ 100/.test(mgPvC) &&
+      /rgba\(/.test(mgJsC);
+    assert('混合排列：卡片底色的 rgba 合成真机/预览同一口径（Math.round(alpha)/100，不是 0.3）',
+      mgAlphaOk,
+      `真机 hexToRgba=${/function hexToRgba\(hex, alphaPct, defHex\)/.test(mgJsC)} 预览 pvRgba=${/function pvRgba\(hex, alphaPct, defHex\)/.test(mgPvC)}`);
+
+    /* (6) 入场动画：真机有 `@keyframes mg-in` 且延迟按「排内序号 × 0.16s」算好传进模板；
+     *     **预览层不做动画**（与其它区块一致，否则装修台里一堆卡片一直在动）。 */
+    const mgAnimOk = /@keyframes mg-in/.test(mgCssC) &&
+      /animation: mg-in \.8s ease-out both/.test(mgCssC) &&
+      /delay: Math\.round\(k \* 16\) \/ 100/.test(mgJsC) &&
+      /animation-delay: ' \+ it\.delay/.test(mgWxmlC) &&
+      !/mg-in/.test(mgPvSeg) && !/animation:/.test(mgPvSeg);
+    assert('混合排列：入场动画只在真机（排内延迟 0/0.16/0.32s），预览层不做动画',
+      mgAnimOk,
+      `keyframes=${/@keyframes mg-in/.test(mgCssC)} 延迟算法=${/delay: Math\.round\(k \* 16\) \/ 100/.test(mgJsC)} 预览无动画=${!/animation:/.test(mgPvSeg)}`);
+
+    /* (7) `.mg-body` 必须显式声明样式（哑 class 会让「名称的位置」靠外边距折叠撑着，
+     *     而且 check-all 的 class 覆盖率断言会直接红）。
+     *     用 flex 列而不是 block 是为了与有赞 `.item_info`（display:flex）同口径 ——
+     *     block 容器里 `.mg-t` 的 margin-top 会折叠穿透，`.mg-body` 的盒子从 327.5/26 变成 332.5/21。 */
+    const mgBodyOk = /\.mg-body\s*\{[\s\S]*?display:\s*flex/.test(mgCssC) &&
+      /display:flex;flex-direction:column;margin:0 ' \+ mgInner/.test(mgPvSeg);
+    assert('混合排列：.mg-body 显式 flex 列（与有赞 .item_info 同口径，也避免哑 class）',
+      mgBodyOk,
+      `真机 .mg-body flex=${/\.mg-body\s*\{[\s\S]*?display:\s*flex/.test(mgCssC)} 预览同口径=${/display:flex;flex-direction:column;margin:0 ' \+ mgInner/.test(mgPvSeg)}`);
+
+    /* (8) 组件库清单里的「混合排列A」必须指向真实区块类型（防「假装可用」）。
+     *     ⚠️ 高级组件这一栏的数量断言用 `>=`：装没装三方插件是**店铺侧**的事，
+     *        写死 `=== 3` 会在别的店铺数据上假红。 */
+    assert('混合排列：组件库「混合排列A」标记已接入且 kind 指向真实区块类型',
+      /n:\s*'混合排列A'[^}]*ok:\s*1[^}]*kind:\s*'mixed_grid'/.test(mgSchema) &&
+      /n:\s*'混合排列A'[^}]*type:\s*'extension-masswx-hpitemsa'/.test(mgSchema) &&
+      schemaMod.HOME_BLOCK_KINDS.mixed_grid !== undefined,
+      `清单项=${/n:\s*'混合排列A'/.test(mgSchema)} 有区块类型=${schemaMod.HOME_BLOCK_KINDS.mixed_grid !== undefined}`);
   }
 
   results.forEach((r) => {

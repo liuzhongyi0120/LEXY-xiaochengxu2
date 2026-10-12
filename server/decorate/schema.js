@@ -67,6 +67,9 @@ const ICONS = {
   content_card: I('<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M6 19h12M8 8h6M8 11h4"/>'),
   buy_bar: I('<rect x="3" y="16" width="18" height="5" rx="2.5"/><path d="M7 8.5h10M7 12h6" stroke-opacity=".5"/>'),
   brand_category: I('<rect x="3" y="4" width="6" height="16" rx="1.5"/><rect x="12" y="4" width="9" height="7" rx="1.5"/><rect x="12" y="13" width="9" height="7" rx="1.5"/>'),
+  /* 混合排列：上排 2 张大卡、下排 3 张小卡 —— 图标本身就把「错落」画出来，
+     与「魔方」（四宫格等分）和「内容卡片」（一张横版卡）都一眼能区分 */
+  mixed_grid: I('<rect x="3" y="3" width="8.5" height="7.5" rx="1.5"/><rect x="12.5" y="3" width="8.5" height="7.5" rx="1.5"/><rect x="3" y="12.5" width="5" height="8.5" rx="1.5"/><rect x="9.5" y="12.5" width="5" height="8.5" rx="1.5"/><rect x="16" y="12.5" width="5" height="8.5" rx="1.5"/>'),
   /* ---- 个人中心专属区块（2026-10-10 新增，见 yzUserCenter.js） ---- */
   page_head: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 6.5h.01M11 6.5h-1"/>'),
   profile: I('<circle cx="12" cy="8.5" r="3.2"/><path d="M5.5 19.5c0-3.1 2.9-5 6.5-5s6.5 1.9 6.5 5"/>'),
@@ -623,6 +626,144 @@ const HOME_BLOCK_KINDS = {
     ]
   },
 
+  /* ---------- 混合排列（对标有赞「混合排列A」extension-masswx-hpitemsa） ---------- */
+  /**
+   * 有赞侧是店铺装上的**开放平台三方扩展**（`extension-masswx-hpitemsa`），
+   * 面板分三页签：基本设置 / 标题设置 / 扩展设置。本后台按原组件功能自建实现，
+   * 字段口径逐项对齐（抓取快照见 `.tooling/_yz2-*.json` 与 `.tooling/_yz2-content.html`）。
+   *
+   * ⚠️ 与「内容卡片」不要合并（两者长得像、用途不同）：
+   *   - 内容卡片 = **等宽网格 + 笔记元信息**（标签 / 阅读数 / 点赞），是「一篇一篇的内容流」；
+   *   - 混合排列 = **按行错落**的橱窗（首行 2 张大卡、之后每行 3 张），卡片只有图 + 名称，
+   *     用来做「一屏入口页」（如「了解莱克」把 8 个栏目一次铺满）。
+   */
+  mixed_grid: {
+    label: '混合排列',
+    lib: 'mixed_grid',
+    group: 'adv',
+    desc: '标题 + 图文卡片按行错落排布，每行列数可不同，一个组件做完整屏入口页',
+    tip: '对标有赞三方扩展「混合排列A」。图片按所选比例裁切铺满，名称显示在图片下方；卡片有依次淡入上浮的入场动画，可在「扩展设置」里关掉。',
+    fields: [
+      /* ============ 标题设置（对标有赞「标题设置」页签） ============ */
+      { k: 'subTitle', label: '副标题文字', type: 'text', hint: '显示在主标题上方的小字，常放英文，如 UNDERSTAND LEXY' },
+      { k: 'title', label: '标题文字', type: 'text', hint: '主标题。与副标题都留空时，整块标题不占位置（卡片直接顶到顶部）' },
+      {
+        type: 'group', label: '标题样式设置',
+        fields: [
+          {
+            k: 'titleAlign', label: '文本对齐', type: 'radiobutton', def: 'left',
+            options: [{ value: 'left', label: '左对齐' }, { value: 'center', label: '居中' }, { value: 'right', label: '右对齐' }]
+          },
+          { k: 'titleSize', label: '标题大小', type: 'slider', min: 12, max: 32, step: 1, unit: 'px', def: 20, hint: '有赞面板显示为「大 (20号)」' },
+          { k: 'subSize', label: '副标题大小', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 16, hint: '有赞面板显示为「大 (16号)」' },
+          {
+            k: 'titleWeight', label: '标题粗细', type: 'radiobutton', def: 'bold',
+            options: [{ value: 'bold', label: '加粗体' }, { value: 'normal', label: '常规体' }]
+          },
+          {
+            k: 'subWeight', label: '副标题粗细', type: 'radiobutton', def: 'normal',
+            options: [{ value: 'normal', label: '常规体' }, { value: 'bold', label: '加粗体' }]
+          },
+          { k: 'titleColor', label: '标题文字色', type: 'color', def: '#444444' },
+          { k: 'subColor', label: '副标题文字色', type: 'color', def: '#2E2B2B' },
+          { k: 'titleGapTop', label: '标题上间距', type: 'slider', min: 0, max: 120, step: 1, unit: 'px', def: 45 },
+          { k: 'titleGapBottom', label: '标题下间距', type: 'slider', min: 0, max: 60, step: 1, unit: 'px', def: 0 }
+        ]
+      },
+
+      /* ============ 内容 ============ */
+      {
+        k: 'layout', label: '布局样式', type: 'radiobutton', def: '2-3',
+        options: [
+          { value: '2-3', label: '首行 2 张' },
+          { value: '3', label: '每行 3 张' },
+          { value: '2', label: '每行 2 张' },
+          { value: '1-3', label: '首张整宽' }
+        ],
+        hint: '「首行 2 张」= 有赞「混合排列A」原样（第一行 2 张，之后每行 3 张）；总张数不整除时最后一行自然留白'
+      },
+      {
+        k: 'items', label: '卡片', type: 'list', max: 30, sortable: true, addable: true,
+        item: {
+          type: 'object', title: (v, i) => v.title || ('卡片 ' + (i + 1)),
+          fields: [
+            { k: 'image', label: '图片', type: 'image', hint: '按下方「图片比例」裁切铺满，建议上传比该比例更高的图' },
+            { k: 'title', label: '名称', type: 'text', hint: '显示在图片下方，建议不超过 6 个字' },
+            linkField()
+          ]
+        }
+      },
+
+      /* ============ 样式设置（对标有赞「参数设置」） ============ */
+      {
+        type: 'group', label: '样式设置',
+        fields: [
+          {
+            k: 'cardStyle', label: '卡片样式', type: 'radiobutton', def: 'white',
+            options: [
+              { value: 'white', label: '无边白底' }, { value: 'shadow', label: '卡片投影' },
+              { value: 'outline', label: '描边白底' }, { value: 'plain', label: '无边透明' }
+            ]
+          },
+          { k: 'cardBg', label: '商品背景色', type: 'color', def: '#F8F8F8' },
+          {
+            k: 'cardBgAlpha', label: '商品背景透明度', type: 'slider', min: 0, max: 100, step: 1, unit: '%', def: 33,
+            hint: '有赞原值为 rgba(248,248,248,0.33)：底色只盖 33%，压在页面底色上做出「比页面亮一档」的卡片感'
+          },
+          {
+            k: 'radius', label: '商品倒角', type: 'radiobutton', def: 'round',
+            options: [{ value: 'round', label: '圆角' }, { value: 'square', label: '直角' }]
+          },
+          { k: 'cardRadius', label: '圆角大小', type: 'slider', min: 0, max: 24, step: 1, unit: 'px', def: 8, hint: '仅「圆角」生效' },
+          {
+            k: 'imgRatio', label: '图片比例', type: 'radiobutton', def: '0.75',
+            options: [{ value: '0.75', label: '3:4' }, { value: '1', label: '1:1' }, { value: '0.5625', label: '16:9' }]
+          },
+          {
+            k: 'gap', label: '商品外间距', type: 'slider', min: 0, max: 20, step: 0.5, unit: 'px', def: 4.5,
+            hint: '有赞原值 4.5px（= 9rpx）。控制卡片之间、以及卡片到模块边缘的留白'
+          },
+          {
+            k: 'paddingInner', label: '商品内间距', type: 'slider', min: 0, max: 24, step: 0.5, unit: 'px', def: 8,
+            hint: '有赞原值 8px（= 16rpx）。图片之外的文字区到卡片边缘的留白'
+          },
+          {
+            k: 'paddingX', label: '模块内部左右边距', type: 'slider', min: 0, max: 40, step: 0.5, unit: 'px', def: 7.5,
+            hint: '有赞原值 7.5px（= 15rpx），即卡片区比模块左右各内收 7.5px'
+          },
+          { k: 'paddingY', label: '模块内部上下边距', type: 'slider', min: 0, max: 60, step: 1, unit: 'px', def: 0 },
+          { k: 'itemTitleColor', label: '商品标题色', type: 'color', def: '#444444' },
+          { k: 'itemTitleSize', label: '名称字号', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 14 },
+          {
+            k: 'itemTitleWeight', label: '名称粗细', type: 'radiobutton', def: 'bold',
+            options: [{ value: 'bold', label: '加粗体' }, { value: 'normal', label: '常规体' }]
+          },
+          {
+            k: 'itemTitleAlign', label: '名称对齐', type: 'radiobutton', def: 'center',
+            options: [{ value: 'center', label: '居中' }, { value: 'left', label: '居左' }]
+          },
+          {
+            k: 'itemTitleLines', label: '名称行数', type: 'radiobutton', def: '1',
+            options: [{ value: '1', label: '1 行' }, { value: '2', label: '2 行' }],
+            hint: '超出即省略号截断'
+          }
+        ]
+      },
+
+      /* ============ 扩展设置（对标有赞「扩展设置 · 模块设置 / 颜色设置」+ 动画设置） ============ */
+      {
+        type: 'group', label: '扩展设置',
+        fields: [
+          { k: 'bg', label: '模块背景色', type: 'color', def: '#DFDEDE', hint: '有赞原值 rgb(223,222,222)' },
+          {
+            k: 'anim', label: '入场动画', type: 'switch', def: true,
+            hint: '卡片淡入上浮（0.8s 缓出），同一排内依次延迟 0.16s —— 与有赞「动画设置」同款手感'
+          }
+        ]
+      }
+    ]
+  },
+
   /* ---------- 购买按钮（对标有赞「购买按钮」，吸底） ---------- */
   buy_bar: {
     label: '购买按钮',
@@ -1053,13 +1194,20 @@ const YZ_BASIC = [].concat(...YZ_BASIC_GROUPS.map((g) => g.items.map((it) => Obj
 /**
  * 有赞「高级组件」tab。
  *
- * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些），本店铺只有 2 个：
- * 「个性导航」「品牌分类E」。「品牌分类E」已按原组件全部功能自建实现（见 HOME_BLOCK_KINDS.brand_category），
- * 「个性导航」仍依赖有赞开放平台运行时，标为未接入。
+ * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些）。本店铺实测到 3 个：
+ * 「个性导航」「品牌分类E」「混合排列A」：
+ *   - 「品牌分类E」已按原组件全部功能自建实现（见 HOME_BLOCK_KINDS.brand_category）；
+ *   - 「混合排列A」已按原组件自建实现（见 HOME_BLOCK_KINDS.mixed_grid），
+ *     2026-10-12 复刻「莱克资讯」页时补入；
+ *   - 「个性导航」仍依赖有赞开放平台运行时，标为未接入。
+ *
+ * ⚠️ 有赞该 tab 的组件是**按店铺安装的插件**，两边店铺装的可能不一样，
+ *   所以这里只写实测确认存在的项，数量断言用 `>=`，不要写死。
  */
 const YZ_ADV = [
   { n: '个性导航', type: 'extension-cnzoom-person-nav', ok: 0, why: '有赞开放平台三方扩展组件，依赖有赞开放平台运行时；本后台的底部导航走「全局配置 · 店铺导航」实现' },
-  { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 1, kind: 'brand_category' }
+  { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 1, kind: 'brand_category' },
+  { n: '混合排列A', type: 'extension-masswx-hpitemsa', ok: 1, kind: 'mixed_grid' }
 ];
 
 /**

@@ -139,6 +139,8 @@
     goods: '商品', rich_text: '富文本', search: '商品搜索', elevator: '电梯导航',
     enter_shop: '进入店铺', audio: '语音', service: '在线客服', content_card: '内容卡片',
     buy_bar: '购买按钮', brand_category: '品牌分类',
+    // 2026-10-12：有赞店铺侧三方扩展「混合排列A」（extension-masswx-hpitemsa）
+    mixed_grid: '混合排列',
     // 2026-10-10：有赞基础/高级组件余下 37 项
     custom_module: '自定义模块', fans: '涨粉', goods_group: '商品分组', game_category: '游戏分类',
     point_order: '点单卡片', shelf_asset: '客户资产', nearby_store: '附近门店', order_pool: '好友拼单',
@@ -441,6 +443,20 @@
     return isNaN(n) ? d : n;
   }
   function pvColor(v, d) { return String(v === null || v === undefined ? '' : v).trim() || d; }
+
+  /**
+   * 底色 + 透明度 → rgba()。**必须与小程序端 `utils/blocks.js` 的 `hexToRgba` 同口径**
+   * （都是 `Math.round(alphaPct) / 100`），否则会出现「装修台浅灰底、真机纯白底」——
+   * 有赞原值就是 rgba(248,248,248,0.33)，透明度写成 0.33 还是 0.3 肉眼可辨。
+   */
+  function pvRgba(hex, alphaPct, defHex) {
+    var h = pvColor(hex, defHex || '#F8F8F8');
+    var m = /^#?([0-9a-f]{6})$/i.exec(h);
+    var rgb = m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)]
+                : [248, 248, 248];
+    var n = pvNum(alphaPct, 33);
+    return 'rgba(' + rgb.join(',') + ',' + (Math.round(Math.min(100, Math.max(0, n))) / 100) + ')';
+  }
 
   /**
    * 品牌分类：左栏品牌导航 + 右栏图文内容。
@@ -888,6 +904,65 @@
                        : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加卡片）</div>') +
         (b.more ? '<div style="text-align:center;font-size:12px;color:#8a919e;padding-top:6px">' +
           esc(b.moreText || '查看更多') + ' ›</div>' : '') +
+        '</div>';
+    } else if (kind === 'mixed_grid') {
+      /*
+       * 混合排列（对标有赞店铺侧三方扩展「混合排列A」extension-masswx-hpitemsa）。
+       *
+       * 口径与真机完全一致（见 miniprogram/utils/blocks.js 的同名分支）：
+       *   - 单位全是 375 基准 px，预览画布就是 375 宽 → **原样使用，不换算**；
+       *   - 行由 flex-wrap 自然形成，每张卡只决定占宽（2 列 50% / 3 列 33.33%），
+       *     所以最后一行不满时自然左对齐留白，与有赞的 w50/w33 打类结果相同；
+       *   - 预览层**不做入场动画**（与其它区块一致）：动画只在真机 index.wxss 的 @keyframes mg-in。
+       */
+      var mgLayout = ['3', '2', '1-3'].indexOf(b.layout) >= 0 ? b.layout : '2-3';
+      var mgCols = function (i) { return mgLayout === '2' ? 2 : mgLayout === '3' ? 3 : mgLayout === '1-3' ? (i === 0 ? 1 : 3) : (i < 2 ? 2 : 3); };
+      var mgGap = pvNum(b.gap, 4.5);
+      var mgInner = pvNum(b.paddingInner, 8);
+      var mgPadX = pvNum(b.paddingX, 7.5);
+      var mgPadY = pvNum(b.paddingY, 0);
+      var mgRadius = (b.radius || 'round') === 'square' ? 0 : pvNum(b.cardRadius, 8);
+      var mgClass = ['shadow', 'outline', 'plain'].indexOf(b.cardStyle) >= 0 ? b.cardStyle : 'white';
+      var mgCardBg = pvRgba(b.cardBg, b.cardBgAlpha, '#F8F8F8');
+      // 图片容器用 padding-top 撑比例：133.33% = 100 ÷ 0.75（与 blocks.js 的 padTopPct 同一算法）
+      var mgPadTop = Math.round(10000 / pvNum(b.imgRatio, 0.75)) / 100;
+      var mgAlign = b.titleAlign === 'center' || b.titleAlign === 'right' ? b.titleAlign : 'left';
+      var mgTitleLines = pvNum(b.itemTitleLines, 1) === 2 ? 2 : 1;
+      var mgItems = (b.items || []).filter(function (x) { return x && (x.image || x.title); });
+      var mgCells = mgItems.slice(0, 30).map(function (it, i) {
+        var w = Math.floor(100 / mgCols(i) * 100) / 100;
+        var nameStyle = 'margin-top:5px;line-height:1.5;color:' + pvColor(b.itemTitleColor, '#444444') +
+          ';font-size:' + pvNum(b.itemTitleSize, 14) + 'px' +
+          ';font-weight:' + (b.itemTitleWeight === 'normal' ? '400' : '700') +
+          ';text-align:' + (b.itemTitleAlign === 'left' ? 'left' : 'center') +
+          ';overflow:hidden;' + (mgTitleLines === 2
+            ? 'display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2'
+            : 'white-space:nowrap;text-overflow:ellipsis');
+        return '<div style="width:' + w + '%;box-sizing:border-box">' +
+          '<div class="pv-mgcard ' + mgClass + '" style="margin:' + mgGap + 'px;background:' + mgCardBg + ';border-radius:' + mgRadius + 'px">' +
+          '<div style="position:relative;width:100%;height:0;padding-top:' + mgPadTop + '%;overflow:hidden;background:#f5f6f8;' +
+          'border-radius:' + mgRadius + 'px ' + mgRadius + 'px 0 0">' +
+          (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">' : '') +
+          '</div><div style="display:flex;flex-direction:column;margin:0 ' + mgInner + 'px ' + mgInner + 'px">' +
+          (it.title ? '<div style="' + nameStyle + '">' + esc(it.title) + '</div>' : '') +
+          '</div></div>' +
+          (it.link ? linkBadge(it.link) : '') +
+          '</div>';
+      }).join('');
+      box += '<div style="background:' + pvColor(b.bg, '#DFDEDE') + ';padding:' + mgPadY + 'px ' + mgPadX + 'px;box-sizing:border-box">' +
+        ((String(b.subTitle || '').trim() || String(b.title || '').trim())
+          ? '<div style="padding-top:' + pvNum(b.titleGapTop, 45) + 'px;margin-bottom:' + pvNum(b.titleGapBottom, 0) + 'px;' +
+            'padding-left:15px;text-align:' + mgAlign + ';box-sizing:border-box">' +
+            (String(b.subTitle || '').trim()
+              ? '<div style="font-size:' + pvNum(b.subSize, 16) + 'px;line-height:1;margin-bottom:6px;color:' + pvColor(b.subColor, '#2E2B2B') +
+                ';font-weight:' + (b.subWeight === 'bold' ? '700' : '400') + '">' + esc(b.subTitle) + '</div>' : '') +
+            (String(b.title || '').trim()
+              ? '<div style="font-size:' + pvNum(b.titleSize, 20) + 'px;line-height:1.4;color:' + pvColor(b.titleColor, '#444444') +
+                ';font-weight:' + (b.titleWeight === 'normal' ? '400' : '700') + '">' + esc(b.title) + '</div>' : '') +
+            '</div>'
+          : '') +
+        (mgItems.length ? '<div style="display:flex;flex-wrap:wrap;align-items:flex-start">' + mgCells + '</div>'
+                        : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加卡片）</div>') +
         '</div>';
     } else if (kind === 'buy_bar') {
       var bbOn = b.bgOn !== false;

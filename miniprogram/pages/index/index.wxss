@@ -558,6 +558,103 @@
   padding: 20rpx 0 4rpx;
 }
 
+/* ==================== 混合排列（对标有赞三方扩展「混合排列A」） ====================
+ * 取值来源：2026-10-12 在真机视口（375 宽）下量有赞线上页得到，
+ * 半像素值（4.5px / 7.5px）由 JS 换算成 9rpx / 15rpx，所以这里只放与取值无关的骨架样式。
+ * 卡片底色 / 圆角 / 图片比例 / 字号 全部走内联 style（它们都是可配字段）。
+ */
+.c-mg {
+  display: block;
+  box-sizing: border-box;
+}
+.mg-head {
+  box-sizing: border-box;
+  /*
+   * 「标题上间距」用 padding-top 而不是 margin-top，是**踩过一次坑**的：
+   * 有赞那边标题块的父层是 flex 容器，margin-top 45px 老老实实留在内部（模块高 747.9）；
+   * 我们这里是普通 block，`.mg-head` 的 margin-top 会**穿透父元素**（外边距折叠），
+   * 结果模块顶部的灰底少 45px、整块内容上移——并排一量 Δy 就是 45。
+   * padding-top 不会折叠，位置与有赞逐像素一致，且语义（模块内部的上间距）更准。
+   */
+  padding-left: 30rpx;   /* = 有赞 .panel-title 的 padding-left: 15px */
+}
+.mg-sub {
+  line-height: 1;        /* 有赞 line-height: 16px = font-size，标题块高度 16+28+6 */
+  margin-bottom: 12rpx;
+}
+.mg-title {
+  line-height: 1.4;      /* 有赞 line-height: 28px（字号 20） */
+}
+.mg-grid {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.mg-cell {
+  box-sizing: border-box;
+}
+.mg-card {
+  overflow: hidden;
+  /* 入场：淡入 + 上浮 20px，同一排内依次延迟 0 / 0.16 / 0.32 秒（delay 由 JS 给）
+     both 让延迟期间保持起始态，否则卡片会先完整显示再跳回透明 */
+  animation: mg-in .8s ease-out both;
+}
+.mg-card.shadow {
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .08);
+}
+.mg-card.outline {
+  border: 1rpx solid var(--color-border);
+}
+.mg-pic {
+  position: relative;
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+  background: var(--color-bg-muted);
+}
+.mg-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.mg-body {
+  /*
+   * flex 列：**故意用 flex 而不是 block**，为了与有赞 `.item_info`（display:flex）同口径 ——
+   * block 容器里 `.mg-t` 的 margin-top 会折叠穿透，`.mg-body` 的盒子会从 327.5/26 变成 332.5/21，
+   * 名称自身的坐标两份都对，但量盒子对账时对不上；flex 容器不会与子元素折叠，盒子与有赞逐像素一致。
+   */
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.mg-t {
+  margin-top: 10rpx;     /* = 有赞 .item_title 的 margin-top: 5px */
+  line-height: 1.5;      /* 有赞 line-height: 21px（字号 14） */
+}
+.mg-t.one {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.mg-t.two {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+@keyframes mg-in {
+  from {
+    opacity: 0;
+    transform: translateY(40rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 /* ==================== 购买按钮（固定吸底） ==================== */
 .cb-spacer {
   width: 100%;

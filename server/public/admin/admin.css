@@ -931,6 +931,14 @@ a.pname { text-decoration: none; }
 .pv-ccard.plain { background: transparent; }
 .pv-ccard img { display: block; }
 
+/* 混合排列（对标有赞三方扩展「混合排列A」）：卡片只有图 + 名称，
+   底色 / 圆角 / 图片比例 / 字号 全是可配字段，走内联 style；
+   这里只放「与取值无关的骨架」，口径与真机 index.wxss 的 .mg-card 一致。 */
+.pv-mgcard { position: relative; overflow: hidden; }
+.pv-mgcard.shadow { box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
+.pv-mgcard.outline { border: 1px solid #e5e6eb; }
+.pv-mgcard img { display: block; }
+
 /* ---------- 右：属性面板 ---------- */
 .col-inspector { flex: 0 0 var(--yz-w-insp); width: var(--yz-w-insp); border-left: 1px solid var(--yz-divider); }
 #inspector { padding: 0 0 40px; }

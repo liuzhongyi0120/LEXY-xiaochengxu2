@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 10:16:29（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 12:26:12（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1806,6 +1806,90 @@ const CUSTOM_PAGES = {
       desc: "",
       bg: "#F5F6F8"
     }
+  },
+  p288: {
+    name: "了解莱克",
+    blocks: [
+      {
+        id: "mgmv4qgmxd",
+        type: "mixed_grid",
+        subTitle: "UNDERSTAND LEXY",
+        title: "了解莱克",
+        titleAlign: "left",
+        titleSize: 20,
+        subSize: 16,
+        titleWeight: "bold",
+        subWeight: "normal",
+        titleColor: "#444444",
+        subColor: "#2E2B2B",
+        titleGapTop: 45,
+        titleGapBottom: 0,
+        layout: "2-3",
+        items: [
+          {
+            image: "/uploads/202610/20261012-kpg1zg.jpg",
+            title: "关于莱克",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-da1l78.jpg",
+            title: "新闻大事",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-x5pfpd.jpg",
+            title: "创业故事",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-99qkmi.jpg",
+            title: "我们品牌",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-nukv7o.jpg",
+            title: "用户分享",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-48a4dw.jpg",
+            title: "业务模式",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-5cweoj.jpg",
+            title: "售后服务",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-1li7p4.jpg",
+            title: "加入我们",
+            link: ""
+          }
+        ],
+        cardStyle: "white",
+        cardBg: "#F8F8F8",
+        cardBgAlpha: 33,
+        radius: "round",
+        cardRadius: 8,
+        imgRatio: "0.75",
+        gap: 4.5,
+        paddingInner: 8,
+        paddingX: 7.5,
+        paddingY: 0,
+        itemTitleColor: "#444444",
+        itemTitleSize: 14,
+        itemTitleWeight: "bold",
+        itemTitleAlign: "center",
+        itemTitleLines: "1",
+        bg: "#DFDEDE",
+        anim: true
+      }
+    ],
+    meta: {
+      desc: "了解莱克 · 栏目入口",
+      bg: "#F7F8FA"
+    }
   }
 };
 
@@ -1842,6 +1926,10 @@ const PAGE_META = {
   p236: {
     desc: "",
     bg: "#F5F6F8"
+  },
+  p288: {
+    desc: "了解莱克 · 栏目入口",
+    bg: "#F7F8FA"
   }
 };
 

@@ -1,6 +1,6 @@
 # 后端点位连通性报告
 
-> 生成时间：2026/10/12 10:17:07　｜　目标服务：`http://127.0.0.1:3000`
+> 生成时间：2026/10/12 12:26:36　｜　目标服务：`http://127.0.0.1:3000`
 > 生成方式：`node server/tools/check-all.mjs`（真实 HTTP 请求，非静态扫描）
 
 ## 一、总览
@@ -10,8 +10,8 @@
 | 已注册点位 | 92 |
 | 已实测点位 | 92 |
 | 未覆盖点位 | 0 |
-| 实测请求/断言 | 514 |
-| 通过 | 510 |
+| 实测请求/断言 | 522 |
+| 通过 | 518 |
 | 失败 | 4 |
 | 服务健康检查 | up |
 | 微信能力模式 | 登录 mock / 支付 mock |
@@ -177,7 +177,7 @@
 | 155 | — | `伪装成 png 的文本被拒（按文件头校验）` | PASS | 0 | ✅ | 断言 |
 | 156 | POST | `/api/media/delete` | 200 | 1001 | ✅ | 预期失败：路径穿越被拦　要求 HTTP 200 + code 1001 |
 | 157 | — | `素材删除接口拦住 ../ 穿越` | PASS | 0 | ✅ | 断言 |
-| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-h0rme4.png"],"targetCount":1}）：202610/20261012-h0rme4.png，文件可能正被占用，请稍后重试 |
+| 158 | POST | `/api/media/delete` | 200 | 2000 | ❌ | 期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-pugnjz.png"],"targetCount":1}）：202610/20261012-pugnjz.png，文件可能正被占用，请稍后重试 |
 | 159 | — | `素材删除成功（自检产生的文件已回收）` | FAIL | - | ❌ | 断言 |
 | 160 | POST | `/api/media/delete` | 200 | 2000 | ✅ | 预期失败：商品图删除被拒　要求 HTTP 200 + code 2000 |
 | 161 | — | `商品库在用的图片，素材管理删除时被拒绝且点名「商品库」引用` | PASS | 0 | ✅ | 断言 |
@@ -534,6 +534,14 @@
 | 512 | — | `品牌分类：整屏两栏带 data-scroll-y（命中共享的滚动条浮层化规则）` | PASS | 0 | ✅ | 断言 |
 | 513 | — | `品牌分类：滚动条浮层化只有一份实现（MpWxss.scrollViewCss），装修台复用它` | PASS | 0 | ✅ | 断言 |
 | 514 | — | `品牌分类：装修台先加载 mp-wxss.js 且手机壳类名与注入前缀一致（改名/漏加载都只会静默窄 8px）` | PASS | 0 | ✅ | 断言 |
+| 515 | — | `混合排列：半像素值 4.5px / 7.5px 三处原样保留（转 rpx 后是 9 / 15，取整不会丢精度）` | PASS | 0 | ✅ | 断言 |
+| 516 | — | `混合排列：图片比例算法四处同一份（3:4 → 133.33%，真机/预览/模板都对得上）` | PASS | 0 | ✅ | 断言 |
+| 517 | — | `混合排列：布局「首行2张」的列数映射真机/预览同口径，行由 flex-wrap 自然形成` | PASS | 0 | ✅ | 断言 |
+| 518 | — | `混合排列：标题上间距用 padding-top（margin-top 会被外边距折叠穿透父元素，模块顶部灰底少 45px）` | PASS | 0 | ✅ | 断言 |
+| 519 | — | `混合排列：卡片底色的 rgba 合成真机/预览同一口径（Math.round(alpha)/100，不是 0.3）` | PASS | 0 | ✅ | 断言 |
+| 520 | — | `混合排列：入场动画只在真机（排内延迟 0/0.16/0.32s），预览层不做动画` | PASS | 0 | ✅ | 断言 |
+| 521 | — | `混合排列：.mg-body 显式 flex 列（与有赞 .item_info 同口径，也避免哑 class）` | PASS | 0 | ✅ | 断言 |
+| 522 | — | `混合排列：组件库「混合排列A」标记已接入且 kind 指向真实区块类型` | PASS | 0 | ✅ | 断言 |
 
 ## 三、覆盖结论
 
@@ -541,10 +549,10 @@
 
 ## 四、失败明细
 
-- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-h0rme4.png"],"targetCount":1}）：202610/20261012-h0rme4.png，文件可能正被占用，请稍后重试
+- `POST /api/media/delete` → HTTP 200 / code 2000：期望业务码 0，实际 2000：删除文件失败（[safe-delete][SAFE_DELETE_BULK_CONFIRM_REQUIRED] {"count":50,"threshold":50,"scope":"turn","targets":["C:\\Users\\8274282\\WorkBuddy\\2026-10-07-13-19-01\\server\\data\\uploads\\202610\\20261012-pugnjz.png"],"targetCount":1}）：202610/20261012-pugnjz.png，文件可能正被占用，请稍后重试
 - `— 素材删除成功（自检产生的文件已回收）` → HTTP FAIL / code -：-
-- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1598 → 1600
-- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 6（自检前 5）
+- `— 自检结束后素材库数量与初始一致（无残留）` → HTTP FAIL / code -：1609 → 1611
+- `— 视频自检素材已回收（未留下测试视频）` → HTTP FAIL / code -：剩余视频 7（自检前 6）
 
 ## 五、前后端点位一致性
 

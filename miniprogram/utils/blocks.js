@@ -115,6 +115,23 @@ function sanitizeRich(html) {
 
 
 /**
+ * 色值 + 透明度 → rgba()。
+ *
+ * 有赞的「商品背景色」本身就是 rgba（#F8F8F8 的 33%），而装修台的取色器只认 #RRGGBB，
+ * 所以后台把它拆成「底色 + 透明度」两个字段，由真机与预览**各自合成一次**。
+ * ⚠️ 两处的合成口径必须一致（同为 `Math.round(a)/100`），否则会出现
+ *   「装修台看是浅灰、真机是纯白」这种只差一点的走样。
+ */
+function hexToRgba(hex, alphaPct, defHex) {
+  const h = String(hex == null || String(hex).trim() === '' ? (defHex || '#F8F8F8') : hex).trim();
+  const m = /^#?([0-9a-f]{6})$/i.exec(h.charAt(0) === '#' ? h : '#' + h);
+  const rgb = m ? [parseInt(m[1].slice(0, 2), 16), parseInt(m[1].slice(2, 4), 16), parseInt(m[1].slice(4, 6), 16)] : [248, 248, 248];
+  const n = Number(alphaPct);
+  const a = isNaN(n) ? 33 : Math.min(100, Math.max(0, n));
+  return 'rgba(' + rgb.join(',') + ',' + (Math.round(a) / 100) + ')';
+}
+
+/**
  * 把装修数据转成渲染需要的派生值，让 wxml 保持干净（不在模板里做算术）。
  *
  * resolveAssets 会把后台上传的 /uploads/… 相对地址补成完整地址，外链原样保留。
@@ -272,6 +289,70 @@ function normalizeBlock(b, index) {
     const ratio = Number(o.ratio) || 0.75;
     o.padTopPct = Math.round(10000 / ratio) / 100;
     o.items = (o.items || []).filter((x) => x && (x.image || x.title));
+  } else if (kind === 'mixed_grid') {
+    /*
+     * 混合排列（对标有赞三方扩展「混合排列A」extension-masswx-hpitemsa）。
+     *
+     * 单位：本组件的字段与有赞面板同口径，都是 375 基准 px —— 含 4.5px / 7.5px 这类半像素值，
+     *      统一 ×2 转 rpx。4.5px 正好是 9rpx、7.5px 是 15rpx，换算无损（px2rpx 取整不会丢精度）。
+     * 行：布局样式只决定「每张卡片占几列」，行由 flex-wrap 自然形成 ——
+     *      有赞也是给每张卡打 w50 / w33 的宽度类，结果与半行留白行为完全一致，
+     *      所以不额外造一层行数据（少一层数据就少一处要同步的地方）。
+     * 动画：有赞是入场时「淡入 + 上浮」，同一排内依次延迟 0 / 0.16 / 0.32 秒 —— 这里按同样的
+     *      规则算出每张卡的 delay，距离固定 20px（40rpx），见 index.wxss 的 @keyframes mg-in。
+     */
+    const mgNum = (v, d) => { const n = Number(v); return (v === '' || v === null || v === undefined || isNaN(n)) ? d : n; };
+    const mgStr = (v, d) => (v === null || v === undefined || String(v).trim() === '' ? d : String(v).trim());
+    const layout = ['3', '2', '1-3'].indexOf(o.layout) >= 0 ? o.layout : '2-3';
+    const colsOf = (i) => (layout === '2' ? 2 : layout === '3' ? 3 : layout === '1-3' ? (i === 0 ? 1 : 3) : (i < 2 ? 2 : 3));
+
+    const raw = (o.items || []).filter((x) => x && (x.image || x.title));
+    const items = [];
+    for (let i = 0, k = 0, cols = 0; i < raw.length; i++) {
+      const c = colsOf(i);
+      if (c !== cols) { cols = c; k = 0; }   // 换行 → 排内序号归零（动画延迟随之从头开始）
+      items.push({
+        image: raw[i].image || '',
+        title: raw[i].title || '',
+        link: raw[i].link || '',
+        // 占宽百分比：2 列 = 50、3 列 = 33.33（截到两位，避免 100/3 的长小数撑破一行）
+        cellW: Math.floor(100 / c * 100) / 100,
+        delay: Math.round(k * 16) / 100     // 0 / 0.16 / 0.32 秒
+      });
+      k++;
+    }
+    o.items = items;
+
+    o.padXRpx = px2rpx(mgNum(o.paddingX, 7.5));
+    o.padYRpx = px2rpx(mgNum(o.paddingY, 0));
+    o.gapRpx = px2rpx(mgNum(o.gap, 4.5));
+    o.innerRpx = px2rpx(mgNum(o.paddingInner, 8));
+    o.bgCss = mgStr(o.bg, '#DFDEDE');
+
+    o.titleGapTopRpx = px2rpx(mgNum(o.titleGapTop, 45));
+    o.titleGapBottomRpx = px2rpx(mgNum(o.titleGapBottom, 0));
+    o.titleSizeRpx = px2rpx(mgNum(o.titleSize, 20));
+    o.subSizeRpx = px2rpx(mgNum(o.subSize, 16));
+    o.titleWeightCss = o.titleWeight === 'normal' ? '400' : '700';
+    o.subWeightCss = o.subWeight === 'bold' ? '700' : '400';
+    o.titleColorCss = mgStr(o.titleColor, '#444444');
+    o.subColorCss = mgStr(o.subColor, '#2E2B2B');
+    o.titleAlignCss = (o.titleAlign === 'center' || o.titleAlign === 'right') ? o.titleAlign : 'left';
+    o.subTitle = o.subTitle || '';
+    o.title = o.title || '';
+    o.hasTitle = !!(String(o.subTitle).trim() || String(o.title).trim());
+
+    o.cardClass = ['shadow', 'outline', 'plain'].indexOf(o.cardStyle) >= 0 ? o.cardStyle : 'white';
+    o.cardRadiusRpx = o.radius === 'square' ? 0 : px2rpx(mgNum(o.cardRadius, 8));
+    o.cardBgCss = hexToRgba(o.cardBg, o.cardBgAlpha, '#F8F8F8');
+    // 图片容器用 padding-top 撑比例（百分比按宽度算）：3:4 = 100 ÷ 0.75 = 133.33 → 133.33%
+    o.padTopPct = Math.round(10000 / mgNum(o.imgRatio, 0.75)) / 100;
+    o.itemTitleColorCss = mgStr(o.itemTitleColor, '#444444');
+    o.itemTitleSizeRpx = px2rpx(mgNum(o.itemTitleSize, 14));
+    o.itemTitleWeightCss = o.itemTitleWeight === 'normal' ? '400' : '700';
+    o.itemTitleAlignCss = o.itemTitleAlign === 'left' ? 'left' : 'center';
+    o.clampTwo = mgNum(o.itemTitleLines, 1) === 2;
+    o.animOn = o.anim !== false;
   } else if (kind === 'buy_bar') {
     o.padXRpx = px2rpx(o.padX);
     o.padBRpx = px2rpx(o.padB);
