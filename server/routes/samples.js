@@ -296,9 +296,9 @@ module.exports = {
   /* ---- 店铺设置 ---- */
   'GET /api/admin/settings': { note: '店铺设置当前值 + 默认值 + 商品 / 分类 / 券模板数量' },
   'POST /api/admin/settings/save': {
-    note: '保存店铺设置（只覆盖传入的字段）：shopName / logo / servicePhone / serviceHours / notice / freightFree / defaultFreight / autoConfirmDays / payExpireMinutes',
+    note: '保存店铺设置（只覆盖传入的字段）：servicePhone / serviceHours / notice / freightFree / defaultFreight / autoConfirmDays / payExpireMinutes。'
+      + '⚠️ shopName / logo 会被拒收（1001）：店铺名称与头像的唯一真源是装修台写回的 replica.SHOP',
     body: {
-      shopName: 'LEXY 莱克官方旗舰店',
       servicePhone: '400-828-0000',
       freightFree: 1,
       defaultFreight: 0,

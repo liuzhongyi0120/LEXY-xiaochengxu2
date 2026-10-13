@@ -256,9 +256,22 @@
 .cg-price {
   margin-top: 8rpx;
   color: var(--color-price);
+  display: flex;
+  align-items: baseline;
 }
 .cg-cur { font-size: 22rpx; }
 .cg-num { font-size: 32rpx; font-weight: 600; }
+/* 划线价：跟在现价右侧，弱化成次要信息（与 goods-card / 详情页同一口径） */
+.cg-origin {
+  margin-left: 8rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+  flex: 0 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
 .cg-buy {
   margin-top: 10rpx;
   height: 52rpx;

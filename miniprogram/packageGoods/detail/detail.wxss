@@ -71,6 +71,14 @@
   font-size: 26rpx;
 }
 
+/* 划线价：紧跟在现价右侧、排在价格区间之前，弱化成次要信息 */
+.price-origin {
+  margin-left: 12rpx;
+  font-size: 26rpx;
+  color: var(--color-text-secondary);
+  text-decoration: line-through;
+}
+
 .price-range {
   font-size: 26rpx;
   color: var(--color-primary);

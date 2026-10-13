@@ -23,10 +23,13 @@
     </view>
 
     <view class="bottom">
-      <view class="price">
-        <text class="price-symbol">¥</text>
-        <text class="price-int">{{priceParts.int}}</text>
-        <text class="price-dec">{{priceParts.dec}}</text>
+      <view class="price-wrap">
+        <view class="price">
+          <text class="price-symbol">¥</text>
+          <text class="price-int">{{priceParts.int}}</text>
+          <text class="price-dec">{{priceParts.dec}}</text>
+        </view>
+        <text class="price-origin" wx:if="{{originalText}}">{{originalText}}</text>
       </view>
       <text class="sales">已售 {{salesText}}</text>
     </view>

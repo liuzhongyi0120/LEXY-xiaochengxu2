@@ -90,6 +90,14 @@
   justify-content: space-between;
 }
 
+.price-wrap {
+  display: flex;
+  align-items: baseline;
+  /* min-width:0 让「价格 + 划线价」这一组可以被压缩，否则长价格会把右侧「已售」挤出卡片 */
+  min-width: 0;
+  flex: 0 1 auto;
+}
+
 .price {
   display: flex;
   align-items: baseline;
@@ -109,7 +117,21 @@
   font-size: 22rpx;
 }
 
+/* 划线价：紧跟在现价右侧，弱化成次要信息（不抢主价的视觉重心） */
+.price-origin {
+  margin-left: 8rpx;
+  font-size: 22rpx;
+  color: var(--color-text-secondary, #969799);
+  text-decoration: line-through;
+  flex: 0 1 auto;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .sales {
   font-size: 22rpx;
   color: var(--color-text-secondary, #969799);
+  flex: 0 0 auto;
+  margin-left: 8rpx;
 }

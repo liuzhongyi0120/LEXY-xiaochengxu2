@@ -1540,7 +1540,9 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     search: ['placeholder', 'mode', 'sticky', 'shape', 'textAlign', 'boxHeight', 'scan', 'bg', 'boxBg', 'color', 'link', 'pageMargin'],
     elevator: ['mode', 'styleType', 'tagStyle', 'items', 'color', 'activeColor', 'bg', 'pageMargin'],
     enter_shop: ['text', 'align', 'color', 'bg', 'radius', 'link', 'bgOut', 'pageMargin'],
-    audio: ['src', 'duration', 'text', 'avatar', 'useShopLogo', 'side', 'resume', 'pageMargin'],
+    // 2026-10-13 清理：删掉 'resume'（播放方式）—— 渲染端从不读它（暂停行为写死在 audio 上下文），
+    // 面板能选但真机不变 ⇒ 属零消费字段。见 yzPanels.js 对应注释。
+    audio: ['src', 'duration', 'text', 'avatar', 'useShopLogo', 'side', 'pageMargin'],
     service: ['text', 'align', 'color', 'bg', 'radius', 'bgOut', 'pageMargin'],
     content_card: ['title', 'cols', 'ratio', 'imgHeight', 'items', 'style', 'radius', 'showTag', 'showRead', 'showLike', 'more', 'moreText', 'link', 'pageMargin',
       // 2026-10-12 复刻「创业故事」页时按真机实测补的细粒度字段（默认值 = 原来写死在 WXSS 里的值）
@@ -1553,7 +1555,8 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
       'title', 'panels', 'layout', 'items',
       'image', 'desc', 'linkMode', 'link',
       'bgImage', 'bgTopLink', 'bgTopGap',          // 内容背景图 / 背景顶部链接 / 背景顶部间距
-      'switchMode', 'navWidth', 'contentPadX',     // 样式设置 · 布局
+      // 2026-10-13 清理：删掉 'switchMode'（菜单切换效果）—— 渲染端只有「分页切换」一种行为
+      'navWidth', 'contentPadX',                   // 样式设置 · 布局
       'navStyle', 'navBg', 'navColor', 'navColorActive', 'navBgActive', 'navBgIdle',
       'navBorderColor', 'navBorderLine', 'navHeight', 'navMargin', 'navBorderH', 'navBorderW',
       'navFontSize', 'navWeight', 'navWeightActive', 'navAlign',   // 样式设置 · 左侧导航
@@ -1587,7 +1590,9 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
       'name', 'items',
       'image', 'video', 'title', 'link',         // 条目字段
       'cardStyle', 'cardBg',                     // 样式设置 · 卡片外观
-      'fit', 'gapOuter', 'gapInner', 'radius', 'halfRound', 'imgRatio',
+      // 2026-10-13 清理：删掉 'gapInner'（图文内间距）—— 渲染端只读外间距 gapOuter，
+      // 内间距是「有赞面板有、我们没实现」的零消费字段
+      'fit', 'gapOuter', 'radius', 'halfRound', 'imgRatio',
       'showTitle', 'titleLines', 'titleSize', 'titleGapY', 'titleGapX', 'titleBold', 'titleAlign',
       'titleColor', 'tabColor', 'tabActiveColor', 'tabBg', 'tabFontSize',   // 扩展设置 · 选项卡
       'paddingInner', 'paddingX', 'paddingTop', 'paddingBottom',
@@ -1668,9 +1673,93 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     `两侧各 ${pvShells.size} 项，逐一对应`);
 
   /* (6) 装修台左侧按「有赞真实分组」渲染，而不是拍平成一堆（否则 55 个平铺没法找） */
-  assert('装修台左侧按 lib.groups 分组渲染，且未接入项会展示具体原因',
-    /lib\.groups/.test(adminJs) && /__group/.test(adminJs) && /it\.why/.test(adminJs),
-    'renderLib 已按 lib.groups 分组 + 显示 why');
+  /* (6) 装修台左侧按「有赞真实分组」渲染，而不是拍平成一堆（否则 55 个平铺没法找）。
+   *     2026-10-13 起再加一条：**能跑的常态展示、跑不起来的收进默认折叠的分组**。
+   *     ⚠️ 这是文本级断言（只证明源码里有这段逻辑）；「默认真的只看到 22 张」这件事
+   *        必须由真浏览器哨兵 `.tooling/test-admin-lib.mjs` 量（折叠时那些卡片压根不渲染）。
+   *        两条一起用：这条防「逻辑被整段删掉」，哨兵防「逻辑在、但没生效」。 */
+  {
+    const libChecks = [
+      ['lib.groups 分组', /lib\.groups/],
+      ['__group 分组头', /__group/],
+      ['it.why 未接入原因', /it\.why/],
+      ['lib-rest-head 折叠头', /lib-rest-head/],
+      ['libRestOpen 展开状态', /libRestOpen/],
+      ['x.on && !x.dep 分桶判据', /x\.on && !x\.dep/]
+    ];
+    const libMissing = libChecks.filter((c) => !c[1].test(adminJs)).map((c) => c[0]);
+    assert('装修台左侧按 lib.groups 分组渲染，且未支持 / 依赖占位收进默认折叠的分组',
+      libMissing.length === 0,
+      libMissing.length ? '缺少：' + libMissing.join(' / ')
+        : 'renderLib 按有赞分组渲染 + 未接入项显示 why + 依赖占位收进 lib-rest-head 折叠组（默认收起）');
+  }
+
+  /* (7) 真能跑的组件里，不允许「面板能填、渲染端一次都不读」的字段。
+   *     判据用**项目自己的契约**（schema 的 dep 字段），不做文本猜测：
+   *       · dep 非空 = 依赖占位组件（照抄有赞面板留档，铁律 8）→ 字段零消费是**预期**的，跳过；
+   *       · dep 为空 = 真能跑 → 此时零消费字段就是缺陷：运营改了没反应，只会反复重配。
+   *     扫描按**词边界**（避免 bg 命中 bgColor），偏保守：只会少报、不会把活字段报成死的。
+   *     对应人工复核脚本 .tooling/audit-block-fields.mjs，这条断言是它的常驻守卫。
+   *     2026-10-13 本批据此清掉 6 个零消费字段（audio.resume / tab_cate.gapInner /
+   *     brand_category.switchMode / goods_group.menuSkin+goodsStyle / shop_rank.rankBy）。 */
+  {
+    const deadSites = [
+      join(MP_ROOT, 'templates', 'blocks.wxml'),
+      join(MP_ROOT, 'utils', 'blocks.js'),
+      join(__dirname, '..', 'public', 'shared', 'pv-render.js'),
+      join(__dirname, '..', 'decorate', 'emit.js'),
+      join(__dirname, '..', 'public', 'admin', 'admin.js')
+    ].map((p) => readFileSync(p, 'utf8'));
+    const NON_DATA = new Set(['k', 'label', 'type', 'def', 'group', 'fields', 'item', 'options', 'hint', 'tip',
+      'desc', 'value', 'min', 'max', 'step', 'unit', 'collapsed', 'open', 'title', 'imageList', 'lib',
+      'template', 'required', 'placeholder', 'when', 'show', 'showWhen', 'visible']);
+    const collectK = (fields, out) => {
+      for (const f of fields || []) {
+        if (f && f.k && !NON_DATA.has(f.k)) out.add(f.k);
+        if (f && f.fields) collectK(f.fields, out);
+        if (f && f.item && f.item.fields) collectK(f.item.fields, out);
+      }
+    };
+    const deadFields = [];
+    let checkedKinds = 0;
+    for (const [type, def] of Object.entries(schemaMod.HOME_BLOCK_KINDS)) {
+      if (def.dep) continue;                 // 依赖占位组件：零消费属预期
+      checkedKinds++;
+      const keys = new Set();
+      collectK(def.fields, keys);
+      for (const k of keys) {
+        const re = new RegExp('(^|[^A-Za-z0-9_$])' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^A-Za-z0-9_$]|$)');
+        if (!deadSites.some((t) => re.test(t))) deadFields.push(type + '.' + k);
+      }
+    }
+    assert('真能跑的组件（dep 空）里没有「面板能填、渲染端不读」的零消费字段',
+      deadFields.length === 0,
+      deadFields.length ? `零消费字段（面板改了真机不变）：${deadFields.join(', ')}`
+        : `${checkedKinds} 个真能跑的组件，全部字段都能落到真机 / 预览`);
+  }
+
+  /* (8) 后台顶栏的身份文案必须去重。
+   *     现象：「超级管理员 · 超级管理员」—— 口令登录拿到的就是 owner，
+   *     服务端 `issue('owner', '超级管理员')` 让 name 与 roleLabel 都是「超级管理员」，
+   *     前端再硬塞一个同名 name，裸拼 `name · roleLabel` 就显示两遍。
+   *     装修台（admin.js）与后台控制台（console.core.js）各有一份顶栏，**两份都要守**。
+   *     断言写成「不许出现裸拼 + 必须用去重函数」，而不是比对某个字符串 ——
+   *     后者只是把当前文案抄一遍，改了标点就假红、也拦不住回归。 */
+  {
+    const whoFiles = [
+      ['装修台 admin.js', readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8')],
+      ['后台控制台 console.core.js', readFileSync(join(__dirname, '..', 'public', 'console', 'console.core.js'), 'utf8')]
+    ];
+    const whoBad = [];
+    for (const [n, src] of whoFiles) {
+      if (!/whoText/.test(src)) whoBad.push(n + '：没有 whoText 去重函数');
+      if (/name\s*\|\|\s*'管理员'\)\s*\+\s*' · '/.test(src)) whoBad.push(n + '：仍在裸拼 name · roleLabel');
+      if (/name:\s*'超级管理员'/.test(src)) whoBad.push(n + "：仍硬塞 name: '超级管理员'（与 roleLabel 重复）");
+    }
+    assert('后台顶栏身份文案去重（不出现「超级管理员 · 超级管理员」）',
+      whoBad.length === 0,
+      whoBad.length ? whoBad.join(' | ') : '两处顶栏都走 whoText：名字与角色标签相同时只显示一次');
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -4308,6 +4397,24 @@ assertBlocked('10 · 通过店铺设置接口改「店铺 Logo」同样被拒（
 const cShopSnap1 = JSON.stringify(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings);
 assert('10 · 两次被拒之后店铺设置未发生任何变化（拒绝发生在写入之前）',
   cShopSnap0 === cShopSnap1, '店铺设置快照一致=' + (cShopSnap0 === cShopSnap1));
+
+/* 2026-10-13 清理：`shopName` / `logo` 这两个**历史遗留的重复键**已从
+ * catalogStore.DEFAULT_SETTINGS 移除（真源唯一 = 装修台 replica.SHOP）。
+ * 这条断言锁「确实删干净了」——否则它们会跟着 GET /api/admin/settings 又冒回后台表单，
+ * 运营改一次被拒一次（1001），变成「面板上有个改不动的字段」。
+ * 同时锁「老数据文件里若还残留这两个键，加载时会被清掉」（load() 的 REMOVED_SETTINGS 分支）。 */
+{
+  const storeMod = requireFromHere(join(__dirname, '..', 'lib', 'catalogStore.js'));
+  const defs = storeMod.DEFAULT_SETTINGS || {};
+  const leftovers = ['shopName', 'logo'].filter((k) => Object.prototype.hasOwnProperty.call(defs, k));
+  const viewKeys = Object.keys(((await call('GET', '/api/admin/settings', { silent: true })).data || {}).settings || {});
+  const viewLeft = ['shopName', 'logo'].filter((k) => viewKeys.indexOf(k) >= 0);
+  assert('10 · 店铺设置里的历史遗留键 shopName / logo 已彻底移除（默认值 + 接口返回两处）',
+    leftovers.length === 0 && viewLeft.length === 0,
+    (leftovers.length ? `默认值里还有：${leftovers.join(', ')}` : '') +
+    (viewLeft.length ? ` 接口返回里还有：${viewLeft.join(', ')}` : '') ||
+    `默认设置 ${Object.keys(defs).length} 项、接口返回 ${viewKeys.length} 项，均无 shopName / logo`);
+}
 
 /* —— 20.6（14）请求体解析：非法 JSON / 非对象 JSON 必须 400；数字样文本不得被改写 —— */
 const cBadJson = await call('POST', '/api/address/save', {

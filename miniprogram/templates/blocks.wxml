@@ -297,7 +297,7 @@
           <view class="cg-info">
             <view wx:if="{{block.showTitle}}" class="cg-name">{{g.name}}</view>
             <view wx:if="{{block.showPrice}}" class="cg-price">
-              <text class="cg-cur">¥</text><text class="cg-num">{{g.priceText}}</text>
+              <text class="cg-cur">¥</text><text class="cg-num">{{g.priceText}}</text><text wx:if="{{g.originalText}}" class="cg-origin">{{g.originalText}}</text>
             </view>
             <view wx:if="{{block.showBuy}}" class="cg-buy">立即购买</view>
           </view>
@@ -840,7 +840,7 @@
           <view class="cg-info">
             <view wx:if="{{block.showTitle}}" class="cg-name">{{g.name}}</view>
             <view wx:if="{{block.showPrice}}" class="cg-price">
-              <text class="cg-cur">¥</text><text class="cg-num">{{g.priceText}}</text>
+              <text class="cg-cur">¥</text><text class="cg-num">{{g.priceText}}</text><text wx:if="{{g.originalText}}" class="cg-origin">{{g.originalText}}</text>
             </view>
             <view wx:if="{{block.showBuy}}" class="cg-buy">立即购买</view>
           </view>

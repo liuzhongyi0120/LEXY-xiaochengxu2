@@ -106,29 +106,52 @@ node server/index.js
 
 ---
 
-## 上线前必做（摘要）
+## 上线前必做
 
-完整清单见 `server/README.md`。
+**先跑一遍体检**：`node .tooling/preflight-wechat.mjs` —— 只读脚本，真读文件 + 真发请求，退出码 `1` 表示有阻塞项。
+分级的可执行清单见 [`微信上传前检查清单.md`](./微信上传前检查清单.md)；后端细节见 `server/README.md`。
 
-1. 设置 `JWT_SECRET`（生产未设置会拒绝启动）
-2. **配置管理员凭证 `ADMIN_PASSWORD`（或 `ADMIN_TOKENS`）**：`/api/admin/*` `/api/decorate/*` `/api/media/*`
+### 一、代码之外的前置条件（不办完，传了也白传）
+
+1. **已 ICP 备案的域名 + 受信任 HTTPS 证书**。把 `miniprogram/utils/constants.js` 的 `BASE_URL_MAP.server`
+   从 IP 换成域名 —— 微信「服务器域名」**不支持 IP / localhost**，正式版 `wx.request` 会被直接拒。
+   （图片走相对路径 `/uploads/…`，换域名不用动数据）
+2. **小程序自身完成工信部备案**（2023-09-01 起强制：先备案才能提审发布；含 12381 短信核验 + 管局终审）
+   ＋ **微信认证**（企业 300 元/年，备案与支付/客服/手机号的前提）
+3. 微信后台配 **`request` 合法域名**（每个类型**每月最多改 5 次**，想清楚再改）
+4. **《用户隐私保护指引》逐项申报**（2023-10-17 起未申报的隐私接口会被直接禁用）。本项目命中的有：
+   `wx.setClipboardData`（读取你的剪切板）、`type="nickname"`（昵称头像）、`open-type="getPhoneNumber"`（手机号）；
+   `wx.scanCode` 官方对照表未逐字列出，建议按「访问你的摄像头」口径申报
+5. **服务类目与资质**（家用电器自营等，类目与业务不符会直接驳回）、**微信客服人员绑定**（6 处 `open-type="contact"`）
+
+### 二、服务器端
+
+6. `JWT_SECRET`（生产未设置会拒绝启动）
+7. **管理员凭证 `ADMIN_PASSWORD`（或 `ADMIN_TOKENS`）**：`/api/admin/*` `/api/decorate/*` `/api/media/*`
    共 49 个运营管理点位**已全部要求管理员令牌**，并按 `viewer` / `operator` / `owner` 三级角色细分
    （删除与「生成代码」等不可逆动作收紧到 `owner`）。生产未配置任何管理员凭证时服务拒绝启动。
    `DEBUG_PAGE=off` 是另一道防线（页面与接口一起 403），**不能替代登录态**；网关层限来源仍建议保留
-3. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，补微信支付 v3 证书签名
-4. 关闭模拟支付（`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`）
-5. `server/data/` 纳入备份与容量监控（素材建议后续迁对象存储 / CDN）
-6. 域名备案 + HTTPS，小程序后台配置 `request` 与 `downloadFile` 合法域名
-7. 存储切 MySQL / Redis
-8. 支付回调地址配为 `https://<域名>/api/pay/notify`
-9. 商品数据接入真实商品库（替换 `server/lib/seed.js` 迁移源即可）
-10. 装修台「生成代码」后**仍需上传并发布小程序新版本**才在真机生效
-10. 登录接口加频次限制
+8. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，补微信支付 v3 证书签名
+9. 关闭模拟支付（`ALLOW_MOCK_PAY=0` 或 `NODE_ENV=production`）—— 否则真机 `wx.requestPayment` **必然失败**
+10. 支付回调地址配为 `https://<域名>/api/pay/notify`
+11. `server/data/` 纳入备份与容量监控（素材建议后续迁对象存储 / CDN）；存储切 MySQL / Redis
+12. 商品数据接入真实商品库（替换 `server/lib/seed.js` 迁移源即可）；登录接口加频次限制
+
+### 三、上传当天
+
+13. **素材先同步上线**：`node .tooling/sync-incremental.mjs --only=server/data/uploads --apply`
+    —— 装修台上传的图片**物理文件只落本机、不进 git**，不推 = 小程序整页「图片加载失败」
+    （**且装修台手机预览必然正常**，只有开发者工具/真机才暴露；本项目已因此重犯过一次）
+14. `node .tooling/sync-incremental.mjs --verify` 确认线上与本机零差异
+15. 装修台「生成代码」后**仍需上传并发布小程序新版本**才在真机生效
 
 ---
 
 ## 说明
 
-- 仓库内的 `server/data/`、`.tooling/`、`.workbuddy/` 已由 `.gitignore` 排除：前者是运行时数据（含联调用户与订单），后两者是内部脚本与工作上下文。
+- `server/data/`（运行时数据：联调用户 / 订单 / 素材）与 `.workbuddy/`（AI 助手工作上下文）已由 `.gitignore` **整体排除**。
+- `.tooling/` 采用「**整体排除 + 逐个放行**」：测试与探针**脚本本身入库**（`*.mjs` / `*.cjs`，以及图标资产的两个可复跑
+  Python 入口与它们的输入字体），截图（`_ui-shots/`）、抓取原图（`assets-src/`）、数据备份等大件不入库
+  —— 脚本不进仓库，等于交付里没有可重复执行的验证入口。
 - 本仓库此前存放的是 PRD 文档（两份 docx 及 md/html 源文件），替换前的状态已归档在 `archive/prd-docs-2026-10-07` 分支，可随时取回。
 - 研发侧的回归脚本（生成器无损性、装修发布全链路、素材库全链路等）不在本仓库内，按需另行提供。

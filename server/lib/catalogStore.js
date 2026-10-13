@@ -24,14 +24,14 @@ const FILE = path.join(DATA_DIR, 'catalog.json');
 /**
  * 店铺默认设置（后台「店铺设置」读写）。
  *
- * ⚠️ `shopName` / `logo` 是**历史遗留的重复字段**：小程序端的店铺名称与头像
- *    唯一真源是装修台维护的 `replica.SHOP`（name / avatar），这两个键没有任何消费方。
- *    保留它们只为兼容旧文件（读出来不报错），`catalog.saveSettings()` 已明确拒绝对它们赋值 ——
- *    见 catalog.js 的 SETTINGS_OWNED_BY_DECORATE。新增设置项请不要再用这两个键。
+ * 2026-10-13 清理：这里原本还留着 `shopName` / `logo` 两个**历史遗留的重复字段** ——
+ * 小程序端的店铺名称与头像唯一真源是装修台维护的 `replica.SHOP`（name / avatar），
+ * 这两个键**没有任何消费方**，而且每次开后台都要在控制台里把它们从 defaults 里摘掉再提交。
+ * 现在从默认值里删掉，并由 `migrate()` 从存量 catalog.json 里一并清除；
+ * `catalog.saveSettings()` 的拒收守卫（SETTINGS_OWNED_BY_DECORATE）**保留** ——
+ * 外部脚本/旧版后台仍可能传这两个键，那时应当报错而不是静默吞掉。
  */
 const DEFAULT_SETTINGS = {
-  shopName: 'LEXY莱克官方旗舰店',   // 已废弃，真源 replica.SHOP.name
-  logo: '',                        // 已废弃，真源 replica.SHOP.avatar
   servicePhone: '400-800-0000',
   serviceHours: '9:00 - 21:00',
   notice: '正品保障 · 全国联保 · 7 天无理由退换',
@@ -40,6 +40,9 @@ const DEFAULT_SETTINGS = {
   autoConfirmDays: 10,   // 发货后自动确认收货天数
   payExpireMinutes: 30   // 未付款自动关闭（分钟）
 };
+
+/** 已废弃、需要从存量数据里清除的键（真源在装修台） */
+const REMOVED_SETTINGS = ['shopName', 'logo'];
 
 let cache = null;
 
@@ -73,6 +76,11 @@ function migrate(db) {
   // settings 缺键补齐（后续新增设置项时老文件能平滑升级）
   Object.keys(DEFAULT_SETTINGS).forEach((k) => {
     if (db.settings[k] === undefined) { db.settings[k] = DEFAULT_SETTINGS[k]; changed = true; }
+  });
+  /* 已废弃键的清除：只从默认值里删掉，存量 catalog.json 里的旧键会一直躺着，
+     所以这里显式删一次（幂等 —— 删干净后不再触发 changed） */
+  REMOVED_SETTINGS.forEach((k) => {
+    if (db.settings[k] !== undefined) { delete db.settings[k]; changed = true; }
   });
   // 商品缺字段补齐（如 status / images）
   db.goods.forEach((g) => {
@@ -145,5 +153,6 @@ module.exports = {
     return cache;
   },
   DEFAULT_SETTINGS,
+  REMOVED_SETTINGS,
   FILE
 };

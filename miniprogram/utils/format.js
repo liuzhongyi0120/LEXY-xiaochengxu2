@@ -25,6 +25,28 @@ function splitPrice(fen) {
 }
 
 /**
+ * 划线价文案（原价），返回空串表示「不该显示」
+ *
+ * 为什么必须有这个判空：后台的「划线价」可以留空，也可以填得比售价还低。
+ * 后端 `catalog.js` 的派生规则是 `originalPrice = max(各 SKU 划线价) || price`，
+ * 也就是**没填时它会等于售价** —— 直接渲染就成了「¥599 ¥599」的假折扣。
+ * 所以这里把「只在原价严格大于现价时才显示」定为唯一口径，调用方一律 `wx:if` 判空。
+ *
+ * @param {number} original 原价（分）
+ * @param {number} price    现价（分）
+ * @returns {string} 如 "¥11,999"；不满足条件返回 ''
+ */
+function strikePrice(original, price) {
+  const o = Number(original) || 0;
+  const p = Number(price) || 0;
+  if (!(o > p)) return '';
+  const parts = money(o).split('.');
+  const int = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const dec = parts[1] === '00' ? '' : `.${parts[1]}`;
+  return `¥${int}${dec}`;
+}
+
+/**
  * 销量/评价数简化展示
  * @param {number} n
  * @returns {string} 1000 → "1000+"，10000 → "1万+"
@@ -52,6 +74,7 @@ function formatTime(ts) {
 module.exports = {
   money,
   splitPrice,
+  strikePrice,
   shortNumber,
   formatTime
 };

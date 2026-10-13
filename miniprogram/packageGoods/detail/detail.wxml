@@ -22,6 +22,7 @@
         <text class="price-int">{{priceParts.int}}</text>
         <text class="price-dec">{{priceParts.dec}}</text>
       </view>
+      <text class="price-origin" wx:if="{{originalText}}">{{originalText}}</text>
       <text class="price-range" wx:if="{{priceMaxText}}">{{priceMaxText}}</text>
       <text class="sales">已售 {{salesText}}</text>
     </view>

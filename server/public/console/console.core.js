@@ -245,6 +245,23 @@ function promptBox(title, defaultValue, placeholder) {
 
 const ROLE_TEXT = { viewer: '只读', operator: '运营', owner: '超级管理员' };
 
+/**
+ * 身份的显示文案。
+ *
+ * ⚠️ 名字与角色标签**经常会一模一样**：口令登录拿到的就是 owner，
+ *    服务端 `issue('owner', '超级管理员')` 让 name 与 roleLabel 都是「超级管理员」，
+ *    直接拼 `name · roleLabel` 会在顶栏显示成「超级管理员 · 超级管理员」。
+ *    所以这里去重：两者相同（或名为空）时只显示一次。
+ * @returns {{text:string, title:string}} text=顶栏文案；title=悬停说明
+ */
+function whoText(me) {
+  if (!me) return { text: '未登录管理员', title: '点击使用管理员口令或长期令牌登录' };
+  const roleText = String(me.roleLabel || ROLE_TEXT[me.role] || '').trim();
+  const name = String(me.name || '').trim();
+  const text = name && roleText && name !== roleText ? name + ' · ' + roleText : (name || roleText || '管理员');
+  return { text, title: '当前身份：' + text };
+}
+
 /** 同步顶栏的「当前身份」显示 */
 function renderWho() {
   const btn = $('#btnWho');
@@ -258,7 +275,8 @@ function renderWho() {
   }
   if (tag) {
     // ⚠️ 不要用 hidden 属性切换 —— 「.tag」自带 display，会盖过 UA 的 [hidden]{display:none}
-    tag.textContent = me ? ((me.name || '管理员') + ' · ' + (me.roleLabel || ROLE_TEXT[me.role] || '')) : '未登录管理员';
+    tag.textContent = whoText(me).text;
+    tag.title = whoText(me).title;
     tag.className = 'tag ' + (me ? 'on' : 'ghost');
   }
 }
@@ -309,11 +327,13 @@ function openLogin(info) {
         AdminSession.save(tk, me);
       } else {
         const d = await API.post('/api/admin/login', { password: pw });
+        // name 留空：口令登录的身份就是 owner，服务端给的 roleLabel 已经是「超级管理员」，
+        // 前端再硬塞一个「超级管理员」名字只会让顶栏显示两遍（详见 whoText）
         AdminSession.save(d.token, {
-          role: d.role, roleLabel: d.roleLabel, name: '超级管理员', source: 'session'
+          role: d.role, roleLabel: d.roleLabel, name: '', source: 'session'
         });
       }
-      toast('已登录：' + ((AdminSession.me() || {}).name || '管理员'));
+      toast('已登录：' + whoText(AdminSession.me()).text);
       m.close();
       boot(); // 带着身份重跑一次，把刚才 401 的页面补上
     } catch (e) {
@@ -1024,6 +1044,8 @@ App.views.settings = {
     const row = (label, tip, input) =>
       '<div class="form-row"><div class="lbl">' + esc(label) + '</div><div class="ctl">' + input +
       (tip ? '<div class="tip">' + tip + '</div>' : '') + '</div></div>';
+    /* 服务参数三行共用同一说明 —— 逐行写「同上」等于没写（运营要往上翻才知道「上」是什么） */
+    const SERVER_SAVED = '保存在服务端 catalog.json，供客服与后续接口读取；<b>不会</b>自动出现在小程序页面上';
     const ro = (v) => '<span class="ro">' + (v ? esc(v) : '—') + '</span>';
     /** 图片地址是相对路径，这里拼成本机可预览的绝对地址（不是线上地址） */
     const imgUrl = (p) => (p ? (/^https?:/.test(p) ? p : location.origin + p) : '');
@@ -1072,9 +1094,9 @@ App.views.settings = {
       '<div class="grid c2">' +
         '<div class="card"><div class="card-h"><h2>服务参数</h2><div class="grow"></div>' +
           '<span class="hint">存放于 server/data/catalog.json</span></div><div class="card-b">' +
-          row('客服电话', '服务端保存，供客服与后续接口使用', '<input type="text" class="w160" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
-          row('客服时间', '同上', '<input type="text" class="w160" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
-          row('店铺公告', '服务端保存；若要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" class="w220" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
+          row('客服电话', SERVER_SAVED, '<input type="text" class="w160" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
+          row('客服时间', SERVER_SAVED, '<input type="text" class="w160" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
+          row('店铺公告', SERVER_SAVED + '；要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" class="w220" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
         '</div></div>' +
 
         '<div class="card"><div class="card-h"><h2>交易设置</h2><div class="grow"></div>' +
@@ -1086,14 +1108,20 @@ App.views.settings = {
         '</div></div>' +
       '</div>' +
 
-      '<div class="card"><div class="card-h"><h2>数据资产</h2><div class="grow"></div><span class="hint">存放于 server/data/catalog.json</span></div>' +
-      '<div class="card-b"><div class="grid c3">' +
-        '<div><div class="sub">商品</div><b>' + d.goodsCount + '</b> 个</div>' +
-        '<div><div class="sub">分类</div><b>' + d.categoryCount + '</b> 个</div>' +
-        '<div><div class="sub">优惠券模板</div><b>' + d.couponCount + '</b> 张</div>' +
-      '</div>' +
-      '<div class="tip">商品 / 分类走接口，保存后<b>商品列表页与商品详情页</b>立即读到新值；' +
-      '但首页与自定义页里的「商品」区块读的是装修快照（replica.js），需要重新生成代码并发布小程序版本才会变。</div>' +
+      /*
+       * 数据资产：原来是一整张大卡 + 三列指标，占掉半屏却只有三个数字。
+       * 改成一行紧凑条 —— 信息一点没少，位置从「压在最下面的大块」变成「操作栏上方的一行」。
+       * 那句「哪些地方会立即生效」是运营最容易踩的坑（装修区块读的是快照），所以留在条上。
+       */
+      '<div class="card stat-line"><div class="card-b">' +
+        '<span class="sub">数据资产</span>' +
+        '<span class="stat">商品<b>' + d.goodsCount + '</b></span>' +
+        '<span class="stat">分类<b>' + d.categoryCount + '</b></span>' +
+        '<span class="stat">券模板<b>' + d.couponCount + '</b></span>' +
+        '<span class="grow"></span>' +
+        '<span class="hint" title="商品 / 分类走接口，保存后商品列表页与商品详情页立即读到新值；' +
+          '但首页与自定义页里的「商品」区块读的是装修快照（replica.js），需要重新生成代码并发布小程序版本才会变。">' +
+          '存于 server/data/catalog.json · 装修区块读的是快照，改商品后需重新生成代码</span>' +
       '</div></div>' +
 
       '<div class="btn-group"><button class="btn primary" data-save>保存设置</button>' +
@@ -1134,11 +1162,9 @@ App.views.settings = {
       if (!needRole('owner', '恢复默认设置')) return;
       if (!(await confirmBox('恢复为默认设置？当前填写内容会丢失。'))) return;
       try {
-        // 默认值里带着两个废弃键（shopName / logo），后端会拒收 —— 这里先摘掉再提交
-        const def = Object.assign({}, d.defaults);
-        delete def.shopName;
-        delete def.logo;
-        await API.post('/api/admin/settings/save', def);
+        /* 默认值直接就是可提交的（第 53 批已把历史遗留的 shopName / logo 从
+           catalogStore.DEFAULT_SETTINGS 里删掉，这里不再需要手工摘键） */
+        await API.post('/api/admin/settings/save', d.defaults);
         toast('已恢复默认');
         App.render();
       } catch (e) { toast(e.message, true); }

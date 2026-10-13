@@ -2,7 +2,7 @@ const app = getApp();
 const { fetchDetail } = require('../../services/goods');
 const { addToCart, fetchCart } = require('../../services/cart');
 const { ensureLogin } = require('../../utils/auth');
-const { splitPrice, shortNumber, money } = require('../../utils/format');
+const { splitPrice, strikePrice, shortNumber, money } = require('../../utils/format');
 const { ROUTES } = require('../../utils/constants');
 
 Page({
@@ -16,6 +16,7 @@ Page({
     goods: null,
 
     priceParts: { int: '0', dec: '.00' },
+    originalText: '',
     priceMaxText: '',
     salesText: '0',
 
@@ -68,6 +69,9 @@ Page({
           detailBlocks,
           recommends: goods.recommends || [],
           priceParts: splitPrice(goods.price),
+          /* 划线价：后端 `originalPrice` 与「展示价」同源配对（最低价那个 SKU），
+             没填时它会等于售价 —— 由 strikePrice 统一判「该不该显示」 */
+          originalText: strikePrice(goods.originalPrice, goods.price),
           priceMaxText: hasRange ? ` - ${money(goods.priceMax)}` : '',
           salesText: shortNumber(goods.sales),
           currentImage: 0,

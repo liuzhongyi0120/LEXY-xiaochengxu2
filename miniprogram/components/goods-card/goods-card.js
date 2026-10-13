@@ -1,4 +1,4 @@
-const { splitPrice, shortNumber } = require('../../utils/format');
+const { splitPrice, strikePrice, shortNumber } = require('../../utils/format');
 
 Component({
   properties: {
@@ -10,6 +10,8 @@ Component({
         if (!goods || !goods.id) return;
         this.setData({
           priceParts: splitPrice(goods.price),
+          /* 划线价：后端在没填时会把它派生成「等于售价」，所以由 strikePrice 统一判「该不该显示」 */
+          originalText: strikePrice(goods.originalPrice, goods.price),
           salesText: shortNumber(goods.sales),
           fallbackText: String(goods.name || '').replace(/[·\s]/g, '').slice(0, 4),
           imgError: false
@@ -22,6 +24,7 @@ Component({
 
   data: {
     priceParts: { int: '0', dec: '.00' },
+    originalText: '',
     salesText: '0',
     fallbackText: '',
     imgError: false

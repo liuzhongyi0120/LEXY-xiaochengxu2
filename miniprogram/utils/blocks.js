@@ -13,6 +13,7 @@
 
 const { resolveAssets, assetUrl } = require('./asset');
 const { px2rpx, heightRpx } = require('./units');
+const { strikePrice } = require('./format');
 const goodsSvc = require('../services/goods');
 
 const SIZE_CLASS = { sm: 's-sm', md: 's-md', lg: 's-lg' };
@@ -983,6 +984,10 @@ function toCard(g) {
     name: g.name || '',
     image: assetUrl(g.image || g.cover || (g.images && g.images[0]) || ''),
     priceText: g.priceText || ((Number(g.price) || 0) / 100).toFixed(2),
+    /* 划线价（原价）：与 `goods-card` / 详情页同一口径 —— 后端 `originalPrice` 与展示价
+       同源配对，没填时等于售价；`strikePrice` 判空，不满足「原价 > 现价」一律给空串。
+       注：装修时区块存的是快照，价格/库存会过期，所以这里读的是**实时**接口返回值。 */
+    originalText: strikePrice(g.originalPrice, g.price),
     // 「店铺榜单」要按销量排序，卡片里带上销量（其余区块用不到，多一个键不影响）
     sales: Number(g.sales) || 0
   };

@@ -14,10 +14,15 @@ const { resolveAssets } = require('../utils/asset');
  * 2）素材地址：后台「本地上传」的商品图存的是 `/uploads/…` 相对路径，
  *    浏览器预览能显示（同源），**真机上却是裂图**。商品接口此前没有过 resolveAssets，
  *    装修数据过了、商品数据没过 —— 这条裂缝就是「后台传的图小程序看不到」的根因。
- *    在这里统一补成完整地址，覆盖封面 / 图集 / SKU 图 / 图文详情 / 推荐 / 分享图。
+ *    在这里统一补成完整地址，覆盖封面 / 图集 / 图文详情 / 推荐 / 分享图。
  *
  * resolveAssets 只改写以 `/uploads/` 开头的字符串，外链与站内路径原样保留，
  * 因此对非图片字段（描述文字、跳转路径）是安全的。
+ *
+ * ⚠️ 2026-10-13 清理：这里原本还给每个 SKU 补一个 `image: s.image || ''` ——
+ *    `sku.image`（规格图）**没有任何消费方**：后台没有编辑控件、规格弹层用的是
+ *    `goods.cover`、详情页也不读它。后端已不再返回该字段，这层补空值一并删掉。
+ *    以后要加「每个规格一张图」，请先在后端 toSkuList、后台表格、真机渲染三处都接上。
  */
 
 /** 单件商品归一：补 goodsId/image 别名 + 统一素材地址 */
@@ -28,9 +33,6 @@ function normGoods(g) {
   o.id = o.id || o.goodsId;
   o.cover = o.cover || (Array.isArray(o.images) ? o.images[0] : '') || '';
   o.image = o.cover;
-  if (Array.isArray(o.skus)) {
-    o.skus = o.skus.map((s) => (s && typeof s === 'object' ? Object.assign({}, s, { image: s.image || '' }) : s));
-  }
   // 推荐位是同一份「商品摘要」，必须走同一层归一 ——
   // 否则详情页相关推荐会缺 goodsId（点不动）且图片字段名与列表不一致
   if (Array.isArray(o.recommends)) o.recommends = o.recommends.map(normGoods);

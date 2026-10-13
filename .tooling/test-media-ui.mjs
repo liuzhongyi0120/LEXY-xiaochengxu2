@@ -193,19 +193,54 @@ async function uploadTempVideo() {
   click(q('.media-side-it[data-folder="首页"]'));
   const filtered = await waitFor(() => q('.media-side-it[data-folder="首页"]').classList.contains('on'), 6000);
   ok(filtered, '点击文件夹后该条目进入选中态');
+
+  /*
+   * 再切到「图片」分档，让网格里**只剩图片**。
+   *
+   * 素材库同时管图片与视频，而「最新上传」排序下第一张常常是刚传过的视频
+   * （视频卡渲染的是 `<video>`，没有 `<img>`）。如果不分档：
+   *   · `firstCard.querySelector('img')` 会是 null（脚本后面直接崩）；
+   *   · 即便挑到图片卡，它在 d.list 里的下标也不是 1 —— 于是「第几张 / 共几张」
+   *     与 ← / → 翻页那几条断言会全部错位（假红）。
+   * 分档之后「第一张卡 = 列表第 1 项 = 图片」，后续断言才成立。
+   */
+  click(q('[data-kindt="image"]'));
+  await sleep(1200);
+  const nonImage = qa('.media-grid .media-it[data-kind="video"]').length;
+  ok(nonImage === 0, '切到「图片」分档后网格里没有视频卡（后续「第一张 = 第 1 项」才能成立）',
+    '残留视频卡 ' + nonImage + ' 个');
+
   const homeCount = qa('.media-grid .media-it').length;
   ok(homeCount > 0 && homeCount < allCount, '切到「首页」后网格只剩该文件夹的图',
     `全部 ${allCount} 张 → 首页 ${homeCount} 张`);
   ok(q('.upzone').textContent.indexOf('首页') > -1, '上传区提示「上传后归入：文件夹「首页」」');
 
   /* ---------- 3. 勾选 / 全选 / 清空（原地切 class） ---------- */
-  const firstCard = q('.media-grid .media-it');
+  /*
+   * ⚠️ 必须**显式挑一张图片**，不能取「第一张卡」。
+   *
+   * 素材库同时管理图片与视频：视频卡片渲染的是 `<video>`（见 console.modules.js 的 cell()，
+   * 带 `data-kind="video"`），里面没有 `<img>`。而「最新上传」排序下，第一张很可能正是
+   * 刚传过的视频 —— 于是 `firstCard.querySelector('img')` 是 null，脚本在
+   * `firstImg.getAttribute(...)` 处直接崩掉。
+   *
+   * 更糟的是第 208 行那条断言 `firstImg === firstCard.querySelector('img')`：
+   * 两边**同时为 null** 时它也判「通过」—— 一条恒真的断言等于没有断言，
+   * 所以这里先断言图片卡确实找得到，再往下走。
+   */
+  const firstCard = q('.media-grid .media-it[data-kind="image"]');
+  if (!firstCard) {
+    ok(false, '素材库里至少要有一张图片素材（本测试后续断言都基于图片卡）',
+      '当前范围下 ' + qa('.media-grid .media-it').length + ' 个素材，但一个 data-kind="image" 的都没有');
+    throw new Error('没有图片素材可用于勾选 / 预览断言');
+  }
   const firstImg = firstCard.querySelector('img');
+  ok(!!firstImg, '图片卡里有 <img>（按 data-kind="image" 挑卡，不受视频卡影响）', firstCard.getAttribute('data-pick') || '');
   ok(!!firstCard.querySelector('.pickbox'), '每张卡片都有常驻的勾选圈（多选入口可见）');
   ok(!!firstCard.querySelector('.zoomtip'), '卡片上有「查看大图」提示（告诉用户点图是预览不是选中）');
   click(firstCard.querySelector('.pickbox'));
   ok(firstCard.classList.contains('sel'), '点勾选圈进入选中态（.sel）');
-  ok(firstImg === firstCard.querySelector('img'), '勾选没有重建 <img>（不整块重绘，避免缩略图闪白）');
+  ok(!!firstImg && firstImg === firstCard.querySelector('img'), '勾选没有重建 <img>（不整块重绘，避免缩略图闪白）');
   ok(q('[data-selcnt]').textContent === '1', '「已选 N 张」随选择更新', q('[data-selcnt]').textContent);
   ok(!q('[data-actbar]').hasAttribute('hidden'), '选中后操作条（移动到…）显示出来');
   click(firstCard.querySelector('.pickbox'));

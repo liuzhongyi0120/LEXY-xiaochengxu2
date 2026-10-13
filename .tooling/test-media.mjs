@@ -114,7 +114,34 @@ const GIF = Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA
     process.exit(1);
   }
 
-  const before = (await jget('/api/media/list')).json.data;
+  /*
+   * 开跑前先扫掉「上一次中断留下的同名夹具」。
+   *
+   * 为什么必须做：这个脚本用**固定的原始文件名**做夹具（要验中文原名与检索），
+   * 而 [8] 那条「按原始文件名搜索命中」要求**全库恰好命中 1 条**。
+   * 上一次只要跑到一半被打断（浏览器崩、Ctrl-C、或环境层批量删除护栏拦住收尾），
+   * 夹具就会留在素材库里 → 本次搜索命中 2 条 → **这条断言永远红**，
+   * 而红的原因和本次改动毫无关系（典型的「测试自己攒出来的假红」，本项目踩过多次）。
+   *
+   * 固定夹具名是有意为之，所以不改随机名，改为**开跑前把自己的历史残留收干净**：
+   * 幂等，跑多少次结果都一样。
+   */
+  const FIXTURE_ORIGS = ['莱克 测试图.png', 'banner-a.png', 'icon-b.gif'];
+  let before = (await jget('/api/media/list')).json.data;
+  {
+    const all = (await jget('/api/media/list?size=500')).json.data;
+    const stale = (all.list || []).filter((x) => FIXTURE_ORIGS.indexOf(x.orig) >= 0);
+    for (const s of stale) {
+      const r = await jpost('/api/media/delete', { name: s.name, force: 1 });
+      if (r.json.code !== 0) {
+        console.log('    · 旧夹具清理失败：' + s.name + ' → code=' + r.json.code + ' msg=' + (r.json.msg || ''));
+      }
+    }
+    if (stale.length) {
+      console.log('    · 已清理上一次留下的夹具 ' + stale.length + ' 个（否则「按原名搜索命中 1 条」必然假红）');
+      before = (await jget('/api/media/list')).json.data;   // 清理后重新取基线
+    }
+  }
 
   /* ---------------------------------------------------------------- */
   section('[1] 上传单张（multipart/form-data）');

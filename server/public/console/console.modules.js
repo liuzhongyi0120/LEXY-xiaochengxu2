@@ -35,6 +35,14 @@ const emptyRow = (cols, text) => '<tr><td colspan="' + cols + '" class="empty">'
 
 /* ============================== 视图：商品管理 ============================== */
 
+/**
+ * 商品行「名称下第二行」的标签 HTML（新品 / 热销 / 限量…）。
+ * 返回空串表示没有标签 —— 调用处据此**整行不渲染**，避免留一行空白撑高表格。
+ */
+function goodsTagHtml(g) {
+  return (g.tags || []).map((t) => '<span class="tag ghost">' + esc(t) + '</span>').join(' ');
+}
+
 App.views.goods = {
   async render(body, state) {
     const d = await API.get('/api/admin/goods/list', {
@@ -76,7 +84,16 @@ App.views.goods = {
         '<tr data-id="' + esc(g.id) + '">' +
           '<td><input type="checkbox" data-ck="' + esc(g.id) + '"></td>' +
           '<td><div class="cell-main"><img class="thumb" src="' + esc(g.cover) + '" alt="">' +
-            '<div class="tt"><b>' + esc(g.name) + '</b><span>ID ' + esc(g.id) + ' · ' + (g.tags || []).map((t) => '<span class="tag ghost">' + esc(t) + '</span>').join(' ') + '</span></div></div></td>' +
+            /*
+             * 商品名下的第二行**不再重复内部 ID**（原来写的是「ID gxxxx · 新品」）：
+             * ID 是内部主键，运营从不按它操作，却让每一行都多出一串噪音；
+             * 它仍然有用（报障时要说清是哪件、搜索框也支持按 ID 搜），所以挪进名称的 title
+             * 悬停提示里 —— 需要时鼠标一停就能看到、也能选中复制，平时不占视觉。
+             * 第二行只留真正给人看的标签（新品 / 热销 / 限量…）；没有标签时这一行整段不渲染。
+             */
+            '<div class="tt"><b title="商品 ID：' + esc(g.id) + '">' + esc(g.name) + '</b>' +
+            (goodsTagHtml(g) ? '<span>' + goodsTagHtml(g) + '</span>' : '') +
+            '</div></div></td>' +
           '<td class="sub">' + esc(catName(g.categoryId)) + '</td>' +
           '<td class="num money">' + (g.priceMax && g.priceMax !== g.price ? money(g.price) + '~' + fen2yuan(g.priceMax) : money(g.price)) + '</td>' +
           '<td class="num">' + (g.stock <= 10 ? '<span class="tag warn">' + g.stock + '</span>' : g.stock) + '</td>' +
@@ -173,7 +190,7 @@ App.views.goods = {
     const d = await API.get('/api/admin/goods/detail', id ? { id } : {});
     const g = Object.assign({
       id: '', name: '', subtitle: '', categoryId: '', tags: [], cover: '', images: [], detailImages: [],
-      description: '', status: 'on_sale', skus: [{ specs: [], price: 0, originalPrice: 0, stock: 0, image: '' }]
+      description: '', status: 'on_sale', skus: [{ specs: [], price: 0, originalPrice: 0, stock: 0 }]
     }, d.goods || {});
     const cats = d.categories;
     let skus = JSON.parse(JSON.stringify(g.skus || []));
@@ -281,7 +298,7 @@ App.views.goods = {
     };
     root.querySelector('[data-addsku]').addEventListener('click', () => {
       const last = skus[skus.length - 1] || { price: 0, stock: 0 };
-      skus.push({ specs: [], price: last.price, originalPrice: last.originalPrice, stock: 0, image: '' });
+      skus.push({ specs: [], price: last.price, originalPrice: last.originalPrice, stock: 0 });
       renderSkus();
     });
 
@@ -300,7 +317,9 @@ App.views.goods = {
         cover: cover || images[0] || '',
         images: images.length ? images : (cover ? [cover] : []),
         detailImages: detailImages,
-        skus: skus.map((s) => ({ skuId: s.skuId, specs: s.specs, price: s.price, originalPrice: s.originalPrice, stock: s.stock, image: s.image || '' }))
+        /* 规格图（sku.image）已下架：没有编辑控件、小程序端也不渲染（规格选择器用 goods.cover），
+           这里不再原样回传，避免出现「只有抓取来的存量商品有、新商品没有」的字段 */
+        skus: skus.map((s) => ({ skuId: s.skuId, specs: s.specs, price: s.price, originalPrice: s.originalPrice, stock: s.stock }))
       };
       if (!payload.name) return toast('请填写商品名称', true);
       if (!payload.categoryId) return toast('请选择商品分类', true);

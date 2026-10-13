@@ -452,6 +452,39 @@ a.pname { text-decoration: none; }
 }
 .lib-group span { flex: 1; }
 .lib-group i { font-style: normal; font-weight: 400; color: var(--gray-3); }
+
+/* 「未支持 / 依赖占位」折叠头：整行、默认可点开。
+   上面那批是能直接用的组件，下面这批照抄了有赞面板但真机跑不起来 ——
+   收进一行，运营不点就不占视野，点开仍是完整的有赞分组清单。 */
+.lib-rest-head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 8px;
+  margin-top: 10px;
+  border: 0;
+  border-top: 1px dashed var(--line);
+  background: transparent;
+  font-size: 11.5px;
+  color: var(--gray-2);
+  font-weight: 600;
+  text-align: left;
+}
+.lib-rest-head:hover { color: var(--blue); }
+.lib-rest-head span { flex: 1; }
+.lib-rest-head i { font-style: normal; font-weight: 400; color: var(--gray-3); }
+.lib-rest-head em {
+  font-style: normal;
+  font-weight: 400;
+  color: var(--blue);
+  border: 1px solid currentColor;
+  border-radius: 9px;
+  padding: 0 7px;
+  line-height: 16px;
+}
+.lib-rest-head.on { border-top-color: transparent; margin-top: 0; }
 .lib-add {
   display: block;
   width: calc(100% - 24px);

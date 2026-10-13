@@ -48,19 +48,28 @@ for (let i = 0; i < argv.length; i++) {
 const base = opt.base.replace(/\/$/, '');
 
 /* 要巡检的页面：每个控制台菜单页 + 装修台。
- * 素材库（#media）与自定义页编辑器单独放在最后 —— 它们会加载大量图片，等等更久。 */
+ * 素材库（#media）与自定义页编辑器单独放在最后 —— 它们会加载大量图片，等等更久。
+ *
+ * ⚠️ hash 必须与 server/public/console/console.core.js 的 NAV 的 `key` **逐字一致**。
+ *    这里曾经写着 `#cates` / `#reviews` / `#coupons` 三个**不存在的 key**，
+ *    而 App.go() 对未知 key 是**静默回落 dashboard** 的 → 这个哨兵自称巡检 11 页，
+ *    实际有 3 页在量「数据概览」，却一路全绿。现在每个条目都带 `title`，
+ *    由下面的「hash ↔ 视图标题」断言钉住 —— 名字对不上就当场报红，不再靠人工核对。
+ *    真实 key（NAV）：dashboard / orders / customers / goods / categories /
+ *    comments / marketing / media / decorate / settings */
 const PAGES = [
-  { name: '概览（数据概览）', url: base + '/console#dashboard', wait: 2200 },
-  { name: '订单管理', url: base + '/console#orders', wait: 2200 },
-  { name: '客户管理', url: base + '/console#customers', wait: 1800 },
-  { name: '商品管理', url: base + '/console#goods', wait: 2000 },
-  { name: '分类管理', url: base + '/console#cates', wait: 1800 },
-  { name: '评价管理', url: base + '/console#reviews', wait: 1800 },
-  { name: '优惠券', url: base + '/console#coupons', wait: 1800 },
-  { name: '店铺设置', url: base + '/console#settings', wait: 1800 },
-  { name: '素材库', url: base + '/console#media', wait: 2600 },
-  { name: '店铺装修', url: base + '/console#decorate', wait: 2000 },
-  { name: '装修台 /admin', url: base + '/admin', wait: 2600 }
+  { name: '概览（数据概览）', url: base + '/console#dashboard', wait: 2200, title: '数据概览' },
+  { name: '订单管理', url: base + '/console#orders', wait: 2200, title: '订单管理' },
+  { name: '客户管理', url: base + '/console#customers', wait: 1800, title: '客户管理' },
+  { name: '商品管理', url: base + '/console#goods', wait: 2000, title: '商品管理' },
+  { name: '分类管理', url: base + '/console#categories', wait: 1800, title: '分类管理' },
+  { name: '评价管理', url: base + '/console#comments', wait: 1800, title: '评价管理' },
+  { name: '优惠券', url: base + '/console#marketing', wait: 1800, title: '优惠券' },
+  { name: '店铺设置', url: base + '/console#settings', wait: 1800, title: '店铺设置' },
+  { name: '素材库', url: base + '/console#media', wait: 2600, title: '素材库' },
+  { name: '店铺装修', url: base + '/console#decorate', wait: 2000, title: '店铺装修' },
+  // 装修台是独立页面（/admin），没有控制台的 #pgTitle —— 不参与标题断言
+  { name: '装修台 /admin', url: base + '/admin', wait: 2600, title: null }
 ];
 
 const chrome = CHROME_CANDIDATES.find((p) => existsSync(p));
@@ -149,8 +158,28 @@ const PROBE = `(()=>{
   const bodyTextLen = (document.body.innerText || '').trim().length;
   const mEl = document.getElementById('modal');
   const loginShown = !!document.querySelector('.login-mask') || (!!mEl && !mEl.hidden);
+  /*
+   * 当前视图的「身份证据」：左侧导航的高亮项 + 页标题（#pgTitle）。
+   * 用途见下面的「hash ↔ 视图标题」断言 —— hash 写错时 App 会静默回落 dashboard，
+   * 从文本量/截图上看不出任何异常；有这两个值就能一句话判定「量的到底是不是那一页」。
+   */
+  const navOn = document.querySelector('#nav .nav-item.on');
+  /*
+   * 只取导航项里的**文字标签**：每个 nav-item 是「图标 span + 文字 span + 可选角标 span」。
+   * 直接用 textContent 会把角标一起读出来（「订单管理248」），于是「标题是否对应」永远为假 ——
+   * 这种「断言自己写错」的假红比不检查更糟，所以这里显式跳过 .ico 与 .badge。
+   * ⚠️ 本段在模板字符串里，注释中不要出现反引号（会提前闭合整段 PROBE）。
+   */
+  const navLabel = navOn
+    ? Array.prototype.map.call(navOn.querySelectorAll('span'), function (s) {
+        return (s.classList.contains('ico') || s.classList.contains('badge')) ? '' : (s.textContent || '').trim();
+      }).filter(Boolean).join(' ')
+    : '';
+  const pgEl = document.getElementById('pgTitle');
   return JSON.stringify({
     url: location.href, bodyTextLen, loginShown,
+    navOn: navLabel,
+    pgTitle: pgEl ? (pgEl.textContent || '').trim() : '',
     htmlBg: getComputedStyle(document.documentElement).backgroundColor,
     layers, sampleHits: uniq, coveredAll,
     layerKids: (document.getElementById('layer') || { children: [] }).children.length
@@ -253,6 +282,19 @@ function report(name, ok, detail) {
     // 断言 4：不能停在登录层上 —— 否则前三条量的都是登录框，等于没测
     report(p.name + '：已登录（量的是页面本身，不是登录框）', !d.loginShown,
       d.loginShown ? '页面停在登录层上：管理员令牌没生效，或该页接口又要求登录' : '—');
+
+    /*
+     * 断言 5：hash ↔ 视图标题必须对应。
+     * 没有这一条的话，hash 一旦写错（App.go 对未知 key 静默回落 dashboard），
+     * 就会变成「哨兵声称巡检 N 页、其实同一页量了 N 次」，且**全绿**——
+     * 这正是本项目踩过的坑（#cates / #reviews / #coupons 三个 key 根本不存在）。
+     */
+    if (p.title) {
+      const ok = d.pgTitle === p.title && d.navOn === p.title;
+      report(p.name + '：hash 落在目标视图上（页标题 / 导航高亮都是「' + p.title + '」）', ok,
+        ok ? '—' : '实际页标题「' + d.pgTitle + '」/ 导航高亮「' + d.navOn + '」'
+          + (d.pgTitle === '数据概览' && p.title !== '数据概览' ? ' → 回落到 dashboard，说明该 hash 不是真实视图 key' : ''));
+    }
   }
 
   console.log('\n===== 明细 =====');

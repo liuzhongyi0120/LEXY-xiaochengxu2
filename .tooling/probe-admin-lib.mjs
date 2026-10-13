@@ -75,6 +75,8 @@ async function libFacts() {
     // 基础组件 tab 只画 lib.basic 那 55 张卡（「个性导航」在高级 tab），比较时要分开算
     depBasic: lib.basic.filter((x) => x.ok && x.dep).length,
     depAll: lib.basic.concat(lib.adv).filter((x) => x.ok && x.dep).length,
+    /* 默认态（未展开折叠区）该看到的卡片数 = 基础组件里的「已接入且不依赖」项 */
+    availBasic: lib.basic.filter((x) => x.ok && !x.dep).length,
     kinds: lib.kinds.length
   };
 }
@@ -91,7 +93,12 @@ if (!ADMIN_TOKEN) { console.error('拿不到管理员会话'); process.exit(1); 
 const draftBefore = await STATS();
 
 console.log('\n[1] 组件库全量可点');
-let tab = await open(SITE + '/admin/');
+/*
+ * ⚠️ 直达 `?edit=home`：页面列表里的「装修」是 `<a href="/admin?edit=xxx" target="_blank">`，
+ *    **已经没有 data-open 了**（见 admin.js 的点击委托注释）。此前靠点 `#pageRows [data-open]`
+ *    进编辑器，在这个版本里永远点不中 → 编辑器进不去 → 组件库是空的。
+ */
+let tab = await open(SITE + '/admin/?edit=home');
 let expr = null;
 {
   /* 登录 */
@@ -104,24 +111,36 @@ let expr = null;
     if (b) b.click();
     return 'clicked';
   })()`);
-  await sleep(1600);
+  await sleep(2600);
 
-  await run(tab, `(() => { const a = document.querySelector('#pageRows [data-open="home"]') || document.querySelector('#pageRows [data-open]'); if (a) a.click(); return 'ok'; })()`);
-  await sleep(2400);
-
-  /* 切到「基础组件」tab 再数：未接入角标 / 依赖角标 / 上限计数 */
-  expr = JSON.parse(await run(tab, `(async() => {
+  /* 切到「基础组件」tab（默认是「常用组件」，那里没有分桶、也没有 55 张卡） */
+  await run(tab, `(async () => {
     const t = [...document.querySelectorAll('.lib-tabs .lib-tab')].find((x) => /基础组件/.test(x.textContent));
     if (t) { t.click(); await new Promise((r) => setTimeout(r, 400)); }
+    return 'ok';
+  })()`);
+  await sleep(600);
+
+  /*
+   * 先看**默认态**，再点开折叠区数全量。
+   *
+   * 2026-10-13 起组件库分成两桶：能真跑的常态展示，未支持 / 依赖占位收进一个**默认折叠**的分组。
+   * 所以「55 张卡 + 33 个依赖角标」只在**展开后**才成立；默认态应当是「22 张卡 + 0 个依赖角标」。
+   * 这里两种状态都数一遍，并把「默认折叠」这条行为也钉住
+   * （静态断言证明不了它 —— 折叠时那些卡片压根不渲染）。
+   */
+  const countCards = async () => JSON.parse(await run(tab, `(() => {
     const cards = [...document.querySelectorAll('.lib-item')];
     /* 只读 .lib-num 自己（读整张卡片会把组件名一起带进来，正则就永远不匹配） */
     const firstNum = cards.find((c) => c.querySelector('.lib-num'));
+    const head = document.querySelector('.lib-rest-head');
     return JSON.stringify({
       cards: cards.length,
       off: cards.filter((c) => c.classList.contains('off')).length,
       flag: cards.filter((c) => c.querySelector('.lib-flag')).length,
       dep: cards.filter((c) => c.querySelector('.lib-dep')).length,
       num: cards.filter((c) => c.querySelector('.lib-num')).length,
+      restHead: head ? ((head.querySelector('em') || {}).textContent || '').trim() : '',
       sampleNum: firstNum ? (firstNum.querySelector('.lib-num').textContent || '').trim() : ''
     });
   })()`));
@@ -130,7 +149,21 @@ let expr = null;
   if (!facts) { console.error('拿不到 /api/decorate/pages 的 lib'); await close(tab); process.exit(1); }
   console.log('    schema 事实：' + JSON.stringify(facts));
 
-  ok(expr.cards === 55, '基础组件 tab 里 55 张卡片', 'cards=' + expr.cards);
+  const closed = await countCards();
+  ok(closed.cards === facts.availBasic, '默认态只展示「能直接跑」的组件',
+    'cards=' + closed.cards + ' / 期望 ' + facts.availBasic);
+  ok(closed.dep === 0, '默认态不露出「依赖」角标（依赖项都在折叠里）', 'dep=' + closed.dep);
+  ok(closed.restHead === '展开', '折叠区默认收起', JSON.stringify(closed.restHead));
+
+  await run(tab, `(async () => {
+    const h = document.querySelector('.lib-rest-head');
+    if (h) { h.click(); await new Promise((r) => setTimeout(r, 400)); }
+    return 'ok';
+  })()`);
+  await sleep(500);
+  expr = await countCards();
+  ok(expr.restHead === '收起', '点一下能展开折叠区', JSON.stringify(expr.restHead));
+  ok(expr.cards === 55, '展开后是完整的有赞清单：55 张卡片', 'cards=' + expr.cards);
   ok(expr.off === 0 && expr.flag === 0, '没有任何「未接入」角标', 'off=' + expr.off + ' flag=' + expr.flag);
   ok(expr.dep === facts.depBasic, '「依赖」角标数 = schema 里带依赖的基础组件数',
     expr.dep + ' vs ' + facts.depBasic + '（另 ' + (facts.depAll - facts.depBasic) + ' 个在高级组件 tab）');
@@ -169,7 +202,13 @@ console.log('\n[2] 点一个「此前未接入」的组件：商品分组');
     const el = document.querySelector('#insp') || document.querySelector('.col-inspector') || document.body;
     return (el.textContent || '').replace(/\\s+/g, ' ');
   })()`);
-  ['菜单样式', '菜单吸顶', '显示全部分组', '列表样式', '商品样式', '分组'].forEach((label) => {
+  /*
+   * 属性面板里必须出现有赞实测的字段（少一项就是「字段没接上」）。
+   * ⚠️ 2026-10-13 清理后「商品样式（goodsStyle）」已从商品分组的面板里删掉
+   *    （渲染端从未读它 = 面板改了真机不变），断言里的字段名必须跟着改，
+   *    否则这里会一直红、而红的原因跟组件库没关系。
+   */
+  ['菜单样式', '菜单吸顶', '显示全部分组', '列表样式', '购买按钮样式', '分组'].forEach((label) => {
     ok(insp.indexOf(label) >= 0, '属性面板里有「' + label + '」');
   });
 

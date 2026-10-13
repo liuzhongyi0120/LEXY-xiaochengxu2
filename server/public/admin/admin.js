@@ -136,6 +136,12 @@
     globalLib: null,    // 全局组件库（首页 / 自定义页 / 固定结构页用）
     pageLibs: {},       // 页面级组件库（按页面 key 索引，目前只有「我的」）
     libTab: 'common',
+    /*
+     * 组件库里「未支持 / 依赖占位」那一组的展开状态。
+     * 默认 **false（折叠）** —— 运营打开组件库第一眼应该只看到能真跑的 25 个，
+     * 而不是 59 个里混着 34 个点了也跑不起来的。展开后仍是完整的有赞分组清单（用于逐项对账）。
+     */
+    libRestOpen: false,
     common: [],         // 常用组件（localStorage 可自定义）
     device: 375,
     pvSlide: {},        // 预览里各轮播区块的手动翻页位置：{ 'blocks.1': 2 }
@@ -207,13 +213,26 @@
     });
   }
 
+  /**
+   * 身份的显示文案 —— 与后台控制台（console.core.js 的 whoText）**同一口径**。
+   *
+   * ⚠️ 名字与角色标签**经常会一模一样**：口令登录拿到的就是 owner，
+   *    服务端 `issue('owner', '超级管理员')` 让 name 与 roleLabel 都是「超级管理员」，
+   *    直接拼 `name · roleLabel` 会在顶栏显示成「超级管理员 · 超级管理员」。
+   *    所以这里去重：两者相同（或名为空）时只显示一次。
+   */
+  function whoText(who) {
+    if (!who) return '未登录';
+    var roleText = String(who.roleLabel || ROLE_TEXT[who.role] || '').replace(/^\s+|\s+$/g, '');
+    var name = String(who.name || '').replace(/^\s+|\s+$/g, '');
+    return (name && roleText && name !== roleText) ? (name + ' · ' + roleText) : (name || roleText || '管理员');
+  }
+
   function renderWho() {
     var t = $('tbWho');
     var b = $('btnWho');
     var who = me();
-    if (t) t.textContent = who
-      ? ((who.name || '管理员') + ' · ' + (who.roleLabel || ROLE_TEXT[who.role] || ''))
-      : '未登录';
+    if (t) t.textContent = whoText(who);
     if (b) {
       b.textContent = who ? '退出' : '登录';
       b.title = who ? '点击退出管理员登录' : '使用管理员口令或长期令牌登录';
@@ -255,13 +274,15 @@
         p = api('GET', '/api/admin/session').then(function (who) { saveSession(tk, who); return who; });
       } else {
         p = api('POST', '/api/admin/login', { body: { password: pw } }).then(function (d) {
-          var who = { role: d.role, roleLabel: d.roleLabel, name: '超级管理员', source: 'session' };
+          // name 留空：口令登录的身份就是 owner，服务端给的 roleLabel 已经是「超级管理员」，
+          // 前端再硬塞一个同名 name 只会让顶栏显示两遍（详见 whoText）
+          var who = { role: d.role, roleLabel: d.roleLabel, name: '', source: 'session' };
           saveSession(d.token, who);
           return who;
         });
       }
       p.then(function (who) {
-        toast('已登录：' + ((who && who.name) || '管理员'));
+        toast('已登录：' + whoText(who));
         closeModal();
         loadPagesThenMaybeOpenEdit();   // 带 ?edit=xxx 进来的窗口，登录完直接续上那个页面
       })['catch'](function (e) {
@@ -827,6 +848,9 @@
     var desc = $('libDesc');
     var meta = lib.tabs.filter(function (t) { return t.key === S.libTab; })[0] || {};
     var items = [];
+    /** 「未支持 / 依赖占位」那一组：默认折叠，展开后与主列表共用同一套卡片渲染 */
+    var restNodes = [];
+    var restCount = 0;
 
     /* 「添加常用组件」只对带「常用组件」tab 的组件库有意义（个人中心没有这一 tab） */
     var hasCommon = !!(lib.tabs || []).filter(function (t) { return t.key === 'common'; })[0];
@@ -841,7 +865,6 @@
       if (!items.length) desc.textContent = '还没有常用组件，点下方「添加常用组件」挑选。';
     } else {
       var src = lib[S.libTab] || [];
-      desc.textContent = (meta.desc || '') + '（共 ' + src.length + ' 个，高亮为本后台已接入、可直接添加）';
       /*
        * 按分组渲染的条件由**数据声明**（`tabs[i].grouped`），不再写死 tab 名：
        * 全局组件库只有「基础组件」这一 tab 带分组，个人中心那一个 tab 自带 4 组。
@@ -874,41 +897,99 @@
       } else {
         src.forEach(pushOne);
       }
+
+      /*
+       * ⚠️ 核心：把组件库切成「现在就能跑」与「未支持 / 依赖占位」两桶。
+       *
+       * 为什么：59 个组件里只有 25 个在真机上跑得起来，另外 34 个是**照抄有赞面板留档**的
+       * 依赖占位（铁律 8：不假装可用）。平铺在一起时，运营在 59 张卡里挑 25 张、还得分清
+       * 哪些点下去只会看到一个「依赖」占位卡片 —— 这是「看上去很全、其实不好用」。
+       * 所以：能跑的常态展示，跑不起来的收进一个**默认折叠**的分组（点开仍是完整有赞分组清单，
+       * 「对标有赞全量」这条基线一点没丢）。
+       *
+       * 判据用 **schema 的 dep**（项目自己的契约），不靠组件名 / 文案猜测。
+       * 分桶后空掉的分组头会被丢弃，所以两桶的分组数各自都是「非空组数」。
+       */
+      var sections = [];   // [{ name, items }]
+      items.forEach(function (it) {
+        if (it.__group) { sections.push({ name: it.__group, items: [] }); return; }
+        if (!sections.length) sections.push({ name: '', items: [] });
+        sections[sections.length - 1].items.push(it);
+      });
+      var availNodes = [];
+      var availCount = 0;
+      sections.forEach(function (sec) {
+        var ok2 = sec.items.filter(function (x) { return x.on && !x.dep; });
+        var no2 = sec.items.filter(function (x) { return !(x.on && !x.dep); });
+        if (sec.name && ok2.length) availNodes.push({ __group: sec.name, __count: ok2.length });
+        ok2.forEach(function (x) { availNodes.push(x); });
+        if (sec.name && no2.length) restNodes.push({ __group: sec.name, __count: no2.length });
+        no2.forEach(function (x) { restNodes.push(x); });
+        availCount += ok2.length;
+        restCount += no2.length;
+      });
+      items = availNodes;
+      desc.textContent = (meta.desc || '') +
+        '（可直接添加 ' + availCount + ' 个' +
+        (restCount ? '；另有 ' + restCount + ' 个未支持 / 依赖占位，已折叠在下方' : '') +
+        '。高亮 = 本后台已接入）';
     }
 
     var grid = $('libGrid');
     grid.innerHTML = '';
-    items.forEach(function (it) {
-      if (it.__group) {
-        // 分组标题（整行占满），不是可点击项
-        var h = el('div', 'lib-group');
-        h.innerHTML = '<span>' + esc(it.__group) + '</span><i>' + it.__count + '</i>';
-        grid.appendChild(h);
-        return;
-      }
-      var used = it.on ? usedCount(it.kind) : 0;
-      var cap = it.max || 0;
-      var b = el('button', 'lib-item' + (it.on ? '' : ' off'));
-      /* 三种状态：可添加（可能带「依赖」角标）/ 未接入（灰显） */
-      b.innerHTML = (it.icon || '') + '<span class="lib-name">' + esc(it.label) + '</span>' +
-        (cap ? '<span class="lib-num">' + used + ' / ' + cap + '</span>' : '') +
-        (it.on ? (it.dep ? '<span class="lib-dep">依赖</span>' : '') : '<span class="lib-flag">未接入</span>');
-      b.title = (it.on
-        ? '点击添加到「页面区块」末尾' + (it.dep ? '（依赖 ' + it.dep + '，真机会原样标注）' : '')
-        : '未接入：') + (it.why || it.desc || '') +
-        (cap ? '（本页已用 ' + used + ' / 上限 ' + cap + '）' : '');
-      if (it.on) {
-        b.onclick = function () {
-          // 达到有赞同款上限就拦住，避免出现「后台能加、真机不渲染」的偏差
-          if (cap > 0 && usedCount(it.kind) >= cap) {
-            toast(it.label + '：单个页面最多添加 ' + cap + ' 个（有赞同款上限）', 'err');
-            return;
-          }
-          addComponent(it.kind);
-        };
-      } else b.onclick = function () { toast(it.label + '：' + (it.why || it.desc || '暂未接入'), 'err'); };
-      grid.appendChild(b);
-    });
+
+    /** 把一批节点画进网格（分组头整行占满；卡片按三种状态渲染） */
+    var paint = function (list, into) {
+      list.forEach(function (it) {
+        if (it.__group) {
+          // 分组标题（整行占满），不是可点击项
+          var h = el('div', 'lib-group');
+          h.innerHTML = '<span>' + esc(it.__group) + '</span><i>' + it.__count + '</i>';
+          into.appendChild(h);
+          return;
+        }
+        var used = it.on ? usedCount(it.kind) : 0;
+        var cap = it.max || 0;
+        var b = el('button', 'lib-item' + (it.on ? '' : ' off'));
+        /* 三种状态：可添加（可能带「依赖」角标）/ 未接入（灰显） */
+        b.innerHTML = (it.icon || '') + '<span class="lib-name">' + esc(it.label) + '</span>' +
+          (cap ? '<span class="lib-num">' + used + ' / ' + cap + '</span>' : '') +
+          (it.on ? (it.dep ? '<span class="lib-dep">依赖</span>' : '') : '<span class="lib-flag">未接入</span>');
+        b.title = (it.on
+          ? '点击添加到「页面区块」末尾' + (it.dep ? '（依赖 ' + it.dep + '，真机会原样标注）' : '')
+          : '未接入：') + (it.why || it.desc || '') +
+          (cap ? '（本页已用 ' + used + ' / 上限 ' + cap + '）' : '');
+        if (it.on) {
+          b.onclick = function () {
+            // 达到有赞同款上限就拦住，避免出现「后台能加、真机不渲染」的偏差
+            if (cap > 0 && usedCount(it.kind) >= cap) {
+              toast(it.label + '：单个页面最多添加 ' + cap + ' 个（有赞同款上限）', 'err');
+              return;
+            }
+            addComponent(it.kind);
+          };
+        } else b.onclick = function () { toast(it.label + '：' + (it.why || it.desc || '暂未接入'), 'err'); };
+        into.appendChild(b);
+      });
+    };
+
+    paint(items, grid);
+
+    /*
+     * 未支持 / 依赖占位：一个横跨整行的折叠头，默认收起。
+     * 展开状态记在 S.libRestOpen 里（切 tab / 重绘后仍保持），展开内容是**同一套分组**，
+     * 所以「对标有赞全量清单」随时可以对账，只是不再占用默认视野。
+     */
+    if (restCount) {
+      var head = el('button', 'lib-rest-head' + (S.libRestOpen ? ' on' : ''));
+      head.innerHTML = '<span>未支持 / 依赖占位</span><i>' + restCount + '</i>' +
+        '<em>' + (S.libRestOpen ? '收起' : '展开') + '</em>';
+      head.title = '这些组件照抄了有赞面板，但真机上还跑不起来（依赖有赞的营销 / 零售 / 知识付费底座）。' +
+        '点开可以看到完整清单与每一项的依赖说明；默认收起是为了让上面那 ' + availCount + ' 个能直接用的组件不被淹没。';
+      head.onclick = function () { S.libRestOpen = !S.libRestOpen; renderLib(); };
+      grid.appendChild(head);
+      if (S.libRestOpen) paint(restNodes, grid);
+    }
   }
 
   /** 点击组件库 → 添加到页面的区块列表末尾 */

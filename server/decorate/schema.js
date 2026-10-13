@@ -566,7 +566,11 @@ const HOME_BLOCK_KINDS = {
       { k: 'avatar', label: '头像', type: 'image', hint: '建议 80×80 像素' },
       { k: 'useShopLogo', label: '使用店铺 logo', type: 'switch', def: true, hint: '开启且未设置头像时，使用店铺头像' },
       { k: 'side', label: '气泡位置', type: 'radiobutton', def: 'left', options: [{ value: 'left', label: '居左' }, { value: 'right', label: '居右' }] },
-      { k: 'resume', label: '播放方式', type: 'radiobutton', def: 'restart', options: [{ value: 'restart', label: '暂停后从头开始' }, { value: 'resume', label: '暂停后从暂停位置开始' }] },
+      /*
+       * 已移除「播放方式（暂停后从头 / 从暂停位置）」：真机与预览都没有消费这个值
+       * （渲染端只输出静态气泡，没有音频播放状态机），留着就是「改了却没生效」。
+       * 若将来要做语音播放，先把状态机写出来再把这个字段加回来。
+       */
       {
         type: 'group', label: '更多设置',
         fields: [{ k: 'pageMargin', label: '页面边距', type: 'slider', min: 0, max: 40, step: 2, unit: 'px', def: 16 }]
@@ -895,7 +899,8 @@ const HOME_BLOCK_KINDS = {
             options: [{ value: 'cover', label: '充满' }, { value: 'contain', label: '完整显示' }]
           },
           { k: 'gapOuter', label: '图文外间距', type: 'slider', min: 0, max: 20, step: 0.5, unit: 'px', def: 6, hint: '有赞原值 6px（= 12rpx）' },
-          { k: 'gapInner', label: '图文内间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 0 },
+          /* 已移除「图文内间距（gapInner）」：渲染端从未读它（外间距走的是 gapOuter），
+             属于「面板能调、真机不动」。有赞面板里有这一项，但我们的复刻**只保留会生效的**。 */
           {
             k: 'radius', label: '图文倒角', type: 'radiobutton', def: 'round',
             options: [{ value: 'round', label: '圆角' }, { value: 'square', label: '直角' }]
@@ -1062,11 +1067,11 @@ const HOME_BLOCK_KINDS = {
       {
         type: 'group', label: '样式设置 · 布局', collapsed: true,
         fields: [
-          {
-            k: 'switchMode', label: '菜单切换效果', type: 'radiobutton', def: 'page',
-            options: [{ value: 'page', label: '分页切换' }, { value: 'slide', label: '滑屏切换' }],
-            hint: '「分页切换」= 点左侧导航直接替换右侧内容；「滑屏切换」= 左右滑动过渡'
-          },
+          /*
+           * 已移除「菜单切换效果（分页 / 滑屏）」：小程序端只实现了分页切换，
+           * 选「滑屏」不会有任何区别 —— 保留就是给运营一个「改了没反应」的开关。
+           * 有赞面板里有这一项，我们只保留真会生效的。
+           */
           { k: 'navWidth', label: '左侧标题宽度', type: 'slider', min: 15, max: 60, step: 1, unit: '%', def: 26, hint: '占组件总宽度的百分比。实测有赞线上为 26%（375 宽下 98px）' },
           { k: 'contentPadX', label: '内容区左右内距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 0 }
         ]

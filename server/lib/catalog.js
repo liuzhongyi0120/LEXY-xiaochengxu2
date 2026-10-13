@@ -43,12 +43,35 @@ function skuStock(sku) {
   return v === undefined ? toInt(sku.stock) : toInt(v);
 }
 
+/**
+ * 划线价必须与「展示价」配对
+ *
+ * 展示价 `price` 取的是**最低** SKU 价；但 `derive()` 历史上把 `originalPrice` 取成
+ * **最高** SKU 的划线价 —— 多规格商品于是出现「¥4499 划掉 ¥5699」，而 ¥5699 属于另一个
+ * 更贵的规格，是**假折扣**（2026-10-13 实测 49 个商品里 4 个多规格商品全中，无一例外）。
+ *
+ * 这里按「提供最低价的那个 SKU」重新配对，读路径统一走它 ——
+ * 存量的旧数据也一并纠正，不需要写数据迁移脚本。
+ */
+function pairOriginal(goods) {
+  const skus = goods.skus || [];
+  if (!skus.length) return toInt(goods.originalPrice) || toInt(goods.price);
+  let idx = 0;
+  for (let i = 1; i < skus.length; i++) {
+    if (toInt(skus[i].price) < toInt(skus[idx].price)) idx = i;
+  }
+  return toInt(skus[idx].originalPrice) || toInt(skus[idx].price);
+}
+
 /** 用实时库存覆盖商品与 SKU 的 stock（读取路径统一调用） */
 function withLiveStock(goods) {
   if (!goods) return goods;
   const skus = (goods.skus || []).map((s) => Object.assign({}, s, { stock: skuStock(s) }));
   const stock = skus.reduce((sum, s) => sum + s.stock, 0);
-  return Object.assign({}, goods, { skus, stock, lowStock: stock <= LOW_STOCK });
+  return Object.assign({}, goods, {
+    skus, stock, lowStock: stock <= LOW_STOCK,
+    originalPrice: pairOriginal(goods)
+  });
 }
 
 /** 把库存写入真源，并同步商品上的展示值
@@ -145,8 +168,13 @@ function resolveSkus(goodsId, skusIn, list) {
       specs: Array.isArray(s.specs) ? s.specs.map((x) => String(x)) : [],
       price,
       originalPrice: toInt(s.originalPrice) || price,
-      stock: toInt(s.stock),
-      image: s.image || ''
+      stock: toInt(s.stock)
+      /*
+       * 2026-10-13 起不再透传 `image`：这个字段**从来没有编辑入口**（后台商品编辑器没有规格图控件），
+       * 小程序端也不读它（规格选择器的缩略图用的是 `goods.cover`，见 components/sku-selector）。
+       * 唯一来源是抓取有赞商品时带进来的历史值 —— 保留只会让存量和新增商品长得不一样。
+       * 若将来要做「规格图」，先把后台控件、真机渲染、预览三处补齐，再把它加回来。
+       */
     };
   });
 }
@@ -329,10 +357,11 @@ function comments(goodsId, page, size) {
 /** 价格与统计字段派生（与 mock/data.js 的口径保持一致） */
 function derive(goods) {
   const prices = (goods.skus || []).map((s) => toInt(s.price));
-  const originals = (goods.skus || []).map((s) => toInt(s.originalPrice) || toInt(s.price));
   goods.price = prices.length ? Math.min.apply(null, prices) : toInt(goods.basePrice);
   goods.priceMax = prices.length ? Math.max.apply(null, prices) : goods.price;
-  goods.originalPrice = originals.length ? Math.max.apply(null, originals) : goods.price;
+  /* 配对规则只此一份（pairOriginal）—— 存进去的值与读出来的值必须同源，
+     否则「保存时是最高价、读出来是最低价 SKU 的原价」，后台对不上账 */
+  goods.originalPrice = pairOriginal(goods);
   goods.basePrice = goods.price;
   goods.stock = (goods.skus || []).reduce((sum, s) => sum + skuStock(s), 0);
   if (!Array.isArray(goods.tags)) goods.tags = [];
@@ -772,6 +801,7 @@ module.exports = {
   bumpSales,
   // —— 后台管理 ——
   withLiveStock,
+  pairOriginal,
   skuStock,
   auditSkuConflicts,
   adminListGoods,
