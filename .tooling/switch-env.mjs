@@ -6,12 +6,15 @@
  *   node .tooling/switch-env.mjs --url=https://mall.lexy.cn/mall-api
  *   node .tooling/switch-env.mjs --url=https://mall.lexy.cn/mall-api --env=server
  *   node .tooling/switch-env.mjs --show          # 只看当前值，不改
+ *   node .tooling/switch-env.mjs --url=https://14.103.50.137/mall-api --allow-ip
+ *                                                # ↑ **只为回滚**：域名链路故障时秒切回联调 IP
+ *                                                #   不加 --allow-ip 时一律拒收 IP（微信不收 IP）
  *
  * 为什么要有脚本，而不是手改一行：
  *   ① 同一个「线上地址」在这个文件里出现**三处**：
  *        第 29 行 `BASE_URL_MAP.server` 的值、
- *        第 7 行注释「连云服务器（腾讯云 CVM 14.103.50.137）」、
- *        第 18 行注释「14.103.50.137 是 IP 不是域名，必然临时关校验」。
+ *        第 7 行注释「连云服务器（当前主机，腾讯云 CVM）」、
+ *        第 18 行注释「当前主机是 IP 不是域名 → 必须临时关校验」。
  *      只要漏一处，后人读注释就会被误导 —— 尤其第 18 行，换域名后它**是错的**
  *      （会让人以为正式版也要关域名校验）。手改必漏，所以交给脚本一次改全。
  *   ② 改完必须能立刻验证「真的生效」：脚本会 require 一次 constants.js 把 ENV / BASE_URL 打出来。
@@ -38,6 +41,9 @@ const arg = (n) => {
 const show = argv.includes('--show');
 const url = arg('url').trim();
 const envName = arg('env').trim() || 'server';
+/* --allow-ip：**只为回滚开的口子**。正常切换一律拒绝 IP（微信不收 IP），
+ * 但域名链路一旦抽风要「秒切回 IP 让业务先活着」，手改一处 + 两处注释很容易漏 → 给个显式开关。 */
+const allowIp = argv.includes('--allow-ip');
 
 function current() {
   const m = require_(FILE);
@@ -60,12 +66,18 @@ if (!/^https:\/\//.test(url)) {
   process.exit(1);
 }
 const host = url.replace(/^https:\/\//, '').split('/')[0];
-if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+const isIpHost = /^\d{1,3}(\.\d{1,3}){3}$/.test(host);
+if (isIpHost && !allowIp) {
   console.error(
     '[x] 这是 IP（' + host + '），微信「服务器域名」不接受 IP —— 换域名再来。\n' +
-    '    真要临时切回 IP 链路，请手改 constants.js（并在知会里写明「仅供开发者工具/体验版联调」）。'
+    '    确需**回滚到联调用的 IP 链路**，加 --allow-ip 显式表明意图：\n' +
+    '      node .tooling/switch-env.mjs --url=https://' + host + '/mall-api --allow-ip'
   );
   process.exit(1);
+}
+if (isIpHost) {
+  console.warn('[!] --allow-ip：正在写 IP 地址。**它只能用于开发者工具 / 体验版联调**，' +
+    '正式版必然请求失败 —— 仅限回滚救急。');
 }
 if (!/\/mall-api$/.test(url)) {
   console.error(
@@ -97,10 +109,12 @@ if (!mapRe.test(out)) {
 }
 out = out.replace(mapRe, `$1${url}$2`);
 
-/* ③ 文件头注释里那句「连云服务器（…）」—— 不改就会误导后人 */
+/* ③ 文件头注释里那句「连云服务器（…）」—— 不改就会误导后人。
+ *    只换**主机名**、保留「，腾讯云 CVM」这个描述 —— 这样 IP ⇄ 域名 来回切是
+ *    **逐字节无损**的（实测第一次写成「整段替换」，把描述吞掉了，「切回来」就与 git 有差异）。 */
 out = out.replace(
   /(^ \* +server —— 连云服务器（)[^）]*(）)/m,
-  `$1${host}$2`
+  `$1${host}，腾讯云 CVM$2`
 );
 
 /* ④ 文件头「联调前置 2)」那段。
@@ -118,9 +132,13 @@ out = out.replace(
   preRe,
   ' *   2) 微信开发者工具 → 详情 → 本地设置 → 勾选\n' +
   ' *      「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」\n' +
-  ' *      （联调期勾上更省事；但**正式版不需要它** —— BASE_URL 主机 ' + host + '\n' +
-  ' *       已在 mp 后台「开发设置 → 服务器域名」配好 request 合法域名，\n' +
-  ' *       模拟器与真机都直连即可，真机也无需开「胶囊 → 开发调试」）\n' +
+  (isIpHost
+    /* IP 档（只可能是 --allow-ip 回滚）：保持原文口径，这样 IP ⇄ 域名 可无损来回切 */
+    ? ' *      （' + host + ' 是 IP 不是域名，未在 mp 后台配置 request 合法域名，必须临时关校验；\n' +
+      ' *       真机上则用「右上角胶囊 → 开发调试 → 打开」绕过）\n'
+    : ' *      （联调期勾上更省事；但**正式版不需要它** —— BASE_URL 主机 ' + host + '\n' +
+      ' *       已在 mp 后台「开发设置 → 服务器域名」配好 request 合法域名，\n' +
+      ' *       模拟器与真机都直连即可，真机也无需开「胶囊 → 开发调试」）\n') +
   ' *\n'   /* ← 保留原文里那行空注释（分隔「联调前置」与下方 ⚠️ 段），别顺手删掉 */
 );
 
