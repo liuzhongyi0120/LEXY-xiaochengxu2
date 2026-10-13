@@ -8,9 +8,12 @@
     3. 图标用 image 而不是 cover-image：底部导航不需要盖在 map / video 之上，
        普通 image 支持网络地址（装修台「本地上传」的素材就是 /uploads 地址）。
     4. 图标染色：内置 PNG 图标的颜色画死在图里，改配色时只换文字颜色是不够的
-       （有赞的内置图标是图标字体、能跟着变色）。`item.styleOff / styleOn` 是
-       utils/navcolor.js 按当前配色算好的内联 style（含 CSS filter，以及
-       「仅选中显示图标」时的 visibility:hidden），这里**原样输出**、不要在 wxml 里拼。
+       （有赞的内置图标是图标字体、能跟着变色）。染色由**服务端做像素级处理**
+       （/navicon/<名>@<色>.png，见 utils/navcolor.js），组件只负责拼地址：
+       `item.srcOff / srcOn` 是两态的最终地址，`item.styleOff` 只含
+       「仅选中显示图标」时的 visibility:hidden —— 这里**原样输出**、不要在 wxml 里拼。
+    5. 图标是**透明背景** PNG：别给 image 或它的容器铺底色（真机会从透明区透出灰块，
+       2026-10-13 踩过 —— 根因是 reset.wxss 里那条裸 image 全局兜底底色，已删）。
 -->
 <view class="tb" style="background: {{background}}; border-top: 1px solid {{borderColor}}">
   <view

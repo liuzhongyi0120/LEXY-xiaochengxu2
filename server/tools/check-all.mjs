@@ -3969,18 +3969,35 @@ assert('15 · 判定函数：服务端异常（HTTP 5xx / code 5000）在任何�
     : `覆盖 ${judgeCases.length} 种组合（含 5000 / 5xx / 期望不符 / 请求未完成）`);
 
 /* ---------------------------------------------------------------------------
- * 21. 汇总口径终值自检（16 节的 stat() 在这里取的就是终值）
+ * 21. 汇总口径终值自检
  *
- * 只做一件事：证明汇总行说的是「全部断言跑完之后」的事实，而不是中途快照。
- *   · 若本节之后才调用的点位被报成「未覆盖」，运维会去补一堆其实已经测过的用例；
- *   · 若本节之后失败的断言不计入总数，自检明明红了却报全绿。
+ * ⚠️ 这里原来是**同义反复**：`stat().failed.length === results.filter(r => !r.passed).length`
+ * —— 两边在同一时刻取值，永远相等，所以它「PASS」却什么也没锁住。实测后果（2026-10-13）：
+ * 把 reset.wxss 的图片底色改坏后，行内确实打印了 ✗，汇总却仍写「失败 0 条」并 exit 0 ——
+ * 因为尾部断言（富文本 / 字体 / 图片底色那一组，4500 行以后）是在喂给汇总的那份
+ * `stat()` 快照（3994 行）**之后**才注册的，快照看不见它们。这就是「验证器自己说谎」。
+ *
+ * 修法两步：① 喂给汇总的 `stat()` 挪到**全部断言注册完之后**（见下面「输出」段）；
+ *           ② 这条断言改成**结构性**检查 —— 直接读本文件源码，要求汇总的
+ *              `const { reg, tested, missing, failed } = stat()` 出现在最后一条
+ *              `assert(` 之后。位置错了就是真错，不会再恒真。
  * ------------------------------------------------------------------------- */
-const finalStat = stat();
-assert('自检汇总口径 = 全部断言的终值（覆盖度与失败数均在最后现算，不漏报本节之后的断言）',
-  finalStat.failed.length === results.filter((r) => !r.passed).length &&
-  finalStat.tested.size === new Set(results.filter((r) => r.method !== '—')
-    .map((r) => `${r.method} ${r.path}`).filter((k) => registeredKeys.has(k))).size,
-  `实测点位 ${finalStat.tested.size}/${finalStat.reg.length} · 失败 ${finalStat.failed.length}/${results.length}`);
+/*
+ * ⚠️ 扫源码前**必须先剥注释** —— 上面这段注释里就逐字写着 `const { reg, tested, missing, failed } = stat()`，
+ * 不剥的话 findIndex 会先命中注释那一行（在最后一条 assert 之前）→ **恒红**。
+ * 剥的时候把注释换成等长空格、**保留换行**，行号才不乱。
+ * （这条自己踩过：第一版没剥注释，改坏业务代码时这条也跟着红了，一看就是假红。）
+ */
+const selfNoC = readFileSync(SELF_FILE, 'utf8')
+  .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+const selfNoCLines = selfNoC.split('\n');
+const lastAssertLine = selfNoCLines.reduce((acc, l, i) => (/^\s*assert\(/.test(l) ? i : acc), -1);
+const statSnapLine = selfNoCLines.findIndex((l) =>
+  /const\s*\{\s*reg\s*,\s*tested\s*,\s*missing\s*,\s*failed\s*\}\s*=\s*stat\(\)/.test(l));
+assert('自检汇总口径 = 全部断言的终值（喂给汇总的 stat() 必须在最后一条 assert 之后取，不许中途快照）',
+  statSnapLine >= 0 && statSnapLine > lastAssertLine,
+  `最后一条 assert 在第 ${lastAssertLine + 1} 行 ｜ 汇总 stat() 在第 ${statSnapLine + 1} 行`
+    + (statSnapLine < 0 ? '（没找到！改过那行的写法？）' : ''));
 
 /* ----------------------------- 输出 ----------------------------- */
 
@@ -3991,7 +4008,10 @@ assert('自检汇总口径 = 全部断言的终值（覆盖度与失败数均在
  * 现在挂上 unhandledRejection / uncaughtException，异常也走同一个 emitReport()。
  */
 function emitReport() {
-  const { reg, tested, missing, failed } = stat();
+  /* ⚠️ 统计**不在这里取** —— 本文件是「边跑边断言」的长流程，下面还会注册几十条断言
+     （富文本 / 字体 / 图片底色…）。在这里取快照 = 那批断言失败也不计入汇总、不影响退出码，
+     行内打印 ✗ 而汇总写「失败 0 条」（2026-10-13 实测踩到）。终值统一在「输出」段现算，
+     并有第 21 节那条结构性断言锁着位置。 */
   // 前置比对（17 节）可能还没跑到，崩溃路径上要能安全取值
   const fe = safe(() => ({ n: fePaths.size, broken: brokenLinks, unused: notUsedByFe }),
     { n: 0, broken: [], unused: [] });
@@ -4536,7 +4556,59 @@ function emitReport() {
     assert('字体：页面字体栈含 Helvetica/Arial 档（对齐有赞 H5，消除桌面预览 4px 假差异）',
       /'Helvetica Neue', Helvetica/.test(rxReset) && /Arial/.test(rxReset),
       `reset.wxss=${/'Helvetica Neue', Helvetica/.test(rxReset)}`);
+
+    /* -------------------------------------------------------------------
+     * 图片兜底底色：真机裸 `image` 铺底色 vs 预览 `img{background:transparent}`
+     *
+     * 2026-10-13 用户报「导航的图标后面是灰色的背景」→ 逐像素量到 5 个图标后面
+     * 各一个 22×22 的 #F2F3F5 方块（(242,243,245) = --color-bg-muted）。
+     * 根因是 reset.wxss 里那条**裸标签选择器** `image { background-color: var(--color-bg-muted) }`
+     * —— 它给全站每个 <image> 都铺了不透明底色，**带透明通道的 PNG**（导航图标 / empty-state
+     * 插图 / 型号图）从透明区把它透出来。不透明照片看不出，所以这条规则长期没被发现。
+     * 而预览侧 runtimeCss 把 img 底色改写成 transparent → 真机与预览不一致，
+     * 「装修台预览好看、开发者工具里全是灰块」，我方的浏览器链路验证永远绿。
+     *
+     * 口径：裸 image 只保留 display:block，不铺底色；兜底底色给确定的实心图盒（容器自己铺，
+     * `.bc-pic.square` 那条断言另在别处）。
+     * ⚠️ 断言前必须剥 CSS 注释 —— 上面 reset.wxss 的新注释里正写着「曾经铺过 background-color」，
+     *    不剥就是**恒红**，而且会带着一句骗人的诊断（本项目踩过这个坑，见 PITFALLS 假红族）。
+     * ------------------------------------------------------------------- */
+    const rxWxss = readFileSync(join(__dirname, '..', 'public', 'shared', 'mp-wxss.js'), 'utf8');
+    const noC = rxReset.replace(/\/\*[\s\S]*?\*\//g, '');
+    const wxssRules = (() => {
+      const out = [];
+      const re = /([^{}]+)\{([^{}]*)\}/g;
+      let m;
+      while ((m = re.exec(noC))) {
+        out.push({ sel: m[1].trim().split('\n').pop().trim(), body: m[2] });
+      }
+      return out;
+    })();
+    const bareImg = wxssRules.filter((r) => r.sel === 'image');
+    const bareImgRule = bareImg.length ? bareImg[bareImg.length - 1].body : '';
+    const pvImgClear = /img\{display:block;background:transparent\}/.test(rxWxss);
+    assert('图片底色：真机裸 image 不铺兜底底色，与预览侧 img{background:transparent} 口径一致',
+      bareImg.length > 0 && !/background/.test(bareImgRule) && pvImgClear,
+      `真机裸 image 规则=${JSON.stringify(bareImgRule.replace(/\s+/g, ' ').trim())} ｜ 预览 runtimeCss 透明=${pvImgClear}`);
+
+    /* 导航图标自己也不许带底色 —— 它是 66×66 的**透明背景** PNG，铺底就重现灰块 */
+    const navCss = readFileSync(join(MP_ROOT, 'custom-tab-bar', 'index.wxss'), 'utf8');
+    const navNoC = navCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const navIconBody = (() => {
+      const m = /\.tb-icon\s*\{([^}]*)\}/.exec(navNoC);
+      return m ? m[1] : '';
+    })();
+    assert('图片底色：底部导航图标不铺底色（内置图标是透明背景 PNG）',
+      navIconBody !== '' && !/background/.test(navIconBody),
+      `.tb-icon{}=${JSON.stringify(navIconBody.replace(/\s+/g, ' ').trim())}`);
   }
+
+  /*
+   * 统计取**终值**：上面最后一条断言已注册完毕，这里才算「跑了多少点位 / 红了几条」。
+   * 挪到前面任意一处都会漏报之后的断言 —— 第 21 节那条结构性断言就是锁这件事的
+   * （2026-10-13：这里原本在函数开头取值，尾部断言失败也报「失败 0 条」+ exit 0）。
+   */
+  const { reg, tested, missing, failed } = stat();
 
   results.forEach((r) => {
     const flag = r.passed ? '✓' : '✗';

@@ -46,6 +46,10 @@
   justify-content: center;
 }
 
+/* 内置图标是**透明背景** PNG（66×66，不透明像素只占 15~19%，其余 alpha=0）——
+   所以这里、以及 .tb-icon-box、.tb-item 都**不许铺任何底色**：真机会从透明区把底色
+   透出来，看起来就是「图标后面一个灰方块」。2026-10-13 就是这么踩的（根因在
+   styles/reset.wxss 的裸 image 全局兜底，已删；自检有两条锁着）。 */
 .tb-icon {
   width: 22px;
   height: 22px;

@@ -31,8 +31,27 @@ scroll-view {
 
 image {
   display: block;
-  /* 图片加载失败时不显示破图图标，由容器底色兜底 */
-  background-color: var(--color-bg-muted, #F2F3F5);
+  /*
+   * ⚠️ 这里**故意不写 background-color** —— 别再把它加回来。
+   *
+   * 曾经是 `background-color: var(--color-bg-muted, #F2F3F5)`，用意是「图片加载失败时
+   * 用底色兜底、不显示破图图标」。但这是**裸标签选择器**，等于给全站每一个 <image>
+   * 都铺了一层不透明的 #F2F3F5：
+   *   · 不透明的照片看不出来（图把它盖住了，所以一直没暴露）
+   *   · **任何带透明通道的 PNG** 都会从透明区透出这块灰底。实测受害：
+   *     底部导航 5 个图标后面各挂一个 22×22 的 #F2F3F5 方块
+   *     （2026-10-13 开发者工具截图逐像素量到，色值 (242,243,245) = 本 token）；
+   *     empty-state 插图、型号图（H5 那份 260×224 PNG 有 92% 像素 alpha=0）同理。
+   *
+   * 口径：兜底底色**只给确定的实心图盒**，由容器自己铺 —— 本项目既有做法，见
+   * pages/index/index.wxss 的 `.bc-pic` 注释（网格图盒不铺色，只给方形小图兜底）。
+   * 已经在铺的地方：`.bc-pic.square` / `.goods-card .cover` / `.cart-item .item-img` /
+   * `.yz-pic` / `.cc-pic` / `.mg-pic` / `.gallery` / `.cell-pic` …
+   *
+   * 另一件必须一起记的事：装修台预览侧（server/public/shared/mp-wxss.js 的 runtimeCss）
+   * 本来就把 img 的底色改写成 `transparent` —— 真机单方面加回来 = 预览与真机不一致，
+   * 「装修台看着干净、开发者工具里全是灰块」。两边保持透明，自检有一条锁着它。
+   */
 }
 
 /* 去掉 button 默认样式，便于自定义 */
