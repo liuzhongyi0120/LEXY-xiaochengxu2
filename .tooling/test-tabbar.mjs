@@ -12,6 +12,8 @@
  *   [6] 共享渲染 pv-tabbar.js 的渲染规则（DOM 桩）：项数 / 选中配色 /
  *       「仅选中显示图标」的占位 / 纯文字模式 / 隐藏 / 转义
  *   [7] 内置导航图标：三处兜底项逐项一致 + 10 张图标文件真的在代码包里
+ *   [8] 导航图标染色（复刻有赞「导航图标色」）：两处算法等价 / 默认态零变化 /
+ *       只染内置图标 / 真机组件两态内联 style / 「仅选中显示图标」的 visibility 占位
  *
  * 为什么要跑真实组件源码：custom-tab-bar 是「每个 tab 页各一份实例」的特殊组件，
  * 它读不到真实自定义属性，只能靠 replica.TABBAR + 内部兜底 —— 这三处兜底值
@@ -37,6 +39,7 @@ const schema = require('../server/decorate/schema');
 const store = require('../server/decorate/store');
 const emit = require('../server/decorate/emit');
 const PvTabbar = require('../server/public/shared/pv-tabbar.js').PvTabbar;
+const NavColor = require('../miniprogram/utils/navcolor.js');
 
 let pass = 0;
 let fail = 0;
@@ -514,6 +517,58 @@ console.log('[7] 内置导航图标：包内文件与三处默认值对得上');
   ok(schema.TABBAR_PRESET_OFF.every((p, i) => p.value === schema.tabbarDefault().items[i].icon) &&
       schema.TABBAR_PRESET_ON.every((p, i) => p.value === schema.tabbarDefault().items[i].activeIcon),
     '快捷按钮的取值就是默认项自身（改默认项时按钮跟着变，不会各写一份后走样）');
+}
+
+/* -------------------- [8] 导航图标染色（有赞「导航图标色」） -------------------- */
+
+console.log('\n[8] 导航图标染色：内置位图跟着配色走（有赞那套是图标字体，我们等效用 CSS filter）');
+{
+  /* 两处实现必须等价（真机 utils/navcolor.js / 预览 pv-tabbar.js 各存一份） */
+  const colors = ['#8A8A8A', '#C8102E', '#000000', '#FFFFFF', '#2B6CB0', '#0F9D58',
+    '#F5A623', '#7B3FE4', '#FF0080', '#334155', '#E11D48', '#9661BC'];
+  const diff = colors.filter((h) => NavColor.tintFilter(h) !== PvTabbar.tintFilter(h));
+  ok(diff.length === 0, '两处染色算法等价（同一批色值 → 逐字符相同的 filter）', diff.join(' '));
+  ok(NavColor.tintFilter('#2B6CB0') === NavColor.tintFilter('#2B6CB0') &&
+    NavColor.tintFilter('#2b6cb0') === NavColor.tintFilter('#2B6CB0'),
+    '求解确定性 + 大小写归一（同一色值必得同一结果，否则预览与真机会漂）');
+
+  /* 默认色 == 源图主色 → 不该产生任何 filter（改造前后像素零变化） */
+  ok(NavColor.iconFilter('/images/tabbar/home.png', schema.TABBAR_DEFAULTS.color) === '' &&
+    NavColor.iconFilter('/images/tabbar/home-active.png', schema.TABBAR_DEFAULTS.selectedColor) === '',
+    '默认配色下不染色（源图主色就是 #8A8A8A / #C8102E，加滤镜只会白增一层误差）',
+    schema.TABBAR_DEFAULTS.color + ' / ' + schema.TABBAR_DEFAULTS.selectedColor);
+
+  /* 自传图 / 素材库图不染 —— 与有赞一致（它只染自己的图标字体） */
+  ok(NavColor.iconFilter('/uploads/202610/a.png', '#2B6CB0') === '' &&
+    NavColor.iconFilter('http://x/uploads/202610/a.png', '#2B6CB0') === '',
+    '自传 / 素材库图标保持原色（彩图被整体染色只会更糟，有赞也不染自传图）');
+
+  /* 真机组件：改配色后 readConfig 必须把两态的内联 style 一起算好 */
+  const tinted = loadComponent({
+    TABBAR: {
+      color: '#2B6CB0', selectedColor: '#0F9D58', background: '#FFFFFF',
+      borderColor: '#EEEEEE', iconMode: 'active', items: schema.TABBAR_DEFAULT_ITEMS
+    }
+  }).def.data;
+  const it0 = (tinted.items || [])[0] || {};
+  ok((it0.styleOff || '').indexOf('visibility:hidden;') === 0 &&
+    (it0.styleOff || '').indexOf('filter:' + NavColor.tintFilter('#2B6CB0')) > 0,
+    '「仅选中显示图标」时未选中态 = visibility 占位 + 未选中色染色（顺序不能反）',
+    it0.styleOff);
+  ok(it0.styleOn === 'filter:' + NavColor.tintFilter('#0F9D58') + ';',
+    '选中态用选中色染色（两态各按自己的色，不能共用一条）', it0.styleOn);
+
+  /* 默认态：组件产出的两个 style 都必须是空的（喂一份没有 TABBAR 的替身，才会走兜底） */
+  const plain = loadComponent({ CUSTOM_PAGES: {} }).def.data;
+  ok((plain.items || []).every((i) => i.styleOff === '' && i.styleOn === ''),
+    '默认配色下组件不产出任何内联 style（改造前后真机像素零变化）',
+    (plain.items || []).map((i) => i.styleOff || '(空)').slice(0, 2).join(' | '));
+
+  /* wxml 只原样输出算好的 style，不在模板里拼字符串：
+     模板里拼一个三元 + 字符串，漏个分号就会让后面的 visibility 失效（文字会跳） */
+  const wxml = readFileSync(join(MP, 'custom-tab-bar', 'index.wxml'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  ok(/selected === index \? item\.styleOn : item\.styleOff/.test(wxml),
+    '真机 wxml 原样输出 item.styleOn / styleOff（不在模板里拼 filter 与分号）');
 }
 
 console.log('');

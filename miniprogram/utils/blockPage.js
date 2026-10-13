@@ -212,6 +212,24 @@ const blockPageBehavior = {
     wx.navigateTo({ url: GOODS_DETAIL + '?id=' + id, fail: () => wx.showToast({ title: '商品详情页开发中', icon: 'none' }) });
   },
 
+  /* ------------------------- 选项卡分类（对标有赞三方扩展「选项卡Z4」） ------------------------- */
+
+  /**
+   * 点顶部选项卡，切换下方图文内容。
+   *
+   * 只改本页 data（activeTab），**不动装修数据** —— 与「品牌分类」的 activeBrand 同口径：
+   * 打开时停在哪个页签属于浏览态，不该被发布出去。
+   * 目标下标与当前一致时直接 return，避免无意义的 setData（列表很长，setData 会白重渲一次）。
+   */
+  onTabCateTap(e) {
+    const ds = e.currentTarget.dataset || {};
+    if (ds.blk === undefined || ds.ti === undefined) return;
+    const i = Number(ds.ti);
+    if (isNaN(i)) return;
+    if (Number(this.data['blocks[' + ds.blk + '].activeTab']) === i) return;
+    this.setData({ ['blocks[' + ds.blk + '].activeTab']: i });
+  },
+
   /* ------------------------- 品牌分类（对标有赞「品牌分类E」） ------------------------- */
 
   /**

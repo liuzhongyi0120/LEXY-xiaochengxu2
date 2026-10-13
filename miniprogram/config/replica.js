@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 12:26:12（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 17:30:20（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1829,42 +1829,42 @@ const CUSTOM_PAGES = {
           {
             image: "/uploads/202610/20261012-kpg1zg.jpg",
             title: "关于莱克",
-            link: ""
+            link: "/pages/custom/index?key=p295"
           },
           {
             image: "/uploads/202610/20261012-da1l78.jpg",
             title: "新闻大事",
-            link: ""
+            link: "/pages/custom/index?key=p296"
           },
           {
             image: "/uploads/202610/20261012-x5pfpd.jpg",
             title: "创业故事",
-            link: ""
+            link: "/pages/custom/index?key=p297"
           },
           {
             image: "/uploads/202610/20261012-99qkmi.jpg",
             title: "我们品牌",
-            link: ""
+            link: "/pages/custom/index?key=p298"
           },
           {
             image: "/uploads/202610/20261012-nukv7o.jpg",
             title: "用户分享",
-            link: ""
+            link: "/pages/custom/index?key=p299"
           },
           {
             image: "/uploads/202610/20261012-48a4dw.jpg",
             title: "业务模式",
-            link: ""
+            link: "/pages/custom/index?key=p300"
           },
           {
             image: "/uploads/202610/20261012-5cweoj.jpg",
             title: "售后服务",
-            link: ""
+            link: "/pages/custom/index?key=p301"
           },
           {
             image: "/uploads/202610/20261012-1li7p4.jpg",
             title: "加入我们",
-            link: ""
+            link: "/pages/custom/index?key=p302"
           }
         ],
         cardStyle: "white",
@@ -1888,6 +1888,1444 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "了解莱克 · 栏目入口",
+      bg: "#F7F8FA"
+    }
+  },
+  p295: {
+    name: "关于莱克",
+    blocks: [
+      {
+        id: "lnytk1d",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtytk1e",
+        type: "rich_text",
+        html: "<p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><strong><span style=\"font-size:24px;\">&nbsp; 关于莱克<br></span></strong></p><p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp;&nbsp; 了解莱克认识莱克<br></span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnytk1f",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnytk1g",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tcytk1h",
+        type: "tab_cate",
+        layout: "1",
+        tabs: [
+          {
+            name: "集团介绍",
+            items: [
+              {
+                image: "/uploads/202610/20261012-5foqqv.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "CEO介绍",
+            items: [
+              {
+                image: "/uploads/202610/20261012-9xf1dq.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "发展历程",
+            items: [
+              {
+                image: "/uploads/202610/20261012-3ak3e5.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "莱克荣誉",
+            items: [
+              {
+                image: "/uploads/202610/20261012-ruxlqg.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "品牌故事",
+            items: [
+              {
+                image: "/uploads/202610/20261012-nejdus.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 6,
+        paddingX: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        cardStyle: "shadow",
+        cardBg: "#FFFFFF",
+        radius: "square",
+        halfRound: true,
+        imgRatio: "auto",
+        showTitle: false,
+        titleLines: "2",
+        titleSize: 14,
+        titleGapY: 12,
+        titleGapX: 9,
+        titleBold: "bold",
+        titleAlign: "left",
+        tabFontSize: 15,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "关于莱克 · 莱克资讯栏目",
+      bg: "#F7F8FA"
+    }
+  },
+  p296: {
+    name: "新闻大事",
+    blocks: [
+      {
+        id: "ln2hg1i",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rt2hg1j",
+        type: "rich_text",
+        html: "<p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><strong><span style=\"font-size:24px;\">&nbsp;新闻大事</span></strong></p><p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp; 实时把握莱克动态</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "ln2hg1k",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "ln2hg1l",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tc2hg1m",
+        type: "tab_cate",
+        layout: "2",
+        tabs: [
+          {
+            name: "新闻资讯",
+            items: [
+              {
+                image: "/uploads/202610/20261012-p6a88s.jpg",
+                video: "",
+                title: "绿色赋能 实力出圈｜莱克电气成功发行江苏省首单上市民企绿色超短期融资券",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-9bwde3.jpg",
+                video: "",
+                title: "莱克电气“四高十法”质量数字化赋能实践入选工信部典型案例",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-86g5a2.jpg",
+                video: "",
+                title: "2026“新三件·新品质”AWE发布会精彩回顾",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-dqfdxs.jpg",
+                video: "",
+                title: "莱克电气旗下三大品牌产品荣膺AWE2026艾普兰创新奖",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-yf92l4.jpg",
+                video: "",
+                title: "权威认证加冕！莱克电气荣获“三合一洗地吸尘器开创者”认证，新品类定义清洁新标准",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-7cyqfk.jpg",
+                video: "",
+                title: "莱克、碧云泉荣获2025中国家电行业\"好产品\"大奖",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-0o9v8h.jpg",
+                video: "",
+                title: "苏宁易购深入莱克电气技术探讨共启11-1月战略攻势合作新篇章",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-p6a88s.jpg",
+                video: "",
+                title: "莱克天狼星S10 Pro、碧云泉小积木G5领跑IFA家电创新赛道",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-lh2cuk.jpg",
+                video: "",
+                title: "书香沁润职场，文化赋能未来“莱克新教育书房“正式授牌",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-0zsu5z.jpg",
+                video: "",
+                title: "2025 莱克 | 碧云泉 | 咖博士新品体验发布会现场回顾",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-68l2pi.jpg",
+                video: "",
+                title: "莱克电气AWE2025大放异彩，多项大奖彰显创新实力",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-68l2pi.jpg",
+                video: "",
+                title: "喜讯 | 莱克入选首批中国消费名品，荣获“时代优品”认证",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-aik88m.jpg",
+                video: "",
+                title: "喜讯 | 莱克荣获两项2024年中国家电行业年度“好产品”奖项",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-rawzvv.jpg",
+                video: "",
+                title: "喜讯 | 莱克电气再获殊荣，荣登2024年度绿色制造名单",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-ylcgut.jpg",
+                video: "",
+                title: "回望2024 见证非凡之旅",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "社会责任",
+            items: [
+              {
+                image: "/uploads/202610/20261012-pf7vpc.jpg",
+                video: "",
+                title: "莱克集团:以公益心筑教育梦，携千年府学共赴未来",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-pqt0qb.jpg",
+                video: "",
+                title: "行直道正，谊在千秋 | 莱克集团向苏州中学捐赠2000万",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-47k5k9.jpg",
+                video: "",
+                title: "莱克电气助力上海疫情防控，捐赠410万元健康家电驰援上海方舱",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "财务报告",
+            items: [
+              {
+                image: "/uploads/202610/20261012-90fkoo.jpg",
+                video: "",
+                title: "一图读懂莱克电气2025年半年报",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-w3xww5.jpg",
+                video: "",
+                title: "一图读懂莱克电气2024年年报",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-90fkoo.jpg",
+                video: "",
+                title: "一图读懂莱克电气2024年半年报",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-mpdhzf.jpg",
+                video: "",
+                title: "一图读懂莱克电气2023年年报和2024年一季报",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-y3jac7.jpg",
+                video: "",
+                title: "一图读懂莱克电气2023半年报",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-k603zo.jpg",
+                video: "",
+                title: "一图读懂莱克电气2022年年报和2023年一季报",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 6,
+        paddingX: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        cardStyle: "shadow",
+        cardBg: "#FFFFFF",
+        radius: "round",
+        halfRound: false,
+        imgRatio: "auto",
+        showTitle: true,
+        titleLines: "2",
+        titleSize: 14,
+        titleGapY: 12,
+        titleGapX: 9,
+        titleBold: "bold",
+        titleAlign: "left",
+        tabFontSize: 15,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "新闻大事 · 莱克资讯栏目",
+      bg: "#F7F8FA"
+    }
+  },
+  p297: {
+    name: "创业故事",
+    blocks: [
+      {
+        id: "vd6ir1n",
+        type: "video",
+        src: "/uploads/202610/20261012-n65axg.mp4",
+        poster: "/uploads/202610/20261012-f46knx.jpg",
+        height: 420,
+        pageMargin: 0,
+        radius: "square",
+        autoplay: false,
+        muted: true,
+        controls: true,
+        loop: false
+      },
+      {
+        id: "cc6ir1o",
+        type: "content_card",
+        title: "",
+        cols: "1",
+        ratio: "0.75",
+        imgHeight: 147,
+        items: [
+          {
+            image: "/uploads/202610/20261012-rmi5x5.jpg",
+            title: "创业语录-辞职下海（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-fiu3f1.jpg",
+            title: "创业语录-龙头老大（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-p5w46r.jpg",
+            title: "创业语录-目标愿景（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-q318hq.jpg",
+            title: "创业语录-立身之本（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-97frov.jpg",
+            title: "创业语录-创造价值（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-g1dn6z.jpg",
+            title: "创业语录-产品至上（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-zftwh9.jpg",
+            title: "创业语录-生意理念（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-a7iod8.jpg",
+            title: "创业语录-与众不同（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-ixvtkg.jpg",
+            title: "创业语录-经营管理（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-qbolqw.jpg",
+            title: "创业语录-终身学习（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-abufl4.jpg",
+            title: "创业语录-因时而变（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-a44624.jpg",
+            title: "创业语录-辩证思维（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-ixjrqv.jpg",
+            title: "创业语录-居安思危（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-ecn4pz.jpg",
+            title: "创业语录-与时俱进（点击查看视频）",
+            desc: "",
+            link: ""
+          },
+          {
+            image: "/uploads/202610/20261012-opmkgd.jpg",
+            title: "创业语录-莱克使命（点击查看视频）",
+            desc: "",
+            link: ""
+          }
+        ],
+        style: "shadow",
+        radius: "round",
+        showTag: false,
+        showRead: false,
+        showLike: false,
+        more: false,
+        moreText: "查看更多",
+        link: "",
+        pageMargin: 15,
+        padY: 18,
+        gapX: 0,
+        gapY: 5,
+        titleSize: 16,
+        titleWeight: "bold",
+        titleLineHeight: 22,
+        titleAlign: "left",
+        titleColor: "#323233",
+        titlePadX: 10,
+        titlePadY: 10
+      },
+      {
+        id: "im6ir1p",
+        type: "image",
+        src: "/uploads/202610/20261012-wys5is.jpg",
+        height: 210,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      }
+    ],
+    meta: {
+      desc: "创业故事 · 莱克资讯栏目",
+      bg: "#FFFFFF"
+    }
+  },
+  p298: {
+    name: "我们品牌",
+    blocks: [
+      {
+        id: "lnav81q",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtav81r",
+        type: "rich_text",
+        html: "<p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><strong><span style=\"font-size:24px;\">&nbsp; 我们品牌</span></strong></p><p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp;&nbsp; 了解莱克四大品牌</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnav81s",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnav81t",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tcav81u",
+        type: "tab_cate",
+        layout: "1",
+        tabs: [
+          {
+            name: "莱克",
+            items: [
+              {
+                image: "/uploads/202610/20261012-elgfpt.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-xuqpd7.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "碧云泉",
+            items: [
+              {
+                image: "/uploads/202610/20261012-byp8px.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-66b92k.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "咖博士",
+            items: [
+              {
+                image: "/uploads/202610/20261012-g5ctzt.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-dgo59f.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "吉米",
+            items: [
+              {
+                image: "/uploads/202610/20261012-1rim2k.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-26bocz.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 0,
+        paddingX: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        cardStyle: "shadow",
+        cardBg: "#FFFFFF",
+        radius: "square",
+        halfRound: true,
+        imgRatio: "auto",
+        showTitle: false,
+        titleLines: "2",
+        titleSize: 14,
+        titleGapY: 12,
+        titleGapX: 9,
+        titleBold: "bold",
+        titleAlign: "left",
+        tabFontSize: 17,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "我们品牌 · 莱克资讯栏目",
+      bg: "#F7F8FA"
+    }
+  },
+  p299: {
+    name: "用户分享",
+    blocks: [
+      {
+        id: "lnfhc1v",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtfhc1w",
+        type: "rich_text",
+        html: "<p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><strong><span style=\"font-size:24px;\">&nbsp; 用户分享</span></strong></p><p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp;&nbsp; 莱克产品使用体验</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnfhc1x",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnfhc1y",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tcfhc1z",
+        type: "tab_cate",
+        layout: "2",
+        tabs: [
+          {
+            name: "城市探店",
+            items: [
+              {
+                image: "/uploads/202610/20261012-908jee.jpg",
+                video: "",
+                title: "冲京东Mall挖到莱克 ，吸尘洗地除螨一步到位",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-rgu5bk.jpg",
+                video: "",
+                title: "上海 AWE 焦点！莱克天狼星，一站式解决家务",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-l7d0n6.jpg",
+                video: "",
+                title: "从清洁黑科技到生活美学，这里藏着多少惊喜？",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-4a2820.jpg",
+                video: "",
+                title: "莱克品质生活，邂逅山城魅力！",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-3jb1eg.jpg",
+                video: "",
+                title: "主持人刘帅亲探潍坊三联家电！沉浸式体验莱克天狼星~",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-q9tcvg.jpg",
+                video: "",
+                title: "逛利群家里不白来！青岛人专属莱克天狼星实测",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-xrfspg.jpg",
+                video: "",
+                title: "天狼星550W大吸力 “卷” 进济宁九龙家电",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-dybs3k.jpg",
+                video: "",
+                title: "跟着主持人张杰逛北国电器：石家庄的隐藏福利",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-kz253h.jpg",
+                video: "",
+                title: "探同利家电天狼星：包头 “包” 藏清洁礼",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "精选内容",
+            items: [
+              {
+                image: "/uploads/202610/20261012-f0emne.jpg",
+                video: "",
+                title: "演员费启鸣晒新家，好夏日配好水",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-7sttg9.jpg",
+                video: "",
+                title: "杨子姗亲测！模块随心搭解锁冰饮自由",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-f9lu0i.jpg",
+                video: "",
+                title: "李思思的24小时喝水养生秘诀",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-coga7l.jpg",
+                video: "",
+                title: "跟着“顿顿”一起解锁夏日饮水黑科技",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-p0yr2l.jpg",
+                video: "",
+                title: "带三个娃还能精致生活？全靠这台天狼星「一键善后」",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-jd47o7.jpg",
+                video: "",
+                title: "科技让爱更纯净，让生活更轻松",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-eimeem.jpg",
+                video: "",
+                title: "于AWE人潮中，邂逅“智能”惊喜",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-pq7e4o.jpg",
+                video: "",
+                title: "莱克30周年！感受来自苏州的洁净吧！",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-du8bf2.jpg",
+                video: "",
+                title: "回归生活本真秩序，找寻「净」的新境界",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-yz9q58.jpg",
+                video: "",
+                title: "在百年故居花园体验“江南之净 ”的一天",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "用户故事",
+            items: [
+              {
+                image: "/uploads/202610/20261012-lr2m1f.jpg",
+                video: "",
+                title: "净家致心安",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-omoq97.jpg",
+                video: "",
+                title: "梦想居所，莱克天王星U7成就洁净之美",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-0txyt1.jpg",
+                video: "",
+                title: "向不凡而生的家",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-hn6etr.jpg",
+                video: "",
+                title: "情绪流动收容所",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-lxddto.jpg",
+                video: "",
+                title: "本真归真 洁来洁往",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-fstns7.jpg",
+                video: "",
+                title: "挖掘记忆深处的故事",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-2pqaul.jpg",
+                video: "",
+                title: "“绅士”养成计划",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "品牌挚友",
+            items: [
+              {
+                image: "/uploads/202610/20261012-yzdqe8.jpg",
+                video: "",
+                title: "智净未来，健康生活",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-yieb2k.jpg",
+                video: "",
+                title: "器之净美 归于心安",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-liqf60.jpg",
+                video: "",
+                title: "生活有净气 灵魂有香气",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-zkwsgg.jpg",
+                video: "",
+                title: "诗意之宅 造景入室",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-rr1w2i.jpg",
+                video: "",
+                title: "寻得隐秘“天堂” 享足自然之乐",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "品牌期刊",
+            items: [
+              {
+                image: "/uploads/202610/20261012-fbdpu2.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-rhi52h.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-n3nxod.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-eitl82.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-lgznz2.jpg",
+                video: "",
+                title: "",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-hwco61.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 5,
+        paddingX: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        cardStyle: "white",
+        cardBg: "#FFFFFF",
+        radius: "round",
+        halfRound: false,
+        imgRatio: "auto",
+        showTitle: true,
+        titleLines: "2",
+        titleSize: 11,
+        titleGapY: 12,
+        titleGapX: 10,
+        titleBold: "bold",
+        titleAlign: "center",
+        tabFontSize: 15,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "用户分享 · 莱克资讯栏目",
+      bg: "#F7F8FA"
+    }
+  },
+  p300: {
+    name: "业务模式",
+    blocks: [
+      {
+        id: "lnkhi20",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtkhi21",
+        type: "rich_text",
+        html: "<p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><strong><span style=\"font-size:24px;\">&nbsp; 业务模式<br></span></strong></p><p style=\"line-height:normal;margin-top:5px;margin-bottom:5px;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp;&nbsp; 持之以恒精益求精</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnkhi22",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnkhi23",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tckhi24",
+        type: "tab_cate",
+        layout: "1",
+        tabs: [
+          {
+            name: "国内自主品牌",
+            items: [
+              {
+                image: "/uploads/202610/20261012-crbmr4.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "国外OEM/ODM",
+            items: [
+              {
+                image: "/uploads/202610/20261012-q3zbio.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "核心零部件",
+            items: [
+              {
+                image: "/uploads/202610/20261012-blb54q.jpg",
+                video: "",
+                title: "",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 6,
+        paddingX: 11,
+        paddingTop: 5,
+        paddingBottom: 11,
+        cardStyle: "shadow",
+        cardBg: "#FFFFFF",
+        radius: "round",
+        halfRound: true,
+        imgRatio: "auto",
+        showTitle: false,
+        titleLines: "2",
+        titleSize: 14,
+        titleGapY: 12,
+        titleGapX: 9,
+        titleBold: "bold",
+        titleAlign: "left",
+        tabFontSize: 14,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "业务模式 · 莱克资讯栏目",
+      bg: "#F7F8FA"
+    }
+  },
+  p301: {
+    name: "售后服务",
+    blocks: [
+      {
+        id: "lnpxw25",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtpxw26",
+        type: "rich_text",
+        html: "<p>&nbsp;&nbsp; <strong><span style=\"font-size:24px;\">售后服务<br></span></strong><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp;&nbsp; 产品售后与使用指南</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnpxw27",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnpxw28",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "elpxw2k",
+        type: "elevator",
+        mode: "scroll",
+        styleType: "theme",
+        tagStyle: "bg",
+        items: [
+          {
+            text: "小莱到家",
+            target: 6
+          },
+          {
+            text: "操作指南",
+            target: 8
+          },
+          {
+            text: "售后政策",
+            target: 14
+          }
+        ],
+        color: "#969799",
+        activeColor: "#000000",
+        bg: "#FFFFFF",
+        pageMargin: 8
+      },
+      {
+        id: "ttpxw29",
+        type: "title",
+        text: "小莱到家",
+        sub: "",
+        size: "md",
+        align: "center",
+        bold: true,
+        color: "#323233",
+        bg: "#FFFFFF",
+        link: "",
+        pageMargin: 16,
+        paddingY: 16
+      },
+      {
+        id: "impxw2a",
+        type: "image",
+        src: "/uploads/202610/20261012-5ukejk.jpg",
+        height: 353,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "ttpxw2b",
+        type: "title",
+        text: "操作指南",
+        sub: "",
+        size: "md",
+        align: "center",
+        bold: true,
+        color: "#323233",
+        bg: "#FFFFFF",
+        link: "",
+        pageMargin: 16,
+        paddingY: 16
+      },
+      {
+        id: "impxw2c",
+        type: "image",
+        src: "/uploads/202610/20261012-07801w.jpg",
+        height: 176,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "impxw2d",
+        type: "image",
+        src: "/uploads/202610/20261012-ow4yfh.jpg",
+        height: 176,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "impxw2e",
+        type: "image",
+        src: "/uploads/202610/20261012-um665o.jpg",
+        height: 176,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "impxw2f",
+        type: "image",
+        src: "/uploads/202610/20261012-9ysr3o.jpg",
+        height: 176,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "lnpxw2g",
+        type: "line",
+        style: "blank",
+        height: 60,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "ttpxw2h",
+        type: "title",
+        text: "售后政策",
+        sub: "",
+        size: "md",
+        align: "center",
+        bold: true,
+        color: "#323233",
+        bg: "#FFFFFF",
+        link: "",
+        pageMargin: 16,
+        paddingY: 16
+      },
+      {
+        id: "impxw2i",
+        type: "image",
+        src: "/uploads/202610/20261012-0f1tx8.jpg",
+        height: 562,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      },
+      {
+        id: "impxw2j",
+        type: "image",
+        src: "/uploads/202610/20261012-x6t10h.jpg",
+        height: 562,
+        pageMargin: 0,
+        radius: "square",
+        link: ""
+      }
+    ],
+    meta: {
+      desc: "售后服务 · 莱克资讯栏目",
+      bg: "#F9F9F9"
+    }
+  },
+  p302: {
+    name: "加入我们",
+    blocks: [
+      {
+        id: "lnvon2l",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "rtvon2m",
+        type: "rich_text",
+        html: "<p style=\"margin-bottom:5px;text-wrap:wrap;line-height:normal;\"><strong><span style=\"font-size:24px;\">&nbsp; 加入我们</span></strong></p><p style=\"margin-bottom:5px;text-wrap:wrap;line-height:normal;\"><span style=\"color:rgb(165 , 165 , 165);font-size:14px;\">&nbsp; &nbsp;价值理念与人才需求</span></p>",
+        bg: "#F9F9F9",
+        full: "0",
+        pageMargin: 10
+      },
+      {
+        id: "lnvon2n",
+        type: "line",
+        style: "blank",
+        height: 16,
+        pageMargin: 0,
+        color: "#EEEEEE",
+        bg: ""
+      },
+      {
+        id: "lnvon2o",
+        type: "line",
+        style: "solid",
+        height: 2,
+        gapY: 10,
+        color: "#E5E5E5",
+        pageMargin: 15,
+        bg: ""
+      },
+      {
+        id: "tcvon2p",
+        type: "tab_cate",
+        layout: "1",
+        tabs: [
+          {
+            name: "人才理念",
+            items: [
+              {
+                image: "/uploads/202610/20261012-95w8ye.jpg",
+                video: "",
+                title: "四星计划",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-j955te.jpg",
+                video: "",
+                title: "阳光计划",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "价值主张",
+            items: [
+              {
+                image: "/uploads/202610/20261012-0fbfi2.jpg",
+                video: "",
+                title: "员工六大行为准则",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-3r39z4.jpg",
+                video: "",
+                title: "核心价值观、使命与愿景",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "人才需求",
+            items: [
+              {
+                image: "/uploads/202610/20261012-p40g5k.jpg",
+                video: "",
+                title: "宣讲现场",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-dv6f0r.jpg",
+                video: "",
+                title: "岗位需求",
+                link: ""
+              }
+            ]
+          },
+          {
+            name: "员工风采",
+            items: [
+              {
+                image: "/uploads/202610/20261012-4lkkt4.jpg",
+                video: "",
+                title: "元宵节活动",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-atph9a.jpg",
+                video: "",
+                title: "妇女节活动",
+                link: ""
+              },
+              {
+                image: "/uploads/202610/20261012-xyv67y.jpg",
+                video: "",
+                title: "趣味运动会",
+                link: ""
+              }
+            ]
+          }
+        ],
+        gapInner: 0,
+        bgImage: "",
+        titleColor: "#444444",
+        tabColor: "#444444",
+        tabActiveColor: "#444444",
+        tabBg: "",
+        bg: "",
+        innerBg: "",
+        gapOuter: 0,
+        paddingX: 10,
+        paddingTop: 10,
+        paddingBottom: 10,
+        cardStyle: "white",
+        cardBg: "#FFFFFF",
+        radius: "round",
+        halfRound: false,
+        imgRatio: "auto",
+        showTitle: true,
+        titleLines: "2",
+        titleSize: 14,
+        titleGapY: 12,
+        titleGapX: 10,
+        titleBold: "bold",
+        titleAlign: "left",
+        tabFontSize: 15,
+        fit: "cover"
+      }
+    ],
+    meta: {
+      desc: "加入我们 · 莱克资讯栏目",
       bg: "#F7F8FA"
     }
   }
@@ -1929,6 +3367,38 @@ const PAGE_META = {
   },
   p288: {
     desc: "了解莱克 · 栏目入口",
+    bg: "#F7F8FA"
+  },
+  p295: {
+    desc: "关于莱克 · 莱克资讯栏目",
+    bg: "#F7F8FA"
+  },
+  p296: {
+    desc: "新闻大事 · 莱克资讯栏目",
+    bg: "#F7F8FA"
+  },
+  p297: {
+    desc: "创业故事 · 莱克资讯栏目",
+    bg: "#FFFFFF"
+  },
+  p298: {
+    desc: "我们品牌 · 莱克资讯栏目",
+    bg: "#F7F8FA"
+  },
+  p299: {
+    desc: "用户分享 · 莱克资讯栏目",
+    bg: "#F7F8FA"
+  },
+  p300: {
+    desc: "业务模式 · 莱克资讯栏目",
+    bg: "#F7F8FA"
+  },
+  p301: {
+    desc: "售后服务 · 莱克资讯栏目",
+    bg: "#F9F9F9"
+  },
+  p302: {
+    desc: "加入我们 · 莱克资讯栏目",
     bg: "#F7F8FA"
   }
 };

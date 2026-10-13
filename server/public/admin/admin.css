@@ -917,7 +917,11 @@ a.pname { text-decoration: none; }
 .pv-goods .empty { padding: 20px 0; text-align: center; color: #b8bec8; font-size: 11px; }
 
 /* ---------- 新增 8 种区块的预览样式（富文本 / 搜索 / 电梯 / 按钮 / 语音 / 卡片 / 吸底） ---------- */
-.pv-rich { font-size: 13px; line-height: 1.7; color: #333; word-break: break-word; }
+/* 字号 16px、行高**比率** 1.5 与真机 .c-rich、有赞 .cap-richtext 同口径 —— 装修台预览可以画得简化，
+   但「同一个富文本在装修台与真机上不一样高」是不可接受的，运营会照着错的那份调。
+   行高必须是比率：混排 24px / 14px 两种字号时，比率会各自重算（36px / 21px），
+   写成 24px 固定值则两行都按 24px 排，整块偏矮。 */
+.pv-rich { font-size: 16px; line-height: 1.5; color: #333; word-break: break-word; }
 .pv-rich p { margin: 6px 0; }
 .pv-rich img { max-width: 100%; display: block; }
 
@@ -938,6 +942,15 @@ a.pname { text-decoration: none; }
 .pv-mgcard.shadow { box-shadow: 0 2px 8px rgba(0, 0, 0, .08); }
 .pv-mgcard.outline { border: 1px solid #e5e6eb; }
 .pv-mgcard img { display: block; }
+
+/* 选项卡分类（对标有赞三方扩展「选项卡Z4」）：卡片只有图 + 标题，
+   底色 / 圆角 / 间距 / 字号 全是可配字段，走内联 style；
+   这里只放「与取值无关的骨架」，口径与真机 index.wxss 的 .tc-card 一致
+   （shadow 的 4rpx/8rpx 在预览里就是 2px/4px）。 */
+.pv-tccard { position: relative; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; }
+.pv-tccard.shadow { box-shadow: 0 2px 4px rgba(0, 0, 0, .06); }
+.pv-tccard.outline { border: 1px solid rgba(50, 50, 51, .1); }
+.pv-tccard img { display: block; }
 
 /* ---------- 右：属性面板 ---------- */
 .col-inspector { flex: 0 0 var(--yz-w-insp); width: var(--yz-w-insp); border-left: 1px solid var(--yz-divider); }

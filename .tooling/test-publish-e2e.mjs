@@ -27,6 +27,12 @@ async function api(path, body) {
     method: 'POST', headers, body: JSON.stringify(body)
   });
   const j = await r.json();
+  /* 业务失败时**把整个信封交出去**，不要只取 `data`：
+     服务端的失败响应是 `{code, msg, data: null}`，只取 data 会拿到 `null`，
+     调用方再写 `x.published` 就以 `TypeError: Cannot read properties of null` 的形式炸掉 ——
+     真正的原因（比如「缺少版本号 versionId」）反而被吞掉，
+     顺便还会让「还原测试数据」这步**半途中断**（2026-10-12 踩过，见第 [8] 步注释）。 */
+  if (j && j.code !== 0) return j;
   return j.data !== undefined ? j.data : j;
 }
 
@@ -115,13 +121,45 @@ console.log('[7] 草稿应已清空');
 const pageAfter = await api('/api/decorate/page?key=home');
 ok(pageAfter.hasDraft === false, '发布后草稿已清空');
 
-console.log('[8] 回滚到 ' + beforeVersion + ' 并发布，还原测试数据');
-const rb = await api('/api/decorate/rollback', { key: 'home', versionId: beforeVersion, mode: 'publish' });
-ok(rb.published && rb.published.ok, '回滚并发布成功 → ' + (rb.published && rb.published.versionId), JSON.stringify(rb.published));
+console.log('[8] 还原测试数据（**不依赖版本回滚**）');
+/*
+ * ⚠️ 还原绝对不能挂在「回滚到某个历史版本」上。
+ *   版本的保留窗口只有最近 20 条（store.js 的 trimVersions），装修台里**任何一次别页发布**
+ *   都会占位 —— 首页一旦不在窗口内，`page.versions` 就是空数组、`beforeVersion` 为 undefined，
+ *   回滚请求必然失败，于是「测试色」就**留在了 replica.js 里被当成线上内容**。
+ *
+ *   2026-10-12 真的发生过：复刻「资讯栏目 8 页」时连续发布了 p295 / p297 / p301，
+ *   把 home 挤出窗口；本测试崩在第 [8] 步，`PAGE_META.home.bg` 停在了测试色 #FFEEDD，
+ *   而且因为崩在还原步骤之前，「失败」看起来像是回滚接口坏了，很容易被当成环境抖动。
+ *
+ *   所以还原走「把第 [1] 步读到的**原始 data 原样写回草稿 → 再发布**」：
+ *   与版本历史无关、永远可执行，失败会明确报在两条断言上。
+ */
+const rbDraft = await api('/api/decorate/draft', { key: 'home', data: page.data });
+ok(!!(rbDraft && rbDraft.at), '原始数据已回写为草稿', rbDraft && (rbDraft.atText || rbDraft.msg));
+const rbPub = await api('/api/decorate/publish', { key: 'home', note: 'e2e 还原' });
+ok(!!(rbPub && rbPub.ok), '已重新发布还原（版本 ' + (rbPub && rbPub.versionId) + '）',
+  rbPub && (rbPub.msg || rbPub.versionId));
+
+/* 版本回滚**本身**也要测，但它会改状态，所以：
+   ① 只在首页确实有历史条目时验（没有就**明说跳过**，不让它悄悄变成永不执行的断言）；
+   ② 用 mode:'draft'（只动草稿、不碰 replica.js）；
+   ③ 验完立刻 discard 收尾，保证第 [9] 步的「草稿区为空」仍成立。 */
+if (beforeVersion) {
+  const rb = await api('/api/decorate/rollback', { key: 'home', versionId: beforeVersion, mode: 'draft' });
+  ok(!!(rb && rb.mode === 'draft' && rb.pageKey === 'home'),
+    '版本回滚可执行（回滚到 ' + beforeVersion + '，mode=draft 不动线上）', JSON.stringify(rb));
+  const dis = await api('/api/decorate/discard', { key: 'home' });
+  ok(!!(dis && dis.discarded === true), '回滚产生的草稿可被 discard 丢弃（不留残渣）', JSON.stringify(dis));
+} else {
+  console.log('    · 跳过「版本回滚」子项：首页不在最近 ' + (page.versions || []).length +
+    ' 条版本窗口内，回滚无从取值。该子项**不再承担还原职责**，跳过是安全的。');
+}
 
 console.log('[9] 核对已还原');
 R = readReplica();
 ok(R.PAGE_META.home.bg === ORIG, 'PAGE_META.home.bg 已还原为 ' + ORIG, R.PAGE_META.home.bg);
+ok(R.PAGE_META.home.bg !== TEST, '测试色 ' + TEST + ' 未残留在线上文件里', R.PAGE_META.home.bg);
 ok(metaKeys(R) === wantMetaKeys(R), 'PAGE_META 键集仍为「内置 5 页 + 自定义页」（回滚不丢键）', Object.keys(R.PAGE_META).join(','));
 ok(R.HOME_BLOCKS.length === beforeBlocks, 'HOME_BLOCKS 区块数回滚后仍一致（' + beforeBlocks + '）', String(R.HOME_BLOCKS.length));
 

@@ -22,6 +22,7 @@
 
 const replica = require('../config/replica');
 const { resolveAssets } = require('../utils/asset');
+const { iconFilter } = require('../utils/navcolor');
 
 /**
  * 兜底配置：replica 里还没有 TABBAR（装修台没发布过导航）时使用，
@@ -116,6 +117,11 @@ function readConfig() {
   const src = (replica.TABBAR && typeof replica.TABBAR === 'object') ? replica.TABBAR : FALLBACK;
   const raw = (Array.isArray(src.items) && src.items.length) ? src.items : FALLBACK.items;
 
+  /* 配色先定下来：图标染色要用它（见下） */
+  const color = src.color || FALLBACK.color;
+  const selectedColor = src.selectedColor || FALLBACK.selectedColor;
+  const iconMode = ICON_MODES.indexOf(src.iconMode) >= 0 ? src.iconMode : FALLBACK.iconMode;
+
   const items = [];
   const seen = {};
   for (let i = 0; i < raw.length && items.length < MAX_ITEMS; i++) {
@@ -128,21 +134,40 @@ function readConfig() {
        activeIcon 空则沿用未选中图标 —— 运营只传了一张图时，两态用同一张。 */
     const icon = resolveAssets(it.icon || '');
     const activeIcon = resolveAssets(it.activeIcon || it.icon || '');
+
+    /*
+     * 图标染色（对齐有赞「导航图标色」）：内置 PNG 图标颜色是画死在图里的，
+     * 只改 `color` 的话文字会变、图标不变。这里按当前配色算出 CSS filter，
+     * 由 wxml 挂到 <image> 上 —— 详见 utils/navcolor.js。
+     *
+     * 两态各自预生成**完整的内联 style 字符串**再交给 wxml 用，而不是在 wxml 里拼：
+     *   ① wxml 的三元 + 字符串拼接很容易把 `;` 漏掉，一个分号就能让后面的
+     *      `visibility:hidden` 失效（「仅选中显示图标」时文字就跳了）；
+     *   ② 染色是 `false` 色值判断，写在 JS 里能顺手单测。
+     * 「仅选中显示图标」的未选中态要**隐藏图标但保留占位**（visibility 而非
+     * display:none），所以这条只落在未选中态的 style 上。
+     */
+    const filterOff = iconFilter(icon, color);
+    const filterOn = iconFilter(activeIcon, selectedColor);
+    const hideOff = iconMode === 'active' ? 'visibility:hidden;' : '';
+
     items.push({
       path: it.path,
       text: cutText(it.text) || pageName(it.path),
       icon: icon,
       activeIcon: activeIcon,
-      hasIcon: !!(icon || activeIcon)
+      hasIcon: !!(icon || activeIcon),
+      styleOff: hideOff + (filterOff ? 'filter:' + filterOff + ';' : ''),
+      styleOn: filterOn ? 'filter:' + filterOn + ';' : ''
     });
   }
 
   return {
-    color: src.color || FALLBACK.color,
-    selectedColor: src.selectedColor || FALLBACK.selectedColor,
+    color: color,
+    selectedColor: selectedColor,
     background: src.background || FALLBACK.background,
     borderColor: src.borderColor || FALLBACK.borderColor,
-    iconMode: ICON_MODES.indexOf(src.iconMode) >= 0 ? src.iconMode : FALLBACK.iconMode,
+    iconMode: iconMode,
     items: items
   };
 }

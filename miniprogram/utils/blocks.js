@@ -102,15 +102,46 @@ const UC_KIND_LIST = ['uc_navbar', 'uc_profile', 'uc_stats', 'uc_order', 'uc_too
 const BRAND = '#C8102E';
 
 /**
+ * 富文本块级标签的**上下外边距重置**。
+ *
+ * 为什么必须做：有赞的富文本容器带一层 `p { margin: 0 }` 重置，
+ * 而编辑器导出的 HTML 往往**只写 margin-bottom**（如 `<p style="margin-bottom:5px">`）。
+ * 于是同一个 HTML：有赞那边 p 的 margin-top 是 0，我们这边是浏览器默认的 `1em = 16px`
+ * ——「加入我们」页整块因此高了 27px，页签条、标题、卡片全部跟着下移。
+ *
+ * 为什么只能在 HTML 上做、不能用 wxss 兜：小程序的 `<rich-text>` **不接受外部样式选择器**
+ * （wxss 里的 `.c-rich p { margin: 0 }` 打不进 nodes 内部），
+ * 所以这条重置必须写进 nodes 自己的 style 里。
+ * ⚠️ 三处口径必须一致：这里 / 装修台的 pvRich / 预览链路的 richSafe。
+ *    节点自己写了 margin 的一律不动（inline 优先，与有赞同一语义）。
+ */
+function richResetMarginTop(html) {
+  return String(html || '').replace(
+    /<(p|div|h[1-6]|ul|ol|li|blockquote|figure|pre|table)\b([^>]*)>/gi,
+    function (whole, tag, rest) {
+      if (/\bmargin(-top)?\s*:/i.test(rest)) return whole;   // 自己写了 margin：尊重它
+      var m = /style\s*=\s*("([^"]*)"|'([^']*)')/i.exec(rest);
+      if (m) {
+        var val = m[2] !== undefined ? m[2] : m[3];
+        return whole.replace(m[0], 'style="margin-top:0;' + val + '"');
+      }
+      return '<' + tag + rest + ' style="margin-top:0">';
+    }
+  );
+}
+
+/**
  * 富文本净化：小程序 rich-text 本身不执行脚本，但历史脏数据里可能带 <script>/on* 属性，
  * 这里统一剥掉，避免「编辑器里粘了网页源码」把脏东西带上线。
  */
 function sanitizeRich(html) {
-  return String(html || '')
-    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
-    .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
-    .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-    .replace(/javascript:/gi, '');
+  return richResetMarginTop(
+    String(html || '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/javascript:/gi, '')
+  );
 }
 
 
@@ -171,6 +202,13 @@ function normalizeBlock(b, index) {
     o.marginRpx = px2rpx(o.pageMargin);
     o.hRpx = heightRpx(o.height, 20);
     o.style = o.style || 'blank';
+    /*
+     * 上下留白：线 / 空白块**自身以外**的垂直间距（375 基准 px）。
+     * 有赞的实线模式渲染的是 `hr { margin: 10px 0 }`（线本身 1px），「高度」字段在那条链路上
+     * 不决定占位 —— 2026-10-12 复刻 6 个资讯页实测：整块占位 = 10 + 1 + 10 = 21px。
+     * 默认 0 = 补字段之前的行为，老数据渲染结果不变。
+     */
+    o.gapYRpx = px2rpx(o.gapY);
   } else if (kind === 'notice') {
     o.marginRpx = px2rpx(o.pageMargin);
   } else if (kind === 'nav') {
@@ -258,6 +296,17 @@ function normalizeBlock(b, index) {
     o.marginRpx = px2rpx(o.pageMargin);
     o.dropdown = o.mode === 'dropdown';
     o.tagStyle = o.tagStyle || 'bg';
+    /*
+     * 「全店风格」= 纯文字均分的页签条（**有赞默认形态**），不是四选一的那种标签块。
+     * 2026-10-12 在「售后服务」页实测：44px 白底条、每项 flex:1 均分（3 项 = 119.67px）、
+     * 文字 14px、选中加粗并换成选中色、下方一条 40×3 的指示线（选中色 = 白 → 视觉上不可见）。
+     * 只有「自定义」才走 tagStyle 的四选一（背景 / 圆框 / 方框 / 下划线）。
+     * ⚠️ 老数据（styleType 缺省 = theme）此前渲染的是四选一里的「背景模式」，
+     *    与有赞不符；本项目入库数据里从未用过 elevator（replica.js 无该类型），故这次直接纠正。
+     */
+    o.plain = o.styleType !== 'custom';
+    o.plainHRpx = px2rpx(44);          // 有赞固定 44px，面板无高度项
+    o.plainFsRpx = px2rpx(14);         // 有赞实测 14px
     o.activeIndex = o.activeIndex || 0;
     o.items = (o.items || [])
       .map((x) => ({ text: (x && x.text) || '', target: Number((x && x.target) || 0) || 0 }))
@@ -279,15 +328,38 @@ function normalizeBlock(b, index) {
     o.round = o.radius !== 'square';
     o.text = o.text || '在线咨询';
   } else if (kind === 'content_card') {
+    /*
+     * 内容卡片（对标有赞「内容卡片」= note_card）。
+     * 2026-10-12 复刻「创业故事」页时按真机实测补了一批细粒度字段 ——
+     * 它们的**默认值等于补字段之前写死在 index.wxss 里的那套值**，所以老数据渲染结果不变。
+     */
+    const ccNum = (v, d) => { const n = Number(v); return (v === '' || v === null || v === undefined || isNaN(n)) ? d : n; };
     o.marginRpx = px2rpx(o.pageMargin);
     const ccols = Number(o.cols) || 2;
     o.cellW = Math.floor(100 / ccols * 100) / 100;
     o.cardClass = o.style === 'white' ? 'white' : (o.style === 'plain' ? 'plain' : 'shadow');
     o.round = o.radius !== 'square';
-    // 图片容器用 padding-top 撑出固定比例：padding-top 的百分比按「宽度」算，
-    // 所以 4:3 要写 133.33%（= 100 ÷ 0.75），不是 1.33%。保留两位小数。
-    const ratio = Number(o.ratio) || 0.75;
-    o.padTopPct = Math.round(10000 / ratio) / 100;
+    o.padYRpx = px2rpx(ccNum(o.padY, 6));
+    o.gapXRpx = px2rpx(ccNum(o.gapX, 4));
+    o.gapYRpx = px2rpx(ccNum(o.gapY, 4));
+    o.imgHRpx = px2rpx(ccNum(o.imgHeight, 0));
+    o.fixedImgH = o.imgHRpx > 0;
+    o.titleSizeRpx = px2rpx(ccNum(o.titleSize, 14));
+    o.titleWeightCss = o.titleWeight === 'bold' ? '700' : '400';
+    o.titleLhRpx = px2rpx(ccNum(o.titleLineHeight, 21));
+    o.titleAlignCss = o.titleAlign === 'center' ? 'center' : 'left';
+    o.titleColorCss = o.titleColor || '#323233';
+    o.titlePadXRpx = px2rpx(ccNum(o.titlePadX, 8));
+    o.titlePadYRpx = px2rpx(ccNum(o.titlePadY, 8));
+    /*
+     * 图片高度三种口径：
+     *   - 「图片固定高度」> 0：写死高度 + aspectFill 裁切（有赞 shopnote 大图模式就是这一种）；
+     *   - 「图片比例 · 自适应」：不撑比例盒，模板走 mode="widthFix" 按原图比例铺满整宽；
+     *   - 指定比例：padding-top 撑高（百分比按宽度算），4:3 → 133.33%。
+     */
+    const cRatio = String(o.ratio == null ? '0.75' : o.ratio).trim();
+    o.imgAuto = cRatio === 'auto';
+    o.padTopPct = (o.fixedImgH || o.imgAuto) ? 0 : (Math.round(10000 / (Number(cRatio) || 0.75)) / 100);
     o.items = (o.items || []).filter((x) => x && (x.image || x.title));
   } else if (kind === 'mixed_grid') {
     /*
@@ -353,6 +425,117 @@ function normalizeBlock(b, index) {
     o.itemTitleAlignCss = o.itemTitleAlign === 'left' ? 'left' : 'center';
     o.clampTwo = mgNum(o.itemTitleLines, 1) === 2;
     o.animOn = o.anim !== false;
+  } else if (kind === 'tab_cate') {
+    /*
+     * 选项卡分类（对标有赞店铺侧三方扩展「选项卡Z4」extension-massdesign-tabcatez4）。
+     *
+     * 单位：与有赞面板同口径 —— 尺寸字段都是 375 基准 px，统一 ×2 转 rpx；颜色 / 比例原样用。
+     *
+     * 布局沿用有赞的「负外边距」写法（**不要改成卡片只留内边距**）：
+     *   内容区左右内缩 = 模块左右边距；卡片行左右各 -图文外间距；每张卡片再各 +图文外间距。
+     *   → 卡片左右内缩 = 模块左右边距（负外边距正好抵消），相邻卡片间距 = **2 ×** 图文外间距。
+     *   实测有赞 375 宽（01 页）：模块左右 10 + 外间距 6 → 卡片左边缘 10.1、卡宽 355；
+     *   双列（02 页）：内容区 355、卡片行 367、单卡 = 367÷2 − 12 = 171.5 —— 与实测逐像素一致。
+     *
+     * 选项卡条：整条高 76rpx（= 有赞 38px），每项 flex:1 均分（5 项 → 75px，8 项 → 93.75px，
+     *   与实测一致）；文字块高 68rpx、行高 68rpx、下留 8rpx（= 有赞 .nav_text 的
+     *   height/line-height 34px + margin-bottom 4px）；选中项加粗（有赞 .nav_text.curent 的
+     *   font-weight:bold），并在**文字正下方**压一条 40×2 的短横线 —— 实测那条线宽固定 40px、
+     *   水平居中于文字、贴选项卡条底边（所以这里用「绝对定位 + left:50% + 负一半宽度」还原）。
+     *   注意：有赞另一条 `.van-tabs__line`（通用下划线）在这个扩展里被 `display:none` 关掉了，
+     *   实线是每项自带的 `text_line` —— 别把两条搞混。
+     *
+     * 卡片图片两种模式：
+     *   - 图片比例「自适应」：按原图比例铺满整宽（有赞 `.item_img_wrap img { width:100%; height:auto }`）
+     *     → 模板走 mode="widthFix"，**不撑比例盒**；
+     *   - 指定比例：用 padding-top 撑出固定高度（百分比按宽度算），图片绝对定位铺满，
+     *     objectFit 由「图片模式」决定（有赞 `.aspect-fit` = contain / `.aspect-fill` = cover）。
+     *
+     * 条目 / 选项卡归一化：既无图无视频又无标题的条目、以及既无名又无内容的选项卡直接丢掉 ——
+     * 否则顶部会多出一个点不动的空白页签、或留下一片空白。
+     */
+    const tcNum = (v, d) => { const n = Number(v); return (v === '' || v === null || v === undefined || isNaN(n)) ? d : n; };
+    const tcStr = (v, d) => (v === null || v === undefined || String(v).trim() === '' ? d : String(v).trim());
+
+    const tcLayout = ['1', '2', '3'].indexOf(String(o.layout)) >= 0 ? String(o.layout) : '1';
+    o.cellW = Math.floor(100 / Number(tcLayout) * 100) / 100;
+
+    const tcTabs = [];
+    (Array.isArray(o.tabs) ? o.tabs : []).slice(0, 10).forEach((t) => {
+      if (!t || typeof t !== 'object') return;
+      const name = String(t.name == null ? '' : t.name).trim();
+      const items = (Array.isArray(t.items) ? t.items : [])
+        .filter((x) => x && typeof x === 'object' && (x.image || x.video || String(x.title || '').trim()))
+        .slice(0, 60)
+        .map((x) => ({
+          image: x.image || '',
+          video: x.video || '',
+          title: String(x.title || '').trim(),
+          link: x.link || ''
+        }));
+      if (!name && !items.length) return;
+      tcTabs.push({ name, items });
+    });
+    o.tabs = tcTabs;
+    o.hasTabs = tcTabs.length > 0;
+    o.tabCount = tcTabs.length;
+
+    // 模块外壳
+    o.padTopRpx = px2rpx(tcNum(o.paddingTop, 5));
+    o.padBottomRpx = px2rpx(tcNum(o.paddingBottom, 11));
+    o.padXRpx = px2rpx(tcNum(o.paddingX, 11));
+    o.padInnerRpx = px2rpx(tcNum(o.paddingInner, 0));
+    /*
+     * 页签条与首行卡片之间的固定间距 = 10px（有赞 `.van-tab__pane-wrapper` 内部那一层
+     * 写死的 padding-top，与「模块内边距」「图文内间距」都无关）—— 6 个页面实测全是 10，
+     * 所以不做成字段，直接写死。少了它每页整体会往上偏 10px。
+     */
+    o.paneTopRpx = px2rpx(10);
+    o.bgCss = tcStr(o.bg, 'transparent');
+    o.innerBgCss = tcStr(o.innerBg, 'transparent');
+    o.bgImgStyle = o.bgImage
+      ? ('background-image: url(' + o.bgImage + '); background-size: cover; background-position: top center; background-repeat: no-repeat;')
+      : '';
+
+    // 选项卡条
+    o.tabHRpx = 76;                                   // 有赞固定 38px，面板无高度项
+    o.tabFsRpx = px2rpx(tcNum(o.tabFontSize, 15));
+    o.tabBgCss = tcStr(o.tabBg, 'transparent');
+    o.tabFg = tcStr(o.tabColor, '#444444');
+    o.tabFgOn = tcStr(o.tabActiveColor, '#444444');
+
+    // 卡片
+    o.gapRpx = px2rpx(tcNum(o.gapOuter, 6));
+    o.gapNegRpx = -o.gapRpx;
+    o.cardClass = ['white', 'shadow', 'outline', 'plain'].indexOf(o.cardStyle) >= 0 ? o.cardStyle : 'shadow';
+    o.cardBgCss = o.cardClass === 'plain' ? 'transparent' : tcStr(o.cardBg, '#FFFFFF');
+    o.cardRadiusRpx = o.radius === 'square' ? 0 : 16;   // 有赞 .circle → 固定 8px（面板无圆角数值项）
+    o.imgRadiusCss = o.cardRadiusRpx === 0
+      ? '0'
+      : (o.halfRound === false
+        ? (o.cardRadiusRpx + 'rpx ' + o.cardRadiusRpx + 'rpx 0 0')
+        : (o.cardRadiusRpx + 'rpx'));
+    o.imgFit = o.fit === 'cover' ? 'aspectFill' : 'aspectFit';
+    const tcRatio = String(o.imgRatio == null ? 'auto' : o.imgRatio).trim();
+    o.imgAuto = tcRatio === '' || tcRatio === 'auto';
+    o.padTopPct = o.imgAuto ? 0 : (Math.round(10000 / tcNum(tcRatio, 1)) / 100);
+
+    // 标题
+    o.showTitle = o.showTitle !== false;
+    o.titleClamp = tcNum(o.titleLines, 2) === 2 ? 2 : 1;
+    o.titleFsRpx = px2rpx(tcNum(o.titleSize, 14));
+    o.titleGapYRpx = px2rpx(tcNum(o.titleGapY, 12));
+    o.titleGapXRpx = px2rpx(tcNum(o.titleGapX, 9));
+    o.titleWeightCss = o.titleBold === 'normal' ? '400' : '700';
+    o.titleAlignCss = o.titleAlign === 'center' ? 'center' : 'left';
+    o.titleColorCss = tcStr(o.titleColor, '#444444');
+
+    /*
+     * 浏览态字段：选中的是第几个选项卡。
+     * 只改本页 data（onTabCateTap），**不动装修数据** —— 与「品牌分类」的 activeBrand 同口径：
+     * 打开时停在哪个页签属于浏览态，不该被发布出去。
+     */
+    o.activeTab = 0;
   } else if (kind === 'buy_bar') {
     o.padXRpx = px2rpx(o.padX);
     o.padBRpx = px2rpx(o.padB);

@@ -174,7 +174,7 @@
   </view>
 
   <!-- ============ 辅助分割 ============ -->
-  <view wx:elif="{{block.type === 'line'}}" style="padding: 0 {{block.marginRpx}}rpx; background: {{block.bg || 'transparent'}};">
+  <view wx:elif="{{block.type === 'line'}}" style="margin: {{block.gapYRpx}}rpx 0; padding: 0 {{block.marginRpx}}rpx; background: {{block.bg || 'transparent'}};">
     <view wx:if="{{block.style === 'blank'}}" style="height: {{block.hRpx}}rpx;"></view>
     <view wx:else class="ln {{block.style}}" style="border-top-width: {{block.hRpx}}rpx; border-color: {{block.color}};"></view>
   </view>
@@ -308,10 +308,12 @@
   </view>
 
   <!-- ============ 富文本 ============ -->
+  <!-- 上内边距 10px / 下 0 —— 有赞 .cap-richtext 的实测值。
+       缺了上内边距，首个 <p> 的 margin-top 会折叠穿透本容器，整块占位少 10px（见 index.wxss 的 .c-rich 注释）。 -->
   <view
     wx:elif="{{block.type === 'rich_text'}}"
     class="c-rich"
-    style="padding: 0 {{block.marginRpx}}rpx; background: {{block.bg || 'transparent'}};"
+    style="padding: 20rpx {{block.marginRpx}}rpx 0; background: {{block.bg || 'transparent'}};"
   >
     <rich-text class="cr-body" nodes="{{block.nodes}}"></rich-text>
   </view>
@@ -335,7 +337,23 @@
 
   <!-- ============ 电梯导航 ============ -->
   <view wx:elif="{{block.type === 'elevator'}}" class="c-elev" style="background: {{block.bg}}; padding: 0 {{block.marginRpx}}rpx;">
-    <scroll-view wx:if="{{!block.dropdown}}" class="ce-scroll" scroll-x enable-flex>
+    <!-- 「全店风格」= 纯文字均分的页签条（有赞默认形态：44px、14px 文字、选中加粗换色） -->
+    <view wx:if="{{block.plain && !block.dropdown}}" class="ce-plain" style="height: {{block.plainHRpx}}rpx;">
+      <view
+        wx:for="{{block.items}}"
+        wx:key="index"
+        wx:for-item="it"
+        wx:for-index="ei"
+        class="ce-plainitem"
+        style="font-size: {{block.plainFsRpx}}rpx; color: {{block.activeIndex === ei ? block.activeColor : block.color}}; font-weight: {{block.activeIndex === ei ? '500' : '400'}};"
+        data-blk="{{index}}"
+        data-i="{{ei}}"
+        data-target="{{it.target}}"
+        bindtap="onElevatorTap"
+      >{{it.text}}</view>
+    </view>
+    <!-- 「自定义」= 四选一标签（背景 / 圆框 / 方框 / 下划线），可横向滚动 -->
+    <scroll-view wx:elif="{{!block.dropdown}}" class="ce-scroll" scroll-x enable-flex>
       <view
         wx:for="{{block.items}}"
         wx:key="index"
@@ -399,7 +417,7 @@
   </view>
 
   <!-- ============ 内容卡片 ============ -->
-  <view wx:elif="{{block.type === 'content_card'}}" class="c-ccard" style="padding: 12rpx {{block.marginRpx}}rpx;">
+  <view wx:elif="{{block.type === 'content_card'}}" class="c-ccard" style="padding: {{block.padYRpx}}rpx {{block.marginRpx}}rpx;">
     <view wx:if="{{block.title}}" class="cc-title">{{block.title}}</view>
     <view class="cc-grid">
       <view
@@ -408,18 +426,34 @@
         wx:for-item="it"
         wx:for-index="ci"
         class="cc-cell"
-        style="width: {{block.cellW}}%;"
+        style="width: {{block.cellW}}%; padding: {{block.gapYRpx}}rpx {{block.gapXRpx}}rpx;"
         data-link="{{it.link}}"
         bindtap="onTapBlock"
         hover-class="{{it.link ? 'hover-lite' : 'none'}}"
         hover-stay-time="80"
       >
         <view class="cc-card {{block.cardClass}} {{block.round ? 'round' : ''}}">
-          <view class="cc-pic" style="padding-top: {{block.padTopPct}}%;">
+          <image
+            wx:if="{{block.imgAuto && it.image}}"
+            class="cc-img-auto"
+            src="{{it.image}}"
+            mode="widthFix"
+            data-index="{{index}}"
+            binderror="onImgError"
+          />
+          <view
+            wx:else
+            class="cc-pic"
+            style="padding-top: {{block.padTopPct}}%;{{block.fixedImgH ? ' height: ' + block.imgHRpx + 'rpx;' : ''}}"
+          >
             <image class="cc-img" src="{{it.image}}" mode="aspectFill" data-index="{{index}}" binderror="onImgError" />
           </view>
-          <view class="cc-body">
-            <view wx:if="{{it.title}}" class="cc-t">{{it.title}}</view>
+          <view class="cc-body" style="padding: {{block.titlePadYRpx}}rpx {{block.titlePadXRpx}}rpx;">
+            <view
+              wx:if="{{it.title}}"
+              class="cc-t"
+              style="font-size: {{block.titleSizeRpx}}rpx; font-weight: {{block.titleWeightCss}}; line-height: {{block.titleLhRpx}}rpx; text-align: {{block.titleAlignCss}}; color: {{block.titleColorCss}};"
+            >{{it.title}}</view>
             <view wx:if="{{it.desc}}" class="cc-d">{{it.desc}}</view>
             <view wx:if="{{block.showTag || block.showRead || block.showLike}}" class="cc-meta">
               <text wx:if="{{block.showTag}}" class="cc-tag">笔记</text>
@@ -498,6 +532,106 @@
           </view>
         </view>
       </view>
+    </view>
+  </view>
+
+  <!-- ============ 选项卡分类（对标有赞三方扩展「选项卡Z4」 extension-massdesign-tabcatez4） ============
+       结构 = 选项卡条（每项均分、选中项加粗 + 文字正下方一条 40×2 短横线）+ 当前选项卡的图文卡片。
+       卡片行的「负外边距」写法见 utils/blocks.js 的同名分支：
+       卡片左右内缩 = 模块左右边距（负外边距抵消掉），相邻卡片间距 = 2 × 图文外间距 ——
+       **不要**改成「卡片只留内边距」，那样列间距会变成 1 倍而不是 2 倍。
+       只渲染**当前**选项卡的内容：有赞那边未激活的 tabpanel 也在 DOM 里并排铺开
+       （Vant 的实现方式），但对用户没有区别，全渲染反而让首屏多背几十张图。
+       外层用 <block wx:for> 而不是在同一个元素上同时写 wx:for + wx:if ——
+       两者同写时谁先求值在 WXML 里没有明确保证，分开写才不会「按错误的顺序过滤」。 -->
+  <view
+    wx:elif="{{block.type === 'tab_cate'}}"
+    class="c-tc"
+    style="background: {{block.bgCss}}; padding: {{block.padTopRpx}}rpx 0 {{block.padBottomRpx}}rpx; {{block.bgImgStyle}}"
+  >
+    <view class="tc-tabs" style="height: {{block.tabHRpx}}rpx; background: {{block.tabBgCss}};">
+      <view
+        wx:for="{{block.tabs}}"
+        wx:key="index"
+        wx:for-item="tb"
+        wx:for-index="ti"
+        class="tc-tab"
+        data-blk="{{index}}"
+        data-ti="{{ti}}"
+        bindtap="onTabCateTap"
+      >
+        <view
+          class="tc-tab-txt"
+          style="font-size: {{block.tabFsRpx}}rpx; color: {{ti === block.activeTab ? block.tabFgOn : block.tabFg}}; font-weight: {{ti === block.activeTab ? '700' : '400'}};"
+        >{{tb.name}}</view>
+        <view
+          wx:if="{{ti === block.activeTab}}"
+          class="tc-tab-line"
+          style="background: {{block.tabFgOn}};"
+        ></view>
+      </view>
+    </view>
+
+    <view class="tc-body" style="background: {{block.innerBgCss}}; padding-top: {{block.paneTopRpx}}rpx;">
+      <view wx:if="{{!block.hasTabs}}" class="tc-empty">（未添加选项卡）</view>
+      <block wx:for="{{block.tabs}}" wx:key="index" wx:for-item="tb" wx:for-index="ti">
+        <view
+          wx:if="{{ti === block.activeTab}}"
+          class="tc-grid"
+          style="margin: 0 {{block.padXRpx}}rpx; padding: {{block.padInnerRpx}}rpx;"
+        >
+          <view wx:if="{{!tb.items.length}}" class="tc-empty">（本选项卡还没有内容）</view>
+          <view class="tc-row" style="margin: 0 {{block.gapNegRpx}}rpx;">
+            <view
+              wx:for="{{tb.items}}"
+              wx:key="index"
+              wx:for-item="it"
+              class="tc-out"
+              style="width: {{block.cellW}}%;"
+            >
+              <view
+                class="tc-card {{block.cardClass}}"
+                style="margin: {{block.gapRpx}}rpx; background: {{block.cardBgCss}}; border-radius: {{block.cardRadiusRpx}}rpx;"
+                data-link="{{it.link}}"
+                bindtap="onTapBlock"
+                hover-class="{{it.link ? 'hover-lite' : 'none'}}"
+                hover-stay-time="80"
+              >
+                <!-- 视频条目：图片自动当封面（有赞「添加视频」同口径） -->
+                <view wx:if="{{it.video}}" class="tc-vpic">
+                  <video class="tc-video" src="{{it.video}}" poster="{{it.image}}" object-fit="contain" show-center-play-btn="{{true}}" />
+                </view>
+                <!-- 图片比例「自适应」：按原图比例铺满整宽（有赞 width:100%; height:auto） -->
+                <image
+                  wx:elif="{{block.imgAuto && it.image}}"
+                  class="tc-img-auto"
+                  src="{{it.image}}"
+                  mode="widthFix"
+                  style="border-radius: {{block.imgRadiusCss}};"
+                  data-index="{{index}}"
+                  binderror="onImgError"
+                />
+                <!-- 指定比例：用 padding-top 撑出固定高度（百分比按宽度算），图片绝对定位铺满 -->
+                <view wx:elif="{{it.image}}" class="tc-pic" style="padding-top: {{block.padTopPct}}%; border-radius: {{block.imgRadiusCss}};">
+                  <image
+                    class="tc-img"
+                    src="{{it.image}}"
+                    mode="{{block.imgFit}}"
+                    data-index="{{index}}"
+                    binderror="onImgError"
+                  />
+                </view>
+                <!-- 标题：图文名称 / 标题行数 / 字号 / 加粗 / 对齐 / 上下左右间距 全部走内联 -->
+                <view
+                  wx:if="{{block.showTitle && it.title}}"
+                  class="tc-title {{block.titleClamp === 2 ? 'two' : 'one'}}"
+                  style="color: {{block.titleColorCss}}; font-size: {{block.titleFsRpx}}rpx; font-weight: {{block.titleWeightCss}}; text-align: {{block.titleAlignCss}}; margin: {{block.titleGapYRpx}}rpx {{block.titleGapXRpx}}rpx;"
+                >{{it.title}}</view>
+              </view>
+            </view>
+          </view>
+        </view>
+      </block>
     </view>
   </view>
 

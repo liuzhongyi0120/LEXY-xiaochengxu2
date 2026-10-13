@@ -72,11 +72,34 @@
    * 小程序端用的是同一份规则（那边过滤后交给 rich-text，本身不执行脚本）。
    */
   function pvRich(html) {
-    return String(html || '')
+    return pvRichMarginTop(String(html || '')
       .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
       .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
       .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/javascript:/gi, '');
+      .replace(/javascript:/gi, ''));
+  }
+
+  /**
+   * 富文本块级标签的 margin-top 重置 —— 与小程序端 `utils/blocks.js` 的 richResetMarginTop、
+   * 预览链路的 `mp-wxml.js` 的 richSafe **同一套规则，三处必须一致**。
+   *
+   * 有赞的富文本容器带 `p{margin:0}`；编辑器导出的 HTML 又常常只写 margin-bottom，
+   * 于是「只写了一半」的 `p` 在我们这边会吃到浏览器默认的 `1em` 上边距（16px 字号下正好 16px），
+   * 「加入我们」页整块因此高了 27px。这条重置补的就是这一半。
+   */
+  function pvRichMarginTop(html) {
+    return String(html || '').replace(
+      /<(p|div|h[1-6]|ul|ol|li|blockquote|figure|pre|table)\b([^>]*)>/gi,
+      function (whole, tag, rest) {
+        if (/\bmargin(-top)?\s*:/i.test(rest)) return whole;
+        var m = /style\s*=\s*("([^"]*)"|'([^']*)')/i.exec(rest);
+        if (m) {
+          var val = m[2] !== undefined ? m[2] : m[3];
+          return whole.replace(m[0], 'style="margin-top:0;' + val + '"');
+        }
+        return '<' + tag + rest + ' style="margin-top:0">';
+      }
+    );
   }
 
   /** 把存下来的跳转路径翻译成人看得懂的名字（装修台属性面板与预览角标共用） */
@@ -141,6 +164,8 @@
     buy_bar: '购买按钮', brand_category: '品牌分类',
     // 2026-10-12：有赞店铺侧三方扩展「混合排列A」（extension-masswx-hpitemsa）
     mixed_grid: '混合排列',
+    // 2026-10-12：有赞店铺侧三方扩展「选项卡Z4」（extension-massdesign-tabcatez4）
+    tab_cate: '选项卡分类',
     // 2026-10-10：有赞基础/高级组件余下 37 项
     custom_module: '自定义模块', fans: '涨粉', goods_group: '商品分组', game_category: '游戏分类',
     point_order: '点单卡片', shelf_asset: '客户资产', nearby_store: '附近门店', order_pool: '好友拼单',
@@ -741,14 +766,19 @@
     } else if (kind === 'title') {
       var sizeCls = { sm: 'sm', md: '', lg: 'lg' }[b.size || 'md'];
       box += '<div class="pv-title" style="padding:' + (b.paddingY || 16) + 'px ' + (b.pageMargin || 12) + 'px;text-align:' + (b.align || 'left') + ';background:' + (b.bg || 'transparent') + ';position:relative">' +
-        '<div class="t1 ' + sizeCls + '" style="color:' + (b.color || '#222') + ';font-weight:' + (b.bold ? 600 : 400) + '">' + esc(b.text || '（未填标题）') + '</div>' +
+        /* 加粗用 700：有赞「标题文本」写的就是 font-weight: bold（与真机 .ct-main.bold 同口径） */
+        '<div class="t1 ' + sizeCls + '" style="color:' + (b.color || '#222') + ';font-weight:' + (b.bold ? 700 : 400) + '">' + esc(b.text || '（未填标题）') + '</div>' +
         (b.sub ? '<div class="t2">' + esc(b.sub) + '</div>' : '') + linkBadge(b.link) + '</div>';
     } else if (kind === 'line') {
       var lh = Math.round((b.height || 20) / 2);
+      /* 上下留白（375 基准 px）：有赞实线模式渲染的是 hr{margin:10px 0}，线本身 1px，
+         所以「高度」不决定占位 —— 见 miniprogram/utils/blocks.js 的同名注释。0 = 老行为。 */
+      var lgapY = (b.gapY == null || b.gapY === '') ? 0 : Number(b.gapY) || 0;
+      var lpadX = (b.pageMargin == null || b.pageMargin === '') ? 12 : (Number(b.pageMargin) || 0);
       if ((b.style || 'blank') === 'blank') {
-        box += '<div class="pv-blank" style="height:' + lh + 'px;margin:0 ' + (b.pageMargin || 12) + 'px"></div>';
+        box += '<div class="pv-blank" style="height:' + lh + 'px;margin:' + lgapY + 'px ' + lpadX + 'px"></div>';
       } else {
-        box += '<div style="padding:0 ' + (b.pageMargin || 12) + 'px">' +
+        box += '<div style="margin:' + lgapY + 'px 0;padding:0 ' + lpadX + 'px">' +
           '<div style="border-top:' + Math.max(1, Math.round((b.height || 2) / 2)) + 'px ' + (b.style === 'dashed' ? 'dashed' : 'solid') + ' ' + (b.color || '#eee') + '"></div></div>';
       }
     } else if (kind === 'notice') {
@@ -801,7 +831,9 @@
       // full='0'（隐藏全屏）= 保留页面边距；full='1' = 内容占满整宽（与小程序端 normalize 同规则）
       var richPad = b.full === '0' ? (b.pageMargin || 12) : 0;
       var richHtml = pvRich(b.html);
-      box += '<div class="pv-rich" style="padding:8px ' + richPad + 'px;background:' + (b.bg || 'transparent') + '">' +
+      /* padding 10px 顶部 / 0 底部、字号 16px、行高 24px —— 与真机 `.c-rich` / `.cr-body`
+         以及有赞 `.cap-richtext` 三处同口径（装修台允许近似，但**允许近似的是画法、不是数值**）。 */
+      box += '<div class="pv-rich" style="padding:10px ' + richPad + 'px 0;background:' + (b.bg || 'transparent') + '">' +
         (richHtml ? richHtml : '<div style="color:#b8bec8;font-size:12px;padding:12px 0">（未填内容）支持 HTML，如 &lt;p&gt;文字&lt;/p&gt;</div>') +
         '</div>';
     } else if (kind === 'search') {
@@ -826,7 +858,30 @@
       var eItems = (b.items || []).filter(function (x) { return x && x.text; });
       var eStyle = b.tagStyle || 'bg';
       var eAct = Number(b.activeIndex) || 0;
-      var ePad = b.pageMargin || 0;
+      var ePad = (b.pageMargin == null || b.pageMargin === '') ? 0 : (Number(b.pageMargin) || 0);
+      /*
+       * 「全店风格」（styleType ≠ custom）= 纯文字均分的页签条，**有赞默认形态**：
+       * 44px 高、每项 flex:1 均分（3 项 = 119.67px）、14px 文字、选中加粗 + 换选中色。
+       * 有赞那条指示线是白色，白底上不可见，所以不画（与真机同口径）。
+       * 只有「自定义」才走 tagStyle 的四选一 —— 见 miniprogram/utils/blocks.js 的 plain。
+       */
+      var ePlain = b.styleType !== 'custom' && b.mode !== 'dropdown';
+      var ePlainItem = function (it, k) {
+        var on = k === eAct;
+        /* 项是**整条高**（stretch）、文字在项内居中，与真机 .ce-plainitem 同口径：
+           写成「一行高 + 文字居中」看着一样，但可点区域只有一行，运营在装修台点不中上下边缘。 */
+        return '<div style="flex:1 1 0%;min-width:0;display:flex;align-items:center;justify-content:center;line-height:20px;' +
+          'overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:14px;color:' +
+          (on ? (b.activeColor || '#000000') : (b.color || '#969799')) + ';' +
+          'font-weight:' + (on ? '500' : '400') + '" title="定位到区块 ' + (Number(it.target) || 0) + '">' + esc(it.text) + '</div>';
+      };
+      if (ePlain && eItems.length) {
+        box += '<div style="background:' + pvColor(b.bg, '#FFFFFF') + ';padding:0 ' + ePad + 'px">' +
+          '<div style="display:flex;align-items:stretch;height:44px">' + eItems.map(ePlainItem).join('') + '</div>' +
+          '</div>';
+        /* 空标签也要给出可选中区域，否则装修台里点不中/挪不动 */
+        box += '';
+      } else {
       var eTag = function (it, k) {
         var on = k === eAct;
         var st = 'color:' + (on ? (b.activeColor || '#C8102E') : (b.color || '#323233')) + ';';
@@ -843,6 +898,7 @@
           : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加标签）</div>') +
         (b.mode === 'dropdown' ? '<div style="font-size:10px;color:#8a919e;margin-top:2px">下拉展示</div>' : '') +
         '</div>';
+      }
     } else if (kind === 'enter_shop' || kind === 'service') {
       var isSvc = kind === 'service';
       var bJustify = b.align === 'right' ? 'flex-end' : (b.align === 'left' ? 'flex-start' : 'center');
@@ -875,21 +931,48 @@
         (b.src ? '' : '<span style="font-size:10px;color:#d46b08;align-self:center">未设置音频地址</span>') +
         '</div>';
     } else if (kind === 'content_card') {
+      /*
+       * 内容卡片（对标有赞「内容卡片」= note_card）。
+       * 2026-10-12：这里原来是一份「大概像」的近似实现（字号 12px、内边距 6px 全是拍脑袋写的），
+       * 复刻「创业故事」页时按真机实测口径重写 —— 预览必须与 miniprogram 侧的 .cc-* 同口径，
+       * 否则运营对着偏小偏紧的预览去调，只会越调越不像（PITFALLS 的 O5）。
+       * 单位：375 基准 px，预览画布就是 375 宽 → 原样使用。
+       */
       var cCols = Number(b.cols) || 2;
-      var cCellW = 100 / cCols;
-      var cRatio = Number(b.ratio) || 0.75;
-      // 与小程序的 padTopPct 同一算法：4:3 → 133.33（不是 1.33），否则预览里卡片会被压成一条线
-      var cPad = Math.round(10000 / cRatio) / 100;
+      var cCellW = Math.floor(100 / cCols * 100) / 100;
+      var cPadY = pvNum(b.padY, 6);
+      var cGapX = pvNum(b.gapX, 4);
+      var cGapY = pvNum(b.gapY, 4);
+      var cImgH = pvNum(b.imgHeight, 0);
       var cClass = b.style === 'white' ? 'white' : (b.style === 'plain' ? 'plain' : 'shadow');
       var cRound = (b.radius || 'round') !== 'square';
+      var cRatio = String(b.ratio == null ? '0.75' : b.ratio).trim();
+      var cAuto = cRatio === 'auto';
+      // 与小程序的 padTopPct 同一算法：4:3 → 133.33（不是 1.33），否则预览里卡片会被压成一条线
+      var cPad = (cImgH > 0 || cAuto) ? 0 : Math.round(10000 / (Number(cRatio) || 0.75)) / 100;
+      var cTitleFs = pvNum(b.titleSize, 14);
+      var cTitleWeight = b.titleWeight === 'bold' ? '700' : '400';
+      var cTitleLh = pvNum(b.titleLineHeight, 21);
+      var cTitleAlign = b.titleAlign === 'center' ? 'center' : 'left';
+      var cTitleColor = pvColor(b.titleColor, '#323233');
+      var cTitlePadX = pvNum(b.titlePadX, 8);
+      var cTitlePadY = pvNum(b.titlePadY, 8);
       var cItems = (b.items || []).filter(function (x) { return x && (x.image || x.title); });
       var cCells = cItems.slice(0, cCols === 1 ? 4 : 6).map(function (it) {
-        return '<div style="width:' + cCellW + '%;box-sizing:border-box;padding:0 ' + (cCols === 1 ? 0 : 3) + 'px;margin-bottom:6px">' +
+        var pic;
+        if (cAuto && it.image) {
+          pic = '<img src="' + attr(it.image) + '" style="display:block;width:100%">';
+        } else {
+          pic = '<div style="position:relative;padding-top:' + cPad + '%;' + (cImgH > 0 ? 'height:' + cImgH + 'px;' : '') + 'overflow:hidden;background:#f5f6f8">' +
+            (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:cover">' : '') +
+            '</div>';
+        }
+        return '<div style="width:' + cCellW + '%;box-sizing:border-box;padding:' + cGapY + 'px ' + cGapX + 'px">' +
           '<div class="pv-ccard ' + cClass + (cRound ? ' round' : '') + '">' +
-          '<div style="position:relative;padding-top:' + cPad + '%;background:#f5f6f8">' +
-          (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">' : '') +
-          '</div><div style="padding:6px">' +
-          (it.title ? '<div style="font-size:12px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.title) + '</div>' : '') +
+          pic +
+          '<div style="padding:' + cTitlePadY + 'px ' + cTitlePadX + 'px">' +
+          (it.title ? '<div style="font-size:' + cTitleFs + 'px;font-weight:' + cTitleWeight + ';line-height:' + cTitleLh + 'px;text-align:' + cTitleAlign +
+            ';color:' + cTitleColor + ';overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2">' + esc(it.title) + '</div>' : '') +
           (it.desc ? '<div style="font-size:11px;color:#8a919e;margin-top:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(it.desc) + '</div>' : '') +
           ((b.showTag || b.showRead || b.showLike)
             ? '<div style="margin-top:4px;display:flex;gap:6px;font-size:10px;color:#8a919e">' +
@@ -898,9 +981,9 @@
             : '') +
           '</div>' + (it.link ? linkBadge(it.link) : '') + '</div></div>';
       }).join('');
-      box += '<div style="padding:6px ' + (b.pageMargin || 12) + 'px">' +
+      box += '<div style="padding:' + cPadY + 'px ' + pvNum(b.pageMargin, 12) + 'px">' +
         (b.title ? '<div style="font-size:13px;font-weight:600;margin-bottom:6px">' + esc(b.title) + '</div>' : '') +
-        (cItems.length ? '<div style="display:flex;flex-wrap:wrap;margin:0 -3px">' + cCells + '</div>'
+        (cItems.length ? '<div style="display:flex;flex-wrap:wrap;margin:0 -' + cGapX + 'px">' + cCells + '</div>'
                        : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加卡片）</div>') +
         (b.more ? '<div style="text-align:center;font-size:12px;color:#8a919e;padding-top:6px">' +
           esc(b.moreText || '查看更多') + ' ›</div>' : '') +
@@ -964,6 +1047,117 @@
         (mgItems.length ? '<div style="display:flex;flex-wrap:wrap;align-items:flex-start">' + mgCells + '</div>'
                         : '<div style="color:#b8bec8;font-size:12px;padding:8px 0">（未添加卡片）</div>') +
         '</div>';
+    } else if (kind === 'tab_cate') {
+      /*
+       * 选项卡分类（对标有赞店铺侧三方扩展「选项卡Z4」extension-massdesign-tabcatez4）。
+       *
+       * 口径与真机完全一致（见 miniprogram/utils/blocks.js 的同名分支 + index.wxss 的 .tc-*）：
+       *   - 单位全是 375 基准 px，预览画布就是 375 宽 → **原样使用，不换算**；
+       *   - 卡片行同款「负外边距」写法：内容区左右 margin = 模块左右边距，
+       *     卡片行左右 margin = -图文外间距，卡片自身 margin = +图文外间距 →
+       *     卡片左右内缩 = 模块左右边距，相邻卡片间距 = 2 × 图文外间距（与有赞逐像素一致）；
+       *   - 内容区 overflow: hidden + 左右 margin（不是 padding）—— 与有赞 `.con` 同构；
+       *   - 只渲染**当前**选项卡：预览区是只读的，切换页签属于浏览态，统一显示第 1 个
+       *     （与真机首屏、与有赞默认选中项一致）。所以这里不做任何点击切换。
+       *   - 选项卡条：整条 38px、每项 flex:1 均分，文字块 34px + 下留 4px，
+       *     选中项加粗 + 文字正下方 40×2 的短横线（有赞 `.van-tabs__line` 是 display:none 的，
+       *     实线是每项自带的 text_line）。
+       */
+      var tcLayout = ['1', '2', '3'].indexOf(String(b.layout)) >= 0 ? String(b.layout) : '1';
+      var tcCellW = Math.floor(100 / Number(tcLayout) * 100) / 100;
+      var tcPadX = pvNum(b.paddingX, 11);
+      var tcPadT = pvNum(b.paddingTop, 5);
+      var tcPadB = pvNum(b.paddingBottom, 11);
+      var tcPadInner = pvNum(b.paddingInner, 0);
+      var tcGap = pvNum(b.gapOuter, 6);
+      var tcCardClass = ['white', 'shadow', 'outline', 'plain'].indexOf(b.cardStyle) >= 0 ? b.cardStyle : 'shadow';
+      var tcCardBg = tcCardClass === 'plain' ? 'transparent' : pvColor(b.cardBg, '#FFFFFF');
+      var tcRadius = (b.radius || 'round') === 'square' ? 0 : 8;
+      var tcImgRadius = tcRadius === 0 ? '0'
+        : (b.halfRound === false ? (tcRadius + 'px ' + tcRadius + 'px 0 0') : (tcRadius + 'px'));
+      var tcFit = b.fit === 'cover' ? 'cover' : 'contain';
+      var tcRatio = String(b.imgRatio == null ? 'auto' : b.imgRatio).trim();
+      var tcAuto = tcRatio === '' || tcRatio === 'auto';
+      var tcPadTopPct = tcAuto ? 0 : Math.round(10000 / pvNum(tcRatio, 1)) / 100;
+      var tcTitleClamp = pvNum(b.titleLines, 2) === 2 ? 2 : 1;
+      var tcTitleGapY = pvNum(b.titleGapY, 12);
+      var tcTitleGapX = pvNum(b.titleGapX, 9);
+      var tcTitleFs = pvNum(b.titleSize, 14);
+      var tcTitleColor = pvColor(b.titleColor, '#444444');
+      var tcTitleWeight = b.titleBold === 'normal' ? '400' : '700';
+      var tcTitleAlign = b.titleAlign === 'center' ? 'center' : 'left';
+      var tcShowTitle = b.showTitle !== false;
+      var tcTabFs = pvNum(b.tabFontSize, 15);
+      var tcTabFg = pvColor(b.tabColor, '#444444');
+      var tcTabFgOn = pvColor(b.tabActiveColor, '#444444');
+      var tcTabs = (b.tabs || []).filter(function (t) { return t && typeof t === 'object'; });
+      // 与真机同口径：空 tab / 空条目在渲染前先丢掉，否则预览里会多一个点不动的空白页签
+      tcTabs = tcTabs.map(function (t) {
+        return {
+          name: String(t.name == null ? '' : t.name).trim(),
+          items: (t.items || []).filter(function (x) {
+            return x && (x.image || x.video || String(x.title || '').trim());
+          })
+        };
+      }).filter(function (t) { return t.name || t.items.length; });
+      /*
+       * 空态**不提前 return**：提前 return 会漏掉末尾的 kindTag 与 opsBar，
+       * 区块在装修台里就选不中、挪不动。统一走「空 tabs → 空 tab 条 + 空态文案」。
+       */
+      var tcCur = tcTabs[0] || { name: '', items: [] };
+      var tcEmptyText = tcTabs.length ? '（本选项卡还没有内容）' : '（未添加选项卡）';
+      var tcTabHtml = tcTabs.map(function (t, k) {
+        var on = k === 0;
+        return '<div style="position:relative;flex:1 1 0%;display:flex;align-items:center;justify-content:center;box-sizing:border-box">' +
+          '<span style="width:100%;height:34px;line-height:34px;margin-bottom:4px;text-align:center;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;' +
+          'font-size:' + tcTabFs + 'px;color:' + (on ? tcTabFgOn : tcTabFg) + ';font-weight:' + (on ? '700' : '400') + '">' + esc(t.name) + '</span>' +
+          (on ? '<span style="position:absolute;left:50%;bottom:0;width:40px;height:2px;margin-left:-20px;background:' + tcTabFgOn + '"></span>' : '') +
+          '</div>';
+      }).join('');
+      var tcCells = tcCur.items.slice(0, 60).map(function (it) {
+        var pic;
+        if (it.video) {
+          pic = '<div style="position:relative;width:100%;height:0;padding-top:56.25%;overflow:hidden;border-radius:' + tcImgRadius + '">' +
+            '<div style="position:absolute;left:0;top:0;width:100%;height:100%;background:#20242c;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center">▶ 视频</div>' +
+            (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:contain;opacity:.5">' : '') +
+            '</div>';
+        } else if (tcAuto) {
+          pic = it.image
+            ? '<img src="' + attr(it.image) + '" style="display:block;width:100%;border-radius:' + tcImgRadius + '">'
+            : '';
+        } else {
+          pic = '<div style="position:relative;width:100%;height:0;padding-top:' + tcPadTopPct + '%;overflow:hidden;border-radius:' + tcImgRadius + '">' +
+            (it.image ? '<img src="' + attr(it.image) + '" style="position:absolute;left:0;top:0;width:100%;height:100%;object-fit:' + tcFit + '">' : '') +
+            '</div>';
+        }
+        var title = (tcShowTitle && String(it.title || '').trim())
+          ? '<div style="margin:' + tcTitleGapY + 'px ' + tcTitleGapX + 'px;color:' + tcTitleColor + ';font-size:' + tcTitleFs + 'px;' +
+            'font-weight:' + tcTitleWeight + ';text-align:' + tcTitleAlign + ';word-break:break-all;overflow:hidden;' +
+            /* 行高 1.5 —— 有赞 `.item_title` 的实测值（14px→21px、11px→16.5px、14px→21px，三页一致）。
+               不写的话浏览器按 `normal` 算（≈1.36），两行标题就矮 3~4px，卡片高度跟着错。 */
+            'line-height:1.5;' +
+            (tcTitleClamp === 2
+              ? 'display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2'
+              : 'white-space:nowrap;text-overflow:ellipsis') + '">' + esc(it.title) + '</div>'
+          : '';
+        return '<div style="width:' + tcCellW + '%;flex-shrink:0;box-sizing:border-box">' +
+          '<div class="pv-tccard ' + tcCardClass + '" style="margin:' + tcGap + 'px;background:' + tcCardBg + ';border-radius:' + tcRadius + 'px">' +
+          pic + title + '</div>' +
+          (it.link ? linkBadge(it.link) : '') +
+          '</div>';
+      }).join('');
+      box += '<div style="background:' + pvColor(b.bg, 'transparent') + ';padding:' + tcPadT + 'px 0 ' + tcPadB + 'px;box-sizing:border-box' +
+        (b.bgImage ? ';background-image:url(' + attr(b.bgImage) + ');background-size:cover;background-position:top center;background-repeat:no-repeat' : '') + '">' +
+        '<div style="display:flex;align-items:flex-start;background:' + pvColor(b.tabBg, 'transparent') + ';height:38px;box-sizing:border-box">' +
+        tcTabHtml + '</div>' +
+        /* 页签条与首行卡片之间的固定 10px：有赞 `.van-tab__pane-wrapper` 内层写死的
+           padding-top（与「模块内边距」「图文内间距」无关），6 个页面实测全是 10 —— 见
+           miniprogram/utils/blocks.js 的 paneTopRpx。 */
+        '<div style="background:' + pvColor(b.innerBg, 'transparent') + ';padding-top:10px">' +
+        '<div style="overflow:hidden;box-sizing:border-box;margin:0 ' + tcPadX + 'px;padding:' + tcPadInner + 'px">' +
+        '<div style="display:flex;flex-wrap:wrap;align-items:flex-start;margin:0 -' + tcGap + 'px">' +
+        (tcCells || '<div style="width:100%;color:#b8bec8;font-size:12px;padding:8px 0">' + tcEmptyText + '</div>') +
+        '</div></div></div></div>';
     } else if (kind === 'buy_bar') {
       var bbOn = b.bgOn !== false;
       var bbBg = b.theme === 'custom' ? (b.btnBg || '#C8102E') : '#C8102E';
@@ -1002,25 +1196,49 @@
 
   /* --------------------------- 各页面渲染 --------------------------- */
 
+  /**
+   * 页面底色包装 —— 内置页与自定义页的真机 WXML 根节点**是同一行**：
+   *   `pages/index/index.wxml`  → `<view class="page" style="background: {{meta.bg || '#F5F6F8'}};">`
+   *   `pages/custom/index.wxml` → 同上（逐字一致）
+   * 所以这一层必须两边都用，且 `PAGE_BG_DEF` 要与这两处 WXML 以及
+   * `schema.js` 的 `CUSTOM_META_DEFAULT.bg` **三处逐字相同**。
+   *
+   * ⚠️ 为什么不能靠装修台手机壳自己的底色（`.phone-screen { background: #fff }`）凑：
+   * 复刻 03「创业故事」时实测两边**根本不是同一个颜色** —— 运营在装修台照着白底/灰底调，
+   * 真机却是另一个（03 页正好反过来），改完还以为是没生效。底色只能由这里画出来。
+   * 首页（`pvHome`）此前同样漏了这层，是同一类缺陷，一并补上。
+   *
+   * 外层 `min-height:100%` 只为让空页在手机壳里也铺满（对应真机 `.page { min-height: 100vh }`）。
+   * 加包装层前确认过 `admin.js` 对 `#preview` 只有 `innerHTML =` 与 `querySelector('[data-path]')`
+   * 两处用法，都不依赖直系子元素；区块自身的 `data-path` / 选中态 / 悬浮操作条全在包装层内部。
+   */
+  var PAGE_BG_DEF = '#F5F6F8';
+  function pvPageBg(d, inner) {
+    var bg = (d && d.meta && d.meta.bg) || PAGE_BG_DEF;
+    return '<div class="pv-page" style="min-height:100%;background:' + bg + '">' + inner + '</div>';
+  }
+
   function pvHome(d) {
     var h = '';
     (d.blocks || []).forEach(function (b, i) { h += pvBlock(b, i); });
     h += '<div class="pv-shop pv-block' + (CTX.edit && CTX.sel === 'shop' ? ' active' : '') + '" data-path="__shop__" style="position:relative">' +
       img(d.shop && d.shop.avatar, 'width:56px;height:56px;border-radius:50%;margin:0 auto 8px') +
       '<b>' + esc((d.shop && d.shop.name) || '') + '</b><br><span>' + esc((d.shop && d.shop.slogan) || '') + '</span></div>';
-    return h;
+    return pvPageBg(d, h);
   }
 
-  /** 自定义页面预览：只有区块流（不含首页底部的店招卡片） */
+  /** 自定义页面预览：只有区块流（不含首页底部的店招卡片）。 */
   function pvCustom(d) {
-    var blocks = d.blocks || [];
+    var blocks = (d && d.blocks) || [];
+    var inner;
     if (!blocks.length) {
-      return '<div class="insp-empty" style="padding:56px 16px;line-height:2">' +
+      inner = '<div class="insp-empty" style="padding:56px 16px;line-height:2">' +
         '这个页面还是空的<br><span style="color:#b8bec8">从左侧「组件库」点一个组件开始装修</span></div>';
+    } else {
+      inner = '';
+      blocks.forEach(function (b, i) { inner += pvBlock(b, i); });
     }
-    var h = '';
-    blocks.forEach(function (b, i) { h += pvBlock(b, i); });
-    return h;
+    return pvPageBg(d, inner);
   }
 
   function pvLexy(d) {

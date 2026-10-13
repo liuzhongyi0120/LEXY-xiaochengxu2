@@ -1231,10 +1231,14 @@
     /* 普通字段（跳过 template，已单独渲染） */
     var rows = fields.filter(function (f) { return f.type !== 'template'; });
     var groups = {};   // 分组名 → 字段
+    var groupOpen = {}; // 分组名 → 是否默认展开（声明里带 open:true 的组）
     var order = [];
     rows.forEach(function (f) {
       if (f.type === 'group') {
         if (!groups[f.label]) { groups[f.label] = []; order.push(f.label); }
+        /* 同名分组只要有一处声明 open，就按展开渲染 —— 合并后的组不该因为
+           后一条声明没带 open 而收回去（收起的分组运营根本看不到，会当成没做） */
+        if (f.open) groupOpen[f.label] = true;
         (f.fields || []).forEach(function (sub) { groups[f.label].push(sub); });
         return;
       }
@@ -1246,7 +1250,7 @@
       host.appendChild(fieldNode(f, loc.data, joinPath(S.sel, f.k)));
     });
     order.forEach(function (g) {
-      host.appendChild(groupBlock(g, groups[g], loc.data, S.sel));
+      host.appendChild(groupBlock(g, groups[g], loc.data, S.sel, groupOpen[g]));
     });
 
     /* 列表字段 */
@@ -1257,6 +1261,10 @@
    * 把 fields 拆成「普通字段」与「列表字段」。
    * UI 分组（type=group）保留为分组节点（渲染成可折叠面板），
    * 但分组内部的列表字段会被提到外层单独渲染。
+   *
+   * `open: true` 的分组**默认展开** —— 底部导航的「导航图标色 / 导航背景色」
+   * 用上了：这两组恰恰是运营最常改的，之前折叠着（标题上写「配色」）
+   * 运营在面板里根本找不到「怎么调图标颜色」。
    */
   function splitFields(fields, outF, outL) {
     (fields || []).forEach(function (f) {
@@ -1266,7 +1274,7 @@
           if (sub.type === 'list') outL.push(sub);
           else inner.push(sub);
         });
-        outF.push({ type: 'group', label: f.label, fields: inner });
+        outF.push({ type: 'group', label: f.label, open: !!f.open, fields: inner });
         return;
       }
       if (f.type === 'list') outL.push(f);
@@ -1335,8 +1343,9 @@
   }
 
   /** 可折叠分组 */
-  function groupBlock(label, fields, parentData, basePath) {
-    var box = el('div', 'grp');
+  /** 可折叠分组。`open` 为真则默认展开（声明里写 `open: true`） */
+  function groupBlock(label, fields, parentData, basePath, open) {
+    var box = el('div', 'grp' + (open ? ' open' : ''));
     var head = el('div', 'grp-head', '<span class="arw"></span>' + esc(label) + '<span class="gk">' + fields.length + ' 项</span>');
     var body = el('div', 'grp-body');
     fields.forEach(function (f) { body.appendChild(fieldNode(f, parentData, joinPath(basePath, f.k))); });

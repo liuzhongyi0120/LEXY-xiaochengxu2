@@ -317,6 +317,57 @@
   }
 
   /**
+   * 富文本清洗 —— 与小程序端 `miniprogram/utils/blocks.js` 的 sanitizeRich、
+   * 装修台的 `shared/pv-render.js` 的 pvRich **同一套规则，四处必须字面一致**。
+   * 预览页与装修台同源，富文本又是运营可自由填的 HTML：少一条规则就是一条存储型 XSS 通道
+   * （真机侧由小程序自身的 rich-text 沙箱兜住，浏览器里没有这层兜底）。
+   */
+  function richSafe(html) {
+    return richMarginTop(String(html == null ? '' : html)
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+      .replace(/javascript:/gi, ''));
+  }
+
+  /**
+   * 富文本块级标签的 margin-top 重置 —— 与小程序端 `utils/blocks.js` 的 richResetMarginTop、
+   * 装修台的 `pv-render.js` 的 pvRichMarginTop **同一套规则，三处必须一致**。
+   *
+   * 预览页编译的是**真机源码**，而真机上 `<rich-text>` 不吃外部样式选择器，
+   * 所以这条重置被写进了小程序端的净化函数里、作用在 nodes 自己的 style 上 ——
+   * 这里必须跟着做同一件事，否则「真机对了、预览还是错的」，对照表会一直报假差异。
+   */
+  function richMarginTop(html) {
+    return String(html == null ? '' : html).replace(
+      /<(p|div|h[1-6]|ul|ol|li|blockquote|figure|pre|table)\b([^>]*)>/gi,
+      function (whole, tag, rest) {
+        if (/\bmargin(-top)?\s*:/i.test(rest)) return whole;
+        var m = /style\s*=\s*("([^"]*)"|'([^']*)')/i.exec(rest);
+        if (m) {
+          var val = m[2] !== undefined ? m[2] : m[3];
+          return whole.replace(m[0], 'style="margin-top:0;' + val + '"');
+        }
+        return '<' + tag + rest + ' style="margin-top:0">';
+      }
+    );
+  }
+
+  /** `nodes` 传「节点数组」时（真机支持，本项目当前只用 HTML 字符串）—— 递归还原成 HTML */
+  function richNodeList(list) {
+    return list.map(function (n) {
+      if (n == null) return '';
+      if (typeof n === 'string') return richSafe(n);
+      if (n.type === 'text') return escText(n.text);
+      var t = String(n.name || 'span').replace(/[^\w-]/g, '');
+      var a = n.attrs || {};
+      var st = a.style ? ' style="' + escAttr(a.style) + '"' : '';
+      var cl = a.class ? ' class="' + escAttr(a.class) + '"' : '';
+      return '<' + t + cl + st + '>' + richNodeList(n.children || []) + '</' + t + '>';
+    }).join('');
+  }
+
+  /**
    * 渲染节点数组
    * @param {Array}  nodes
    * @param {object} scope
@@ -432,6 +483,23 @@
     /* ---- block：虚拟节点，只渲染子节点 ---- */
     if (tag === 'block') {
       return renderNodes(node.children, scope, opts);
+    }
+
+    /* ---- rich-text：真机把 nodes（HTML 字符串 / 节点数组）渲染成富文本 ----
+     *
+     * ⚠️ 这里原本把 `rich-text` 当普通标签翻成 `<div>`，`nodes` 被塞进 attribute（还转了义），
+     *    子节点为空 → **富文本块在预览里恒为 0 高**：装修台看得到内容、/preview 一片空白。
+     *    连带的更隐蔽的后果是「外壳高度错位」——2026-10-12 复刻资讯 8 页时，整页比有赞矮 75px，
+     *    查了三轮才发现少的就是这块富文本（真机是好的，只有预览在说谎）。
+     *    微信 `rich-text` 的 `nodes` 从基础库 2.x 起就支持直接传 HTML 字符串，预览必须照做。
+     */
+    if (tag === 'rich-text') {
+      var rCls = attrs['class'] !== undefined ? attrValue(attrs['class'], scope) : '';
+      var rStyle = attrs['style'] !== undefined ? attrValue(attrs['style'], scope) : '';
+      var rNodes = attrs['nodes'] !== undefined ? attrValue(attrs['nodes'], scope) : '';
+      return '<div' + (rCls ? ' class="' + escAttr(rCls) + '"' : '') +
+        (rStyle ? ' style="' + escAttr(rStyle) + '"' : '') + '>' +
+        (Array.isArray(rNodes) ? richNodeList(rNodes) : richSafe(rNodes)) + '</div>';
     }
 
     /* ---- 自定义组件 ---- */

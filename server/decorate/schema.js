@@ -70,6 +70,9 @@ const ICONS = {
   /* 混合排列：上排 2 张大卡、下排 3 张小卡 —— 图标本身就把「错落」画出来，
      与「魔方」（四宫格等分）和「内容卡片」（一张横版卡）都一眼能区分 */
   mixed_grid: I('<rect x="3" y="3" width="8.5" height="7.5" rx="1.5"/><rect x="12.5" y="3" width="8.5" height="7.5" rx="1.5"/><rect x="3" y="12.5" width="5" height="8.5" rx="1.5"/><rect x="9.5" y="12.5" width="5" height="8.5" rx="1.5"/><rect x="16" y="12.5" width="5" height="8.5" rx="1.5"/>'),
+  /* 选项卡分类：顶部一条页签（选中那条带短横线）+ 下方两张卡 —— 与「混合排列」的错落
+     「内容卡片」的单张横版卡都不同形 */
+  tab_cate: I('<path d="M4 6h4M10 6h4M16 6h4" stroke-width="2"/><path d="M4 9.5h4"/><rect x="3" y="12" width="8.5" height="9" rx="1.5"/><rect x="12.5" y="12" width="8.5" height="9" rx="1.5"/>'),
   /* ---- 个人中心专属区块（2026-10-10 新增，见 yzUserCenter.js） ---- */
   page_head: I('<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><path d="M8 6.5h.01M11 6.5h-1"/>'),
   profile: I('<circle cx="12" cy="8.5" r="3.2"/><path d="M5.5 19.5c0-3.1 2.9-5 6.5-5s6.5 1.9 6.5 5"/>'),
@@ -272,6 +275,14 @@ const HOME_BLOCK_KINDS = {
     fields: [
       { k: 'style', label: '样式', type: 'radiobutton', def: 'blank', options: [{ value: 'blank', label: '空白' }, { value: 'solid', label: '实线' }, { value: 'dashed', label: '虚线' }] },
       { k: 'height', label: '高度 / 线粗', type: 'slider', min: 2, max: 240, step: 2, unit: 'rpx', def: 20 },
+      /*
+       * 上下留白：线/空白块**自身以外**的垂直留白。
+       * 有赞的「辅助分割」在实线模式下渲染的是 `hr { margin: 10px 0 }`（线本身只有 1px）——
+       * 也就是说「高度」字段在那条链路上并不决定占位，上下留白是独立的一档。
+       * 2026-10-12 复刻「关于莱克 / 经营等 6 个资讯页」时实测到这一点：整块占位 = 10 + 1 + 10 = 21px，
+       * 所以补了这个字段；**默认 0 = 补字段之前的行为**（老数据渲染结果不变）。
+       */
+      { k: 'gapY', label: '上下留白', type: 'slider', min: 0, max: 60, step: 2, unit: 'px', def: 0 },
       { k: 'color', label: '线条颜色', type: 'color', def: '#EEEEEE' },
       { k: 'bg', label: '背景颜色', type: 'color', def: '' },
       {
@@ -490,7 +501,9 @@ const HOME_BLOCK_KINDS = {
     lib: 'elevator',
     group: 'basic',
     desc: '标签导航条，点击滚动定位到页面下方指定区块',
-    tip: '与有赞一致：只能定位到「本组件下方」的区块，所以「定位到区块」填的是区块序号（从 1 开始，含本组件自身）。',
+    tip: '与有赞一致：只能定位到「本组件下方」的区块，所以「定位到区块」填的是区块序号（从 1 开始，含本组件自身）。'
+      + '「标签样式」选「全店风格」= 纯文字均分的页签条（有赞默认形态，2026-10-12 在「售后服务」页实测：44px 白底、14px 文字、选中加粗 + 选中色）；'
+      + '选「自定义」才用下面「标签风格」的四选一（背景 / 圆框 / 方框 / 下划线）。',
     fields: [
       { k: 'mode', label: '展示方式', type: 'radiobutton', def: 'scroll', options: [{ value: 'scroll', label: '横向滚动' }, { value: 'dropdown', label: '下拉展示' }] },
       { k: 'styleType', label: '标签样式', type: 'radiobutton', def: 'theme', options: [{ value: 'theme', label: '全店风格' }, { value: 'custom', label: '自定义' }] },
@@ -584,7 +597,16 @@ const HOME_BLOCK_KINDS = {
     ]
   },
 
-  /* ---------- 内容卡片（对标有赞「内容卡片」） ---------- */
+  /* ---------- 内容卡片（对标有赞「内容卡片」= note_card） ---------- */
+  /**
+   * 2026-10-12 复刻「创业故事」页时按真机实测把这 12 个字段补齐（原来写死在 WXSS 里）：
+   *   有赞那个页面的卡片是「图片固定高 147px + 标题 16px 加粗 + 上下留白 13px + 卡片间距 10px」，
+   *   而本组件原来写死的是「图片按 4:3 + 标题 14px 常规 + 上下留白 6px + 卡片间距 8px」——
+   *   眼睛能直接看出来，光靠改数据补不平，所以把这几项做成字段。
+   *   **默认值全部等于补字段之前的那套写死值**，所以已有数据渲染结果一字不变；
+   *   只有「图片固定高度」与「图片比例 · 自适应」是新增能力（原实现只能按比例撑高）。
+   * 阴影口径也在同批对齐到有赞 `.cardShadow`（`0 2px 4px rgba(0,0,0,.08)`，原来是 0 2px 8px .06）。
+   */
   content_card: {
     label: '内容卡片',
     lib: 'content_card',
@@ -593,7 +615,15 @@ const HOME_BLOCK_KINDS = {
     fields: [
       { k: 'title', label: '专题名称', type: 'text', hint: '建议不超过 8 个字' },
       { k: 'cols', label: '列表样式', type: 'radiobutton', def: '2', options: [{ value: '1', label: '一行一个' }, { value: '2', label: '两列' }] },
-      { k: 'ratio', label: '图片比例', type: 'radiobutton', def: '0.75', options: [{ value: '1', label: '1:1' }, { value: '0.75', label: '4:3' }, { value: '0.5625', label: '16:9' }] },
+      {
+        k: 'ratio', label: '图片比例', type: 'radiobutton', def: '0.75',
+        options: [{ value: 'auto', label: '自适应' }, { value: '1', label: '1:1' }, { value: '0.75', label: '4:3' }, { value: '0.5625', label: '16:9' }],
+        hint: '「自适应」= 按原图比例铺满整宽；填「图片固定高度」时本项自动失效'
+      },
+      {
+        k: 'imgHeight', label: '图片固定高度', type: 'slider', min: 0, max: 400, step: 1, unit: 'px', def: 0,
+        hint: '0 = 关闭（按上面的「图片比例」撑高）；填了就按这个高度裁切（对应「图片模式 · 充满」）'
+      },
       {
         k: 'items', label: '卡片', type: 'list', max: 50, sortable: true, addable: true,
         item: {
@@ -617,6 +647,22 @@ const HOME_BLOCK_KINDS = {
           { k: 'more', label: '查看更多', type: 'switch', def: false },
           { k: 'moreText', label: '查看更多文案', type: 'text', def: '查看更多' },
           linkField('查看更多跳转')
+        ]
+      },
+      /* ============ 尺寸与文字（2026-10-12 复刻「创业故事」页时按真机实测补齐） ============ */
+      {
+        type: 'group', label: '尺寸与文字',
+        fields: [
+          { k: 'padY', label: '区块上下边距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 6, hint: '原实现写死 6px（12rpx）。有赞「创业故事」页实测：包装层 padding 13px，卡片自身另有 5px 上外边距 → 本组件两处合并，该页填 18' },
+          { k: 'gapX', label: '卡片左右间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 4, hint: '卡片左右各留这么多，相邻两卡之间 = 2 倍' },
+          { k: 'gapY', label: '卡片上下间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 4, hint: '原实现写死 4px；有赞该页是 5（相邻两卡之间 10px）' },
+          { k: 'titleSize', label: '标题字号', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 14, hint: '原实现写死 14px（--font-base）；有赞该页是 16px' },
+          { k: 'titleWeight', label: '标题字重', type: 'radiobutton', def: 'normal', options: [{ value: 'normal', label: '常规体' }, { value: 'bold', label: '加粗体' }] },
+          { k: 'titleLineHeight', label: '标题行高', type: 'slider', min: 14, max: 40, step: 1, unit: 'px', def: 21, hint: '原实现跟随默认行高（14px 字号下≈21px）' },
+          { k: 'titleAlign', label: '标题对齐', type: 'radiobutton', def: 'left', options: [{ value: 'left', label: '左对齐' }, { value: 'center', label: '居中' }] },
+          { k: 'titleColor', label: '标题颜色', type: 'color', def: '#323233' },
+          { k: 'titlePadX', label: '标题左右间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 8, hint: '原实现写死 8px（16rpx）；有赞该页是 10px' },
+          { k: 'titlePadY', label: '标题上下间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 8 }
         ]
       },
       {
@@ -759,6 +805,148 @@ const HOME_BLOCK_KINDS = {
             k: 'anim', label: '入场动画', type: 'switch', def: true,
             hint: '卡片淡入上浮（0.8s 缓出），同一排内依次延迟 0.16s —— 与有赞「动画设置」同款手感'
           }
+        ]
+      }
+    ]
+  },
+
+  /* ---------- 选项卡分类（对标有赞「选项卡Z4」extension-massdesign-tabcatez4） ---------- */
+  /**
+   * 有赞侧同样是**店铺装上的开放平台三方扩展**（`extension-massdesign-tabcatez4`，
+   * 面板名「选项卡Z4」，2026-10-12 从装修台逐个点击抄录，快照见 `.tooling/_yz3/panel-dom.txt`
+   * 与 `.tooling/_cmp/yz3-panel-*.png`）。
+   *
+   * 有赞面板分两页签：**图文设置**（选项卡列表 + 列表布局 / 图文展示样式 / 图文倒角 /
+   * 图片比例 / 图文名称 / 标题行数与字号 / 文本样式与对齐 / 按钮显示 / 自动轮播 / 标题文字大小）
+   * 与**扩展设置**（图文标题色 · 图文背景色 · 导航文字色 · 导航背景色 + 模块设置七项）。
+   *
+   * ⚠️ 与有赞的一处**有意合并**（写在最前面，避免以后被当成漏抄）：
+   *   有赞把「这一个选项卡叫什么」和「这一个选项卡装什么」拆在两个地方配 ——
+   *   「添加大分类 → 分类标题」里填名字，「选项卡【N】」里填内容，两处靠**下标一一对应**。
+   *   运营配 5 个选项卡要来回滚两遍面板，错一个下标就是「名字和内容对不上」。
+   *   本后台合并成 `tabs[] = [{ name, items[] }]`，一次编完一个选项卡。
+   *   落库后渲染结果与有赞一致（tab 条名字 + 内容面板一一对应）。
+   *
+   * 另有三个字段**有意不做**（有赞有、本后台不提供入口，按项目「不支持的入口不展示」的约定）：
+   *   - 「自动轮播」：需要页面级定时器，本次复刻的 8 个页面全部是关的；
+   *   - 「按钮显示 / 视频按钮位置 / 图片按钮显示」：有赞用来给条目挂「进店 / 购买」按钮与
+   *     视频角标，本次 8 个页面一条都没用到（条目只有图 + 标题）。
+   *   不做就不在面板上出现，避免「点了没反应」。
+   *
+   * 交互的**一处有意偏离**：只做「点选项卡切换」，不做左右滑动切换。
+   *   依据（不是偷懒）：有赞这个扩展用的是 Vant `Tabs`，`swipeable` 默认 false，且扩展面板里
+   *   只有「自动轮播」一个开关、**没有滑动开关**，本次 8 个页面「自动轮播」全是关的 ——
+   *   也就是说线上这些页面本来就没有可滑动的交互，点按才是唯一被配置启用的交互。
+   *   （未激活的 tabpanel 在 DOM 里是 `width:100%` 并排铺开、且 `.pane-wrapper--inactive { height:0 }`，
+   *    那是 Vant 的渲染方式，不代表开启了手势。）
+   *
+   * 数值口径来源：真机 375 视口逐个量盒 + 逐条读计算样式（`.tooling/_yz3-measure.mjs` +
+   * `_yz3-tab-measure.js`），扩展自身的 CSS 规则从线上 `document.styleSheets` 抄录
+   * （`.tooling/_yz3-css.js`），不是靠肉眼看截图估的。
+   */
+  tab_cate: {
+    label: '选项卡分类',
+    lib: 'tab_cate',
+    group: 'adv',
+    desc: '选项卡 + 每个选项卡下的图文 / 视频列表，一个组件承载多条内容线',
+    tip: '对标有赞三方扩展「选项卡Z4」。顶部选项卡条点击切换内容；内容按所选列数铺排，可带标题。数据抓取与逐像素对账见 `.tooling/_yz3-measure.mjs`。',
+    fields: [
+      {
+        k: 'layout', label: '列表布局', type: 'radiobutton', def: '1',
+        options: [{ value: '1', label: '一行一个' }, { value: '2', label: '一行两个' }, { value: '3', label: '一行三个' }],
+        hint: '有赞面板显示为「列表布局 · 大图模式」加几个图标'
+      },
+      {
+        k: 'tabs', label: '选项卡', type: 'list', max: 10, sortable: true, addable: true,
+        item: {
+          type: 'object', title: (v, i) => v.name || ('选项卡 ' + (i + 1)),
+          fields: [
+            { k: 'name', label: '选项卡名称', type: 'text', hint: '显示在顶部选项卡条上，建议 10 个字以内（有赞原提示同款）' },
+            {
+              k: 'items', label: '图文内容', type: 'list', max: 60, sortable: true, addable: true,
+              item: {
+                type: 'object', title: (v, i) => v.title || ('内容 ' + (i + 1)),
+                fields: [
+                  { k: 'image', label: '图片', type: 'image', hint: '不填视频时显示这张图' },
+                  { k: 'video', label: '视频地址', type: 'text', hint: '填了就播放视频，图片自动作为封面（有赞此处是「添加视频」）' },
+                  { k: 'title', label: '标题', type: 'text', hint: '有赞把它拆成「数据 / 标题」两栏，本后台合并成一栏' },
+                  linkField()
+                ]
+              }
+            }
+          ]
+        }
+      },
+
+      /* ============ 样式设置（对标有赞「图文设置」下半段） ============ */
+      {
+        type: 'group', label: '样式设置',
+        fields: [
+          {
+            k: 'cardStyle', label: '图文展示样式', type: 'radiobutton', def: 'shadow',
+            options: [
+              { value: 'white', label: '无边白底' }, { value: 'shadow', label: '卡片投影' },
+              { value: 'outline', label: '描边白底' }, { value: 'plain', label: '无边透明' }
+            ]
+          },
+          { k: 'cardBg', label: '图文背景色', type: 'color', def: '#FFFFFF' },
+          {
+            k: 'fit', label: '图片模式', type: 'radiobutton', def: 'cover',
+            options: [{ value: 'cover', label: '充满' }, { value: 'contain', label: '完整显示' }]
+          },
+          { k: 'gapOuter', label: '图文外间距', type: 'slider', min: 0, max: 20, step: 0.5, unit: 'px', def: 6, hint: '有赞原值 6px（= 12rpx）' },
+          { k: 'gapInner', label: '图文内间距', type: 'slider', min: 0, max: 20, step: 1, unit: 'px', def: 0 },
+          {
+            k: 'radius', label: '图文倒角', type: 'radiobutton', def: 'round',
+            options: [{ value: 'round', label: '圆角' }, { value: 'square', label: '直角' }]
+          },
+          {
+            k: 'halfRound', label: '图片下半区圆角', type: 'switch', def: true,
+            hint: '开：图片四角都跟着卡片圆（有赞 class「need_radius」→ border-radius:8px）；关：只有图片上面两角圆（有赞内联 border-radius:8px 8px 0 0）'
+          },
+          {
+            k: 'imgRatio', label: '图片比例', type: 'radiobutton', def: 'auto',
+            options: [
+              { value: 'auto', label: '自适应' }, { value: '1', label: '1:1' },
+              { value: '0.75', label: '4:3' }, { value: '0.5625', label: '16:9' }
+            ],
+            hint: '「自适应」= 按原图比例铺满整宽（长图不会被裁），有赞原值'
+          },
+          { k: 'showTitle', label: '显示图文名称', type: 'switch', def: true },
+          {
+            k: 'titleLines', label: '图文标题行数', type: 'radiobutton', def: '2',
+            options: [{ value: '1', label: '1 行' }, { value: '2', label: '2 行' }]
+          },
+          { k: 'titleSize', label: '图文标题文字大小', type: 'slider', min: 10, max: 24, step: 1, unit: 'px', def: 14 },
+          { k: 'titleGapY', label: '图文标题上下间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 12 },
+          { k: 'titleGapX', label: '图文标题左右间距', type: 'slider', min: 0, max: 30, step: 1, unit: 'px', def: 9 },
+          {
+            k: 'titleBold', label: '标题加粗', type: 'radiobutton', def: 'bold',
+            options: [{ value: 'bold', label: '加粗体' }, { value: 'normal', label: '常规体' }]
+          },
+          {
+            k: 'titleAlign', label: '文本对齐', type: 'radiobutton', def: 'left',
+            options: [{ value: 'left', label: '左对齐' }, { value: 'center', label: '居中' }]
+          }
+        ]
+      },
+
+      /* ============ 扩展设置（对标有赞「扩展设置」页签） ============ */
+      {
+        type: 'group', label: '扩展设置',
+        fields: [
+          { k: 'titleColor', label: '图文标题色', type: 'color', def: '#444444' },
+          { k: 'tabColor', label: '导航文字色', type: 'color', def: '#444444' },
+          { k: 'tabActiveColor', label: '导航选中色', type: 'color', def: '#444444', hint: '同时作用于选项卡文字与下方的那条短横线' },
+          { k: 'tabBg', label: '导航背景色', type: 'color', def: '#FFFFFF' },
+          { k: 'tabFontSize', label: '标题文字大小', type: 'slider', min: 12, max: 22, step: 1, unit: 'px', def: 15, hint: '选项卡条上的文字字号' },
+          { k: 'paddingInner', label: '模块内边距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 0 },
+          { k: 'paddingX', label: '模块左右边距', type: 'slider', min: 0, max: 40, step: 1, unit: 'px', def: 11 },
+          { k: 'paddingTop', label: '模块上边距', type: 'slider', min: 0, max: 60, step: 1, unit: 'px', def: 5 },
+          { k: 'paddingBottom', label: '模块下边距', type: 'slider', min: 0, max: 60, step: 1, unit: 'px', def: 11 },
+          { k: 'bg', label: '模块背景色', type: 'color', def: '', hint: '留空 = 透出页面底色（有赞原值为空）' },
+          { k: 'innerBg', label: '模块内部背景色', type: 'color', def: '#FFFFFF' },
+          { k: 'bgImage', label: '模块背景图', type: 'image' }
         ]
       }
     ]
@@ -1194,11 +1382,13 @@ const YZ_BASIC = [].concat(...YZ_BASIC_GROUPS.map((g) => g.items.map((it) => Obj
 /**
  * 有赞「高级组件」tab。
  *
- * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些）。本店铺实测到 3 个：
- * 「个性导航」「品牌分类E」「混合排列A」：
+ * 实测该 tab 是**店铺侧扩展组件**（装了哪些插件就显示哪些）。本店铺实测到 4 个：
+ * 「个性导航」「品牌分类E」「混合排列A」「选项卡Z4」：
  *   - 「品牌分类E」已按原组件全部功能自建实现（见 HOME_BLOCK_KINDS.brand_category）；
  *   - 「混合排列A」已按原组件自建实现（见 HOME_BLOCK_KINDS.mixed_grid），
  *     2026-10-12 复刻「莱克资讯」页时补入；
+ *   - 「选项卡Z4」已按原组件自建实现（见 HOME_BLOCK_KINDS.tab_cate），
+ *     2026-10-12 复刻「关于莱克」等 8 个品牌页时补入；
  *   - 「个性导航」仍依赖有赞开放平台运行时，标为未接入。
  *
  * ⚠️ 有赞该 tab 的组件是**按店铺安装的插件**，两边店铺装的可能不一样，
@@ -1207,7 +1397,8 @@ const YZ_BASIC = [].concat(...YZ_BASIC_GROUPS.map((g) => g.items.map((it) => Obj
 const YZ_ADV = [
   { n: '个性导航', type: 'extension-cnzoom-person-nav', ok: 0, why: '有赞开放平台三方扩展组件，依赖有赞开放平台运行时；本后台的底部导航走「全局配置 · 店铺导航」实现' },
   { n: '品牌分类E', type: 'extension-cnzoom-category-4-1', ok: 1, kind: 'brand_category' },
-  { n: '混合排列A', type: 'extension-masswx-hpitemsa', ok: 1, kind: 'mixed_grid' }
+  { n: '混合排列A', type: 'extension-masswx-hpitemsa', ok: 1, kind: 'mixed_grid' },
+  { n: '选项卡Z4', type: 'extension-massdesign-tabcatez4', ok: 1, kind: 'tab_cate' }
 ];
 
 /**
@@ -1748,12 +1939,35 @@ const TABBAR_NODE = {
       },
       hint: '最少 2 项、最多 5 项（微信限制）。拖动可排序，顺序即底部导航从左到右的顺序'
     },
+    /*
+     * 配色两组 —— 分组名照有赞「店铺导航 > 更多设置」的叫法
+     * （导航图标色 / 导航背景色），并**默认展开**（`open: true`）。
+     *
+     * 为什么改：原来是一个折叠的「配色」组，运营打开导航面板只看得到最上面几项，
+     * 折叠标题也不提「图标」，于是「图标颜色怎么改」这件事在面板里根本找不到入口。
+     *
+     * 图标能跟着变色，靠 `utils/navcolor.js` 给内置 PNG 图标算 CSS filter
+     * （有赞内置图标是图标字体、天然跟着 color 走）。自传 / 素材库的图不染色，
+     * 与有赞一致 —— 这条写在下面两个字段的 hint 里，免得运营以为是坏了。
+     */
     {
-      type: 'group', label: '配色',
+      type: 'group', label: '导航图标色', open: true,
       fields: [
-        { k: 'color', label: '未选中颜色', type: 'color', def: '#8A8A8A' },
-        { k: 'selectedColor', label: '选中颜色', type: 'color', def: '#C8102E' },
-        { k: 'background', label: '导航背景色', type: 'color', def: '#FFFFFF' },
+        {
+          k: 'color', label: '未选中色', type: 'color', def: '#8A8A8A',
+          hint: '未选中项的「文字 + 图标」颜色。内置图标会跟着这个颜色重新染色'
+            + '（对齐有赞「导航图标色」）；自己上传 / 从素材库选的图保持原色，不会被重新着色'
+        },
+        {
+          k: 'selectedColor', label: '选中色', type: 'color', def: '#C8102E',
+          hint: '当前所在那一项的颜色。同样会染内置图标'
+        }
+      ]
+    },
+    {
+      type: 'group', label: '导航背景色', open: true,
+      fields: [
+        { k: 'background', label: '背景色', type: 'color', def: '#FFFFFF' },
         { k: 'borderColor', label: '顶部分割线', type: 'color', def: '#EEEEEE' }
       ]
     }

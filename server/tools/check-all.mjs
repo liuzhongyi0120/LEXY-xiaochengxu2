@@ -1504,7 +1504,9 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     enter_shop: ['text', 'align', 'color', 'bg', 'radius', 'link', 'bgOut', 'pageMargin'],
     audio: ['src', 'duration', 'text', 'avatar', 'useShopLogo', 'side', 'resume', 'pageMargin'],
     service: ['text', 'align', 'color', 'bg', 'radius', 'bgOut', 'pageMargin'],
-    content_card: ['title', 'cols', 'ratio', 'items', 'style', 'radius', 'showTag', 'showRead', 'showLike', 'more', 'moreText', 'link', 'pageMargin'],
+    content_card: ['title', 'cols', 'ratio', 'imgHeight', 'items', 'style', 'radius', 'showTag', 'showRead', 'showLike', 'more', 'moreText', 'link', 'pageMargin',
+      // 2026-10-12 复刻「创业故事」页时按真机实测补的细粒度字段（默认值 = 原来写死在 WXSS 里的值）
+      'padY', 'gapX', 'gapY', 'titleSize', 'titleWeight', 'titleLineHeight', 'titleAlign', 'titleColor', 'titlePadX', 'titlePadY'],
     buy_bar: ['goodsId', 'text', 'fontSize', 'align', 'theme', 'btnBg', 'padX', 'padB', 'btnH', 'btnR', 'bgOn', 'bg', 'bgH'],
     // 品牌分类（对标有赞「品牌分类E」）：三层数据 + 三个样式分组 + 扩展设置。
     // 这 62 个字段是有赞面板逐项抓来的，少任何一个都等于「属性面板少一项」。
@@ -1538,6 +1540,20 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
       'gap', 'paddingInner', 'paddingX', 'paddingY',
       'itemTitleColor', 'itemTitleSize', 'itemTitleWeight', 'itemTitleAlign', 'itemTitleLines',
       'bg', 'anim'                                // 扩展设置
+    ],
+    // 选项卡分类（对标有赞店铺侧三方扩展「选项卡Z4」extension-massdesign-tabcatez4）。
+    // 这 35 个字段是按有赞两页签（图文设置 / 扩展设置）逐项抄下来的，
+    // 少一个 = 属性面板少一项、运营就复刻不出这个组件。
+    tab_cate: [
+      'layout', 'tabs',                          // 列表布局 + 选项卡（→ 图文内容 → 条目）
+      'name', 'items',
+      'image', 'video', 'title', 'link',         // 条目字段
+      'cardStyle', 'cardBg',                     // 样式设置 · 卡片外观
+      'fit', 'gapOuter', 'gapInner', 'radius', 'halfRound', 'imgRatio',
+      'showTitle', 'titleLines', 'titleSize', 'titleGapY', 'titleGapX', 'titleBold', 'titleAlign',
+      'titleColor', 'tabColor', 'tabActiveColor', 'tabBg', 'tabFontSize',   // 扩展设置 · 选项卡
+      'paddingInner', 'paddingX', 'paddingTop', 'paddingBottom',
+      'bg', 'innerBg', 'bgImage'
     ]
   };
   /**
@@ -2916,10 +2932,104 @@ assert('店铺导航是全局配置，不被当成第 6 个页面混进页面列
 
 const navOpen = await call('GET', '/api/decorate/page', { auth: false, query: { key: 'nav' } });
 const navFields = navOpen.ok ? (navOpen.data.schema.fields || []) : [];
-assert('店铺导航的字段结构 = 图标样式 / 导航项 / 配色组（由 schema 自动推导，后台表单不硬编码）',
-  navOpen.ok && navFields.length === 3 && navFields[0].k === 'iconMode' && navFields[1].k === 'items' &&
-  navFields[2].type === 'group',
+assert('店铺导航的字段结构 = 图标样式 / 导航项 / 导航图标色组 / 导航背景色组（由 schema 自动推导，后台表单不硬编码）',
+  navOpen.ok && navFields.length === 4 && navFields[0].k === 'iconMode' && navFields[1].k === 'items' &&
+  navFields[2].type === 'group' && navFields[2].label === '导航图标色' &&
+  navFields[3].type === 'group' && navFields[3].label === '导航背景色',
   navOpen.ok ? navFields.map((f) => f.k || ('group:' + f.label)).join(' / ') : navOpen.json.msg);
+/*
+ * 配色两组必须**默认展开**（`open: true`）。
+ * 起因：原来是一个折叠的「配色」组，运营在导航面板里只看得到最上面几项，
+ * 折叠标题也不提「图标」——「图标颜色怎么改」这件事在面板里根本没有入口。
+ * 这条断言同时锁三件事：schema 声明了 open、admin.js 支持 open、两组确实都带了。
+ */
+const navOpenGroups = navFields.filter((f) => f.type === 'group');
+const navAdminJs = readFileSync(join(PUB, 'admin', 'admin.js'), 'utf8');
+/*
+ * 同时锁**源码文件**与**服务返回值**：
+ *   只锁服务返回值的话，把 `open: true` 从 schema.js 里删掉、不重启服务，断言照样绿
+ *   —— 本轮实测踩到（改文件→跑自检→该红没红，原因是老进程还在用旧 schema）。
+ *   只锁源码文本的话，又测不到「服务确实把 open 透出来了」（后端某处漏传就发现不了）。
+ *   两头都锁才是完整的一句「配色两组默认展开」。
+ */
+const navSchemaSrc = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+const navSchemaOpen = /type: 'group', label: '导航图标色', open: true/.test(navSchemaSrc) &&
+  /type: 'group', label: '导航背景色', open: true/.test(navSchemaSrc);
+assert('店铺导航的配色两组默认展开（schema 源码声明 open:true ＋ 服务透出 ＋ 装修台支持 open）',
+  navSchemaOpen && navOpenGroups.length === 2 && navOpenGroups.every((g) => g.open === true) &&
+  /'grp' \+ \(open \? ' open' : ''\)/.test(navAdminJs) && /open: !!f\.open/.test(navAdminJs),
+  `schema 源码=${navSchemaOpen} ｜ 服务返回 ${navOpenGroups.map((g) => g.label + ':' + g.open).join(' ')} ｜ admin.js 支持=${/'grp' \+ \(open/.test(navAdminJs) && /open: !!f\.open/.test(navAdminJs)}`);
+
+/*
+ * ---- F. 导航图标染色（复刻有赞「导航图标色」）----
+ *
+ * 背景：内置 icon 是 PNG 位图（颜色画死在图里），有赞用的是图标字体（字形跟着 color 走）。
+ * 我们等效地用 CSS filter 把位图染成目标色，算法在**两处**各存一份：
+ *   miniprogram/utils/navcolor.js   —— 真机（custom-tab-bar 在 readConfig 里算）
+ *   server/public/shared/pv-tabbar.js —— 装修台手机壳与 /preview
+ * 两份是同一算法，**必须行为等价**，否则「装修台预览一个色、真机另一个色」。
+ * 这里喂同一批输入给两边、逐字符比 filter 字符串 —— 比文本比函数体更硬
+ * （文本断言会因为加注释/换行就红，那是假红）。
+ */
+const NAV_NC = pvRequire(join(MP_ROOT, 'utils', 'navcolor.js'));
+const navTintColors = [
+  '#8A8A8A', '#C8102E', '#000000', '#FFFFFF', '#1A1A1A', '#2B6CB0', '#0F9D58',
+  '#F5A623', '#7B3FE4', '#FF0080', '#00A0A0', '#666666', '#C0C0C0', '#334155',
+  '#E11D48', '#5B8FF9', '#F6BD16', '#7262FD', '#78D3F8', '#9661BC'
+];
+const navTintMismatch = navTintColors.filter((h) => NAV_NC.tintFilter(h) !== NAV_PV.tintFilter(h));
+assert('导航图标染色算法两处等价（真机 utils/navcolor.js ↔ 预览 pv-tabbar.js，逐字符比 filter）',
+  navTintMismatch.length === 0 && !!NAV_NC.tintFilter('#2B6CB0'),
+  navTintMismatch.length === 0
+    ? `${navTintColors.length} 个色值全部一致`
+    : `不一致：${navTintMismatch.join(' ')}`);
+
+const navTintIcon = [
+  /* [图标地址, 颜色, 期望是否染色] */
+  ['/images/tabbar/home.png', '#8A8A8A', false, '内置未选中图标 + 默认未选中色 → 零变化'],
+  ['/images/tabbar/home-active.png', '#C8102E', false, '内置选中图标 + 默认选中色 → 零变化'],
+  ['/images/tabbar/home.png', '#2B6CB0', true, '内置未选中图标 + 改色 → 染色'],
+  ['/images/tabbar/home-active.png', '#0F9D58', true, '内置选中图标 + 改色 → 染色'],
+  ['http://14.103.50.137/uploads/202610/a.png', '#2B6CB0', false, '素材库自传图 → 不染（与有赞一致）'],
+  ['/uploads/202610/a.png', '#2B6CB0', false, '本地上传图 → 不染']
+];
+const navTintIconBad = navTintIcon.filter(([src, hex, want]) => {
+  const a = !!NAV_NC.iconFilter(src, hex), b = !!NAV_PV.iconFilter(src, hex);
+  return a !== want || b !== want;
+});
+assert('图标染色的适用边界：只染内置图标；默认色下零变化；自传 / 素材库图保持原色',
+  navTintIconBad.length === 0,
+  navTintIconBad.length === 0
+    ? navTintIcon.map((x) => (x[2] ? '染' : '不染')).join('/')
+    : navTintIconBad.map((x) => x[3]).join('；'));
+assert('染色 filter 的形状对（压黑打底 + 六原语恒定输出，便于两端逐字符比对）',
+  /^brightness\(0\) saturate\(100%\) invert\(-?\d+%\) sepia\(\d+%\) saturate\(\d+%\) hue-rotate\(-?\d+deg\) brightness\(\d+%\) contrast\(\d+%\)$/
+    .test(NAV_NC.tintFilter('#2B6CB0')),
+  NAV_NC.tintFilter('#2B6CB0'));
+
+/* 真机组件：readConfig 必须把两态的内联 style 一起算好（wxml 里不拼字符串） */
+const navCtbWxml = readFileSync(join(NAV_CTB, 'index.wxml'), 'utf8');
+const navCtbWxmlNoComment = navCtbWxml.replace(/<!--[\s\S]*?-->/g, '');
+assert('真机 custom-tab-bar：图标两态内联 style 由组件算好（styleOff / styleOn），wxml 只原样输出',
+  /selected === index \? item\.styleOn : item\.styleOff/.test(navCtbWxmlNoComment) &&
+  /styleOff: hideOff \+ \(filterOff \? 'filter:' \+ filterOff \+ ';' : ''\)/.test(navCtbSrc) &&
+  /styleOn: filterOn \? 'filter:' \+ filterOn \+ ';' : ''/.test(navCtbSrc),
+  `wxml 用 styleOn/styleOff=${/selected === index \? item\.styleOn/.test(navCtbWxmlNoComment)}`);
+const navCtbTint = navRunWithTabbar({
+  color: '#2B6CB0', selectedColor: '#0F9D58', background: '#FFFFFF', borderColor: '#EEEEEE', iconMode: 'active',
+  items: NAV_SCHEMA.TABBAR_DEFAULT_ITEMS
+});
+const navCtbTintOff = ((navCtbTint.items || [])[0] || {}).styleOff || '';
+const navCtbTintOn = ((navCtbTint.items || [])[0] || {}).styleOn || '';
+assert('真机组件按配色算出图标染色（改色 → 两态 filter 各按自己的色；「仅选中显示图标」的未选中态保留 visibility 占位）',
+  navCtbTintOff.indexOf('visibility:hidden;') === 0 &&
+  navCtbTintOff.indexOf('filter:' + NAV_NC.tintFilter('#2B6CB0')) > 0 &&
+  navCtbTintOn === 'filter:' + NAV_NC.tintFilter('#0F9D58') + ';',
+  `off=${navCtbTintOff.slice(0, 46)}… on=${navCtbTintOn.slice(0, 46)}…`);
+const navCtbDefault = navRunComponent(true);
+assert('真机组件：默认配色下不产生任何 filter（改造前后像素零变化）',
+  (navCtbDefault.items || []).every((i) => !/filter:/.test(i.styleOff || '') && (i.styleOn || '') === ''),
+  (navCtbDefault.items || []).map((i) => i.styleOff || '(空)').slice(0, 3).join(' | '));
 const navPathField = (() => {
   const items = navFields.filter((f) => f.k === 'items')[0];
   return items && items.item && (items.item.fields || []).filter((f) => f.k === 'path')[0];
@@ -4114,6 +4224,184 @@ function emitReport() {
       /n:\s*'混合排列A'[^}]*type:\s*'extension-masswx-hpitemsa'/.test(mgSchema) &&
       schemaMod.HOME_BLOCK_KINDS.mixed_grid !== undefined,
       `清单项=${/n:\s*'混合排列A'/.test(mgSchema)} 有区块类型=${schemaMod.HOME_BLOCK_KINDS.mixed_grid !== undefined}`);
+  }
+
+  /* ---------------------------------------------------------------------
+   * 资讯栏目页复刻（关于莱克 / 新闻大事 / 创业故事 / 我们品牌 / 用户分享 /
+   * 业务模式 / 售后服务 / 加入我们，2026-10-12）
+   *
+   * 这一组锁的是「量出来才知道」的几处口径 —— 它们都**不是**照着截图能看出来的：
+   *   1. 辅助分割的「高度」不决定占位：有赞实线模式渲染的是 hr{margin:10px 0}（线本身 1px），
+   *      所以补了 gapY（上下留白）。少了它，6 个页面的整块内容都会往上偏 10px。
+   *   2. 选项卡分类的页签条与首行卡片之间固定 10px（`.van-tab__pane-wrapper` 内层写死），
+   *      与「模块内边距 / 图文内间距」都无关，不做成字段、直接写死 20rpx。
+   *   3. 电梯导航「全店风格」是纯文字均分的页签条（有赞默认形态），不是四选一的标签块。
+   *   4. 「标题文本」的加粗是 font-weight: bold = 700，真机与预览必须同口径。
+   * ------------------------------------------------------------------- */
+  {
+    const nzSchema = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+    const nzJs = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+    const nzWxml = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    const nzCss = readFileSync(join(MP_ROOT, 'pages', 'index', 'index.wxss'), 'utf8');
+    const nzPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+
+    const nzGapYOk = /k:\s*'gapY'[^}]*def:\s*0/.test(nzSchema) &&
+      /o\.gapYRpx = px2rpx\(o\.gapY\)/.test(nzJs) &&
+      /block\.gapYRpx\}\}rpx 0;/.test(nzWxml) &&
+      /margin:' \+ lgapY \+ 'px 0/.test(nzPv);
+    assert('资讯页：辅助分割的「上下留白」四处齐备（有赞实线是 hr{margin:10px 0}，「高度」不决定占位）',
+      nzGapYOk,
+      `字段=${/k:\s*'gapY'/.test(nzSchema)} 派生=${/o\.gapYRpx/.test(nzJs)} 真机=${/block\.gapYRpx/.test(nzWxml)} 预览=${/lgapY/.test(nzPv)}`);
+
+    /* 三条判定各自成变量，**诊断行直接复用**（不再各写一条更松的正则）。
+       曾经踩过：判定用的正则写成 `\+ ';padding-top:10px'`（要求引号紧跟 10px），
+       而源码是 `+ ';padding-top:10px">'` → 断言恒红；诊断行却用了更松的 `/padding-top:10px/`，
+       输出「预览=true」，读起来像代码坏了、其实是断言写错。**假红 + 骗人的诊断比不检查更糟**。 */
+    const nzPaneJs = /o\.paneTopRpx = px2rpx\(10\)/.test(nzJs);
+    const nzPaneWxml = /class="tc-body" style="background: \{\{block\.innerBgCss\}\}; padding-top: \{\{block\.paneTopRpx\}\}rpx;"/.test(nzWxml);
+    const nzPanePv = /pvColor\(b\.innerBg, 'transparent'\) \+ ';padding-top:10px">'/.test(nzPv);
+    assert('资讯页：选项卡分类的「页签条→首行卡片」固定 10px 三处一致（有赞写在 pane-wrapper 内层）',
+      nzPaneJs && nzPaneWxml && nzPanePv,
+      `派生=${nzPaneJs} 真机=${nzPaneWxml} 预览=${nzPanePv}`);
+
+    /* 选项卡分类的网格层**不得** overflow:hidden（2026-10-12 逐像素对账时纠正）。
+       有赞同层 `.con`（x=10 w=355）是 `overflow: visible`；我们的 `.tc-grid` 盒子完全相同，
+       却曾写着 hidden —— 裁剪盒**正好等于卡片盒**，`.tc-card.shadow` 的 `0 4rpx 8rpx`
+       被齐着卡片边裁掉，**卡片投影一点都画不出来**（computed style 里 box-shadow 明明一致、
+       像素上差 6 级：有赞 241,242,244 / 我们 247,248,250）。
+       这类「样式对得上、像素对不上」的偏差只有逐像素取样能发现 → 必须落成断言防回归。
+       注：`.tc-card` 自己**要** overflow:hidden（图片圆角靠它裁），别把这条读成通用规则。
+       另外：**必须先剥掉 CSS 注释再匹配**（与「HTML 断言要另剥注释」同理）——
+       这段规则的注释里就写着「不能 overflow: hidden」几个字，不剥注释会把自己注释里的字
+       当成声明读出来，断言恒红。 */
+    const nzCssNoCmt = nzCss.replace(/\/\*[\s\S]*?\*\//g, '');
+    const nzGridRule = (/\.tc-grid \{([\s\S]*?)\}/.exec(nzCssNoCmt) || [null, ''])[1];
+    const nzGridNoClip = !/overflow:\s*hidden/.test(nzGridRule);
+    const nzGridBox = /box-sizing:\s*border-box/.test(nzGridRule);
+    assert('资讯页：选项卡分类的网格层不得 overflow:hidden（裁剪盒==卡片盒会把卡片投影齐边裁掉）',
+      nzGridNoClip && nzGridBox,
+      `overflow=${(/overflow:\s*([a-z]+)/.exec(nzGridRule) || [null, '（无，即 visible）'])[1]} box-sizing=${nzGridBox}`);
+
+    const nzElevOk = /o\.plain = o\.styleType !== 'custom'/.test(nzJs) &&
+      /o\.plainHRpx = px2rpx\(44\)/.test(nzJs) &&
+      /block\.plain && !block\.dropdown/.test(nzWxml) &&
+      /class="ce-plainitem"/.test(nzWxml) &&
+      /\.ce-plain \{[\s\S]*?align-items: stretch;/.test(nzCss) &&
+      /\.ce-plainitem \{[\s\S]*?flex: 1 1 0%/.test(nzCss) &&
+      /* 项必须**整条高**（stretch + 项内居中）：写成一行高的话可点区域只有一行，
+         真机上点上下边缘点不中 —— 外观一样，手感完全不同，只能靠断言锁。 */
+      /\.ce-plainitem \{[\s\S]*?align-items: center;/.test(nzCss) &&
+      /\.ce-plainitem \{[\s\S]*?line-height: 20px;/.test(nzCss) &&
+      /var ePlain = b\.styleType !== 'custom'/.test(nzPv) &&
+      /align-items:stretch;height:44px/.test(nzPv);
+    assert('资讯页：电梯导航「全店风格」= 纯文字均分页签条（真机 ce-plain / 预览 ePlain 同口径）',
+      nzElevOk,
+      `派生=${/o\.plain =/.test(nzJs)} 真机=${/ce-plainitem/.test(nzWxml)} 预览=${/ePlain/.test(nzPv)} 样式=${/\.ce-plainitem/.test(nzCss)} 整条高=${/align-items: stretch/.test(nzCss)}`);
+
+    /* 选项卡标题行高必须是字号的 1.5 倍（有赞 .item_title 实测：14px→21、11px→16.5）——
+       不写就按 normal 算，两行标题矮 3~4px，「新闻大事」整页因此矮 30px。 */
+    const nzTcLh = /\.tc-title \{[\s\S]*?line-height: 1\.5;/.test(nzCss) &&
+      /'line-height:1\.5;' \+/.test(nzPv);
+    assert('资讯页：选项卡「图文标题」行高比率 1.5 真机/预览同口径（有赞 .item_title 实测）',
+      nzTcLh,
+      `真机=${/\.tc-title \{[\s\S]*?line-height: 1\.5;/.test(nzCss)} 预览=${/'line-height:1\.5;'/.test(nzPv)}`);
+
+    const nzBoldOk = /\.ct-main\.bold \{ font-weight: 700; \}/.test(nzCss) &&
+      /b\.bold \? 700 : 400/.test(nzPv);
+    assert('资讯页：标题文本加粗真机/预览同为 700（有赞写的就是 font-weight: bold）',
+      nzBoldOk,
+      `真机=${/\.ct-main\.bold \{ font-weight: 700/.test(nzCss)} 预览=${/b\.bold \? 700 : 400/.test(nzPv)}`);
+  }
+
+  /* -------------------------------------------------------------------
+   * 页面底色：真机 WXML / schema 默认值 / 预览 pv-render **三处同口径**
+   * （2026-10-12 复刻资讯 8 页时补）
+   *
+   * 起因：真机的两个页面根节点都是
+   *   `style="background: {{meta.bg || '#F5F6F8'}};"`
+   * 而装修台预览原先**不画这一层**，靠手机壳自己的 `.phone-screen { background: #fff }` 顶着 ——
+   * 两边根本不是同一个颜色：运营在装修台照着白底调、真机上却是灰的（复刻 03「创业故事」时
+   * 正好反过来：有赞白、我们灰）。修法是在 `pv-render.js` 里**把底色画出来**（`pvPageBg`）。
+   *
+   * 任何一处改了默认色、或预览又漏画这层，就会复现「后台一个样、真机另一个样」——
+   * 而这种偏差在装修台里看起来「一切正常」，只有把两边截图叠起来才发现。
+   * ------------------------------------------------------------------- */
+  {
+    const bgWxmlHome = readFileSync(join(MP_ROOT, 'pages', 'index', 'index.wxml'), 'utf8');
+    const bgWxmlCustom = readFileSync(join(MP_ROOT, 'pages', 'custom', 'index.wxml'), 'utf8');
+    const bgSchema = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+    const bgPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+
+    const reWxmlBg = /background:\s*\{\{meta\.bg \|\| '([#0-9A-Fa-f]{3,8})'\}\}/;
+    const wHome = (reWxmlBg.exec(bgWxmlHome) || [null, ''])[1];
+    const wCustom = (reWxmlBg.exec(bgWxmlCustom) || [null, ''])[1];
+    const wSchema = (/CUSTOM_META_DEFAULT = \{[^}]*?\bbg:\s*'([#0-9A-Fa-f]{3,8})'/.exec(bgSchema) || [null, ''])[1];
+    const wDef = (/var PAGE_BG_DEF = '([#0-9A-Fa-f]{3,8})'/.exec(bgPv) || [null, ''])[1];
+    /* 预览必须**真的把底色画出来**，且**首页与自定义页都走同一条**：
+       `var bg = (d && d.meta && d.meta.bg) || PAGE_BG_DEF` + `pvPageBg(d, …)`。 */
+    const wDrawBg = /var bg = \(d && d\.meta && d\.meta\.bg\) \|\| PAGE_BG_DEF/.test(bgPv);
+    const wHomeUses = /function pvHome\(d\) \{[\s\S]*?return pvPageBg\(d, h\);[\s\S]*?\n  \}/.test(bgPv);
+    const wCustomUses = /function pvCustom\(d\) \{[\s\S]*?return pvPageBg\(d, inner\);[\s\S]*?\n  \}/.test(bgPv);
+    assert('页面底色：真机两处 WXML / schema 默认值 / 预览 pv-render 四处同口径（且首页与自定义页都画出来）',
+      !!wHome && wHome === wCustom && wHome === wSchema && wHome === wDef && wDrawBg && wHomeUses && wCustomUses,
+      `首页WXML=${wHome || '（没解析到）'} 自定义WXML=${wCustom || '（没解析到）'} schema=${wSchema || '（没解析到）'} ` +
+      `预览默认值=${wDef || '（没解析到）'} 画底色=${wDrawBg} 首页用=${wHomeUses} 自定义页用=${wCustomUses}`);
+  }
+
+  /* -------------------------------------------------------------------
+   * 富文本区块：预览链路必须真渲染 + 三端同口径（2026-10-12 复刻资讯 8 页时补）
+   *
+   * 起因是一个「查了三轮才发现」的 bug：WXML→HTML 编译器把 `<rich-text nodes="{{…}}">`
+   * 当普通标签翻成 `<div>`，`nodes` 落进 attribute，于是**富文本块在 /preview 里恒为 0 高**
+   * （装修台看得到内容、预览页一片空白），页面整体比有赞矮 75px。
+   * 真机是好的 —— 只有预览在说谎，这类 bug 不锁就会再犯。
+   * ------------------------------------------------------------------- */
+  {
+    const rxWxml = readFileSync(join(__dirname, '..', 'public', 'shared', 'mp-wxml.js'), 'utf8');
+    const rxPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+    const rxJs = readFileSync(join(MP_ROOT, 'utils', 'blocks.js'), 'utf8');
+    const rxTpl = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    const rxCss = readFileSync(join(MP_ROOT, 'pages', 'index', 'index.wxss'), 'utf8');
+    const rxAdminCss = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.css'), 'utf8');
+    const rxReset = readFileSync(join(MP_ROOT, 'styles', 'reset.wxss'), 'utf8');
+
+    assert('富文本：WXML→HTML 编译器必须单独特判 rich-text 并把 nodes 渲染成子节点',
+      /tag === 'rich-text'/.test(rxWxml) && /attrValue\(attrs\['nodes'\]/.test(rxWxml) &&
+        /Array\.isArray\(rNodes\)/.test(rxWxml),
+      `特判=${/tag === 'rich-text'/.test(rxWxml)} 取 nodes=${/attrs\['nodes'\]/.test(rxWxml)} 数组分支=${/Array\.isArray\(rNodes\)/.test(rxWxml)}`);
+
+    /* 清洗规则三处字面一致 —— 预览页与装修台同源，富文本又是运营可自由填的 HTML，差一条就是一条 XSS 通道 */
+    const RICH_RULES = ['script|style|iframe|object|embed|link|meta', '\\son\\w+\\s*=', 'javascript:'];
+    const rxClean = (src) => RICH_RULES.every((r) => src.indexOf(r) >= 0);
+    assert('富文本：清洗规则真机/预览/装修台三处一致（含 on* 事件与 javascript: 两条）',
+      rxClean(rxJs) && rxClean(rxPv) && rxClean(rxWxml),
+      `真机=${rxClean(rxJs)} 装修台=${rxClean(rxPv)} 预览=${rxClean(rxWxml)}`);
+
+    /* 模块口径：上内边距 10px 是关键 —— 缺了它首个 <p> 的 margin-top 会穿透容器，整块少 10px（整页矮 5px）；
+       行高必须是**比率 1.5**（有赞口径）：写成固定长度就不会随字号缩放，混排大小字时整块偏矮。 */
+    const rxPadOk = /padding: 20rpx \{\{block\.marginRpx\}\}rpx 0;/.test(rxTpl) &&
+      /padding:10px ' \+ richPad \+ 'px 0;/.test(rxPv) &&
+      /\.c-rich \{[\s\S]*?font-size: 32rpx;[\s\S]*?line-height: 1\.5;/.test(rxCss) &&
+      /\.c-rich \{[\s\S]*?overflow: hidden;/.test(rxCss) &&
+      /\.pv-rich \{ font-size: 16px; line-height: 1\.5;/.test(rxAdminCss) &&
+      !/\.cr-body \{[\s\S]{0,200}?font-size: var\(--font-base\)/.test(rxCss);
+    assert('富文本：上内边距 10px / 字号 16px / 行高比率 1.5 四处一致（有赞 .cap-richtext 实测）',
+      rxPadOk,
+      `真机模板=${/padding: 20rpx/.test(rxTpl)} 预览=${/padding:10px /.test(rxPv)} 真机样式=${/line-height: 1\.5;/.test(rxCss)} 装修台=${/\.pv-rich \{ font-size: 16px; line-height: 1\.5;/.test(rxAdminCss)} 内容不越权=${!/\.cr-body \{[\s\S]{0,200}?var\(--font-base\)/.test(rxCss)}`);
+
+    /* <p> 默认 margin-top 是 1em；有赞容器带 p{margin:0}，编辑器又常常只写 margin-bottom，
+       于是「只写一半」的段落会多出 16px 上外边距。这条重置三处必须都有。 */
+    const rxResetOk = /function richResetMarginTop/.test(rxJs) && /richResetMarginTop\(/.test(rxJs) &&
+      /function pvRichMarginTop/.test(rxPv) && /pvRichMarginTop\(/.test(rxPv) &&
+      /function richMarginTop/.test(rxWxml) && /richMarginTop\(/.test(rxWxml);
+    assert('富文本：块级标签 margin-top 重置三处齐备（有赞容器有 p{margin:0}，编辑器常只写 margin-bottom）',
+      rxResetOk,
+      `真机=${/richResetMarginTop\(/.test(rxJs)} 装修台=${/pvRichMarginTop\(/.test(rxPv)} 预览=${/richMarginTop\(/.test(rxWxml)}`);
+
+    /* 字体栈：line-height:normal 按字体本身的行高算，桌面 Chrome 上 Arial 与 Segoe UI 差 0.17em（24px 下 4px） */
+    assert('字体：页面字体栈含 Helvetica/Arial 档（对齐有赞 H5，消除桌面预览 4px 假差异）',
+      /'Helvetica Neue', Helvetica/.test(rxReset) && /Arial/.test(rxReset),
+      `reset.wxss=${/'Helvetica Neue', Helvetica/.test(rxReset)}`);
   }
 
   results.forEach((r) => {

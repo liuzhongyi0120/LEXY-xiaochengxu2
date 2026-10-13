@@ -1,6 +1,18 @@
 /* 基础重置 */
 page {
-  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto, sans-serif;
+  /*
+   * 字体栈与有赞 H5（以及绝大多数中文 H5）**逐字对齐**，多出来的 Helvetica / Arial 档不是凑数：
+   * `line-height: normal` 是按「真正被选中的那款字体的 ascent/descent」算行高的，
+   * 所以在桌面 Chrome 上「Helvetica→Arial」与「Segoe UI」会差约 0.17em —— 24px 字号下正好 4px。
+   * 复刻资讯 8 页时对照表里就出现过「HTML 一模一样、有赞段落 31px、我们 35px」，
+   * 真机（iOS/Android 两端都落到系统字体）根本不会有这个差，纯属 Windows 预览环境的假差异。
+   * 把栈对齐后，本地对照不再背着这 4px 噪声，真问题才浮得出来。
+   * ⚠️ 真机行为不变：iOS 命中 -apple-system、Android 命中 BlinkMacSystemFont→Roboto，
+   *    新增的几档只在桌面 Chrome 上生效。
+   * 改完请跑 .tooling/_yz3-compare.mjs 确认对照表收敛。
+   */
+  font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Helvetica, 'Segoe UI', Arial,
+    Roboto, 'PingFang SC', miui, 'Hiragino Sans GB', 'Microsoft Yahei', sans-serif;
   font-size: 28rpx;
   color: var(--color-text);
   background-color: var(--color-bg);

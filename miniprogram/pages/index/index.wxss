@@ -92,7 +92,8 @@
 .ct-main.s-sm { font-size: 26rpx; }
 .ct-main.s-md { font-size: 32rpx; }
 .ct-main.s-lg { font-size: 40rpx; }
-.ct-main.bold { font-weight: 600; }
+/* 有赞「标题文本」的加粗是 font-weight: bold（= 700），不是 600 */
+.ct-main.bold { font-weight: 700; }
 .ct-sub {
   margin-top: 6rpx;
   font-size: 24rpx;
@@ -307,14 +308,37 @@
 
 /* ==================== 富文本 ==================== */
 .c-rich {
+  /*
+   * 有赞「富文本」模块的口径（2026-10-12 在 375 宽真机实测 .cap-richtext）：
+   *   padding: 10px 10px 0（左右由模板按「页面边距」内联下发）、font-size: 16px、line-height: 24px。
+   *
+   * ⚠️ 上内边距 10px 不是装饰，缺了它会**连带改变整块占位**：容器 padding-top 为 0 时，
+   *    首个 <p> 的 margin-top 会穿透容器继续往外折（margin 折叠），
+   *    结果是「整块被往下顶 5px、总高少 10px」—— 复刻资讯 8 页时页面整体因此比有赞矮 5px，
+   *    而其它每一块都量得准，非常难查。改这里请一起跑 .tooling/_yz3-compare.mjs。
+   */
   display: block;
+  font-size: 32rpx;
+  /*
+   * 行高必须是**比率 1.5**，不能写成固定长度（如 48rpx）——
+   * line-height 是比率时逐元素**重算**（24px 字号 → 36px、14px → 21px），
+   * 写成固定长度则原样继承（都变 24px）。
+   * 有赞 `.cap-richtext` 量的就是比率：容器 16px 字号算出来 24px，同一个 <p> 里的
+   * 24px 与 14px 两个 span 分别是 36px 与 21px。写错的表现是「富文本里混排大小字时整块偏矮」
+   * ——「售后服务」页因此矮 9px，后面所有区块跟着上移 9px。
+   */
+  line-height: 1.5;
+  /* 收住**末段**的下外边距（有赞 .cap-richtext 同样收住了，量出来容器高 75 而内容只到 70）。
+     不收的话末段的 5px margin 会穿透容器落到容器外 —— 排版位置一样，
+     但容器盒子会矮 5px，「富文本块多高」这个数就对不上，以后排查会被这 5px 牵着走。 */
+  overflow: hidden;
 }
 .cr-body {
   display: block;
-  font-size: var(--font-base);
   color: var(--color-text);
-  line-height: 1.7;
   word-break: break-all;
+  /* 字号/行高一律从 .c-rich 继承（有赞那边也是容器给、内容继承），
+     这里再写一份就会盖掉容器口径，出现「容器 16px、内容 14px」。 */
 }
 
 /* ==================== 商品搜索 ==================== */
@@ -352,6 +376,31 @@
 /* ==================== 电梯导航 ==================== */
 .c-elev {
   display: block;
+}
+/*
+ * 「全店风格」的纯文字页签条（有赞实测：整条 44px，每项 flex:1 均分，文字 14px 居中，
+ * 选中项加粗 + 换成选中色）。有赞那条 `.van-tabs__line` 指示线在这里是**白色**，
+ * 白底上等于不可见，所以不画 —— 状态只靠文字颜色/字重区分。
+ */
+.ce-plain {
+  display: flex;
+  /* stretch 而不是 center：有赞的页签项是**整条高**（实测 44px，flex 项在 flex-start 的容器里
+     默认 stretch），文字在项内自己居中。用 center 的话「项」只有一行高（16.8px），
+     虽然文字看起来位置一样，但**可点区域小了一大半**，真机上点上下边缘点不中。 */
+  align-items: stretch;
+  width: 100%;
+}
+.ce-plainitem {
+  flex: 1 1 0%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 有赞实测 line-height: 20px（14px 字号） */
+  line-height: 20px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .ce-scroll {
   white-space: nowrap;
@@ -492,7 +541,9 @@
 }
 .cc-card.shadow {
   border-radius: var(--radius-base);
-  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, .06);
+  /* 2026-10-12 对齐有赞「内容卡片」的 .cardShadow 实测值 box-shadow: 0 2px 4px rgba(0,0,0,.08)
+     （原来是我们自己定的 0 2px 8px rgba(0,0,0,.06)：模糊半径大 4px、又淡一点）。 */
+  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, .08);
 }
 .cc-card.white {
   border-radius: 0;
@@ -513,6 +564,11 @@
   top: 0;
   width: 100%;
   height: 100%;
+}
+/* 「图片比例 · 自适应」：不撑比例盒，按原图比例铺满整宽（有赞 widthFix 同款） */
+.cc-img-auto {
+  display: block;
+  width: 100%;
 }
 .cc-body {
   padding: 16rpx;
@@ -653,6 +709,161 @@
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+/* ==================== 选项卡分类（对标有赞三方扩展「选项卡Z4」） ====================
+ * 取值来源：2026-10-12 真机 375 视口量盒（.tooling/_yz3-measure.mjs）+ 扩展自身的 CSS 规则
+ * （.tooling/_yz3-css.js，从线上 document.styleSheets 抄录）。
+ * 这里只放与取值无关的骨架：底色 / 圆角 / 间距 / 字号 全部走内联 style（它们都是可配字段）。
+ *
+ * 选项卡条口径（与有赞扩展逐项对齐）：
+ *   - 整条高 76rpx（= 有赞 38px）；每项 flex:1 均分；
+ *   - 文字块高 68rpx、行高 68rpx、下留 8rpx
+ *     （= 有赞 .nav_text 的 height/line-height 34px + margin-bottom 4px）；
+ *   - 选中项加粗（有赞 .nav_text.curent 的 font-weight:bold），**但颜色不变**
+ *     —— 实测 8 个页面里「导航文字色」与「导航选中色」都是 #444444，靠加粗区分选中；
+ *   - 短横线：宽固定 80rpx（= 有赞 40px）、高 4rpx（= 2px）、贴在选项卡条底边、
+ *     水平居中于文字 → 用「绝对定位 + left:50% + margin-left:-40rpx」还原
+ *     （有赞那两条线里 `.van-tabs__line` 被 display:none 关掉了，实线是每项自带的 text_line）。
+ */
+.c-tc {
+  display: block;
+  box-sizing: border-box;
+}
+.tc-tabs {
+  display: flex;
+  align-items: flex-start;
+  box-sizing: border-box;
+}
+.tc-tab {
+  position: relative;
+  flex: 1 1 0%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+.tc-tab-txt {
+  width: 100%;
+  height: 68rpx;
+  line-height: 68rpx;
+  margin-bottom: 8rpx;
+  text-align: center;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tc-tab-line {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 80rpx;
+  height: 4rpx;
+  margin-left: -40rpx;
+}
+.tc-body {
+  display: block;
+}
+.tc-grid {
+  /*
+   * ⚠️ 这一层**不能** overflow: hidden（曾经是 hidden，2026-10-12 用探针纠正）。
+   *
+   * 旧注释的理由是「与有赞 `.con` 完全同构，负外边距溢出的那几像素在有赞那边也被这层裁掉」——
+   * 实测是错的：`_yz3-bg-probe.mjs` 把有赞 `.con` 的祖先链摊开后，
+   *   `.con`        x=10 w=355  **overflow: visible**
+   *   `.con_iner`   x=4  w=367  overflow: visible
+   *   `van-tabs__content` x=0 w=375 overflow: hidden（够宽，裁不到卡片投影）
+   * 而我们的 `.tc-grid` 是 x=10 w=355 + hidden —— 裁剪盒**正好等于卡片盒**，
+   * 于是 `.tc-card.shadow` 的 `0 4rpx 8rpx` 被齐着卡片边裁掉，**卡片投影一点都画不出来**
+   * （计算样式里 box-shadow 明明一致，像素上两边差 6 级：有赞 241,242,244 / 我们 247,248,250）。
+   *
+   * 去掉 overflow 后：`.tc-out`/`.tc-row` 仍在 4..371（负外边距照旧，盒子逐项不变），
+   * 只是不再被裁 —— 与有赞同构。外层 `.c-tc`/`.tc-body` 都是 0..375，溢不出手机屏。
+   */
+  box-sizing: border-box;
+}
+.tc-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.tc-out {
+  /* 与有赞 `.list_out { flex-shrink: 0 }` 一致：宽度类（one/two/three → 100/50/33.33%）
+     由 JS 算成 block.cellW 后内联下发，半行留白行为随之自然一致。 */
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+.tc-card {
+  /* 有赞 `.list` 是 flex 列（`.f_dis.f_col`）—— 标题的 margin 不会折叠穿透，
+     盒子量出来才与有赞逐像素一致（与「混合排列」的 .mg-body 同一个坑同一个口径）。 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.tc-card.shadow {
+  box-shadow: 0 4rpx 8rpx rgba(0, 0, 0, .06);
+}
+.tc-card.outline {
+  border: 1rpx solid rgba(50, 50, 51, .1);
+}
+.tc-pic {
+  position: relative;
+  width: 100%;
+  height: 0;
+  overflow: hidden;
+}
+.tc-img {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.tc-img-auto {
+  display: block;
+  width: 100%;
+}
+.tc-vpic {
+  width: 100%;
+  height: 0;
+  padding-top: 56.25%;
+  position: relative;
+}
+.tc-video {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+}
+.tc-title {
+  box-sizing: border-box;
+  word-break: break-all;
+  /*
+   * 行高 1.5 —— 有赞 `.item_title` 的实测值：14px 字号 → 21px、11px → 16.5px、14px → 21px，
+   * 三个页面都是「字号 × 1.5」，是**比率**不是固定值。
+   * 不写就按 `normal` 算（≈1.36），两行标题矮 3~4px，卡片高度、整页高度跟着一起错
+   * （「新闻大事」整页因此矮 30px、「用户分享」矮 15px）。
+   */
+  line-height: 1.5;
+}
+.tc-title.one {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.tc-title.two {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.tc-empty {
+  padding: 40rpx 0;
+  text-align: center;
+  font-size: 26rpx;
+  color: #b8bec8;
 }
 
 /* ==================== 购买按钮（固定吸底） ==================== */
