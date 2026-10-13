@@ -229,7 +229,7 @@ function ctxOf(pageObj, extra) {
   check('页面上会渲染出来的工具项，每项都有可用的落点（真页面 / 非跳转方式 / 说明页）', noTarget.length === 0,
     noTarget.length ? `无落点：${noTarget.join(', ')}` : `${shown.length} 项全部有落点`);
 
-  /* 个人资产区块：数值先给 `—`，优惠券由页面回填真实张数 */
+  /* 个人资产区块：缺省数值按项给（余额 / 积分 '0'，张数类 '—'），优惠券由页面回填真实张数 */
   const statBlock = blocksLib.normalizeBlock({ type: 'uc_stats', showBalance: true, showCoupon: true, showWallet: true });
   const couponItem = (statBlock.items || []).filter((i) => i.key === 'coupon')[0];
   check('个人资产区块：优惠券项带真实落点，其余项带依赖说明',
@@ -237,14 +237,34 @@ function ctxOf(pageObj, extra) {
     && statBlock.items.filter((i) => !i.route).every((i) => i.dep.length > 0),
     `items=${statBlock.items.map((i) => i.key + (i.route ? '✓' : '·')).join(' ')}`);
 
+  /* 缺省数值口径（2026-10-13 店主要求）：余额 / 积分显示 0，张数类显示 —。
+     这条的作用是**锁口径**：以前全表都是 `—`，谁把它改回 `—`（或把张数类改成 0）都会红。 */
+  const defItems = blocksLib.normalizeBlock({ type: 'uc_stats' }).items;
+  const defZero = ['balance', 'points'];
+  const defBad = defItems
+    .filter((i) => i.value !== (defZero.indexOf(i.key) >= 0 ? '0' : '—'))
+    .map((i) => i.key + '=' + i.value);
+  check('个人资产缺省数值：余额 / 积分是 0（新用户的真实状态），张数类（权益卡 / 券 / 钱包 / 礼品卡 / 提货卡）是 —（「查不到」≠「0 张」）',
+    defBad.length === 0,
+    defBad.length ? `口径不对：${defBad.join(', ')}` : defItems.map((i) => i.label + '=' + i.value).join(' '));
+
   const patched = blocksLib.applyStatValues(
     blocksLib.normalizeBlocks([{ type: 'uc_stats', showCoupon: true, showBalance: true }]),
     { coupon: 3 }
   )[0];
-  check('真实券数能回填到优惠券项，且未回填的项保持 `—`（「未知」不等于「0」）',
+  check('真实券数能回填到优惠券项，未回填的项保持各自缺省值（余额仍是 0、权益卡仍是 —）',
     patched.items.filter((i) => i.key === 'coupon')[0].value === '3'
-    && patched.items.filter((i) => i.key === 'balance')[0].value === '—',
+    && patched.items.filter((i) => i.key === 'balance')[0].value === '0'
+    && patched.items.filter((i) => i.key === 'card')[0].value === '—',
     patched.items.map((i) => i.key + '=' + i.value).join(' '));
+
+  /* 复位出口：未登录 / 退出登录必须整块回到缺省值，而不是只手写优惠券那一项 */
+  const resetVals = typeof blocksLib.defaultStatValues === 'function' ? blocksLib.defaultStatValues() : null;
+  const resetBad = (blocksLib.UC_STAT_DEFS || []).filter((d) => !resetVals || resetVals[d.key] !== (d.def || '—'));
+  check('defaultStatValues() 覆盖全部资产项且与 UC_STAT_DEFS 逐项一致（复位值只有一处定义）',
+    !!resetVals && resetBad.length === 0,
+    !resetVals ? 'blocks.js 没有导出 defaultStatValues()'
+      : (resetBad.length ? `不一致：${resetBad.map((d) => d.key).join(', ')}` : JSON.stringify(resetVals)));
 }
 
 /* ------------------------------ 汇总 ------------------------------ */

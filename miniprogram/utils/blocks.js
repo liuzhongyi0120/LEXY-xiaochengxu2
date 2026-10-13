@@ -87,12 +87,22 @@ const TOOL_META = {
  *
  * `route` = 这一项在本商城的真实落点（有就真跳）；没写 `route` 的项自建商城没有对应
  * 业务底座，点击统一落「功能未开放」页，并把 `dep`（缺的是哪套数据）写在页面上。
- * ⚠️ 本表是**唯一一份**：route 只在这里定义，`utils/blockPage.js` 直接 require 本表来跳转
- *    （那张 `TOOL_ROUTE` 是「必备工具」的，两套条目不是同一批，别混）。
+ *
+ * `def` = **页面没有拿到真实数值时显示的缺省值**（2026-10-13 按店主要求定口径）：
+ *   · 余额 / 积分 → `'0'`。这两项是「任何新用户的真实状态就是 0」（0 元、0 分），
+ *     而不是「我们不知道」—— 后端没有余额/积分账户，显示 0 与「没有资产体系」并不冲突；
+ *   · 其余项（权益卡 / 钱包 / 礼品卡 / 提货卡）→ `'—'`。这四项是**张数**，
+ *     不接入数据源时「0 张」与「查不到」是两件事，显示 0 会骗用户说有卡但已用完；
+ *   · 优惠券也不写 `def`（即 `'—'`）：它有真数据源，未登录时是「取不到」而非「0 张」
+ *     （未登录复位见 `pages/mine/mine.js` 的 `loadStatValues`，复位值由 `defaultStatValues()` 统一给）。
+ * ⚠️ 本表是**唯一一份**：route / def 只在这里定义，`utils/blockPage.js` 直接 require 本表来跳转
+ *    （那张 `TOOL_ROUTE` 是「必备工具」的，两套条目不是同一批，别混）；
+ *    装修台预览（`server/public/shared/pv-render.js`）有一份**同源同序**的镜像表，
+ *    口径必须逐项一致，否则运营在预览里调半天、真机却是另一个值。
  */
 const UC_STAT_DEFS = [
-  { k: 'showBalance', key: 'balance', label: '余额', unit: '元', dep: '会员余额账户' },
-  { k: 'showPoints', key: 'points', label: '积分', unit: '', dep: '积分体系' },
+  { k: 'showBalance', key: 'balance', label: '余额', unit: '元', dep: '会员余额账户', def: '0' },
+  { k: 'showPoints', key: 'points', label: '积分', unit: '', dep: '积分体系', def: '0' },
   { k: 'showCard', key: 'card', label: '权益卡', unit: '张', dep: '付费权益卡' },
   { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张', route: '/packageUser/coupon/coupon' },
   { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元', dep: '钱包账户' },
@@ -101,13 +111,27 @@ const UC_STAT_DEFS = [
 ];
 
 /**
- * 个人资产项的静态定义（供页面级跳转 / 说明使用）。
- * @returns {{key:string,label:string,unit:string,route:string,dep:string}|null}
+ * 个人资产项的静态定义（供页面级跳转 / 说明 / 复位使用）。
+ * @returns {{key:string,label:string,unit:string,route:string,dep:string,def:string}|null}
  */
 function statDef(key) {
   const d = UC_STAT_DEFS.filter((x) => x.key === key)[0];
   if (!d) return null;
-  return { key: d.key, label: d.label, unit: d.unit, route: d.route || '', dep: d.dep || '' };
+  return { key: d.key, label: d.label, unit: d.unit, route: d.route || '', dep: d.dep || '', def: d.def || '—' };
+}
+
+/**
+ * 全部资产项的**缺省数值**，形如 `{ balance: '0', points: '0', coupon: '—', … }`。
+ *
+ * 用途：未登录 / 退出登录时把资产数值复位。**必须走这个出口，不要在页面里手写
+ * `{ coupon: '—' }` 这种局部对象** —— 以前就是这么写的，于是「余额 / 积分缺省值改成 0」
+ * 这种口径变更要改两处，漏一处就会出现「退出登录后还留着上一个账号的数」。
+ * @returns {object}
+ */
+function defaultStatValues() {
+  const v = {};
+  UC_STAT_DEFS.forEach((d) => { v[d.key] = d.def || '—'; });
+  return v;
 }
 
 /** 我的订单 6 个入口（与有赞面板的 6 个开关一一对应） */
@@ -740,12 +764,13 @@ function normalizeBlock(b, index) {
   } else if (kind === 'uc_stats') {
     /*
      * 个人资产：7 个开关只决定「展示哪几项」。
-     *   · 有底座的项（优惠券）先给 '—'，页面装配 data 时用 applyStatValues 回填真实数值；
-     *   · 没底座的项保持 '—'，点了落「功能未开放」页并说明缺哪套数据（dep 一起带到页面）。
+     *   · 数值先取**本项自己的缺省值**（`d.def`，见 UC_STAT_DEFS 注释：余额 / 积分是 `0`，
+     *     其余是 `—`），页面装配 data 时用 applyStatValues 回填真实数值（目前只有优惠券有真数）；
+     *   · 没落点的项点了落「功能未开放」页并说明缺哪套数据（dep 一起带到页面）。
      * 每项都是可点的 —— 「点了没反应」比「点了告诉你为什么没有」糟得多。
      */
     o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false).map((d) => ({
-      key: d.key, label: d.label, unit: d.unit, value: '—',
+      key: d.key, label: d.label, unit: d.unit, value: d.def || '—',
       route: d.route || '',
       dep: d.dep || ''
     }));
@@ -1039,8 +1064,10 @@ function applyUserProfile(blocks, user) {
  * 把**真实数值**回填到个人资产区块（目前只有「优惠券」有数据源）。
  *
  * 与 applyUserProfile 同一模式：装修数据里只有「展示哪些项」，数值是运行态。
- * 只覆盖传进来的 key —— 没传的项保持 `—`（「未知」和「0」是两件事，
- * 未登录时接口要令牌、拿不到数，不能显示成 0 张）。
+ * 只覆盖传进来的 key —— 没传的项**保持它自己的缺省值**（`UC_STAT_DEFS[].def`：
+ * 余额 / 积分是 `0`，权益卡 / 钱包 / 礼品卡 / 提货卡 / 优惠券是 `—`）。
+ * 「缺省值」与「查到 0」在显示上可能重合，但语义不同，所以缺省值只在 UC_STAT_DEFS 定一处、
+ * 复位走 `defaultStatValues()`，页面不许自己拼缺省对象。
  *
  * @param {Array} blocks 已 normalize 的区块数组
  * @param {object} values 形如 { coupon: 3 }
@@ -1058,6 +1085,6 @@ function applyStatValues(blocks, values) {
 
 module.exports = {
   normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, applyUserProfile, applyStatValues,
-  sanitizeRich, SIZE_CLASS, statDef,
+  sanitizeRich, SIZE_CLASS, statDef, defaultStatValues,
   SHELL_FAMILY, UC_KIND_LIST, TOOL_META, UC_STAT_DEFS, UC_ORDER_DEFS
 };

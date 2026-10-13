@@ -19,7 +19,7 @@ const couponSvc = require('../../services/coupon');
 const { ROUTES } = require('../../utils/constants');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
-const { normalizeBlocks, applyShopAvatar, applyUserProfile, applyStatValues } = require('../../utils/blocks');
+const { normalizeBlocks, applyShopAvatar, applyUserProfile, applyStatValues, defaultStatValues } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
 
 /** 店铺头像可能是后台上传的 /uploads/… 相对路径，必须过一遍素材地址解析（首页同理） */
@@ -147,14 +147,15 @@ Page(Object.assign({}, blockPageBehavior, {
   /**
    * 把个人资产里**有真实数据源**的项回填成真实数值（目前只有「优惠券」）。
    *
-   * 未登录时接口要令牌、拿不到数：`—` 表示「未知」，不是「0 张」——
-   * 两者混在一起会让用户以为自己的券没了。
+   * 未登录时接口要令牌、拿不到数 → **整块复位成各项自己的缺省值**（`defaultStatValues()`：
+   * 余额 / 积分 `0`，权益卡 / 钱包 / 礼品卡 / 提货卡 / 优惠券 `—`）。
+   * 必须整块复位而不是只写优惠券那一项 —— 否则退出登录后会把上一个账号的余额 / 积分留在页面上。
+   * 缺省值只在 `utils/blocks.js` 的 `UC_STAT_DEFS[].def` 定义一处，页面不许自己拼。
    * 失败静默：这是锦上添花的数字，不该因为它弹错误打断用户。
    */
   loadStatValues() {
     if (!isLogged()) {
-      // 退出登录后必须复位成 `—`，否则会把上一个账号的券数留给下一个人看
-      this.syncStatValues({ coupon: '—' });
+      this.syncStatValues(defaultStatValues());
       return Promise.resolve();
     }
     return couponSvc.fetchList('all')

@@ -230,11 +230,13 @@
     text: 1, link: 1, blank: 1, follow_oa: 1
   };
 
-  /* 与 miniprogram/utils/blocks.js 的 UC_STAT_DEFS / UC_ORDER_DEFS 同源同序 */
+  /* 与 miniprogram/utils/blocks.js 的 UC_STAT_DEFS / UC_ORDER_DEFS 同源同序
+     第 4 个元素 = 该项的缺省数值（页面没拿到真数时显示什么），口径与真机逐项一致：
+     余额 / 积分 '0'（新用户的真实状态），其余 '—'（张数未知 ≠ 0 张）。 */
   var UC_STAT_DEFS = [
-    ['showBalance', '余额', '元'], ['showPoints', '积分', ''], ['showCard', '权益卡', '张'],
-    ['showCoupon', '优惠券', '张'], ['showWallet', '钱包', '元'],
-    ['showGiftCard', '礼品卡', '张'], ['showPickupCard', '提货卡', '张']
+    ['showBalance', '余额', '元', '0'], ['showPoints', '积分', '', '0'], ['showCard', '权益卡', '张', '—'],
+    ['showCoupon', '优惠券', '张', '—'], ['showWallet', '钱包', '元', '—'],
+    ['showGiftCard', '礼品卡', '张', '—'], ['showPickupCard', '提货卡', '张', '—']
   ];
   var UC_ORDER_DEFS = [
     ['showPendingPay', '待付款', '付'], ['showPendingShip', '待发货', '发'], ['showShipped', '待收货', '收'],
@@ -292,11 +294,11 @@
       h += '<div style="margin:10px 0;padding:12px 8px;background:#fff">' +
         '<div style="display:flex;flex-wrap:wrap">' + stats.map(function (d) {
           return '<div style="flex:1;min-width:25%;text-align:center;padding:6px 0">' +
-            '<div style="font-size:17px;font-weight:600;color:#323233">—<span style="font-size:10px;font-weight:400;color:#969799">' + d[2] + '</span></div>' +
+            '<div style="font-size:17px;font-weight:600;color:#323233">' + d[3] + '<span style="font-size:10px;font-weight:400;color:#969799">' + d[2] + '</span></div>' +
             '<div style="margin-top:5px;font-size:12px;color:#969799">' + d[1] + '</div></div>';
         }).join('') + '</div>' +
         (stats.length ? '' : '<div style="color:#b8bec8;font-size:12px;padding:8px 0;text-align:center">所有资产项都被关掉了</div>') +
-        ucDep(b.dep || '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡）') +
+        ucDep(b.dep || '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡 / 提货卡）') +
         '</div>';
       return h;
     }

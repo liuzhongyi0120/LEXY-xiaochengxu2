@@ -2001,6 +2001,42 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     statNotPage.length === 0,
     statNotPage.length ? statNotPage.join('；') : `有落点的资产项：${(blocksLib.UC_STAT_DEFS || []).filter((d) => d.route).map((d) => d.key).join(', ')}`);
 
+  /* (7b) 个人资产「缺省数值」口径（2026-10-13 店主要求：余额 / 积分缺省 0，不是 `—`）。
+   *      这个值有**三处**会显示给用户：真机归一化（`blocks.js` 的 `UC_STAT_DEFS[].def`）、
+   *      装修台预览（`pv-render.js` 里同源同序的镜像表）、页面复位（`defaultStatValues()`）。
+   *      三处任意一处走样，运营就会看到「预览是 0、真机是 —」这种「改了却没生效」的现象，
+   *      所以这里逐个对账 —— 预览镜像表尤其容易被人只改一边。 */
+  const statDefs = blocksLib.UC_STAT_DEFS || [];
+  const zeroKeys = ['balance', 'points'];
+  const badDef = statDefs
+    .filter((d) => (d.def || '—') !== (zeroKeys.indexOf(d.key) >= 0 ? '0' : '—'))
+    .map((d) => `${d.key}=${d.def || '—'}`);
+  assert('个人资产的缺省数值：余额 / 积分显示 0，张数类（权益卡 / 券 / 钱包 / 礼品卡 / 提货卡）显示 —',
+    badDef.length === 0,
+    badDef.length
+      ? `口径不对：${badDef.join(', ')}`
+      : statDefs.map((d) => `${d.label}=${d.def || '—'}`).join(' · '));
+
+  const resetVals = typeof blocksLib.defaultStatValues === 'function' ? blocksLib.defaultStatValues() : null;
+  const badReset = statDefs.filter((d) => !resetVals || resetVals[d.key] !== (d.def || '—')).map((d) => d.key);
+  assert('defaultStatValues() 与 UC_STAT_DEFS 逐项一致（复位值只有一处定义，页面不许自己拼）',
+    !!resetVals && badReset.length === 0,
+    !resetVals ? 'blocks.js 没有导出 defaultStatValues()' : (badReset.length ? `不一致：${badReset.join(', ')}` : `${Object.keys(resetVals).length} 项一致`));
+
+  const pvSrc = readFileSync(join(ROOT_DIR, 'server', 'public', 'shared', 'pv-render.js'), 'utf8');
+  const pvStatBlock = (pvSrc.match(/var UC_STAT_DEFS = \[([\s\S]*?)\n  \];/) || [])[1] || '';
+  const pvStats = [];
+  pvStatBlock.replace(/\['([^']+)',\s*'([^']*)',\s*'([^']*)'(?:,\s*'([^']*)')?\]/g,
+    (m, k, label, unit, def) => { pvStats.push({ k, label, unit, def: def === undefined ? '—' : def }); return m; });
+  const pvBadDef = statDefs.filter((d, i) => {
+    const p = pvStats[i];
+    return !p || p.k !== d.k || p.label !== d.label || p.unit !== d.unit || p.def !== (d.def || '—');
+  }).map((d) => d.key);
+  assert('装修台预览里的资产缺省值与真机逐项一致（同源同序，预览不许显示另一个值）',
+    pvStats.length === statDefs.length && pvBadDef.length === 0,
+    `预览 ${pvStats.length} 项 / 真机 ${statDefs.length} 项`
+      + (pvBadDef.length ? `；不一致：${pvBadDef.join(', ')}` : '，键 / 名称 / 单位 / 缺省值逐项一致'));
+
   /* (8) 个人中心链路上不许再有「点了没反应」式敷衍文案。
    *     ⚠️ 必须先剥注释再查：「注释里写着要禁用的字面量」会被当成代码（本仓库踩过）。
    *     这两个文件里的注释**确实**在讲以前那句「该功能开发中」，所以剥注释是必需的，不是修饰。 */
@@ -2015,6 +2051,22 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
   assert('个人中心链路不再有「开发中」式敷衍提示（依赖型入口一律落到讲清楚原因的页面）',
     leftover.length === 0,
     leftover.length ? leftover.join('；') : 'blockPage.js / mine.js 已无占位提示');
+
+  /* (9) 缺省值只许有一处定义：页面别自己拼缺省值。
+   *     本轮的真实教训 —— `mine.js` 的 `loadStatValues` 原来写的是
+   *     `this.syncStatValues({ coupon: '—' })`，于是「余额 / 积分缺省改成 0」这件事
+   *     要改两个文件（blocks.js + mine.js），漏一处就是「退出登录后余额还留着上一个账号的数」。
+   *     现在复位统一走 `defaultStatValues()`。
+   *     ⚠️ 断言**不能**写成「页面里不许出现 `syncStatValues({`」—— 服务端拿到真数后回填
+   *     本来就是 `syncStatValues({ coupon: 3 })`，那是对的（第一版这么写，当场误伤报红）。
+   *     缺省值的特征就是那个 `—` 字面量，所以只盯它。 */
+  const dashHard = mineSrc.indexOf("'—'") >= 0 || mineSrc.indexOf('"—"') >= 0;
+  const resetOk = mineSrc.indexOf('syncStatValues(defaultStatValues())') >= 0 && !dashHard;
+  assert('资产数值复位走 defaultStatValues()，页面里不出现 `—` 字面量（缺省值只定义一处）',
+    resetOk,
+    resetOk ? '复位值来自 utils/blocks.js 的 UC_STAT_DEFS[].def'
+      : (dashHard ? 'mine.js 里又出现 `—` 字面量 —— 「余额 / 积分缺省 0」这类口径会分家'
+        : 'mine.js 里没走 defaultStatValues() 复位'));
 }
 
 /* ---------------------------------------------------------------------------
