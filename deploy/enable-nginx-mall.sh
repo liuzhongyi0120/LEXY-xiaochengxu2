@@ -83,3 +83,10 @@ curl -fsS -m 10 -k https://127.0.0.1/mall-api/api/health || die "HTTPS 探针不
 echo
 
 log "完成。小程序端 BASE_URL 用： https://14.103.50.137/mall-api"
+cat <<'EOT'
+
+  ⚠️ 上面这个 IP 地址**只能用于开发者工具 / 体验版联调**：微信「服务器域名」不接受 IP，
+     正式版必然请求失败。要提审上架，必须先给已备案域名挂 HTTPS —— 见
+     deploy/域名上线手册.md（服务器侧跑 deploy/enable-domain-https.sh，本机跑
+     .tooling/switch-env.mjs --url=https://你的域名/mall-api）。
+EOT
