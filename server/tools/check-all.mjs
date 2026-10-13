@@ -2964,72 +2964,158 @@ assert('店铺导航的配色两组默认展开（schema 源码声明 open:true 
  * ---- F. 导航图标染色（复刻有赞「导航图标色」）----
  *
  * 背景：内置 icon 是 PNG 位图（颜色画死在图里），有赞用的是图标字体（字形跟着 color 走）。
- * 我们等效地用 CSS filter 把位图染成目标色，算法在**两处**各存一份：
- *   miniprogram/utils/navcolor.js   —— 真机（custom-tab-bar 在 readConfig 里算）
+ * 我们等效地让**服务端**把位图染成目标色再发出去：
+ *   GET /navicon/<图标名>@<rrggbb>.png
+ *   （server/lib/png.js 解码 → server/lib/navicon.js 换 RGB / 原样留 alpha → 编码）
+ *
+ * 2026-10-13 改版：**不再用 CSS filter**。微信渲染层对 <image> 的 filter 支持不可靠 ——
+ * 实测开发者工具里选中项图标渲染成一个 22×22 的实心色块（颜色对了、**alpha 被丢掉**），
+ * 而浏览器（装修台预览）里同样的 filter 逐像素正确 →「预览好看、真机是色块」，
+ * 属于最难查的一种走样。现在两端拿到的是**同一张 PNG**，物理上不可能再走样。
+ *
+ * 规则仍在**两处**各存一份（但都只剩「拼地址」，不再有数值求解）：
+ *   miniprogram/utils/navcolor.js    —— 真机（custom-tab-bar 在 readConfig 里用）
  *   server/public/shared/pv-tabbar.js —— 装修台手机壳与 /preview
- * 两份是同一算法，**必须行为等价**，否则「装修台预览一个色、真机另一个色」。
- * 这里喂同一批输入给两边、逐字符比 filter 字符串 —— 比文本比函数体更硬
- * （文本断言会因为加注释/换行就红，那是假红）。
+ * 喂同一批 (图标, 色值) 给两边、比输出路径 —— 唯一允许的差异是 navcolor 多一个
+ * BASE_URL 前缀（真机要绝对地址）。比函数体文本更硬，也不会因为加注释就假红。
  */
 const NAV_NC = pvRequire(join(MP_ROOT, 'utils', 'navcolor.js'));
+const NAV_CONST = pvRequire(join(MP_ROOT, 'utils', 'constants.js'));
+const navTintIcons = [
+  '/images/tabbar/home.png', '/images/tabbar/home-active.png',
+  '/images/tabbar/news.png', '/images/tabbar/news-active.png'
+];
 const navTintColors = [
   '#8A8A8A', '#C8102E', '#000000', '#FFFFFF', '#1A1A1A', '#2B6CB0', '#0F9D58',
   '#F5A623', '#7B3FE4', '#FF0080', '#00A0A0', '#666666', '#C0C0C0', '#334155',
   '#E11D48', '#5B8FF9', '#F6BD16', '#7262FD', '#78D3F8', '#9661BC'
 ];
-const navTintMismatch = navTintColors.filter((h) => NAV_NC.tintFilter(h) !== NAV_PV.tintFilter(h));
-assert('导航图标染色算法两处等价（真机 utils/navcolor.js ↔ 预览 pv-tabbar.js，逐字符比 filter）',
-  navTintMismatch.length === 0 && !!NAV_NC.tintFilter('#2B6CB0'),
+const navTintPairs = [];
+navTintIcons.forEach((s) => navTintColors.forEach((h) => navTintPairs.push([s, h])));
+const navTintMismatch = navTintPairs.filter(([s, h]) => {
+  const a = NAV_NC.iconPath(s, h);
+  const b = NAV_PV.tintPath(s, h);
+  return !(a === b || (b !== '' && a === NAV_CONST.BASE_URL + b));
+});
+assert('导航图标染色：两处口径等价（真机 utils/navcolor.js ↔ 预览 pv-tabbar.js，逐个比输出路径）',
+  navTintMismatch.length === 0 &&
+  NAV_NC.iconPath('/images/tabbar/home.png', '#2B6CB0') === '/navicon/home@2b6cb0.png',
   navTintMismatch.length === 0
-    ? `${navTintColors.length} 个色值全部一致`
-    : `不一致：${navTintMismatch.join(' ')}`);
+    ? `${navTintPairs.length} 组（${navTintIcons.length} 图标 × ${navTintColors.length} 色值）全部一致`
+    : `不一致：${navTintMismatch.map((p) => p.join(' ')).slice(0, 3).join(' ｜ ')}`);
 
 const navTintIcon = [
-  /* [图标地址, 颜色, 期望是否染色] */
+  /* [图标地址, 颜色, 期望「要染色」, 说明] */
   ['/images/tabbar/home.png', '#8A8A8A', false, '内置未选中图标 + 默认未选中色 → 零变化'],
   ['/images/tabbar/home-active.png', '#C8102E', false, '内置选中图标 + 默认选中色 → 零变化'],
   ['/images/tabbar/home.png', '#2B6CB0', true, '内置未选中图标 + 改色 → 染色'],
   ['/images/tabbar/home-active.png', '#0F9D58', true, '内置选中图标 + 改色 → 染色'],
-  ['http://14.103.50.137/uploads/202610/a.png', '#2B6CB0', false, '素材库自传图 → 不染（与有赞一致）'],
-  ['/uploads/202610/a.png', '#2B6CB0', false, '本地上传图 → 不染']
+  ['/uploads/202610/a.png', '#2B6CB0', false, '本地上传 / 素材库图 → 不染（与有赞一致）'],
+  ['https://x.com/a.png', '#2B6CB0', false, '外链图 → 不染'],
+  ['/images/tabbar/home.png', 'not-a-color', false, '色值非法 → 不染（宁可不染，也不拼一个必然 404 的地址）']
 ];
 const navTintIconBad = navTintIcon.filter(([src, hex, want]) => {
-  const a = !!NAV_NC.iconFilter(src, hex), b = !!NAV_PV.iconFilter(src, hex);
+  const a = !!NAV_NC.iconPath(src, hex);
+  const b = !!NAV_PV.tintPath(src, hex);
   return a !== want || b !== want;
 });
-assert('图标染色的适用边界：只染内置图标；默认色下零变化；自传 / 素材库图保持原色',
+assert('图标染色的适用边界：只染内置图标；默认色与非法色不染；自传 / 外链图保持原色',
   navTintIconBad.length === 0,
   navTintIconBad.length === 0
     ? navTintIcon.map((x) => (x[2] ? '染' : '不染')).join('/')
     : navTintIconBad.map((x) => x[3]).join('；'));
-assert('染色 filter 的形状对（压黑打底 + 六原语恒定输出，便于两端逐字符比对）',
-  /^brightness\(0\) saturate\(100%\) invert\(-?\d+%\) sepia\(\d+%\) saturate\(\d+%\) hue-rotate\(-?\d+deg\) brightness\(\d+%\) contrast\(\d+%\)$/
-    .test(NAV_NC.tintFilter('#2B6CB0')),
-  NAV_NC.tintFilter('#2B6CB0'));
+assert('染色地址形状对（小写归一 / 不带 # / .png 结尾 —— 便于长缓存与两端逐字符比对）',
+  /^\/navicon\/home@[0-9a-f]{6}\.png$/.test(NAV_NC.iconPath('/images/tabbar/home.png', '#2B6CB0')) &&
+  NAV_NC.iconPath('/images/tabbar/home.png', '#2b6cb0') ===
+    NAV_NC.iconPath('/images/tabbar/home.png', '#2B6CB0'),
+  NAV_NC.iconPath('/images/tabbar/home.png', '#2B6CB0'));
 
-/* 真机组件：readConfig 必须把两态的内联 style 一起算好（wxml 里不拼字符串） */
+/*
+ * 染色路由的**像素级**断言 —— 这套实现唯一的正确性依据，不依赖任何渲染引擎，
+ * 直接看服务端吐出来的 PNG 字节。判据两条：
+ *   ① RGB 全部等于目标色（包括抗锯齿像素）；
+ *   ② alpha 与源图**逐字节相同** —— 这条最关键：当初 CSS filter 就是丢了 alpha，
+ *      把描边图标变成一个实心色块，而「颜色对了」会让人误以为染色成功了。
+ */
+const NAV_PNG = pvRequire(join(__dirname, '..', 'lib', 'png.js'));
+async function navFetchTint(name, hex) {
+  const r = await fetch(BASE + '/navicon/' + name + '@' + hex + '.png');
+  const buf = Buffer.from(await r.arrayBuffer());
+  let img = null;
+  try { img = NAV_PNG.decode(buf); } catch (e) { img = null; }
+  return { status: r.status, type: r.headers.get('content-type'), img };
+}
+const navPixelOk = (res, rgb, srcImg) => {
+  if (!res.img || !srcImg) return false;
+  if (res.img.width !== srcImg.width || res.img.height !== srcImg.height) return false;
+  const d = res.img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] !== rgb[0] || d[i + 1] !== rgb[1] || d[i + 2] !== rgb[2]) return false;
+    if (d[i + 3] !== srcImg.data[i + 3]) return false;
+  }
+  return true;
+};
+{
+  const srcHome = NAV_PNG.decode(readFileSync(join(MP_ROOT, 'images', 'tabbar', 'home.png')));
+  const srcNewsOn = NAV_PNG.decode(readFileSync(join(MP_ROOT, 'images', 'tabbar', 'news-active.png')));
+  const r1 = await navFetchTint('home', '2b6cb0');
+  const r2 = await navFetchTint('news-active', '080808');
+  const ok1 = navPixelOk(r1, [0x2b, 0x6c, 0xb0], srcHome);
+  const ok2 = navPixelOk(r2, [0x08, 0x08, 0x08], srcNewsOn);
+  assert('染色路由真的出图且**像素正确**：RGB 全等目标色、alpha 与源图逐字节相同（抗锯齿不能丢）',
+    r1.status === 200 && r1.type === 'image/png' && ok1 && r2.status === 200 && ok2,
+    `home@2b6cb0 → ${r1.status}/${r1.type}/像素=${ok1} ｜ news-active@080808 → ${r2.status}/像素=${ok2}`);
+}
+
+/* 安全边界：这条路由**不跟随 DEBUG_PAGE**（线上真机要用），必须自己把门 */
+const navBadReqs = [
+  ['/navicon/nope@c8102e.png', 404, '源图不存在'],
+  ['/navicon/home@zzzzzz.png', 400, '色值非法'],
+  ['/navicon/home.png@c8102e.png', 400, '名字带了 .png 后缀'],
+  ['/navicon/HOME@c8102e.png', 400, '名字非小写（白名单口径）'],
+  ['/navicon/..%2f..%2fserver%2findex.js@c8102e.png', 400, '编码过的目录穿越'],
+  ['/navicon/../../server/index.js@c8102e.png', 404, '未编码穿越（被 URL 归一化后落到总路由）']
+];
+{
+  const got = [];
+  for (const [p, want, why] of navBadReqs) {
+    let st = -1;
+    try { st = (await fetch(BASE + p)).status; } catch (e) { st = -1; }
+    got.push([p, want, st, why]);
+  }
+  assert('染色路由的安全边界：源图不存在 404、色值非法 / 带后缀 / 穿越一律 400 或 404',
+    got.every(([, want, st]) => st === want),
+    got.map(([, want, st, why]) => `${why}:${st}${st === want ? '' : '≠' + want}`).join(' ｜ '));
+}
+
+/* 真机组件：readConfig 必须把两态的**图标地址**一起算好（wxml 里不拼字符串） */
 const navCtbWxml = readFileSync(join(NAV_CTB, 'index.wxml'), 'utf8');
 const navCtbWxmlNoComment = navCtbWxml.replace(/<!--[\s\S]*?-->/g, '');
-assert('真机 custom-tab-bar：图标两态内联 style 由组件算好（styleOff / styleOn），wxml 只原样输出',
-  /selected === index \? item\.styleOn : item\.styleOff/.test(navCtbWxmlNoComment) &&
-  /styleOff: hideOff \+ \(filterOff \? 'filter:' \+ filterOff \+ ';' : ''\)/.test(navCtbSrc) &&
-  /styleOn: filterOn \? 'filter:' \+ filterOn \+ ';' : ''/.test(navCtbSrc),
-  `wxml 用 styleOn/styleOff=${/selected === index \? item\.styleOn/.test(navCtbWxmlNoComment)}`);
+assert('真机 custom-tab-bar：图标地址由组件算好（srcOff / srcOn），wxml 只原样输出并带加载失败回落',
+  /selected === index \? item\.srcOn : item\.srcOff/.test(navCtbWxmlNoComment) &&
+  /binderror="onIconError"/.test(navCtbWxmlNoComment) &&
+  /srcOff: srcOff,/.test(navCtbSrc) && /srcOn: srcOn,/.test(navCtbSrc) &&
+  /onIconError\(e\) \{/.test(navCtbSrc),
+  `wxml 用 srcOn/srcOff=${/selected === index \? item\.srcOn/.test(navCtbWxmlNoComment)}` +
+  ` ｜ 有回落=${/binderror="onIconError"/.test(navCtbWxmlNoComment)}`);
 const navCtbTint = navRunWithTabbar({
   color: '#2B6CB0', selectedColor: '#0F9D58', background: '#FFFFFF', borderColor: '#EEEEEE', iconMode: 'active',
   items: NAV_SCHEMA.TABBAR_DEFAULT_ITEMS
 });
-const navCtbTintOff = ((navCtbTint.items || [])[0] || {}).styleOff || '';
-const navCtbTintOn = ((navCtbTint.items || [])[0] || {}).styleOn || '';
-assert('真机组件按配色算出图标染色（改色 → 两态 filter 各按自己的色；「仅选中显示图标」的未选中态保留 visibility 占位）',
-  navCtbTintOff.indexOf('visibility:hidden;') === 0 &&
-  navCtbTintOff.indexOf('filter:' + NAV_NC.tintFilter('#2B6CB0')) > 0 &&
-  navCtbTintOn === 'filter:' + NAV_NC.tintFilter('#0F9D58') + ';',
-  `off=${navCtbTintOff.slice(0, 46)}… on=${navCtbTintOn.slice(0, 46)}…`);
+const navCtbT0 = (navCtbTint.items || [])[0] || {};
+assert('真机组件按配色算出图标地址（两态各按自己的色；「仅选中显示图标」的未选中态保留 visibility 占位）',
+  navCtbT0.srcOff === NAV_CONST.BASE_URL + '/navicon/home@2b6cb0.png' &&
+  navCtbT0.srcOn === NAV_CONST.BASE_URL + '/navicon/home-active@0f9d58.png' &&
+  navCtbT0.styleOff === 'visibility:hidden',
+  `off=${navCtbT0.srcOff} ｜ on=${navCtbT0.srcOn} ｜ styleOff=${JSON.stringify(navCtbT0.styleOff)}`);
 const navCtbDefault = navRunComponent(true);
-assert('真机组件：默认配色下不产生任何 filter（改造前后像素零变化）',
-  (navCtbDefault.items || []).every((i) => !/filter:/.test(i.styleOff || '') && (i.styleOn || '') === ''),
-  (navCtbDefault.items || []).map((i) => i.styleOff || '(空)').slice(0, 3).join(' | '));
+assert('真机组件：默认配色下图标仍是**包内原图**（零网络请求、改造前后零变化）',
+  (navCtbDefault.items || []).every((i) =>
+    i.srcOff === i.rawOff && i.srcOn === i.rawOn &&
+    String(i.srcOff || '').indexOf('/navicon/') === -1 &&
+    String(i.srcOn || '').indexOf('/navicon/') === -1) &&
+  (navCtbDefault.items || []).every((i) => !i.styleOff || i.styleOff === 'visibility:hidden'),
+  (navCtbDefault.items || []).map((i) => i.srcOff).slice(0, 3).join(' | '));
 
 /*
  * ---- G. 「页面布局」浮层底部那个入口按页面类型分流（2026-10-13）----

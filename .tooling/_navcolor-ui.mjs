@@ -2,10 +2,16 @@
  * 「导航图标色」真 UI 端到端验证：在装修台里**真的改一次颜色**，看手机壳图标跟不跟着变。
  *
  * 与 _navcolor-probe.mjs 的分工：
- *   探针那份是「拿真 preview 模块渲染一份合成配置」—— 证明渲染层会染色；
+ *   探针那份是「拿真 preview 模块渲染一份合成配置」—— 证明渲染层会指向染色图；
  *   本脚本走**运营的完整操作链路**：在属性面板的色值输入框里打字 →
- *   面板写草稿 → 预览重渲染 → 手机壳图标染色。缺这一环就只能说「渲染层没问题」，
- *   说不了「运营改了真的会变」。
+ *   面板写草稿 → 预览重渲染 → 手机壳图标换成服务端染色图 → **浏览器真的把它加载出来**。
+ *   缺这一环就只能说「渲染层没问题」，说不了「运营改了真的会变、而且图是对的」。
+ *
+ * 为什么读的是**像素主色**（canvas 取样）而不是 CSS：
+ *   这套实现的染色在服务端（/navicon/<名>@<色>.png），客户端只有一个 <img src>。
+ *   只看 src 只能证明「地址对」，把图取回来取样才能证明**图本身是对的** ——
+ *   上一版用 CSS filter 时真机拿到的就是个纯色方块（颜色对、alpha 丢），
+ *   只断言 CSS 是发现不了的。
  *
  * ⚠️ 数据安全（「改数据→还原」型）：
  *   先记下**原值**，测完把原值**原样写回**（不是回滚版本、不依赖历史），
@@ -130,18 +136,43 @@ const typeColor = (label, hex) => ev(tid, `(() => {
   return JSON.stringify({ label: ${JSON.stringify(label)}, before, after: input.value });
 })()`);
 
-/** 读手机壳底部导航：每项的文字色 + 图标内联 filter */
+/** 读手机壳底部导航：每项的文字色 + 图标地址 + 图标**真实像素主色**（canvas 取样） */
 const readShell = () => ev(tid, `(() => {
   const nav = document.querySelector('#preview .pvtb') || document.querySelector('.pvtb');
   if (!nav) return JSON.stringify({ err: '手机壳里没有 .pvtb' });
+  const slot = document.createElement('canvas');
   const items = [];
   nav.querySelectorAll('.pvtb-item').forEach((it) => {
     const img = it.querySelector('img');
+    let sample = '';
+    let natural = '';
+    if (img) {
+      natural = img.naturalWidth + 'x' + img.naturalHeight;
+      if (img.complete && img.naturalWidth) {
+        try {
+          slot.width = img.naturalWidth;
+          slot.height = img.naturalHeight;
+          const g = slot.getContext('2d');
+          g.clearRect(0, 0, slot.width, slot.height);
+          g.drawImage(img, 0, 0);
+          const d = g.getImageData(0, 0, slot.width, slot.height).data;
+          const cnt = {};
+          for (let i = 0; i < d.length; i += 4) {
+            if (d[i + 3] > 200) {
+              const k = d[i] + ',' + d[i + 1] + ',' + d[i + 2];
+              cnt[k] = (cnt[k] || 0) + 1;
+            }
+          }
+          sample = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || '';
+        } catch (e) { sample = 'ERR:' + e.message; }
+      }
+    }
     items.push({
       text: (it.querySelector('.pvtb-text') || {}).textContent || '',
       color: getComputedStyle(it).color,
-      inline: img ? (img.getAttribute('style') || '') : '',
-      computed: img ? getComputedStyle(img).filter : ''
+      src: img ? (img.getAttribute('src') || '') : '',
+      natural,
+      sample
     });
   });
   return JSON.stringify({ items });
@@ -149,18 +180,28 @@ const readShell = () => ev(tid, `(() => {
 
 console.log('════════ 1. 改色前（默认配色） ════════');
 let s = JSON.parse(await readShell());
-(s.items || []).forEach((i) => console.log(`  · ${i.text}  color=${i.color}  filter=${i.computed || '(空)'}`));
-ok('改动前 5 项图标都不带 filter（零变化基线）', (s.items || []).every((i) => !i.computed || i.computed === 'none'));
+(s.items || []).forEach((i) => console.log(`  · ${i.text}  color=${i.color}  ${i.natural}  主色=${i.sample}  ${i.src}`));
+ok('改动前 5 项图标都还是包内原图（零变化基线，且不发任何网络请求）',
+  (s.items || []).length === 5 && (s.items || []).every((i) => /^\/images\/tabbar\//.test(i.src)),
+  (s.items || []).map((i) => i.src).join(' | '));
 
 console.log(`\n════════ 2. 在属性面板里把「未选中色」改成 ${NEW_COLOR} ════════`);
 console.log('  ' + await typeColor('未选中色', NEW_COLOR));
-await sleep(1800);
+await sleep(2200);   // 比原来多留一点：这次多了一次「取染色图」的网络请求
 s = JSON.parse(await readShell());
-(s.items || []).forEach((i) => console.log(`  · ${i.text}  color=${i.color}  filter=${(i.computed || '(空)').slice(0, 60)}`));
-ok('改色后未选中项的文字色跟着变', (s.items || []).slice(0, 1).every((i) => i.color === 'rgb(43, 108, 176)'), (s.items || [])[0] && (s.items)[0].color);
-ok('改色后未选中项的**图标**也挂上了染色 filter（这就是本次要复刻的有赞能力）',
-  (s.items || []).every((i) => /brightness\(0\)/.test(i.computed || '')),
-  (s.items || []).map((i) => (/brightness\(0\)/.test(i.computed || '') ? '染' : '未染')).join('/'));
+(s.items || []).forEach((i) => console.log(`  · ${i.text}  color=${i.color}  ${i.natural}  主色=${i.sample}  ${i.src}`));
+ok('改色后未选中项的文字色跟着变', (s.items || []).every((i) => i.color === 'rgb(43, 108, 176)'),
+  (s.items || []).map((i) => i.color).slice(0, 2).join(' | '));
+ok('改色后**图标地址**换成了服务端染色图 /navicon/<名>@2b6cb0.png（这就是本次要复刻的有赞能力）',
+  (s.items || []).length === 5 &&
+  (s.items || []).every((i) => /^\/navicon\/[a-z0-9-]+@2b6cb0\.png$/.test(i.src)),
+  (s.items || []).map((i) => i.src).slice(0, 2).join(' | '));
+ok('染色图**真的被浏览器加载出来**了（66×66，不是裂图 —— 地址对但取不到图就白搭）',
+  (s.items || []).every((i) => i.natural === '66x66'),
+  (s.items || []).map((i) => i.natural).join('/'));
+ok('染色图的**像素主色就是目标色**（取样 rgb(43,108,176)；只看 CSS/src 是发现不了「图是纯色块」的）',
+  (s.items || []).every((i) => i.sample === '43,108,176'),
+  (s.items || []).map((i) => i.sample).join(' | '));
 
 /* 截图要在**还是改过的颜色时**拍 —— 还原之后再拍就什么也看不出来了。
    只截手机壳那一块（含底部导航），1:1 像素，便于交付时肉眼核对图标确实变了色。 */
@@ -184,8 +225,9 @@ console.log('\n════════ 3. 写回原值还原（不依赖版本�
 console.log('  ' + await typeColor('未选中色', ORIG_COLOR));
 await sleep(1800);
 s = JSON.parse(await readShell());
-ok('还原后图标 filter 回到空（与改动前一致）', (s.items || []).every((i) => !i.computed || i.computed === 'none'),
-  (s.items || []).map((i) => i.computed || '(空)').slice(0, 2).join(' | '));
+ok('还原后图标地址回到包内原图（与改动前一致、也不再发网络请求）',
+  (s.items || []).every((i) => /^\/images\/tabbar\//.test(i.src)),
+  (s.items || []).map((i) => i.src).slice(0, 2).join(' | '));
 const afterDiff = await diffOf('nav');
 const afterReplica = fs.readFileSync('miniprogram/config/replica.js', 'utf8');
 ok('nav 草稿已回到「无草稿」（面板写回原值后与线上一致）', afterDiff.hasDraft === false, JSON.stringify(afterDiff).slice(0, 120));

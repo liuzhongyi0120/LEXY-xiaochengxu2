@@ -22,7 +22,8 @@
 
 const replica = require('../config/replica');
 const { resolveAssets } = require('../utils/asset');
-const { iconFilter } = require('../utils/navcolor');
+const { BASE_URL } = require('../utils/constants');
+const { iconSrc } = require('../utils/navcolor');
 
 /**
  * 兜底配置：replica 里还没有 TABBAR（装修台没发布过导航）时使用，
@@ -137,19 +138,19 @@ function readConfig() {
 
     /*
      * 图标染色（对齐有赞「导航图标色」）：内置 PNG 图标颜色是画死在图里的，
-     * 只改 `color` 的话文字会变、图标不变。这里按当前配色算出 CSS filter，
-     * 由 wxml 挂到 <image> 上 —— 详见 utils/navcolor.js。
+     * 只改 `color` 的话文字会变、图标不变。
      *
-     * 两态各自预生成**完整的内联 style 字符串**再交给 wxml 用，而不是在 wxml 里拼：
-     *   ① wxml 的三元 + 字符串拼接很容易把 `;` 漏掉，一个分号就能让后面的
-     *      `visibility:hidden` 失效（「仅选中显示图标」时文字就跳了）；
-     *   ② 染色是 `false` 色值判断，写在 JS 里能顺手单测。
-     * 「仅选中显示图标」的未选中态要**隐藏图标但保留占位**（visibility 而非
-     * display:none），所以这条只落在未选中态的 style 上。
+     * 这里只负责**拼地址**，像素级的染色在服务端做（换 RGB、留 alpha，输出标准 PNG，
+     * 见 server/lib/navicon.js）。目标色 == 源色（默认配色）时 iconSrc 原样返回包内路径
+     * —— 零网络请求、零变化；只有真改了色，图标才指向 /navicon/<名>@<色>.png。
+     *
+     * ⚠️ 别再改回 CSS filter：微信渲染层对 <image> 的 filter 支持不可靠 ——
+     * 实测开发者工具里选中项图标渲染成一个 22×22 的**实心**色块（alpha 被丢），
+     * 而浏览器里同样的 filter 逐像素正确 →「装修台预览好看、真机是色块」。
+     * 详见 utils/navcolor.js 顶部注释。
      */
-    const filterOff = iconFilter(icon, color);
-    const filterOn = iconFilter(activeIcon, selectedColor);
-    const hideOff = iconMode === 'active' ? 'visibility:hidden;' : '';
+    const srcOff = iconSrc(icon, color, BASE_URL);
+    const srcOn = iconSrc(activeIcon, selectedColor, BASE_URL);
 
     items.push({
       path: it.path,
@@ -157,8 +158,18 @@ function readConfig() {
       icon: icon,
       activeIcon: activeIcon,
       hasIcon: !!(icon || activeIcon),
-      styleOff: hideOff + (filterOff ? 'filter:' + filterOff + ';' : ''),
-      styleOn: filterOn ? 'filter:' + filterOn + ';' : ''
+      /* 两态各自的最终地址（默认配色下就是包内原图本身） */
+      srcOff: srcOff,
+      srcOn: srcOn,
+      /* 原图兜底：染色图加载失败时回落（宁可图标是原色，也不要一个空白 tab） */
+      rawOff: icon,
+      rawOn: activeIcon,
+      /*
+       * 「仅选中显示图标」的未选中态要**隐藏图标但保留占位**（visibility 而非 display:none），
+       * 这样文字不会上下跳。字符串在 JS 里预生成 —— 放到 wxml 里拼，
+       * 漏一个字符就会静默失效，而且没有单测能拦。
+       */
+      styleOff: iconMode === 'active' ? 'visibility:hidden' : ''
     });
   }
 
@@ -195,6 +206,29 @@ Component({
         if (items[i].path === path) { index = i; break; }
       }
       if (index !== this.data.selected) this.setData({ selected: index });
+    },
+
+    /**
+     * 染色图标加载失败 → 回落到包内原图。
+     *
+     * 什么时候会失败：运营把配色改成了非默认值，图标就变成一条对服务端的请求
+     * （/navicon/…），网络不好 / 服务端没起来 / 线上还没同步到新代码时就会失败。
+     * 不做这条兜底的话，那个 tab 会变成**一个空白图标**（文字还在），
+     * 比「图标是原色灰/红」糟糕得多 —— 后者至少还是个正常的导航条。
+     *
+     * 已经在用原图时直接返回，否则每次 error 都 setData 会把这条路径变成死循环。
+     */
+    onIconError(e) {
+      const index = Number(e.currentTarget.dataset.index);
+      const item = (this.data.items || [])[index];
+      if (!item) return;
+      const isOn = index === this.data.selected;
+      const key = isOn ? 'srcOn' : 'srcOff';
+      const raw = isOn ? item.rawOn : item.rawOff;
+      if (!raw || item[key] === raw) return;
+      const patch = {};
+      patch['items[' + index + '].' + key] = raw;
+      this.setData(patch);
     },
 
     onTap(e) {

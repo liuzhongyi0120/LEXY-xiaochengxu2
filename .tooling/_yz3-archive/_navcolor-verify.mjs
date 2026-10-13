@@ -1,7 +1,13 @@
 /**
  * 导航图标染色（CSS filter 逼近）**真浏览器实测**探针。
  *
- * 为什么必须实测：`miniprogram/utils/navcolor.js` 里的误差是我**自己按 CSS 规范矩阵
+ * ⚠️ **已归档（2026-10-13 第 48 批）**：本脚本验的是第 46 批的 **CSS filter** 方案，
+ *    该方案已被推翻 —— 微信渲染层对 `<image>` 的 filter 不可靠（实测出实心色块、alpha 被丢），
+ *    现改为**服务端像素级染色** `/navicon/`（见 `server/lib/png.js` + `server/lib/navicon.js`
+ *    与 `.workbuddy/memory/PITFALLS.md` T 节）。本脚本连同比对脚本 `navcolor-verify.py` 一起挪进
+ *    `_yz3-archive/` 仅作历史保留：**它验的「浏览器里 Δmax=2」是真的，只是验错了层**。
+ *
+ * 为什么当初必须实测：`miniprogram/utils/navcolor.js` 里的误差是我**自己按 CSS 规范矩阵
  * 模拟**出来的。真实浏览器在「每个滤镜原语之后是否立即把通道夹到 0..1」这件事上
  * 与模拟未必一致，而这会直接改变结果色。模拟说 Δmax≤2，不实测就等于自说自话。
  *
@@ -13,7 +19,7 @@
  *      确认 filter 在 <img> 上确实生效（不只是色块上生效）。
  *
  * 产出：.tooling/_cmp/navcolor-grid.png ＋ .tooling/_cmp/navcolor-cells.json
- *      （取样与比对交给 .tooling/_cmp/navcolor-verify.py，它带 PIL）
+ *      （取样与比对交给同目录的 navcolor-verify.py，它带 PIL）
  */
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

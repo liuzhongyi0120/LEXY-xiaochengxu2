@@ -173,169 +173,23 @@
   }
 
   /* ======================================================================
-   * 图标染色 —— 与 miniprogram/utils/navcolor.js **同一算法**（自检喂同一批
-   * 色值给两边、逐字符比 filter 字符串；改一边必须同步改另一边）。
+   * 图标染色 —— 与 miniprogram/utils/navcolor.js **同一套规则**
+   * （自检喂同一批「图标 + 色值」给两边，逐个比输出路径；改一边必须同步改另一边）。
    *
-   * 为什么预览也要染：内置图标是 PNG，颜色画死在图里（未选中 #8A8A8A /
-   * 选中 #C8102E）。只改 color 的话文字会变、图标不变 —— 运营在装修台里
-   * 改「未选中颜色」看不到图标跟着变，就以为这功能坏了。有赞的内置图标是
-   * 图标字体（yz-tabbar-icon-v2），字形跟着 color 走；我们等效地用 CSS filter
-   * 把位图染成目标色（算法取舍见 navcolor.js 顶部注释）。
+   * 染色本身在**服务端**做（server/lib/navicon.js：换 RGB、留 alpha，输出标准 PNG），
+   * 预览这边只把 <img src> 指过去。为什么不在这里就地用 CSS filter 染：
+   * 微信小程序渲染层对 <image> 的 filter 支持**不可靠** —— 实测开发者工具里
+   * 选中项图标渲染成一个实心色块（颜色对了、alpha 被丢掉），而浏览器里
+   * 同样的 filter 逐像素正确 → 「装修台预览好看、真机是色块」，最难查的一种走样。
+   * 改成服务端出图后两端拿的是**同一张 PNG**，物理上不可能再走样；
+   * 代价是改色后预览也要发一次请求（同源、有缓存，肉眼无感）。
    * ====================================================================== */
   var BUILTIN_PREFIX = '/images/tabbar/';
   var SRC_OFF = '#8A8A8A';   // home.png 等未选中图标的主色（生成脚本固定写的）
   var SRC_ON = '#C8102E';    // 对应的 -active.png 主色
+  var TINT_PREFIX = '/navicon/';
 
-  function clamp01(x) { return x < 0 ? 0 : (x > 1 ? 1 : x); }
-
-  function hexToRgb(hex) {
-    var s = typeof hex === 'string' ? hex.trim().replace(/^#/, '') : '';
-    if (s.length === 3) s = s.charAt(0) + s.charAt(0) + s.charAt(1) + s.charAt(1) + s.charAt(2) + s.charAt(2);
-    if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
-    return [parseInt(s.slice(0, 2), 16) / 255, parseInt(s.slice(2, 4), 16) / 255, parseInt(s.slice(4, 6), 16) / 255];
-  }
-
-  /* CSS Filter Effects Level 1 的色彩矩阵，统一表示成 3×4：
-     [m00,m01,m02,o0, m10,m11,m12,o1, m20,m21,m22,o2]，作用在非预乘 sRGB 上 */
-  function fApply(m, v) {
-    return [
-      clamp01(m[0] * v[0] + m[1] * v[1] + m[2] * v[2] + m[3]),
-      clamp01(m[4] * v[0] + m[5] * v[1] + m[6] * v[2] + m[7]),
-      clamp01(m[8] * v[0] + m[9] * v[1] + m[10] * v[2] + m[11])
-    ];
-  }
-
-  function fInvert(p) { var a = 1 - 2 * p; return [a, 0, 0, p, 0, a, 0, p, 0, 0, a, p]; }
-
-  var SEPIA9 = [0.393, 0.769, 0.189, 0.349, 0.686, 0.168, 0.272, 0.534, 0.131];
-
-  function mixIdentity(m9, t) {
-    var o = [];
-    for (var i = 0; i < 9; i++) {
-      var id = (i === 0 || i === 4 || i === 8) ? 1 : 0;
-      o[i] = id * (1 - t) + m9[i] * t;
-    }
-    return [o[0], o[1], o[2], 0, o[3], o[4], o[5], 0, o[6], o[7], o[8], 0];
-  }
-
-  function fSepia(p) { return mixIdentity(SEPIA9, p); }
-
-  function fSaturate(s) {
-    return [
-      0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0,
-      0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0,
-      0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s, 0
-    ];
-  }
-
-  function fHueRotate(deg) {
-    var c = Math.cos(deg * Math.PI / 180);
-    var s = Math.sin(deg * Math.PI / 180);
-    return [
-      0.213 + c * 0.787 - s * 0.213, 0.715 - c * 0.715 - s * 0.715, 0.072 - c * 0.072 + s * 0.928, 0,
-      0.213 - c * 0.213 + s * 0.143, 0.715 + c * 0.285 + s * 0.140, 0.072 - c * 0.072 - s * 0.283, 0,
-      0.213 - c * 0.213 - s * 0.787, 0.715 - c * 0.715 + s * 0.715, 0.072 + c * 0.928 + s * 0.072, 0
-    ];
-  }
-
-  function fBrightness(b) { return [b, 0, 0, 0, 0, b, 0, 0, 0, 0, b, 0]; }
-
-  function fContrast(k) { var o = 0.5 - 0.5 * k; return [k, 0, 0, o, 0, k, 0, o, 0, 0, k, o]; }
-
-  /* 参数量纲：[invert, sepia, saturate, hueRotate(deg), brightness, contrast] */
-  var RANGE = [[0, 1], [0, 1], [0, 30], [-180, 180], [0, 2], [0.5, 2]];
-  var STEP = [0.01, 0.01, 0.01, 1, 0.01, 0.01];
-  var SEEDS = [
-    [0.5, 1, 1, 0, 1, 1],
-    [0.5, 0, 1, 0, 1, 1],
-    [0.2, 1, 8, 0, 1, 1],
-    [0.8, 1, 8, 0, 1, 1],
-    [0.5, 1, 12, 120, 1, 1],
-    [0.5, 1, 12, -120, 1, 1]
-  ];
-
-  function fEvaluate(p, target) {
-    var v = [0, 0, 0]; // brightness(0) saturate(100%) 之后恒为黑
-    v = fApply(fInvert(p[0]), v);
-    v = fApply(fSepia(p[1]), v);
-    v = fApply(fSaturate(p[2]), v);
-    v = fApply(fHueRotate(p[3]), v);
-    v = fApply(fBrightness(p[4]), v);
-    v = fApply(fContrast(p[5]), v);
-    var dr = v[0] - target[0], dg = v[1] - target[1], db = v[2] - target[2];
-    return { v: v, e: dr * dr + dg * dg + db * db };
-  }
-
-  function clampParam(k, x) {
-    var lo = RANGE[k][0], hi = RANGE[k][1];
-    return x < lo ? lo : (x > hi ? hi : x);
-  }
-
-  function snap(k, x) { return clampParam(k, Math.round(x / STEP[k]) * STEP[k]); }
-
-  /** 确定性求解（无随机数）→ 同样输入在任何一端都得到同样的 filter 字符串 */
-  function tintSolve(target) {
-    var best = null;
-    for (var si = 0; si < SEEDS.length; si++) {
-      var p = SEEDS[si].slice();
-      var span = [0.5, 0.5, 15, 180, 0.5, 0.5];
-      var cur = fEvaluate(p, target);
-      for (var round = 0; round < 24; round++) {
-        for (var k = 0; k < 6; k++) {
-          var c0 = clampParam(k, p[k] - span[k]);
-          var c1 = clampParam(k, p[k] + span[k]);
-          if (c1 <= c0) continue;
-          var N = 8;
-          for (var j = 0; j <= N; j++) {
-            var cand = p.slice();
-            cand[k] = c0 + (c1 - c0) * j / N;
-            var ce = fEvaluate(cand, target);
-            if (ce.e < cur.e) { cur = ce; p = cand; }
-          }
-        }
-        for (var q = 0; q < 6; q++) span[q] *= 0.6;
-      }
-      if (!best || cur.e < best.e) best = { e: cur.e, p: p };
-    }
-    for (var pk = 0; pk < 6; pk++) best.p[pk] = snap(pk, best.p[pk]);
-    var bestQ = { e: fEvaluate(best.p, target).e, p: best.p.slice() };
-    for (var pass = 0; pass < 8; pass++) {
-      var improved = false;
-      for (var kk = 0; kk < 6; kk++) {
-        for (var dir = -1; dir <= 1; dir += 2) {
-          var c2 = bestQ.p.slice();
-          c2[kk] = snap(kk, c2[kk] + dir * STEP[kk]);
-          var e2 = fEvaluate(c2, target).e;
-          if (e2 < bestQ.e) { bestQ = { e: e2, p: c2 }; improved = true; }
-        }
-      }
-      if (!improved) break;
-    }
-    return bestQ;
-  }
-
-  /** 参数 → filter 字符串。六个原语恒定输出，不做「恒等就省略」的分支 */
-  function toFilter(p) {
-    return 'brightness(0) saturate(100%)' +
-      ' invert(' + Math.round(p[0] * 100) + '%)' +
-      ' sepia(' + Math.round(p[1] * 100) + '%)' +
-      ' saturate(' + Math.round(p[2] * 100) + '%)' +
-      ' hue-rotate(' + Math.round(p[3]) + 'deg)' +
-      ' brightness(' + Math.round(p[4] * 100) + '%)' +
-      ' contrast(' + Math.round(p[5] * 100) + '%)';
-  }
-
-  var tintCache = {};
-
-  function tintFilter(hex) {
-    var t = hexToRgb(hex);
-    if (!t) return '';
-    var key = String(hex).trim().toUpperCase();
-    if (tintCache[key] === undefined) tintCache[key] = toFilter(tintSolve(t).p);
-    return tintCache[key];
-  }
-
-  /** 源图主色：只对内置图标（/images/tabbar/）成立，别的返回 '' */
+  /** 源图主色：只对内置图标成立，别的返回 ''（= 不参与染色） */
   function sourceColor(src) {
     var s = typeof src === 'string' ? src : '';
     if (s.indexOf(BUILTIN_PREFIX) !== 0) return '';
@@ -343,15 +197,19 @@
   }
 
   /**
-   * 该图标在该颜色下要不要染色、染成什么。
-   * 两条「不染」：① 非内置图标（素材库 / 自传图保持原色，与有赞一致）；
-   *              ② 目标色 == 源色（默认态 → 零变化，像素与改造前逐点相同）。
+   * 染色图路径（'' = 不用染，直接用原图）。
+   * 与 navcolor.js 的 iconPath 同口径 —— 唯一区别是那边会再拼一个 BASE_URL 前缀
+   * （真机要绝对地址），这边预览与服务器同源，用相对路径即可。
    */
-  function iconFilter(src, color) {
+  function tintPath(src, color) {
     var ref = sourceColor(src);
     if (!ref) return '';
-    if (String(color || '').trim().toUpperCase() === ref) return '';
-    return tintFilter(color);
+    var name = String(src).slice(BUILTIN_PREFIX.length).replace(/\.png$/i, '');
+    if (!name) return '';
+    var c = hex(color, '');
+    if (!c) return '';
+    if (c === ref) return '';        // 默认配色：不染（零变化、零请求）
+    return TINT_PREFIX + name + '@' + c.slice(1).toLowerCase() + '.png';
   }
 
   var STYLE_ID = 'pvtbStyle';
@@ -404,16 +262,18 @@
       var src = (on ? (it.activeIcon || it.icon) : (it.icon || it.activeIcon)) || '';
       // 「仅选中显示图标」：未选中项把图标藏起来但**保留占位**，文字不会跳
       var hideIcon = c.iconMode === 'active' && !on;
-      /* 图标染色：内置图标跟着配色走（computed style 里也能看到 filter，
-         便于自检/探针直接断言「预览确实染了」）。自传图 / 素材库图不染。
-         ⚠️ visibility 只挂外层 `.pvtb-ico`（visibility 会继承给 img），
+      /* 图标染色：内置图标跟着配色走 —— 目标色与源色相同（默认配色）时
+         tintPath 返回 ''，src 原样，预览与真机都零变化。
+         自传图 / 素材库图（/uploads/…）一律不染。
+         ⚠️ visibility 只挂外层 `.pvtb-ico`（visibility 会**继承**给 img），
          别再往 img 上写一遍 —— 那会多出一份冗余内联样式，
          也会让「数 visibility 出现次数」这类渲染断言凭空翻倍（实测被 test-tabbar 抓到）。 */
-      var tint = iconFilter(src, on ? c.selectedColor : c.color);
+      var tinted = tintPath(src, on ? c.selectedColor : c.color);
+      var viewSrc = tinted || src;
 
       var iconHtml = showIconBox
         ? '<div class="pvtb-ico"' + (hideIcon ? ' style="visibility:hidden"' : '') + '>' +
-            '<img src="' + esc(src) + '" alt=""' + (tint ? ' style="filter:' + esc(tint) + '"' : '') + '>' +
+            '<img src="' + esc(viewSrc) + '" alt="">' +
           '</div>'
         : '';
 
@@ -432,10 +292,9 @@
     setCustomPages: setCustomPages,
     isPage: isPage,
     pageName: pageName,
-    /* 图标染色 —— 自检会拿这三个（tintFilter / iconFilter / sourceColor）
-       与 miniprogram/utils/navcolor.js 的同名实现喂同一批输入比结果 */
-    tintFilter: tintFilter,
-    iconFilter: iconFilter,
+    /* 图标染色 —— 自检会拿这两个（tintPath / sourceColor）与
+       miniprogram/utils/navcolor.js 的同名实现喂同一批输入比结果 */
+    tintPath: tintPath,
     sourceColor: sourceColor,
     CUSTOM_PAGE_PREFIX: CUSTOM_PAGE_PREFIX,
     DEFAULT: DEFAULT,

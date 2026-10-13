@@ -12,8 +12,9 @@
  *   [6] 共享渲染 pv-tabbar.js 的渲染规则（DOM 桩）：项数 / 选中配色 /
  *       「仅选中显示图标」的占位 / 纯文字模式 / 隐藏 / 转义
  *   [7] 内置导航图标：三处兜底项逐项一致 + 10 张图标文件真的在代码包里
- *   [8] 导航图标染色（复刻有赞「导航图标色」）：两处算法等价 / 默认态零变化 /
- *       只染内置图标 / 真机组件两态内联 style / 「仅选中显示图标」的 visibility 占位
+ *   [8] 导航图标染色（复刻有赞「导航图标色」）：两处口径等价 / 默认态零变化 /
+ *       只染内置图标 / 真机组件两态地址 / 「仅选中显示图标」的 visibility 占位 /
+ *       加载失败回落
  *
  * 为什么要跑真实组件源码：custom-tab-bar 是「每个 tab 页各一份实例」的特殊组件，
  * 它读不到真实自定义属性，只能靠 replica.TABBAR + 内部兜底 —— 这三处兜底值
@@ -40,6 +41,7 @@ const store = require('../server/decorate/store');
 const emit = require('../server/decorate/emit');
 const PvTabbar = require('../server/public/shared/pv-tabbar.js').PvTabbar;
 const NavColor = require('../miniprogram/utils/navcolor.js');
+const { BASE_URL } = require('../miniprogram/utils/constants.js');
 
 let pass = 0;
 let fail = 0;
@@ -521,29 +523,41 @@ console.log('[7] 内置导航图标：包内文件与三处默认值对得上');
 
 /* -------------------- [8] 导航图标染色（有赞「导航图标色」） -------------------- */
 
-console.log('\n[8] 导航图标染色：内置位图跟着配色走（有赞那套是图标字体，我们等效用 CSS filter）');
+console.log('\n[8] 导航图标染色：内置位图跟着配色走（有赞那套是图标字体，我们让服务端出一张染色 PNG）');
 {
-  /* 两处实现必须等价（真机 utils/navcolor.js / 预览 pv-tabbar.js 各存一份） */
+  /* 两处实现必须等价（真机 utils/navcolor.js / 预览 pv-tabbar.js 各存一份规则） */
+  const icons = ['/images/tabbar/home.png', '/images/tabbar/home-active.png', '/images/tabbar/news-active.png'];
   const colors = ['#8A8A8A', '#C8102E', '#000000', '#FFFFFF', '#2B6CB0', '#0F9D58',
     '#F5A623', '#7B3FE4', '#FF0080', '#334155', '#E11D48', '#9661BC'];
-  const diff = colors.filter((h) => NavColor.tintFilter(h) !== PvTabbar.tintFilter(h));
-  ok(diff.length === 0, '两处染色算法等价（同一批色值 → 逐字符相同的 filter）', diff.join(' '));
-  ok(NavColor.tintFilter('#2B6CB0') === NavColor.tintFilter('#2B6CB0') &&
-    NavColor.tintFilter('#2b6cb0') === NavColor.tintFilter('#2B6CB0'),
-    '求解确定性 + 大小写归一（同一色值必得同一结果，否则预览与真机会漂）');
+  const diff = [];
+  icons.forEach((s) => colors.forEach((h) => {
+    const a = NavColor.iconPath(s, h);
+    const b = PvTabbar.tintPath(s, h);
+    /* 唯一允许的差异：真机要绝对地址（多一个 BASE_URL 前缀），预览与服务器同源用相对路径 */
+    if (!(a === b || (b !== '' && a === BASE_URL + b))) diff.push(s + ' ' + h);
+  }));
+  ok(diff.length === 0, '两处染色口径等价（同一批「图标 × 色值」→ 同一串地址）', diff.join(' '));
+  ok(NavColor.iconPath('/images/tabbar/home.png', '#2B6CB0') ===
+    NavColor.iconPath('/images/tabbar/home.png', '#2b6cb0'),
+    '大小写归一（同一色值必得同一地址，否则预览与真机会指向两张图）',
+    NavColor.iconPath('/images/tabbar/home.png', '#2B6CB0'));
 
-  /* 默认色 == 源图主色 → 不该产生任何 filter（改造前后像素零变化） */
-  ok(NavColor.iconFilter('/images/tabbar/home.png', schema.TABBAR_DEFAULTS.color) === '' &&
-    NavColor.iconFilter('/images/tabbar/home-active.png', schema.TABBAR_DEFAULTS.selectedColor) === '',
-    '默认配色下不染色（源图主色就是 #8A8A8A / #C8102E，加滤镜只会白增一层误差）',
+  /* 默认色 == 源图主色 → 不染色（改造前后像素零变化，而且零网络请求） */
+  ok(NavColor.iconPath('/images/tabbar/home.png', schema.TABBAR_DEFAULTS.color) === '' &&
+    NavColor.iconPath('/images/tabbar/home-active.png', schema.TABBAR_DEFAULTS.selectedColor) === '',
+    '默认配色下不染色（源图主色就是 #8A8A8A / #C8102E，不必多这一次请求）',
     schema.TABBAR_DEFAULTS.color + ' / ' + schema.TABBAR_DEFAULTS.selectedColor);
 
   /* 自传图 / 素材库图不染 —— 与有赞一致（它只染自己的图标字体） */
-  ok(NavColor.iconFilter('/uploads/202610/a.png', '#2B6CB0') === '' &&
-    NavColor.iconFilter('http://x/uploads/202610/a.png', '#2B6CB0') === '',
+  ok(NavColor.iconPath('/uploads/202610/a.png', '#2B6CB0') === '' &&
+    NavColor.iconPath('http://x/uploads/202610/a.png', '#2B6CB0') === '',
     '自传 / 素材库图标保持原色（彩图被整体染色只会更糟，有赞也不染自传图）');
 
-  /* 真机组件：改配色后 readConfig 必须把两态的内联 style 一起算好 */
+  /* 色值非法 → 不染（宁可保持原色，也不要拼出一个必然 404 的地址：那会变成空白图标） */
+  ok(NavColor.iconPath('/images/tabbar/home.png', 'not-a-color') === '',
+    '色值非法时不染色（地址一定 404，宁可留着原色图标）');
+
+  /* 真机组件：改配色后 readConfig 必须把两态的地址一起算好 */
   const tinted = loadComponent({
     TABBAR: {
       color: '#2B6CB0', selectedColor: '#0F9D58', background: '#FFFFFF',
@@ -551,24 +565,24 @@ console.log('\n[8] 导航图标染色：内置位图跟着配色走（有赞那�
     }
   }).def.data;
   const it0 = (tinted.items || [])[0] || {};
-  ok((it0.styleOff || '').indexOf('visibility:hidden;') === 0 &&
-    (it0.styleOff || '').indexOf('filter:' + NavColor.tintFilter('#2B6CB0')) > 0,
-    '「仅选中显示图标」时未选中态 = visibility 占位 + 未选中色染色（顺序不能反）',
-    it0.styleOff);
-  ok(it0.styleOn === 'filter:' + NavColor.tintFilter('#0F9D58') + ';',
-    '选中态用选中色染色（两态各按自己的色，不能共用一条）', it0.styleOn);
+  ok(it0.srcOff === BASE_URL + '/navicon/home@2b6cb0.png' &&
+    it0.srcOn === BASE_URL + '/navicon/home-active@0f9d58.png',
+    '真机组件两态各按自己的色算出图标地址（不能共用一条）', it0.srcOff + ' | ' + it0.srcOn);
+  ok(it0.styleOff === 'visibility:hidden',
+    '「仅选中显示图标」时未选中态 = visibility 占位（用 display:none 文字会上下跳）', it0.styleOff);
 
-  /* 默认态：组件产出的两个 style 都必须是空的（喂一份没有 TABBAR 的替身，才会走兜底） */
+  /* 默认态：组件产出的地址必须仍是包内原图（喂一份没有 TABBAR 的替身，才会走兜底） */
   const plain = loadComponent({ CUSTOM_PAGES: {} }).def.data;
-  ok((plain.items || []).every((i) => i.styleOff === '' && i.styleOn === ''),
-    '默认配色下组件不产出任何内联 style（改造前后真机像素零变化）',
-    (plain.items || []).map((i) => i.styleOff || '(空)').slice(0, 2).join(' | '));
+  ok((plain.items || []).every((i) => i.srcOff === i.rawOff && i.srcOn === i.rawOn &&
+    String(i.srcOff).indexOf('/navicon/') === -1),
+    '默认配色下组件仍用包内原图（零网络请求、改造前后真机零变化）',
+    (plain.items || []).map((i) => i.srcOff).slice(0, 2).join(' | '));
 
-  /* wxml 只原样输出算好的 style，不在模板里拼字符串：
-     模板里拼一个三元 + 字符串，漏个分号就会让后面的 visibility 失效（文字会跳） */
+  /* wxml 只原样输出算好的地址；另外必须挂加载失败回落 —— 染色图是网络图，取不到时会变空白 */
   const wxml = readFileSync(join(MP, 'custom-tab-bar', 'index.wxml'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-  ok(/selected === index \? item\.styleOn : item\.styleOff/.test(wxml),
-    '真机 wxml 原样输出 item.styleOn / styleOff（不在模板里拼 filter 与分号）');
+  ok(/selected === index \? item\.srcOn : item\.srcOff/.test(wxml) &&
+    /binderror="onIconError"/.test(wxml),
+    '真机 wxml 原样输出 item.srcOn / srcOff，并挂 binderror 回落到包内原图');
 }
 
 console.log('');

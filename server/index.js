@@ -25,6 +25,7 @@ const router = require('./routes');
 const wechat = require('./lib/wechat');
 const media = require('./lib/media');
 const flags = require('./lib/featureFlags');
+const navicon = require('./lib/navicon');
 
 const PORT = Number(process.env.PORT || 3000);
 const HOST = process.env.HOST || '0.0.0.0';
@@ -251,6 +252,58 @@ function tryMpImg(path, req, res) {
 }
 
 /**
+ * 底部导航**图标染色**：GET /navicon/<图标名去掉 .png>@<rrggbb>.png
+ *   例：/navicon/home@2b6cb0.png → miniprogram/images/tabbar/home.png 染成 #2B6CB0
+ *
+ * 为什么染色放在服务端（而不是像最初那样给 <image> 挂 CSS filter）：
+ *   微信小程序的渲染层对 <image> 上的 `filter` 支持**不可靠** ——
+ *   实测开发者工具里选中项图标变成了一个实心色块（约 24×22px、纯 `#080808`）：颜色对了、
+ *   **alpha 被丢掉**（描边图变成实心方块）。而浏览器（装修台预览）里同类 filter
+ *   逐像素正确 —— 于是就成了「预览好看、真机是色块」这种最坑的走样。
+ *   干脆把染色做成**服务端像素级处理**（lib/png.js + lib/navicon.js）：
+ *   真机 / 装修台手机壳 / /preview 拿到的是同一张标准 PNG，
+ *   客户端一行 filter 都不用写，也不必再维护两套等价的求解器。
+ *
+ * 安全（这条路由**不跟随 DEBUG_PAGE** —— 它服务的是线上真机，不是预览页）：
+ *   - 源图白名单 = miniprogram/images/tabbar 下真实存在的 .png
+ *     （名字正则同时挡住目录穿越与任意读文件）；
+ *   - 色值只认 6 位十六进制，非法一律 400，不做「猜一个色」的兜底；
+ *   - 结果按「源图指纹 + 色值」缓存，重复请求不重复编码。
+ */
+function tryNavIcon(path, req, res) {
+  if (path.indexOf('/navicon/') !== 0) return false;
+
+  const m = /^\/navicon\/([a-z0-9-]+)@([0-9a-f]{6})\.png$/.exec(path);
+  if (!m) {
+    fail(res, '染色图标地址不合法（应形如 /navicon/home@c8102e.png）', ERR.PARAM, 400);
+    return true;
+  }
+
+  let out;
+  try {
+    out = navicon.tinted(m[1] + '.png', m[2]);
+  } catch (e) {
+    fail(res, '图标不存在：' + m[1], ERR.NOT_FOUND, 404);
+    return true;
+  }
+
+  /* 源图与色值都写进了 URL，同一个 URL 的内容不会变 —— 可以放心让客户端长缓存 */
+  const headers = {
+    'Content-Type': 'image/png',
+    'Cache-Control': 'public, max-age=86400',
+    'ETag': out.etag
+  };
+  if (String(req.headers['if-none-match'] || '') === out.etag) {
+    res.writeHead(304, headers);
+    return res.end();
+  }
+  headers['Content-Length'] = out.buf.length;
+  res.writeHead(200, headers);
+  res.end(out.buf);
+  return true;
+}
+
+/**
  * 素材静态服务：GET /uploads/<yyyyMM>/<file>
  *
  * 与调试台 / 装修台不同，这里**不受 DEBUG_PAGE 开关影响**——
@@ -425,6 +478,9 @@ const server = http.createServer(async (req, res) => {
 
   /* 小程序包内图片只读：/images/…（底部导航图标等；装修台预览与 /preview 用） */
   if (method === 'GET' && tryMpImg(path, req, res)) return;
+
+  /* 底部导航图标染色：/navicon/…（真机与预览都要用，故不受 DEBUG_PAGE 约束） */
+  if (method === 'GET' && tryNavIcon(path, req, res)) return;
 
   /* 素材库图片：/uploads/…（不受管理页面开关影响） */
   if (method === 'GET' && tryUploads(path, req, res)) return;

@@ -92,6 +92,19 @@ PORT=8080 node server/index.js
 > 浏览器侧的装修台手机壳与 `/preview` 拿不到「包内」，只能靠它读到**同一份文件**。
 > 有这条路由之后，装修台预览 / `/preview` / 真机三处取的是**同一个 URL 约定**，不会各拿一份后走样。
 
+导航图标**改色**走 **`GET /navicon/<图标名>@<rrggbb>.png`**（服务端**像素级染色**，见「店铺导航」一节）：
+
+```
+GET /navicon/home@2b6cb0.png          ← 未选中色 #2B6CB0 版「首页」图标
+GET /navicon/news-active@080808.png   ← 选中色 #080808 版「资讯」图标
+```
+
+读包内同名 PNG → **只换 RGB、alpha 逐字节保留**（描边图的主色变成目标色，抗锯齿边缘不变硬）→ 输出标准 PNG。
+出图是**标准 PNG 字节**，真机 / 装修台手机壳 / `/preview` 拿到的**物理上就是同一张图**，
+不像 CSS 滤镜那样依赖渲染内核支持（微信渲染层对 `<image>` 的滤镜不可靠，见下）。
+`Cache-Control: public, max-age=86400` + ETag（支持 304）；因服务线上真机，**不受 `DEBUG_PAGE` 约束**。
+非内置图标名 / 非法色值 → 400，取不到源图 → 404。实现：`server/lib/png.js`（零依赖 PNG 编解码）+ `server/lib/navicon.js`（染色 + LRU 缓存）。
+
 ### 装修台的手机预览（/admin）
 
 装修台里的预览是**另一条链路**，刻意不与上面共用：它要画区块角标、悬浮操作条、跳转角标，
@@ -200,19 +213,24 @@ PORT=8080 node server/index.js
   - 取值口径：`icon = 配置值`；`activeIcon = 配置的选中图标 || 配置的未选中图标`（运营只传一张图时两态同图）。
 - **图标跟着配色变色**（2026-10-13 起，复刻有赞「更多设置 > 导航图标色」）：
   内置图标是**位图**（颜色画死在图里），而有赞的内置图标是**图标字体** `yz-tabbar-icon-v2` —— 它的字形用 `color`
-  染色，所以有赞改「未选中色」图标跟着变；我们改色**原来只改文字**。现在用 CSS `filter` 把位图染成目标色：
-  - 算法在 `miniprogram/utils/navcolor.js`（真机）与 `shared/pv-tabbar.js`（装修台手机壳 + `/preview`）**各一份、行为等价**
-    （自检喂 20 个色值给两边、逐字符比 `filter` 字符串）。前缀 `brightness(0) saturate(100%)` 把源图压成
-    「黑色 + 原 alpha」，所以**与源图本身是什么颜色无关**，同一套参数对 10 张图都成立，边缘 alpha 不受影响。
-  - **默认态不加任何滤镜**：实测 10 张图标的主色就是默认配色（未选中 `#8A8A8A`、选中 `#C8102E`），
-    目标色 == 源色时直接返回空 filter —— 改造前后像素逐点相同。
+  染色，所以有赞改「未选中色」图标跟着变；我们改色**原来只改文字**。现在用**服务端像素级染色**把位图染成目标色：
+  - 出图走 `GET /navicon/<图标名>@<色值>.png`（见「只读路由」一节）：读包内 PNG → **只换 RGB、alpha 原样保留** →
+    输出标准 PNG。**10 张图标都是单色描边图**（不透明像素 RGB 精确等于源色、半透明抗锯齿像素 RGB 也是同一源色），
+    所以「换 RGB 留 alpha」就足够，不需要任何色彩矩阵逼近。
+  - 算法在 `server/lib/navicon.js`（唯一一份）；客户端**只剩拼地址** —— 真机 `miniprogram/utils/navcolor.js`、
+    装修台手机壳 + `/preview` 的 `shared/pv-tabbar.js`。两边口径等价（自检喂 4 图标 × 20 色值 = 80 组逐字符比 URL 路径，
+    唯一允许差异是 navcolor 多一个 `BASE_URL` 前缀）。
+  - ⚠️ **别再改回给 `<image>` 挂 CSS `filter`**：微信渲染层不支持（实测把描边图标渲染成 24×22px 的**实心色块** ——
+    **颜色对了、alpha 被丢掉**），而同样一份 filter 在浏览器里逐像素正确 → 「装修台预览好看、真机是色块」。
+    服务端出图让三端拿同一份字节，物理上不可能再走样，且能本机逐像素断言。
+  - **默认态不发任何请求**：实测 10 张图标的主色就是默认配色（未选中 `#8A8A8A`、选中 `#C8102E`），
+    目标色 == 源色时 `iconPath()` 直接返回空串 → 仍用包内原图，改造前后**零变化、零网络请求**。
   - **只染内置图标**（`/images/tabbar/` 开头）：自传 / 素材库图（`/uploads/…`）**保持原色**，与有赞一致
     （它也不染自传图），也避免彩图被整体染色。
-  - **回落方向是安全的**：滤镜不被支持（旧内核）时图标就是**原灰 / 红**，不裂图不白屏。
-    （这也是没选 `-webkit-mask` 的原因：mask 不被支持会露出一整块纯色方块，那才是真事故。）
-  - 精度（**真 Chrome 实测**，不是模拟）：15 个色值 → 色块 Δmax=2、真 `<img>` Δmax=2、手机壳内取样 Δmax=3。
-  - 接线：真机 `readConfig()` 算出 `item.styleOff / styleOn` 并由 wxml **原样输出**（模板里拼字符串漏个分号
-    会让后面的 `visibility` 失效）；预览侧 `filter` 挂 `<img>`，`visibility` 仍只挂外层 `.pvtb-ico`（会继承，别写两遍）。
+  - **回落方向是安全的**：染色图是**网络图**，取不到时会变空白图标（比原色图标糟得多）→
+    真机组件对 `<image>` 挂 `binderror="onIconError"`，失败时**回落到包内原图**（已在用原图就直接 return，防死循环）。
+  - 真机 `readConfig()` 算出 `item.srcOff / srcOn`（默认态就等于 `item.icon / activeIcon`）与 `styleOff`，
+    由 wxml 原样输出；`visibility` 是**继承属性**，只挂外层 `.pvtb-ico`，别往 `<img>` 再写一遍。
   - 面板：原「配色」折叠组拆成 **「导航图标色」+「导航背景色」两组并默认展开**（`type:'group'` 支持 `open: true`）——
     折叠着的时候运营在面板里根本找不到「图标颜色怎么改」的入口。
   - **有意偏离**：有赞的「样式风格 品牌/基础」与「导航图标色 自定义/与店铺风格一致」两个开关**没做**
@@ -473,7 +491,8 @@ PORT=8080 node server/index.js
 | `.tooling/test-mp-render.mjs` | 预览渲染内核单测（40 项，纯 node、不依赖浏览器）：WXSS 单位换算与作用域/标签映射、WXML 编译（`wx:for` / `wx:if/else` / 裸 `&&` / `mode` / `show-scrollbar={{false}}` 真求值）、**用真机 `product.wxss` 原文做端到端对账**（196rpx→98px / 90rpx→45px / 239rpx→119.5px / 100vh→718px 等 12 项）、装修台预览 6 项口径对账 |
 | `.tooling/test-emit.mjs` | 生成器无损性（8 字段哈希一致 + 语法校验） |
 | `.tooling/test-pagemeta.mjs` | `PAGE_META` 丢键回归 + emit 端到端（13 项） |
-| `.tooling/test-tabbar.mjs` | 店铺导航专项单测（**88 项**，纯 node 不依赖浏览器）：三处兜底值一致（**含图标**）、`normalizeTabbar` 边界与幂等、`validate('nav')` 的微信硬限制、`emit` 条件输出与导出清单、**用 vm 跑真实 `custom-tab-bar` 组件源码**（`setActive` 按路径 / 未命中 -1 / `onTap` 分流：内置页 `switchTab` · 自定义页 `navigateTo` · 已在自定义页容器内 `redirectTo` · 越界不崩 / `readConfig` 过滤与截断 / 图标 `hasIcon` 与站内路径不被拼域名）、`pv-tabbar` 渲染规则（DOM 桩：项数 / 选中配色 / 两态图标切换 / 图标占位 / 纯文字 / 隐藏 / 转义 / 样式只注入一次）、**包内 10 张导航图标**（真 PNG 魔数 + 66×66 RGBA + 三处默认项两态都命中真文件 + 装修台「内置图标」快捷按钮取值）。<br>⚠️ 验「内置兜底」时必须喂**没有 TABBAR 的替身 replica** —— `loadComponent(null)` 读的是**真实 replica**（已发布数据，运营会把某项指到微页面、把文案改掉），拿它比兜底必然假红（本文件踩过） |
+| `.tooling/test-tabbar.mjs` | 店铺导航专项单测（**97 项**，纯 node 不依赖浏览器）：三处兜底值一致（**含图标**）、`normalizeTabbar` 边界与幂等、`validate('nav')` 的微信硬限制、`emit` 条件输出与导出清单、**用 vm 跑真实 `custom-tab-bar` 组件源码**（`setActive` 按路径 / 未命中 -1 / `onTap` 分流：内置页 `switchTab` · 自定义页 `navigateTo` · 已在自定义页容器内 `redirectTo` · 越界不崩 / `readConfig` 过滤与截断 / 图标 `hasIcon` 与站内路径不被拼域名）、`pv-tabbar` 渲染规则（DOM 桩：项数 / 选中配色 / 两态图标切换 / 图标占位 / 纯文字 / 隐藏 / 转义 / 样式只注入一次）、**包内 10 张导航图标**（真 PNG 魔数 + 66×66 RGBA + 三处默认项两态都命中真文件 + 装修台「内置图标」快捷按钮取值）、**图标染色地址口径**（真机 ↔ 预览两处等价 / 大小写归一 / 默认配色与非法色**都不染** / 自传图不染 / 两态地址 / `binderror` 回落挂载 / 真机 wxml 原样输出）。<br>⚠️ 验「内置兜底」时必须喂**没有 TABBAR 的替身 replica** —— `loadComponent(null)` 读的是**真实 replica**（已发布数据，运营会把某项指到微页面、把文案改掉），拿它比兜底必然假红（本文件踩过） |
+| `.tooling/test-navicon.mjs` | 服务端图标染色（`/navicon/`）本机回归：`server/lib/png.js` 是**自己写的 PNG 编解码器**，所以要有三条独立证据 —— ① 10 张包内图标全部解码并导出 `decoded.json` 供 **PIL 独立比对**（两条独立证据才敢说解码器没错）；② **`decode(encode(img))` 与原图逐字节相同**（行过滤器 / CRC / 通道顺序写错都在这暴露）；③ 10 图标 × 5 色 = 50 张逐像素自证 **RGB 全等目标色 && alpha 与源图逐字节相同**，并打印 **alpha 取值种类**（远超 `{0,255}` 才说明抗锯齿被保留）。<br>⚠️ 它管**全量 + 编解码**；`check-all` F 组管**真服务与安全边界**；`test-tabbar` 管**客户端地址口径** —— 三者不重叠 |
 | `.tooling/test-publish-e2e.mjs` | 真实 HTTP 全链路：改草稿 → diff → 发布 → 核对 replica.js → 回滚还原（19 项） |
 | `.tooling/test-media.mjs` | 素材库全链路：上传 → 落盘核对 → 静态访问 → 列表 → 引用检查 → 删除 → 越权/穿越拦截（48 项） |
 | `.tooling/test-media-ui.mjs` | **素材库的 UI 无头实测**（81 项，jsdom 加载真实 `/console#media` 页面并模拟点击）：渲染文件夹栏、点文件夹筛选、勾选不重建 `<img>`、全选/清空、新建文件夹真实落库、批量移动、删文件夹后素材回未分组；**放大预览**（点图开浮层、点卡片不会顺手选中、←/→ 按钮与键盘翻页、首尾循环、点图片本身不误关、**点图片四周的留白 / 舞台空白 / × / Esc 都能关**、关闭后键盘监听已解绑、页面滚动恢复）、预览层里删除后网格同步刷新并自动切下一张；**卡片排版**（图在上、信息在下、名称与元信息的先后、操作行常驻且是图标、**缩略图区不许叫 `.thumb`**、旧 `.ops2` 已移除、浮层根选择器是 `.lbx` 而非 `.lb`）、**视频**（上传 mp4 → 视频档 → `<video>` 卡片 + 角标 + 时长 → 点开预览播视频且 `<img>` 已隐藏 → 点空白关闭 → 分档不串档）、全程无 JS 报错、跑完自清理。**`node --check` 只能证明语法没错，证明不了「点得动」**，所以补了这一层；**但它不做布局，像素级要靠 `.tooling/test-media-layout.mjs`** |
@@ -502,7 +521,7 @@ PORT=8080 node server/index.js
 | `.tooling/probe-admin-list.mjs` | **装修台列表「操作」列布局验收**（15 项，需 Chrome + CDP）：每行都挂 `.ops-row`、按钮最紧的一行仍有 ≥24px 余量、每个标签只占 1 个行盒（不折字/不竖排）、按钮同高（`a.btn` 盒模型没退回 content-box）、文案无 `↗` 且「新窗口」口径仍在 `title` 里；把操作列强行压到 120px 后标签仍单行、按钮一个像素都不被压、改为整颗换行；最后**反向自证**：造出修复前的状态（按钮压到 34px + 允许折字）必须出现竖排 —— 证明前面的断言不空转。⚠️ **量高度没用**（`.btn.sm` 高度写死 26px，折字时字是溢出按钮的），必须量 `Range.getClientRects().length`（文字占几个行盒）；⚠️ 注入样式后**必须等 ~700ms 再量**：`.btn { transition: .15s }` 是全属性过渡，`flex-shrink` / `color` 都可动画，立刻读会拿到过渡前的旧值（实测 300ms 还会误判成「覆盖不生效」） |
 | `.tooling/probe-console-decorate.mjs` | **装修入口「新窗口打开」验收**（18 项，需 Chrome + CDP）：`/admin` 列表里每行「装修」/ 页面名 / 「设置底部导航」都是 `<a target="_blank">` 且 href=`/admin?edit=<key>`、点击**不被 `preventDefault`**（进入编辑器完全交给链接默认行为，没有 JS 抢走）、不再有同页 `button[data-open]`；`/admin?edit=<key>` 端到端**直达编辑器**、「返回列表」后地址栏回落 `/admin`；控制台「在新窗口打开 ↗」+ 侧栏「装修台 /admin」都是新窗口链接、店铺设置「去装修台修改」是 `target=_blank` 真链接；`iframe` 仍内嵌且高度不溢出。⚠️ **不拿「真的多开一个标签页」当断言**：合成点击不带用户手势，Chrome 弹窗拦截会静默拦下，正确的实现也会被判红（假红比不检查更浪费时间） |
 | `node server/tools/reset-dev-data.mjs` | **开发期数据复位**：把 `db.json` 收敛成最小可用集（客户保留最近 1 个、评价保留 1 条、可选连带清订单、清掉孤儿 `payLogs` 与空壳键），执行前全量备份。**必须先停服务**（脚本会探测 3000 端口并拒绝在运行中改文件），默认预演、加 `--apply` 才写。详见脚本头部注释 |
-| `node server/tools/check-all.mjs` | 全量点位连通性自检（92 点位 / **514 条实测（请求 + 断言）**，含装修、自定义页面全生命周期、素材库（含**视频魔数识别 / moov 时长与分辨率解析 / kind 分档 / Range 投递**）、后台控制台往返、安全开关判定矩阵、持久化兜底守卫、**数据落盘原子写与瞬态重试**、**WXSS 作用域与设计令牌静态校验**、**后台前端类名撞车静态校验**（`.thumb` 必须收窄为 `img.thumb`、素材卡片缩略图区必须叫 `.mt`、旧 `.ops2` 不得残留、**lightbox 根类名必须是 `#layer > .lbx` 且子规则一律带 `.lbx` 作用域 —— 裸 `.lb` 曾命中概览页图表轴标签 `<div class="lb">`，把 7 个图例变成铺满全屏的黑色层，整页黑屏**）、**装修跳转链路校验（三个进入编辑器的入口必须是 `<a target="_blank">` 且带 `?edit=` / 支持 URL 直达编辑器 / 地址栏同步）**、**装修台列表操作列口径（按钮不许被压缩/折字 `flex:0 0 auto`+`nowrap` / 列宽 ≥300px / `min-width` ≥ 定宽列之和 + 名称列 150px / 文案无 `↗` / 「查看变更」「版本」两个入口下架后不许再有 `btnDiff`·`btnVersions`·`data-diff=`·`data-vers=` 以及 `showDiff`·`showVersions`·`rollback` 死函数）**、**组件库全量对账 + 全部区块类型端到端覆盖**、**商品库图片的删除保护与商品图文详情**、**评价持久化与「无幽灵评价」**、**自检自身不污染真实数据（固定联调账号 / 动态库存探针）**、**`/mp-src` 源码路由的类型白名单与路径穿越拦截**、**`/images/` 包内图标只读路由（字节一致 / 非位图 403 / 穿越拦截 / DEBUG_PAGE 门控）**、**预览页必须编译真机源码（不得有第二份 HTML 近似）**、**装修台预览与真机口径一致**、**两态渲染实测**、**店铺导航全链路（候选页面与 `app.json` 一致 / 四件套齐全 / 5 个 tab 页都同步高亮 / 三处兜底值一致 + 组件有配置时原样采用（合成输入，不依赖运营数据）/ 组件与预览同口径 / 校验边界 / 发布器接线 / 两处预览共用唯一实现 / 包内 10 张导航图标 + 两态成对 + 快捷按钮取值）**、**固定结构页收起组件库并给出说明**、**个人中心全链路（我的 = 首页 57 + 专属 9 / 9 种新区块五处渲染齐备 / 组件库 4 组 25 项且与 union 严格同集 / `MINE_BLOCKS` 落盘 + 发布器三处 + 页面级 `pageLibs`）**；含小程序配置与页面资源可达性静态校验） |
+| `node server/tools/check-all.mjs` | 全量点位连通性自检（92 点位 / **547 条实测（请求 + 断言）**，含装修、自定义页面全生命周期、素材库（含**视频魔数识别 / moov 时长与分辨率解析 / kind 分档 / Range 投递**）、后台控制台往返、安全开关判定矩阵、持久化兜底守卫、**数据落盘原子写与瞬态重试**、**WXSS 作用域与设计令牌静态校验**、**后台前端类名撞车静态校验**（`.thumb` 必须收窄为 `img.thumb`、素材卡片缩略图区必须叫 `.mt`、旧 `.ops2` 不得残留、**lightbox 根类名必须是 `#layer > .lbx` 且子规则一律带 `.lbx` 作用域 —— 裸 `.lb` 曾命中概览页图表轴标签 `<div class="lb">`，把 7 个图例变成铺满全屏的黑色层，整页黑屏**）、**装修跳转链路校验（三个进入编辑器的入口必须是 `<a target="_blank">` 且带 `?edit=` / 支持 URL 直达编辑器 / 地址栏同步）**、**装修台列表操作列口径（按钮不许被压缩/折字 `flex:0 0 auto`+`nowrap` / 列宽 ≥300px / `min-width` ≥ 定宽列之和 + 名称列 150px / 文案无 `↗` / 「查看变更」「版本」两个入口下架后不许再有 `btnDiff`·`btnVersions`·`data-diff=`·`data-vers=` 以及 `showDiff`·`showVersions`·`rollback` 死函数）**、**组件库全量对账 + 全部区块类型端到端覆盖**、**商品库图片的删除保护与商品图文详情**、**评价持久化与「无幽灵评价」**、**自检自身不污染真实数据（固定联调账号 / 动态库存探针）**、**`/mp-src` 源码路由的类型白名单与路径穿越拦截**、**`/images/` 包内图标只读路由（字节一致 / 非位图 403 / 穿越拦截 / DEBUG_PAGE 门控）**、**`/navicon/` 图标染色路由（解码后 RGB 全等目标色 + alpha 与源图逐字节相同 / 未知名 404 / 非法色与穿越 400 / 支持 304）**、**预览页必须编译真机源码（不得有第二份 HTML 近似）**、**装修台预览与真机口径一致**、**两态渲染实测**、**店铺导航全链路（候选页面与 `app.json` 一致 / 四件套齐全 / 5 个 tab 页都同步高亮 / 三处兜底值一致 + 组件有配置时原样采用（合成输入，不依赖运营数据）/ 组件与预览同口径 / 校验边界 / 发布器接线 / 两处预览共用唯一实现 / 包内 10 张导航图标 + 两态成对 + 快捷按钮取值 + 图标染色地址口径）**、**固定结构页收起组件库并给出说明**、**个人中心全链路（我的 = 首页 57 + 专属 9 / 9 种新区块五处渲染齐备 / 组件库 4 组 25 项且与 union 严格同集 / `MINE_BLOCKS` 落盘 + 发布器三处 + 页面级 `pageLibs`）**；含小程序配置与页面资源可达性静态校验） |
 | `.tooling/check-admin-nav.mjs` | 店铺导航的**浏览器验收**（**25 项**，需 Chrome + CDP 代理）：装修台列表卡片 / 进编辑器隐藏组件库 / 点区块树高亮跟随 / 改文案实时 5 字截断 / 图标样式切换真的生效 / **内置图标快捷按钮写进字段且 5 项都渲染 `/images/tabbar/…`、高亮项取 `-active`** / 改成外链图标生效 / 纯文字 0 图标 / **`/preview` 底部 5 张包内图标全部加载成功（哨兵：靠 `/images/` 只读路由）** / **自定义页目标高亮 + 内置产品页不高亮（数据驱动，不写死某项）**。补「静态自检覆盖不到、只能真浏览器验」的那一段；只新开标签页用完即关，不碰已有标签页 |
 | `.tooling/probe-deployed.mjs` | **已部署服务器**的端到端冒烟（30 项，默认打 `https://14.103.50.137/mall-api`）：连通与 92 点位 / **管理页面与 44 个运营接口在公网确实被拒**（代理路径 403 + 站点根 410 两处都查，防「只是 nginx 顺手挡了」的假安全）/ 登录 / 首页 / 商品 / 分类 / **加购 → 下单 → 核对库存扣减 → 取消 → 核对库存回滚** / 图片静态资源。会真实写数据，但结尾自动取消订单；用于每次部署后确认「线上真的能用」，而不是只在本机自检通过 |
 
@@ -1049,7 +1068,7 @@ node server/tools/check-all.mjs
 | 预览渲染链路 | `/mp-src` 放行文本类型 / 拒绝非文本（403）/ 拦截路径穿越（400，含 `%2F`、`%2e`、`%5C` 三种编码形态）；预览页必须加载三件套且顺序正确、不得引 `admin.css`；`preview.js` 里不得出现 `PvRender.render(` 或第二份手写渲染 —— 专抓「预览又变成另一个实现，跟真机对不上」 |
 | 店铺导航（`check-all.mjs` 第 15.11 节） | 候选页面与 `app.json` 的 `tabBar.list` 逐项一致（选错了真机点不动且不报错）/ `tabBar.custom:true` 且 list 仍完整 / custom-tab-bar 四件套齐全 / **5 个 tab 页的 json 都声明 `usingComponents`**（漏了底部导航整体不渲染）/ **5 个 tab 页都在 `onShow` 里同步高亮**、且同步逻辑只有 `utils/tabbar.js` 一处、按路径匹配、`onTap` 不 `setData` / 兜底值三处哈希一致（**含图标地址**）/ `validate('nav')` 的四条边界 / 发布器接线 / 装修台与 `/preview` 只共用 `pv-tabbar.js` 一份实现 / **自定义页也能当导航目标**（第 41 批）：自定义页地址字面四处同源、目标判定只有一份实现且 `store.js` 复用 `schema.isTabbarPath`（第 41 批的 502 就是 store.js 自己又写了一份候选集合）、**把组件真跑起来点一次**（内置页 → `switchTab`／自定义页 → `navigateTo`／已在自定义页容器内 → `redirectTo`）、被选中的自定义页自渲染一份导航、**空文案回落页面名三处消费方同结果**（组件一度只认 5 个内置页 → 真机空白 tab） |
 | 内置导航图标（`check-all.mjs` 第 15.11 节 H 组） | **10 张图标真在包里**（按 PNG 魔数校验，不看扩展名）/ 都是 **66×66 · 8bit RGBA**（3 倍图 —— 尺寸错了不报错，只是真机发虚或被拉伸）/ **三处默认值的图标路径都命中真文件且两态成对**（3 处 × 5 项 × 2 态 = 30 个路径）/ 图标名映射表与内置页面表一一对应无重名 / 装修台「内置图标」快捷按钮的 10 个取值都指向真文件且就是默认项自身 / **`/images/` 只读路由**：能取到且与包内文件**字节一致**、带 `no-store`、与 `/mp-src` 同受 `DEBUG_PAGE` 约束、不存在的图 / 非位图扩展名 / 脚本 / `..` 穿越 / 目录本身一律拿不到内容 |
-| 导航图标染色（`check-all.mjs` 第 15.11 节 F 组） | **两处实现等价**（真机 `utils/navcolor.js` ↔ 预览 `pv-tabbar.js`，喂 20 个色值**逐字符比 `filter` 字符串** —— 差一个百分号就是「装修台看着蓝、真机还是灰」）/ **适用边界**（内置图标 + 默认配色 → 不染；内置图标 + 改色 → 染；外链与 `/uploads/…` 自传图 → **一律不染**，彩图不该被整体染色）/ **filter 恒定六原语且形状对**（正则锁 `brightness(0) saturate(100%) invert… sepia… saturate… hue-rotate… brightness… contrast…`，少一个原语就染不到目标色）/ **真机 wxml 必须原样输出** `selected === index ? item.styleOn : item.styleOff`（模板里拼字符串漏个分号会让后面的 `visibility` 静默失效）/ **把组件真跑起来**按配色算出两态（且 `iconMode:'active'` 时未选中态的 `visibility:hidden;` 必须在 `filter:` **之前**）/ **默认配色下不产出任何内联 style**（改造前后像素逐点相同，配过默认色的运营零感知）|
+| 导航图标染色（`check-all.mjs` 第 15.11 节 F 组） | **两处实现等价**（真机 `utils/navcolor.js` ↔ 预览 `pv-tabbar.js`，喂 **4 图标 × 20 色值 = 80 组**逐字符比 `/navicon/<名>@<色>.png` 路径；唯一允许差异 = navcolor 多一个 `BASE_URL` 前缀）/ **服务端像素级染色正确性（真服务端到端）**：取回 PNG 解码后 **RGB 全等目标色 && alpha 与源图逐字节相同**（不是「近似」，是逐像素等值）/ **地址形状对**（小写归一）/ **适用边界**（内置图标 + 默认配色 → 返回空串不染；内置图标 + 改色 → 染；外链与 `/uploads/…` 自传图 → **一律不染**，彩图不该被整体染色；**非法色值不染**）/ **安全边界 6 条**（未知名 404、非法色 400、`home.png@` 400、`HOME@` 400、编码穿越 400、未编码穿越落到总路由 404）/ **真机 wxml 必须原样输出** `selected === index ? item.srcOn : item.srcOff` 且带 `binderror="onIconError"`（回落链的入口，丢了就是「图标一取不到就变空白」）/ **把组件真跑起来**按配色算出两态地址（且 `iconMode:'active'` 时未选中态的 `visibility:hidden;` 要在）/ **默认配色下仍用包内原图、地址里不含 `/navicon/`**（改造前后零变化、零请求，配过默认色的运营零感知）|
 | 「页面设置」入口分流（`check-all.mjs` 第 15.11 节 G 组） | **导航没有 `meta`** 这个前提（同时锁 schema 源码的 `TABBAR_NODE` 段与服务返回值 —— 只锁服务的话改了源码不重启照样绿）/ **入口在导航页上分流到「导航整体属性」**，且判断必须在 `locate('meta')` **之前**（放后面就永远不执行；判定用**逐行**匹配，`indexOf` 会被自己注释里的 `locate('meta')` 字面量带偏）/ **入口文案与属性面板根视图标签都随页面类型切换**（导航 → 「导航整体属性」；其它页仍是「页面设置」）/ **静态兜底文案还在**（`index.html` 的 `#btnPageSetting` 仍写「页面设置」，JS 没跑起来时不变）|
 
 外加一组**装修链条对账**（`check-all.mjs` 第 15.78 节），把四个环节串起来比对，任一处漏接都会红：
@@ -1095,6 +1114,8 @@ node .tooling/test-nontrade.mjs        # 88 项：MALL_DATA_DIR + MALL_REPLICA_F
                                        # 末节自断言「server/data 与 replica.js 未被改动」
 node .tooling/test-admin-auth.mjs      # 62 项：三级角色矩阵 / 用户令牌不能进管理接口 / 口令退避
 node .tooling/test-media.mjs           # 48 项：素材库全链路（含安全用例）
+node .tooling/test-navicon.mjs         # 服务端 PNG 染色：10 张解码 + encode→decode 逐字节 round-trip
+                                       #   + 10 图标 × 5 色 逐像素自证（RGB 全等目标色、alpha 与源图相同）
 node .tooling/test-inject-server-error.mjs  # 故意注入 500，验证「服务端异常必须被判成失败」
 node .tooling/probe-custom.cjs         # 40 项：自定义页 lib 层
 node .tooling/probe-custom-http.cjs    # 36 项：自定义页 HTTP 层
@@ -1108,7 +1129,7 @@ node .tooling/clean-fixtures.mjs       # 清掉测试夹具残留（配额触顶
 NODE_PATH=<node工作区>/node_modules node .tooling/test-media-ui.mjs   # 81 项：jsdom 真点击
 node .tooling/test-page-occlusion.mjs                                 # 44 项：真 Chrome 查整页遮挡
 node .tooling/test-media-layout.mjs                                   # 21 项：真 Chrome 量卡片像素
-node .tooling/check-admin-nav.mjs                                     # 18 项：CDP 实测装修台导航与 /preview
+node .tooling/check-admin-nav.mjs                                     # 25 项：CDP 实测装修台导航与 /preview
 node .tooling/probe-admin-delete.mjs                                  # 15 项：删除免二次确认 + 撤销原位
 node .tooling/probe-admin-lib.mjs                                     # 17 项：组件库 55 卡全量可点
 node .tooling/probe-numf.mjs                                          # 10 项：数字步进器尺寸 + −/+ 真写数据
@@ -1229,6 +1250,9 @@ ssh root@14.103.50.137 'tar -xzf /root/lexy-backend.tar.gz -C /opt/lexy-mall \
 > 小程序端 `ENV='server'` 读的是云服务器，不推上去就是**「图片加载失败」**（线上 404）。
 > 这类失败**在装修台的手机预览里看不出来** —— 预览页由本机服务同源喂图，必然显示得出来；
 > `/preview` 同理。只有开发者工具与真机才暴露。
+> **已重犯过一次**（2026-10-13：资讯页整页图裂 —— 复刻 8 页时抓的 126 个素材只在本机，
+> 线上 404；`sync-incremental --only=server/data/uploads --apply` 后恢复）。
+> 口诀：**只要在装修台传过图或复刻过页面，上线前先跑一次 `--only=server/data/uploads`**。
 > 体检入口：`node .tooling/sync-incremental.mjs --verify`（把页面与商品引用到的
 > `/uploads/…` 全部逐张 GET，取不到就报红并给出修法；顺带告警**素材库里的自检夹具残留**）。
 >
