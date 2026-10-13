@@ -45,6 +45,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
+import { isFixtureItem } from './fixture-orig.mjs';
 
 const require_ = createRequire(import.meta.url);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -369,7 +370,8 @@ async function verifyUploadRefs() {
 }
 
 /**
- * 素材库里的「自检夹具残留」——`orig` 以 `selfcheck-` 开头的上传测试文件。
+ * 素材库里的「自检夹具残留」（`orig` 为 `selfcheck-*` / `ui-test-<6位hex>.*` / `from-json.*`，
+ * **判据只定义在 `.tooling/fixture-orig.mjs`**，与 `sweep-selfcheck.mjs` 同源）。
  *
  * 为什么会在体检里出现这一条：
  *   `server/tools/check-all.mjs` 为了验上传/删除链路，会**真的**造 2×2 png /
@@ -388,7 +390,7 @@ function checkFixtureResidue() {
   if (!fs.existsSync(p)) return;
   let items = [];
   try { items = JSON.parse(fs.readFileSync(p, 'utf8')).items || []; } catch (e) { return; }
-  const fx = items.filter((x) => /^selfcheck-/i.test(String(x.orig || '')));
+  const fx = items.filter(isFixtureItem);
   if (!fx.length) { okMsg('素材库没有被自检夹具污染'); return; }
   warn(`素材索引里有 ${fx.length} 条自检夹具残留（运营在素材管理列表里看得到）：`);
   fx.slice(0, 3).forEach((x) => info(`  ${x.name}  (orig=${x.orig})`));

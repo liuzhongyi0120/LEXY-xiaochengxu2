@@ -9,6 +9,7 @@
  * （控制台的 hash 是 App.go 写的「视图 key」，写错会 fallback 到 dashboard 而不报错）。
  */
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -71,9 +72,23 @@ function send(method, params) {
   });
 }
 
+/** 组件库当前渲染出的卡片数（`#libGrid .lib-item`）—— 断言「展开真的生效」用 */
+async function libCardCount() {
+  const r = await send('Runtime.evaluate', {
+    expression: `document.querySelectorAll('#libGrid .lib-item').length`,
+    returnByValue: true
+  });
+  return Number(r.result.value) || 0;
+}
+
 const META = `(()=>{
   const t = document.getElementById('pgTitle');
-  const nav = document.querySelector('.nav-item.on span:last-child');
+  /* ⚠️ 不能用 span:last-child —— 导航项末尾往往是角标（订单管理里的 248），
+     那样读出来的 navOn 会是「248」而不是「订单管理」。显式跳过 .ico 与 .badge。 */
+  const navItem = document.querySelector('.nav-item.on');
+  const nav = navItem
+    ? [...navItem.querySelectorAll('span')].find((s) => !s.classList.contains('ico') && !s.classList.contains('badge'))
+    : null;
   const body = document.getElementById('body');
   return JSON.stringify({
     hash: location.hash,
@@ -151,22 +166,49 @@ const META = `(()=>{
   });
   await sleep(700);
   const shot2 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
-  writeFileSync(join(OUT, 'admin-edit-lib-collapsed.png'), Buffer.from(shot2.data, 'base64'));
-  console.log('装修台编辑器（组件库 · 折叠态）已截图');
+  const buf2 = Buffer.from(shot2.data, 'base64');
+  writeFileSync(join(OUT, 'admin-edit-lib-collapsed.png'), buf2);
+  const nCollapsed = await libCardCount();
+  console.log('装修台编辑器（组件库 · 折叠态）已截图，卡片 ' + nCollapsed + ' 张');
 
-  /* 展开折叠区再来一张，便于肉眼比对「默认只看到能用的」与「展开是完整清单」 */
-  await send('Runtime.evaluate', {
+  /* 展开折叠区再来一张，便于肉眼比对「默认只看到能用的」与「展开是完整清单」。
+     ⚠️ **必须断言「真的展开了」** —— 第一版只是 `h.click()` 后直接截图，
+     结果 `.lib-rest-head` 不存在时静默跳过点击，两张图**字节完全相同**，
+     等于产出了一份看起来像证据、其实是同一张图的假证据（实测 md5 一致才发现）。 */
+  const expanded = await send('Runtime.evaluate', {
     expression: `(async () => {
       const h = document.querySelector('.lib-rest-head');
-      if (h) { h.click(); await new Promise((r) => setTimeout(r, 500)); }
-      return 'ok';
+      if (!h) return 'no-head';
+      h.click();
+      await new Promise((r) => setTimeout(r, 600));
+      /* ⚠️ 光展开还不够：折叠头下面那 33 张卡片落在**内层滚动容器**的可视区之外，
+         不滚进来的话，展开态截图的像素与折叠态**一模一样**（这是我第二次踩到同一个坑）。
+         滚到容器顶部再截，变化才看得见。 */
+      const again = document.querySelector('.lib-rest-head');
+      if (again && again.scrollIntoView) again.scrollIntoView({ block: 'start' });
+      await new Promise((r) => setTimeout(r, 500));
+      return 'clicked';
     })()`,
     awaitPromise: true, returnByValue: true
   });
+  if (expanded.result.value !== 'clicked') {
+    throw new Error('找不到 .lib-rest-head（说明折叠组没渲染出来），拒绝产出「展开态」截图');
+  }
   await sleep(700);
+  const nExpanded = await libCardCount();
+  if (!(nExpanded > nCollapsed)) {
+    throw new Error('点了展开但卡片数没变（' + nCollapsed + ' → ' + nExpanded + '），展开态截图会是假的');
+  }
   const shot3 = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: true });
-  writeFileSync(join(OUT, 'admin-edit-lib-expanded.png'), Buffer.from(shot3.data, 'base64'));
-  console.log('装修台编辑器（组件库 · 展开态）已截图');
+  const buf3 = Buffer.from(shot3.data, 'base64');
+  writeFileSync(join(OUT, 'admin-edit-lib-expanded.png'), buf3);
+  /* 最后一道：两张图必须真的不一样。DOM 计数变了、像素没变 = 变化全被裁在视野外，
+     这种截图看着像证据、其实证明不了任何事。 */
+  const md5 = (b) => createHash('md5').update(b).digest('hex');
+  if (md5(buf3) === md5(buf2)) {
+    throw new Error('展开态与折叠态截图**字节完全相同** —— 说明变化的部分不在可视区内，这张图证明不了任何事');
+  }
+  console.log('装修台编辑器（组件库 · 展开态）已截图，卡片 ' + nExpanded + ' 张');
 
   writeFileSync(join(OUT, '_meta.json'), JSON.stringify(meta, null, 2));
 

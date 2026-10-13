@@ -20,14 +20,21 @@
  *   node .tooling/sweep-selfcheck.mjs --apply   执行隔离 + 清索引
  *
  * ── 判定口径 ───────────────────────────────────────────────────────
- * **只认 `orig` 以 `selfcheck-` 开头的条目**（这正是 check-all 造夹具时用的原始名）。
- * 不要放宽成「名字里有 test / xx」：有赞导入的素材原始名里大量含 `xx`
- * （如 `FmDkS1V0NxxGJOk8266ZqYXV3vn6.png!middle.webp`），放宽会把真素材误伤。
+ * **夹具原始名有「两套」，只认一个前缀就会漏**（2026-10-13 实测漏了 7 个）：
+ *   · `selfcheck-*`          —— `check-all.mjs` 造的上传夹具
+ *   · `ui-test-<6位hex>.<ext>` —— UI 测试（`test-media-ui.mjs`）走**界面**上传的夹具
+ *   · `from-json.<ext>`      —— 同一测试的「从 JSON 上传」通道
+ * 一律**锚定开头 + 硬结构**（如 `^ui-test-[0-9a-f]{6}\.`）。**不要放宽成「名字里含
+ * test / xx」**：有赞导入的素材原始名里大量含 `xx`（如
+ * `FmDkS1V0NxxGJOk8266ZqYXV3vn6.png!middle.webp`），放宽会把真素材误伤。
+ * ⚠️ 漏掉的代价不只是「本机多几条」—— 这些条目会随 `sync-incremental --apply`
+ * **推上线上素材库**（公开可 GET），所以自检后必须跑一次本脚本。
  */
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isFixtureItem } from './fixture-orig.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
@@ -38,7 +45,11 @@ const QUARANTINE = path.join(__dirname, '_fixtures-quarantine');
 const APPLY = process.argv.includes('--apply');
 /** --also=<相对名>（可重复）：索引条目已被清掉、但文件还在的孤儿夹具（搬它，不涉及索引） */
 const ALSO = process.argv.filter((a) => a.startsWith('--also=')).map((a) => a.slice('--also='.length));
-const isFixture = (it) => /^selfcheck-/i.test(String((it && it.orig) || ''));
+/**
+ * 判据**只定义在 `.tooling/fixture-orig.mjs`** —— `sync-incremental.mjs` 的上线守卫用的是同一份，
+ * 两处必须同源（此前各自写了一份 `/^selfcheck-/`，双双漏掉 `ui-test-*` / `from-json.*`）。
+ */
+const isFixture = isFixtureItem;
 
 const idx = JSON.parse(fs.readFileSync(INDEX, 'utf8'));
 const fixtures = idx.items.filter(isFixture);
@@ -54,7 +65,7 @@ fixtures.forEach((it) => {
   bytes += it.size || 0;
 });
 
-console.log('自检夹具（orig 以 selfcheck- 开头）');
+console.log('自检夹具（orig 为 selfcheck-* / ui-test-* / from-json.*）');
 console.log('  索引内条目：' + fixtures.length + ' / 索引共 ' + idx.items.length);
 console.log('  按日期：' + JSON.stringify(byDate));
 console.log('  合计体积：' + bytes + ' bytes');
