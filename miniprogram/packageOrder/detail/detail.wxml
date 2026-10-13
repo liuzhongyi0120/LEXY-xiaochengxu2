@@ -1,0 +1,158 @@
+<!--
+  订单详情
+  金额全部用服务端下发的元字符串（amounts.*），本页不重算 —— 见 detail.js 文件头。
+-->
+<view class="page">
+
+  <view wx:if="{{loading}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="订单加载失败"
+    desc="订单可能已删除，或网络异常"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <block wx:else>
+    <!-- 状态头 -->
+    <!-- 状态头：底色随状态变（修饰类在 JS 里算好，见 detail.js 的 decorate） -->
+    <view class="hero {{order.heroClass}}">
+      <text class="hero-st">{{order.statusText}}</text>
+      <text wx:if="{{order.hint}}" class="hero-hint">{{order.hint}}</text>
+    </view>
+
+    <!-- 收货信息 -->
+    <view class="card sec">
+      <view class="addr">
+        <view class="addr-line1">
+          <text class="addr-name">{{order.address.name}}</text>
+          <text class="addr-phone">{{order.address.phone}}</text>
+        </view>
+        <text class="addr-line">{{order.address.line}}</text>
+      </view>
+    </view>
+
+    <!-- 商品 -->
+    <view class="card sec">
+      <view class="sec-hd">
+        <text class="sec-t">商品信息</text>
+        <text class="sec-x">共 {{order.totalQty}} 件</text>
+      </view>
+      <view class="item" wx:for="{{order.items}}" wx:for-item="g" wx:for-index="gi" wx:key="goodsId">
+        <image
+          wx:if="{{!g.imgErr}}"
+          class="item-img"
+          src="{{g.image}}"
+          mode="aspectFill"
+          lazy-load
+          data-gi="{{gi}}"
+          binderror="onImgError"
+        />
+        <view wx:else class="item-img item-img-ph"></view>
+        <view class="item-info">
+          <text class="item-name ellipsis-2">{{g.name}}</text>
+          <text wx:if="{{g.specText}}" class="item-spec">{{g.specText}}</text>
+          <view class="item-row">
+            <text class="item-price">¥{{g.priceText}}</text>
+            <text class="item-qty">×{{g.quantity}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 金额明细 -->
+    <view class="card sec">
+      <view class="sec-hd">
+        <text class="sec-t">金额明细</text>
+      </view>
+      <view class="kv">
+        <text class="kv-k">商品金额</text>
+        <text class="kv-v">¥{{order.amounts.goods}}</text>
+      </view>
+      <view wx:if="{{order.amounts.hasCoupon}}" class="kv">
+        <text class="kv-k">优惠券</text>
+        <text class="kv-v kv-cut">-¥{{order.amounts.coupon}}</text>
+      </view>
+      <view class="kv">
+        <text class="kv-k">运费</text>
+        <text class="kv-v">{{order.amounts.freightFree ? '免运费' : '¥' + order.amounts.freight}}</text>
+      </view>
+      <view class="kv kv-total">
+        <text class="kv-k">实付款</text>
+        <text class="kv-amt">¥{{order.amounts.pay}}</text>
+      </view>
+    </view>
+
+    <!-- 物流节点（只有真发生过节点才展示这张卡） -->
+    <view wx:if="{{order.logistics.length}}" class="card sec">
+      <view class="sec-hd">
+        <text class="sec-t">物流进度</text>
+      </view>
+      <view class="tl">
+        <view class="tl-node" wx:for="{{order.logistics}}" wx:key="atText">
+          <view class="tl-dot"></view>
+          <view class="tl-body">
+            <text class="tl-text">{{item.text}}</text>
+            <text class="tl-time">{{item.atText}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 订单信息 -->
+    <view class="card sec">
+      <view class="sec-hd">
+        <text class="sec-t">订单信息</text>
+      </view>
+      <view class="kv">
+        <text class="kv-k">订单号</text>
+        <view class="kv-copy" bindtap="onCopyOrderNo" hover-class="hover" hover-stay-time="80">
+          <text class="kv-v">{{order.orderNo}}</text>
+          <text class="kv-copy-t">复制</text>
+        </view>
+      </view>
+      <view class="kv" wx:for="{{order.times}}" wx:key="label">
+        <text class="kv-k">{{item.label}}</text>
+        <text class="kv-v">{{item.value}}</text>
+      </view>
+      <view wx:if="{{order.remark}}" class="kv">
+        <text class="kv-k">买家留言</text>
+        <text class="kv-v">{{order.remark}}</text>
+      </view>
+    </view>
+
+    <view class="bottom-hold"></view>
+
+    <!-- 底部操作栏：无操作时不留空栏 -->
+    <view
+      wx:if="{{order.canPay || order.canCancel || order.canConfirm}}"
+      class="footer-bar ops"
+    >
+      <view
+        wx:if="{{order.canCancel}}"
+        class="btn"
+        bindtap="onTapCancel"
+        hover-class="hover"
+        hover-stay-time="80"
+      >取消订单</view>
+      <view
+        wx:if="{{order.canConfirm}}"
+        class="btn btn-primary"
+        bindtap="onTapConfirm"
+        hover-class="hover"
+        hover-stay-time="80"
+      >确认收货</view>
+      <view
+        wx:if="{{order.canPay}}"
+        class="btn btn-primary"
+        bindtap="onTapPay"
+        hover-class="hover"
+        hover-stay-time="80"
+      >去付款</view>
+    </view>
+  </block>
+</view>

@@ -1,0 +1,80 @@
+<!-- 我的收藏 -->
+<view class="page">
+
+  <view wx:if="{{loading && !list.length}}" class="body">
+    <view class="item" wx:for="{{[1,2,3]}}" wx:key="*this">
+      <view class="skeleton sk-img"></view>
+      <view class="sk-lines">
+        <view class="skeleton sk-t1"></view>
+        <view class="skeleton sk-t2"></view>
+      </view>
+    </view>
+  </view>
+
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="收藏加载失败"
+    desc="请检查网络后重试"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <empty-state
+    wx:elif="{{needLogin}}"
+    text="登录后查看收藏"
+    desc="收藏与账号绑定，需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <empty-state
+    wx:elif="{{!list.length}}"
+    text="还没有收藏商品"
+    desc="在商品详情页点「收藏」，之后就能在这里找到"
+    button-text="去逛逛"
+    bind:action="onTapGoShopping"
+  />
+
+  <view wx:else class="body">
+    <view class="item" wx:for="{{list}}" wx:for-index="i" wx:key="id">
+      <view
+        class="g-main"
+        data-id="{{item.id}}"
+        bindtap="onTapGoods"
+        hover-class="hover-lite"
+        hover-stay-time="80"
+      >
+        <image
+          wx:if="{{!item.imgErr}}"
+          class="g-img"
+          src="{{item.cover}}"
+          mode="aspectFill"
+          lazy-load
+          data-i="{{i}}"
+          binderror="onImgError"
+        />
+        <view wx:else class="g-img g-img-ph"></view>
+
+        <view class="g-info">
+          <text class="g-name ellipsis-2">{{item.name}}</text>
+          <view class="g-bottom">
+            <text class="g-price">¥{{item.priceText}}</text>
+            <text class="g-sales">已售 {{item.salesText}}</text>
+          </view>
+          <text wx:if="{{item.soldOut}}" class="g-out">已售罄</text>
+        </view>
+      </view>
+
+      <text
+        class="g-remove"
+        data-id="{{item.id}}"
+        catchtap="onTapRemove"
+        hover-class="hover"
+        hover-stay-time="80"
+      >取消收藏</text>
+    </view>
+
+    <view wx:if="{{loadingMore}}" class="more-tip">正在加载…</view>
+    <view wx:elif="{{!hasMore && list.length > 1}}" class="more-tip">没有更多了</view>
+  </view>
+</view>

@@ -1,0 +1,143 @@
+<!--
+  订单列表
+  类名全部在本页 list.wxss 里定义 —— 页面样式不会作用到组件内部，
+  用 app.wxss 的通用类（.row/.card/…）才是安全的跨页复用。
+-->
+<view class="page">
+
+  <!-- 状态页签：角标只在待付款 / 待发货 / 待收货 三档展示（已完成/已取消没有可操作项） -->
+  <view class="tabs">
+    <view
+      class="tab {{status === item.key ? 'on' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onTapTab"
+      hover-class="hover"
+      hover-stay-time="80"
+    >
+      <text class="tab-t">{{item.label}}</text>
+      <text wx:if="{{counts[item.key]}}" class="tab-badge">{{counts[item.key]}}</text>
+    </view>
+  </view>
+
+  <!-- 首屏骨架 -->
+  <view wx:if="{{loading && !list.length}}" class="body">
+    <view class="order" wx:for="{{[1,2]}}" wx:key="*this">
+      <view class="skeleton sk-hd"></view>
+      <view class="sk-row">
+        <view class="skeleton sk-img"></view>
+        <view class="sk-lines">
+          <view class="skeleton sk-t1"></view>
+          <view class="skeleton sk-t2"></view>
+        </view>
+      </view>
+      <view class="skeleton sk-ft"></view>
+    </view>
+  </view>
+
+  <!-- 首屏失败（断网 / 服务异常）与「没有订单」是两件事，必须分开 -->
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="订单加载失败"
+    desc="请检查网络后重试"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <!-- 未登录：给登录入口，而不是一个空白列表 -->
+  <empty-state
+    wx:elif="{{needLogin}}"
+    text="登录后查看订单"
+    desc="订单信息与账号绑定，需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <empty-state
+    wx:elif="{{!list.length}}"
+    text="还没有相关订单"
+    desc="{{status === 'all' ? '去挑一件心仪的好物吧' : '换个状态看看别的订单'}}"
+  />
+
+  <view wx:else class="body">
+    <view class="order" wx:for="{{list}}" wx:for-item="od" wx:for-index="oi" wx:key="orderId">
+      <!-- 头部：订单号 + 状态（整行可点进详情） -->
+      <view class="od-hd" data-id="{{od.orderId}}" bindtap="onTapDetail" hover-class="hover-lite" hover-stay-time="80">
+        <text class="od-no">{{od.createdAtText}}</text>
+        <!-- 状态文案：已取消 / 已完成用中性色（不是「待办」，不该整页报红）。
+             修饰类在 JS 里算好（od.statusClass）—— 详见 list.js 的 statusClassOf 注释。 -->
+        <text class="od-st {{od.statusClass}}">{{od.statusText}}</text>
+      </view>
+
+      <!-- 商品行 -->
+      <view class="od-body" data-id="{{od.orderId}}" bindtap="onTapDetail" hover-class="hover-lite" hover-stay-time="80">
+        <view class="od-item" wx:for="{{od.items}}" wx:for-item="g" wx:for-index="gi" wx:key="goodsId">
+          <image
+            wx:if="{{!g.imgErr}}"
+            class="od-img"
+            src="{{g.image}}"
+            mode="aspectFill"
+            lazy-load
+            data-oi="{{oi}}"
+            data-gi="{{gi}}"
+            binderror="onImgError"
+          />
+          <view wx:else class="od-img od-img-ph"></view>
+          <view class="od-info">
+            <text class="od-name ellipsis-2">{{g.name}}</text>
+            <text wx:if="{{g.specText}}" class="od-spec">{{g.specText}}</text>
+            <view class="od-price-row">
+              <text class="od-price">¥{{g.priceText}}</text>
+              <text class="od-qty">×{{g.quantity}}</text>
+            </view>
+          </view>
+        </view>
+      </view>
+
+      <!-- 底部：件数 + 实付 + 操作 -->
+      <view class="od-ft">
+        <view class="od-sum">
+          <text class="od-sum-t">共 {{od.totalQty}} 件，实付</text>
+          <text class="od-sum-amt">¥{{od.payAmountYuan}}</text>
+        </view>
+        <view class="od-ops">
+          <view
+            wx:if="{{od.canCancel}}"
+            class="btn"
+            data-id="{{od.orderId}}"
+            bindtap="onTapCancel"
+            hover-class="hover"
+            hover-stay-time="80"
+          >取消订单</view>
+          <view
+            wx:if="{{od.canConfirm}}"
+            class="btn"
+            data-id="{{od.orderId}}"
+            bindtap="onTapConfirm"
+            hover-class="hover"
+            hover-stay-time="80"
+          >确认收货</view>
+          <view
+            wx:if="{{od.canPay}}"
+            class="btn btn-primary"
+            data-id="{{od.orderId}}"
+            bindtap="onTapPay"
+            hover-class="hover"
+            hover-stay-time="80"
+          >去付款</view>
+          <view
+            class="btn"
+            data-id="{{od.orderId}}"
+            bindtap="onTapDetail"
+            hover-class="hover"
+            hover-stay-time="80"
+          >查看详情</view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{loadingMore}}" class="more-tip">正在加载…</view>
+    <view wx:elif="{{!hasMore && list.length > 1}}" class="more-tip">没有更多了</view>
+  </view>
+</view>

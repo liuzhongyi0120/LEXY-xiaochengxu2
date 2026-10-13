@@ -1,0 +1,15 @@
+<!-- 功能未开放：把「依赖什么」讲清楚，而不是一句「开发中」（见 coming.js 文件头） -->
+<view class="page">
+  <view class="box">
+    <view class="ring"><text class="ring-t">…</text></view>
+
+    <text class="t-name">{{name || '该功能'}}</text>
+    <text class="t-main">功能暂未开放</text>
+    <text class="t-desc">{{desc || fallback}}</text>
+
+    <view class="btns">
+      <view class="btn btn-primary" bindtap="onBack" hover-class="hover" hover-stay-time="80">返回上一页</view>
+      <view class="btn" bindtap="onGoMine" hover-class="hover" hover-stay-time="80">回到个人中心</view>
+    </view>
+  </view>
+</view>

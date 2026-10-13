@@ -1,0 +1,147 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: var(--space-lg);
+}
+
+/* ------------------------------ 品牌区 ------------------------------ */
+.brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80rpx var(--space-lg) 60rpx;
+}
+
+.brand-logo {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: var(--radius-base);
+  background: transparent;
+}
+
+.brand-logo-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light);
+}
+
+.brand-logo-t {
+  font-size: 40rpx;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.brand-name {
+  margin-top: var(--space-base);
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.brand-slogan {
+  margin-top: 12rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.brand-ver {
+  margin-top: 12rpx;
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
+}
+
+/* ------------------------------ 区块 ------------------------------ */
+.sec {
+  margin: 0 var(--space-base) var(--space-sm);
+  padding: var(--space-base);
+}
+
+.sec-hd {
+  margin-bottom: var(--space-sm);
+}
+
+.sec-t {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.kv {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 80rpx;
+}
+
+.kv-k {
+  flex: 0 0 auto;
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.kv-right {
+  display: flex;
+  align-items: center;
+}
+
+.kv-v {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--space-base);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.kv-phone {
+  flex: 0 0 auto;
+  font-size: var(--font-base);
+  color: var(--color-primary);
+}
+
+.kv-a {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
+  padding: 0 20rpx;
+  height: 52rpx;
+  border-radius: 26rpx;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--font-xs);
+  line-height: 52rpx;
+}
+
+/* button 自带边框与 ::after 描边，要当普通按钮用必须清掉 */
+.btn-contact {
+  margin-top: var(--space-base);
+  height: 80rpx;
+  border-radius: 40rpx;
+  background: var(--color-bg-muted);
+  color: var(--color-text);
+  font-size: var(--font-base);
+  line-height: 80rpx;
+  text-align: center;
+}
+
+.btn-contact::after {
+  border: none;
+}
+
+.notice {
+  display: block;
+  font-size: var(--font-sm);
+  line-height: 40rpx;
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 说明 ------------------------------ */
+.foot {
+  padding: var(--space-base) var(--space-lg) 0;
+}
+
+.foot-t {
+  display: block;
+  font-size: var(--font-xs);
+  line-height: 34rpx;
+  color: var(--color-text-placeholder);
+}

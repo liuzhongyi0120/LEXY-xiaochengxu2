@@ -1,0 +1,93 @@
+<!-- 账号与安全：只放真的能执行的动作（见 account.js 文件头） -->
+<view class="page">
+
+  <view wx:if="{{loading}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{!logged}}"
+    text="登录后管理账号"
+    desc="账号信息需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <block wx:else>
+    <!-- 头像：只读，注明来源（小程序端没有用户上传接口，见文件头说明） -->
+    <view class="card sec">
+      <view class="row-between">
+        <text class="k">头像</text>
+        <view class="av-wrap">
+          <image wx:if="{{avatar}}" class="av" src="{{avatar}}" mode="aspectFill" />
+          <view wx:else class="av av-ph"><text class="av-t">我</text></view>
+        </view>
+      </view>
+      <text class="hint">头像来自微信授权信息，暂不支持在小程序内自定义上传</text>
+    </view>
+
+    <!-- 昵称：可改，改动后必须点保存才生效 -->
+    <view class="card sec">
+      <view class="row-between">
+        <text class="k">昵称</text>
+        <input
+          class="ipt"
+          type="nickname"
+          maxlength="20"
+          placeholder="请填写昵称"
+          placeholder-class="ipt-ph"
+          value="{{nicknameInput}}"
+          bindinput="onInputNickname"
+        />
+      </view>
+      <view
+        wx:if="{{dirty}}"
+        class="btn-save {{saving ? 'btn-disabled' : ''}}"
+        bindtap="onSaveNickname"
+        hover-class="hover"
+        hover-stay-time="80"
+      >{{saving ? '保存中…' : '保存昵称'}}</view>
+    </view>
+
+    <!-- 手机号：已绑定展示掩码，未绑定给微信授权按钮 -->
+    <view class="card sec">
+      <view class="row-between">
+        <text class="k">手机号</text>
+        <block wx:if="{{hasPhone}}">
+          <text class="v">{{phoneMasked}}</text>
+        </block>
+        <button
+          wx:else
+          class="btn-phone"
+          open-type="getPhoneNumber"
+          bindgetphonenumber="onGetPhone"
+          hover-class="hover"
+          hover-stay-time="80"
+        >微信授权绑定</button>
+      </view>
+      <text class="hint">手机号由微信一次性授权，服务端保管，小程序不落地明文</text>
+    </view>
+
+    <!-- 账号标识 -->
+    <view class="card sec">
+      <view class="link-row" bindtap="onGoMemberCode" hover-class="hover-lite" hover-stay-time="80">
+        <text class="k">账号编号</text>
+        <view class="link-right">
+          <text class="v-arrow">查看 ›</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 退出登录 -->
+    <view class="card sec">
+      <view class="link-row" bindtap="onTapLogout" hover-class="hover-lite" hover-stay-time="80">
+        <text class="k k-danger">退出登录</text>
+      </view>
+    </view>
+
+    <view class="foot">
+      <text class="foot-t">账号与安全相关的问题可联系在线客服</text>
+    </view>
+  </block>
+</view>

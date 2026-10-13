@@ -5,6 +5,7 @@
  */
 
 const authRoutes = require('./auth');
+const shopRoutes = require('./shop');
 const goodsRoutes = require('./goods');
 const cartRoutes = require('./cart');
 const orderRoutes = require('./order');
@@ -18,6 +19,7 @@ const SAMPLES = require('./samples');
 
 const all = [].concat(
   authRoutes,
+  shopRoutes,
   goodsRoutes,
   cartRoutes,
   orderRoutes,

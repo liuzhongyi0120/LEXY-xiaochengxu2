@@ -34,6 +34,12 @@ module.exports = {
   },
   'POST /api/auth/logout': { note: '服务端 JWT 无状态，前端清 token 即可；此点位用于打通链路', body: {} },
 
+  /* ------------------------- 店铺（小程序端公开只读） ------------------------- */
+  'GET /api/shop/settings': {
+    note: '运营参数：客服电话 / 服务时间 / 公告 / 运费规则 / 自动确认天数。用于「关于我们」「联系客服」与订单详情的超时说明。' +
+      '**不含**店铺名称与 Logo —— 那两个字段的唯一数据源是装修台「店铺信息」（replica.SHOP），这里再返回一份就会变成两套数据源'
+  },
+
   /* ----------------------------- 首页与商品 ----------------------------- */
   'GET /api/home': { note: '首页聚合：轮播 + 分类入口 + 推荐商品' },
   'GET /api/goods/categories': { note: '分类树，含二级分类' },
@@ -61,6 +67,11 @@ module.exports = {
   'POST /api/order/precreate': {
     note: '金额由服务端重算，前端传值不生效。两种来源：① items 立即购买 ② fromCart:true 结算购物车已勾选项。下单即锁库存',
     body: { fromCart: true, addressId: '{{addressId}}', couponId: '', remark: '调试下单' }
+  },
+  'POST /api/order/prepay': {
+    note: '待付款订单「继续支付」：不新建订单，只返回该订单的支付参数。' +
+      '返回里的 sandbox=true 表示未配置商户号、参数是沙箱造的（wx.requestPayment 必然失败），前端据此提供「模拟支付成功」',
+    body: { orderId: '{{orderId}}' }
   },
   'GET /api/order/list': {
     note: 'status 可选：pending_pay / pending_ship / shipped / finished / cancelled，留空为全部',

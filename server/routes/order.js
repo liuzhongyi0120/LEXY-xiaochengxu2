@@ -1,6 +1,7 @@
 /**
  * 交易路由
  *   POST /api/order/precreate  预下单（返回订单号 + 支付参数）
+ *   POST /api/order/prepay     待付款订单「继续支付」（返回支付参数，不新建订单）
  *   GET  /api/order/list       订单列表
  *   GET  /api/order/detail     订单详情
  *   GET  /api/order/count      各状态数量（「我的」页角标）
@@ -21,7 +22,17 @@ module.exports = [
       const created = orderLib.precreate(ctx.db, ctx.userId, ctx.params);
       // 同一响应里直接给出支付参数，少一次往返
       const pay = await orderLib.buildPayment(ctx.db, ctx.userId, created.orderId);
-      return Object.assign({}, created, { payment: pay.payment, amountFen: pay.amountFen });
+      return Object.assign({}, created, { payment: pay.payment, amountFen: pay.amountFen, sandbox: pay.sandbox });
+    }
+  },
+
+  {
+    method: 'POST',
+    path: '/api/order/prepay',
+    auth: true,
+    desc: '待付款订单继续支付：返回该订单的支付参数（订单列表 / 订单详情里「去付款」用）',
+    async handler(ctx) {
+      return orderLib.buildPayment(ctx.db, ctx.userId, ctx.params.orderId);
     }
   },
 

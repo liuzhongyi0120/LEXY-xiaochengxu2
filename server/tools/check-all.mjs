@@ -408,6 +408,15 @@ const cartItem = cartList.data.items[0];
 await call('PUT', '/api/cart/update', { body: { cartItemId: cartItem.cartItemId, quantity: 2, selected: true } });
 await call('POST', '/api/cart/selectAll', { body: { selected: true } });
 
+/* 7.5 运营参数（小程序端公开只读：「关于我们」「拨打商家电话」要用客服电话。
+   以前它只挂在 /api/admin/settings 上（要管理员令牌），小程序去调只会 403。） */
+const shopSet = await call('GET', '/api/shop/settings', { auth: false });
+assert('运营参数接口公开可读，且**不下发店铺名称与 Logo**（那两个的真源是装修台 replica.SHOP，两处下发必然对不上）',
+  shopSet.ok && shopSet.data && typeof shopSet.data.servicePhone === 'string' &&
+  shopSet.data.shopName === undefined && shopSet.data.logo === undefined,
+  shopSet.ok ? `客服电话 ${shopSet.data.servicePhone}｜字段 ${Object.keys(shopSet.data).join(', ')} ｜无 shopName/logo`
+    : '接口不可用：' + (shopSet.json && shopSet.json.msg));
+
 /* 8. 优惠券可用性 + 领券 */
 await call('GET', '/api/coupon/available', { query: { goodsAmount: 249900, categoryIds: JSON.stringify(['c101']) } });
 await call('POST', '/api/coupon/receive', { body: { templateId: 'ct_500_300' } });
@@ -428,6 +437,18 @@ if (!precreate.ok) {
     `  运费 ¥${(precreate.data.amounts.freightAmount / 100).toFixed(2)}` +
     `  应付 ¥${(precreate.data.amounts.payAmount / 100).toFixed(2)}`);
   assert('下单返回支付参数', !!(precreate.data.payment && precreate.data.payment.package), 'payment.package 存在');
+  assert('下单响应下发 sandbox 标记（前端据此如实告知「联调环境无法拉起真实支付」，而不是让用户对着必败的支付面板反复点）',
+    precreate.data.sandbox === true, `sandbox=${precreate.data.sandbox}`);
+
+  /*
+   * 「继续支付」：订单列表点「去付款」走的是 prepay，**不新建订单**，只补发支付参数。
+   * 必须有这一条：没有它，待付款订单只有一个永远失败的下单入口。
+   */
+  const prepay = await call('POST', '/api/order/prepay', { body: { orderId } });
+  assert('prepay 给待付款订单补发支付参数，且不新建订单（orderNo 与下单时一致）',
+    prepay.ok && prepay.data.orderId === orderId && prepay.data.orderNo === precreate.data.orderNo &&
+    !!(prepay.data.payment && prepay.data.payment.package) && prepay.data.sandbox === true,
+    prepay.ok ? `${prepay.data.orderNo}｜sandbox=${prepay.data.sandbox}` : 'prepay 失败：' + (prepay.json && prepay.json.msg));
 
   await call('GET', '/api/order/detail', { query: { orderId } });
   await call('GET', '/api/order/list', { query: { status: 'pending_pay', page: 1, size: 10 } });
@@ -1798,17 +1819,24 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     csInData ? `show=${csInData.show}` : '落盘数据里没有客服项');
 
   /* (9) 「我的」页的真实交互不能被装修吃掉：
-   *     页面必须走 blockPageBehavior（事件唯一实现），并保留登录 / 退出 / 关于我们 / 账号与安全。 */
+   *     页面必须走 blockPageBehavior（事件唯一实现），并保留「人」的装配与订单入口。
+   *     ⚠️ 2026-10-13 起三处实现搬了家，断言跟着改成锁「能力」而不是锁「方法名」：
+   *        · 「关于我们」「账号与安全」→ packageUser 分包里的真实页面（TOOL_ROUTE 统一跳转）；
+   *        · 登录 / 退出登录 → utils/blockPage.js 的共用行为（blocks.wxml 是三个页面共用的，
+   *          处理器只放「我的」页会让别的页面上出现绑了没实现的死绑定）；
+   *        · 「我的」页只保留 syncUser / loadProfile 两个钩子（装修数据与运行态的缝合点）。 */
   const mineJs = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.js'), 'utf8');
   const mineWxml = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.wxml'), 'utf8');
   const mineJson = readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.json'), 'utf8');
-  const keepHandlers = ['onTapUcLogin', 'onTapUcLogout', 'onTapAbout', 'onTapAccountSettings', 'onTapOrderStatus'];
+  const bpForLogin = readFileSync(join(MP_ROOT, 'utils', 'blockPage.js'), 'utf8');
+  const keepHandlers = ['onTapOrderStatus', 'syncUser', 'loadProfile'];
   const lostHandlers = keepHandlers.filter((h) => mineJs.indexOf(h) < 0);
-  assert('「我的」页改用区块流渲染，同时保留登录 / 退出 / 客服 / 关于我们 / 订单入口等真实交互',
+  assert('「我的」页改用区块流渲染，同时保留登录 / 退出 / 客服 / 订单入口等真实交互',
     /blockPageBehavior/.test(mineJs) && /normalizeBlocks\(RAW_BLOCKS\)/.test(mineJs) &&
     mineWxml.indexOf('templates/blocks.wxml') > 0 && lostHandlers.length === 0 &&
+    /onTapUcLogin/.test(bpForLogin) && /onTapUcLogout/.test(bpForLogin) &&
     JSON.parse(mineJson).usingComponents && !!JSON.parse(mineJson).usingComponents['empty-state'],
-    lostHandlers.length ? `丢失交互：${lostHandlers.join(', ')}` : '真实交互全部保留');
+    lostHandlers.length ? `丢失交互：${lostHandlers.join(', ')}` : '真实交互全部保留（登录/退出在共用行为里）');
 
   /* (10) 组件库按页面下发：装修台必须能按页面切库（否则「我的」页显示的仍是首页那 57 种） */
   const decorateRoute = readFileSync(join(__dirname, '..', 'routes', 'decorate.js'), 'utf8');
@@ -1817,6 +1845,176 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     /usePageLib/.test(adminJs) && /meta\.grouped/.test(adminJs) &&
     Object.keys(schemaMod.pageLibs()).join(',') === 'mine',
     'pageLibs 下发 + usePageLib 切库 + grouped 分组渲染均已就位');
+}
+
+/* ---------------------------------------------------------------------------
+ * 15.80 个人中心「点得动」链路（页面存在性 / 跳转表 / real 标记三方对账）
+ *
+ * 为什么必须有这一组：
+ *   2026-10-13 之前的真实故障是 —— **后端 90 个点位全都存在，前端页面一个都没有**。
+ *   `constants.js` 里 `ROUTES.ORDER_LIST`、`ADDRESS_LIST` 早就声明好了，`TOOL_META`
+ *   也标着 `real: true`，但 `packageOrder` / `packageUser` 两个分包从没注册进 app.json、
+ *   页面文件从没建过。于是「我的」页每个入口点下去都落到 `blockPage.js` 的兜底分支，
+ *   弹一句「该功能开发中」—— 用户的原话是「每个点进去都点不了」。
+ *
+ *   这一组的价值就是把「声明」和「事实」焊死：
+ *     · ROUTES 里每个路径都必须在 app.json 注册过（反过来也要成立）；
+ *     · 每个注册过的页面四件套（js/wxml/wxss/json）必须真的在；
+ *     · wxml 里绑定的每个事件处理函数必须在页面 js（或其行为对象）里真的有 —— 
+ *       「绑了但没实现」就是「点了没反应」，编译期还不报错；
+ *     · `real: true` 的工具必须有真实落点（TOOL_ROUTE 或声明过的非跳转方式）；
+ *     · 依赖型入口必须都写了「为什么没有」（NOT_READY）。
+ * ------------------------------------------------------------------------- */
+{
+  const appJson = JSON.parse(readFileSync(join(MP_ROOT, 'app.json'), 'utf8'));
+  const routes = requireFromHere(join(MP_ROOT, 'utils', 'constants.js')).ROUTES;
+  const bpMod = requireFromHere(join(MP_ROOT, 'utils', 'blockPage.js'));
+  const blocksLib = requireFromHere(join(MP_ROOT, 'utils', 'blocks.js'));
+
+  /* app.json 里所有注册过的页面路径（主包 + 分包） */
+  const allPages = [];
+  (appJson.pages || []).forEach((p) => allPages.push('/' + p));
+  (appJson.subPackages || []).forEach((sp) => {
+    (sp.pages || []).forEach((p) => allPages.push('/' + sp.root + '/' + p));
+  });
+
+  /* (1) ROUTES ⇄ app.json 双向一致。
+   *     曾经 `ROUTES.ORDER_CONFIRM = '/packageOrder/confirm/confirm'` 挂着一个**不存在**的页面：
+   *     常量表里有路径 ≠ 真有页面 —— 这正是本次要修的坑，所以直接把「单向声明」也禁掉。 */
+  const routeNotRegistered = Object.keys(routes).filter((k) => allPages.indexOf(routes[k]) < 0)
+    .map((k) => `${k}=${routes[k]}`);
+  assert('utils/constants.js 的 ROUTES 每个路径都已在 app.json 注册（不允许再出现「只声明没页面」的常量）',
+    routeNotRegistered.length === 0,
+    routeNotRegistered.length ? `未注册：${routeNotRegistered.join('；')}` : `${Object.keys(routes).length} 个路径全部已注册`);
+
+  /* (2) 反过来：app.json 注册的每个页面，四件套必须真的在。
+   *     「注册了但文件不在」在小程序里是编译期报错，但在本仓库里是很容易出现的半成品状态。 */
+  const missingFiles = [];
+  allPages.forEach((p) => {
+    ['js', 'wxml', 'wxss', 'json'].forEach((ext) => {
+      const f = join(MP_ROOT, p.replace(/^\//, '') + '.' + ext);
+      if (!existsSync(f)) missingFiles.push(p + '.' + ext);
+    });
+  });
+  assert('app.json 注册的每个页面四件套（js / wxml / wxss / json）都真实存在',
+    missingFiles.length === 0,
+    missingFiles.length ? `缺文件：${missingFiles.join('；')}` : `${allPages.length} 个页面 × 4 = ${allPages.length * 4} 个文件齐全`);
+
+  /* (3) 分包注册：本次交付的两个分包必须出现在 app.json，且 preloadRule 里有「我的」页预下载
+   *     （否则点订单/地址要等分包下载，弱网下就是「点了没反应」）。 */
+  const subRoots = (appJson.subPackages || []).map((s) => s.root);
+  const mineRule = (appJson.preloadRule || {})['pages/mine/mine'] || { packages: [] };
+  assert('packageOrder / packageUser 两个分包已注册，「我的」页配了预下载（弱网下点入口不再等分包）',
+    subRoots.indexOf('packageOrder') >= 0 && subRoots.indexOf('packageUser') >= 0 &&
+    mineRule.packages.indexOf('packageOrder') >= 0 && mineRule.packages.indexOf('packageUser') >= 0,
+    `分包：[${subRoots.join(', ')}]；我的页预下载：[${(mineRule.packages || []).join(', ')}]`);
+
+  /* (4) wxml 绑定的事件处理函数必须在页面 js（含其行为对象）里真有 ——
+   *     「绑了但没实现」在小程序里是**静默无效**：不报错，就是点了没反应。
+   *     做法是「真的 require 每个页面模块 + 捕获 Page 对象」，方法名以 Page 对象为准
+   *     （静态正则数不准；而且这一手法顺手抓到了地址列表页 `require('../../services/address')`
+   *      少一级目录的真实故障 —— 页面一加载就 Cannot find module，整个页面打不开）。 */
+  if (!globalThis.wx) {
+    // 页面模块在 Node 里加载需要一个 wx 兜底；只用于「取方法名」，不执行任何业务逻辑
+    globalThis.wx = new Proxy({}, { get: () => () => ({}) });
+    globalThis.Component = () => {};
+    globalThis.getApp = () => ({ globalData: {} });
+    globalThis.getCurrentPages = () => [];
+  }
+  const pageMethods = (rel) => {
+    const saved = globalThis.Page;
+    let captured = null;
+    globalThis.Page = (o) => { captured = o; };
+    try {
+      requireFromHere(join(MP_ROOT, rel + '.js'));
+    } catch (e) {
+      globalThis.Page = saved;
+      return { err: e.message, keys: [] };
+    }
+    globalThis.Page = saved;
+    return { err: '', keys: captured ? Object.keys(captured) : [] };
+  };
+  const bindRe = /\b(?:capture-bind:|capture-catch:|bind:|catch:|bind|catch)([a-zA-Z]+)\s*=\s*"([^"{}]+)"/g;
+  const collectBinds = (src) => {
+    const out = [];
+    let m;
+    bindRe.lastIndex = 0;
+    while ((m = bindRe.exec(src))) out.push(m[2].trim());
+    return out;
+  };
+  const unbound = [];
+  const checkedPages = [];
+  allPages.forEach((p) => {
+    const rel = p.replace(/^\//, '');
+    const wxmlPath = join(MP_ROOT, rel + '.wxml');
+    if (!existsSync(wxmlPath)) return;
+    const info = pageMethods(rel);
+    if (info.err) { unbound.push(`${rel}.js 加载失败：${info.err}`); return; }
+    checkedPages.push(rel);
+    let src = readFileSync(wxmlPath, 'utf8');
+    // 「我的」页是区块流页：真正的交互在 include 进来的 templates/blocks.wxml 里。
+    // 这里的语义是「模板里的绑定必须在**引入它的这个页面**上解析得到」——
+    // 所以对「我的」页来说，它必须拥有 blocks.wxml 用到的全部事件方法。
+    if (src.indexOf('templates/blocks.wxml') > 0) {
+      src += readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    }
+    // 先剥 HTML 注释再扫：注释里写着的事件名会被当成真绑定（本仓库踩过这个坑）
+    const binds = collectBinds(src.replace(/<!--[\s\S]*?-->/g, ''));
+    binds.forEach((fn) => {
+      if (info.keys.indexOf(fn) < 0) unbound.push(`${rel}.wxml → ${fn}（js 里没有这个方法）`);
+    });
+  });
+  assert('每个页面 wxml 里绑定的事件处理函数在页面 js 里都真实存在（绑了没实现＝点了没反应，且不报错）',
+    unbound.length === 0,
+    unbound.length ? unbound.join('；') : `${checkedPages.length} 个页面的绑定逐一命中`);
+
+  /* (5) 「real: true」必须有真实落点。
+   *     两条合法路径：TOOL_ROUTE 里有真实页面（且路径已注册），或 TOOL_NON_NAV 里
+   *     声明了非跳转的落地方式（客服 open-type / 拨号）。
+   *     标 true 却点不动比标 false 更糟 —— 那是一次「页面暂未开放」的失败跳转。 */
+  const realNoRoute = (schemaMod.UC_TOOL_ITEMS || [])
+    .filter((t) => t.real === true && !bpMod.TOOL_ROUTE[t.type] && !bpMod.TOOL_NON_NAV[t.type])
+    .map((t) => t.type);
+  const routeNotPage = Object.keys(bpMod.TOOL_ROUTE)
+    .filter((k) => allPages.indexOf(bpMod.TOOL_ROUTE[k]) < 0)
+    .map((k) => `${k}→${bpMod.TOOL_ROUTE[k]}`);
+  assert('必备工具里 real:true 的每一项都有真实落点（TOOL_ROUTE 里的真实页面，或声明过的非跳转方式）',
+    realNoRoute.length === 0 && routeNotPage.length === 0,
+    (realNoRoute.length ? `标了能用却没落点：${realNoRoute.join(', ')}` : '') +
+    (routeNotPage.length ? ` 跳转目标不是已注册页面：${routeNotPage.join(', ')}` : '') ||
+    `real:true 共 ${(schemaMod.UC_TOOL_ITEMS || []).filter((t) => t.real).length} 项，落点齐全`);
+
+  /* (6) 依赖型入口必须都写了「为什么没有」——
+   *     否则点下去只会看到兜底文案，用户还是不知道缺什么（等于换个说法的「开发中」）。 */
+  const noReason = (schemaMod.UC_TOOL_ITEMS || [])
+    .filter((t) => t.real !== true && !bpMod.NOT_READY[t.type])
+    .map((t) => t.type);
+  assert('「必备工具」里 real:false 的每一项都在 NOT_READY 表里写了具体依赖（不留空白说明）',
+    noReason.length === 0,
+    noReason.length ? `缺说明：${noReason.join(', ')}` : `${Object.keys(bpMod.NOT_READY).length} 条说明覆盖全部依赖型入口`);
+
+  /* (7) 个人资产：写了 route 的项必须真的有页面（与工具同一口径）。 */
+  const statNotPage = (blocksLib.UC_STAT_DEFS || [])
+    .filter((d) => d.route && allPages.indexOf(d.route) < 0)
+    .map((d) => `${d.key}→${d.route}`);
+  assert('个人资产里有真实落点的项（优惠券）指向的是已注册页面',
+    statNotPage.length === 0,
+    statNotPage.length ? statNotPage.join('；') : `有落点的资产项：${(blocksLib.UC_STAT_DEFS || []).filter((d) => d.route).map((d) => d.key).join(', ')}`);
+
+  /* (8) 个人中心链路上不许再有「点了没反应」式敷衍文案。
+   *     ⚠️ 必须先剥注释再查：「注释里写着要禁用的字面量」会被当成代码（本仓库踩过）。
+   *     这两个文件里的注释**确实**在讲以前那句「该功能开发中」，所以剥注释是必需的，不是修饰。 */
+  const stripJs = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+  const bpSrc = stripJs(readFileSync(join(MP_ROOT, 'utils', 'blockPage.js'), 'utf8'));
+  const mineSrc = stripJs(readFileSync(join(MP_ROOT, 'pages', 'mine', 'mine.js'), 'utf8'));
+  const leftover = [];
+  ['该功能开发中', '订单中心开发中'].forEach((t) => {
+    if (bpSrc.indexOf(t) >= 0) leftover.push(`blockPage.js: ${t}`);
+    if (mineSrc.indexOf(t) >= 0) leftover.push(`mine.js: ${t}`);
+  });
+  assert('个人中心链路不再有「开发中」式敷衍提示（依赖型入口一律落到讲清楚原因的页面）',
+    leftover.length === 0,
+    leftover.length ? leftover.join('；') : 'blockPage.js / mine.js 已无占位提示');
 }
 
 /* ---------------------------------------------------------------------------

@@ -1,0 +1,54 @@
+<!-- 支付结果：轮询状态直到确定（见 pay-result.js 文件头） -->
+<view class="page">
+  <view class="box">
+
+    <!-- 查询中 -->
+    <block wx:if="{{state === 'polling'}}">
+      <view class="spinner big"></view>
+      <text class="t-main">正在确认支付结果…</text>
+      <text class="t-sub">请勿关闭页面，通常几秒内完成</text>
+    </block>
+
+    <!-- 已支付 -->
+    <block wx:elif="{{state === 'paid'}}">
+      <view class="ring ring-ok"><text class="ring-t">✓</text></view>
+      <text class="t-main">支付成功</text>
+      <text class="t-sub">实付 ¥{{amountText}}</text>
+    </block>
+
+    <!-- 未完成（用户取消 / 超时未回调 / 订单已取消） -->
+    <block wx:elif="{{state === 'unpaid'}}">
+      <view class="ring ring-wait"><text class="ring-t">!</text></view>
+      <text class="t-main">支付未完成</text>
+      <text class="t-sub">{{statusText ? '当前状态：' + statusText : '可以稍后在「我的订单」里继续支付'}}</text>
+    </block>
+
+    <!-- 查询失败（网络/服务异常，与「未支付」是两件事） -->
+    <block wx:else>
+      <view class="ring ring-err"><text class="ring-t">×</text></view>
+      <text class="t-main">查询失败</text>
+      <text class="t-sub">{{statusText || '请稍后重试'}}</text>
+    </block>
+
+    <view wx:if="{{orderNo}}" class="ono">订单号 {{orderNo}}</view>
+
+    <view class="btns">
+      <view
+        wx:if="{{state === 'paid' || state === 'unpaid'}}"
+        class="btn btn-primary"
+        bindtap="onTapOrder"
+        hover-class="hover"
+        hover-stay-time="80"
+      >查看订单</view>
+      <view
+        wx:if="{{state === 'fail'}}"
+        class="btn btn-primary"
+        bindtap="onRetry"
+        hover-class="hover"
+        hover-stay-time="80"
+      >重试查询</view>
+      <view class="btn" bindtap="onTapOrders" hover-class="hover" hover-stay-time="80">全部订单</view>
+      <view class="btn" bindtap="onTapHome" hover-class="hover" hover-stay-time="80">回到首页</view>
+    </view>
+  </view>
+</view>

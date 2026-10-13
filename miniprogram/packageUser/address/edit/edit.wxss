@@ -1,0 +1,108 @@
+.page {
+  min-height: 100vh;
+  padding-top: var(--space-sm);
+  box-sizing: border-box;
+}
+
+.form {
+  margin: 0 var(--space-base) var(--space-sm);
+  padding: 0 var(--space-base);
+}
+
+.f-row {
+  display: flex;
+  align-items: center;
+  min-height: 100rpx;
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.f-row:last-child {
+  border-bottom: 0;
+}
+
+/* 详细地址是多行输入，标签要与首行对齐而不是垂直居中 */
+.f-row-top {
+  align-items: flex-start;
+  padding: var(--space-base) 0;
+}
+
+.f-k {
+  flex: 0 0 auto;
+  width: 180rpx;
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.f-i {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.f-i-ph {
+  color: var(--color-text-placeholder);
+}
+
+.f-ph {
+  color: var(--color-text-placeholder);
+  font-size: var(--font-base);
+}
+
+.f-ta {
+  flex: 1;
+  min-width: 0;
+  min-height: 96rpx;
+  font-size: var(--font-base);
+  line-height: 40rpx;
+  color: var(--color-text);
+}
+
+.f-arrow {
+  flex: 0 0 auto;
+  margin-left: 12rpx;
+  font-size: 40rpx;
+  line-height: 40rpx;
+  color: var(--color-text-placeholder);
+}
+
+.f-sw {
+  /* 右对齐：开关自己会撑开宽度，用 margin-left:auto 顶到最右 */
+  margin-left: auto;
+  transform: scale(0.9);
+}
+
+.tip {
+  padding: var(--space-sm) var(--space-lg) 0;
+  font-size: var(--font-xs);
+  line-height: 34rpx;
+  color: var(--color-text-secondary);
+}
+
+.bottom-hold {
+  height: 160rpx;
+}
+
+.bar {
+  padding: var(--space-sm) var(--space-base);
+  box-sizing: border-box;
+}
+
+.btn {
+  height: 84rpx;
+  border-radius: 42rpx;
+  font-size: var(--font-lg);
+  line-height: 82rpx;
+  text-align: center;
+}
+
+.btn-primary {
+  border: 1rpx solid var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+.btn-disabled {
+  border-color: var(--color-disabled);
+  background: var(--color-disabled);
+}

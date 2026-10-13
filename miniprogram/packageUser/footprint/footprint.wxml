@@ -1,0 +1,65 @@
+<!-- 浏览记录：记录由商品详情页写入，「清空」不可撤销 -->
+<view class="page">
+
+  <view wx:if="{{loading && !list.length}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="浏览记录加载失败"
+    desc="请检查网络后重试"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <empty-state
+    wx:elif="{{needLogin}}"
+    text="登录后查看浏览记录"
+    desc="浏览记录与账号绑定，需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <empty-state
+    wx:elif="{{!list.length}}"
+    text="还没有浏览记录"
+    desc="看过的商品会自动出现在这里"
+    button-text="去逛逛"
+    bind:action="onTapGoShopping"
+  />
+
+  <block wx:else>
+    <view class="hd">
+      <text class="hd-t">共 {{total}} 件</text>
+      <text class="hd-clear" bindtap="onTapClear" hover-class="hover" hover-stay-time="80">清空</text>
+    </view>
+
+    <view class="body">
+      <view class="item" wx:for="{{list}}" wx:for-index="i" wx:key="id" data-id="{{item.id}}" bindtap="onTapGoods" hover-class="hover-lite" hover-stay-time="80">
+        <image
+          wx:if="{{!item.imgErr}}"
+          class="g-img"
+          src="{{item.cover}}"
+          mode="aspectFill"
+          lazy-load
+          data-i="{{i}}"
+          binderror="onImgError"
+        />
+        <view wx:else class="g-img g-img-ph"></view>
+
+        <view class="g-info">
+          <text class="g-name ellipsis-2">{{item.name}}</text>
+          <view class="g-bottom">
+            <text class="g-price">¥{{item.priceText}}</text>
+            <text class="g-time">{{item.atText}}</text>
+          </view>
+        </view>
+      </view>
+
+      <view wx:if="{{loadingMore}}" class="more-tip">正在加载…</view>
+      <view wx:elif="{{!hasMore && list.length > 1}}" class="more-tip">没有更多了</view>
+    </view>
+  </block>
+</view>

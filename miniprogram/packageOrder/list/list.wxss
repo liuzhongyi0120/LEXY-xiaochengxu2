@@ -1,0 +1,259 @@
+.page {
+  min-height: 100vh;
+  /* 页签吸顶，滚动时筛选条件始终可见 */
+  padding-bottom: 40rpx;
+}
+
+/* ------------------------------ 状态页签 ------------------------------ */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  background: var(--color-bg-card);
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.tab {
+  position: relative;
+  flex: 1;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-t {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+
+.tab.on .tab-t {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* 选中下划线：用伪元素，不额外占布局高度 */
+.tab.on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 48rpx;
+  height: 6rpx;
+  margin-left: -24rpx;
+  border-radius: 4rpx;
+  background: var(--color-primary);
+}
+
+.tab-badge {
+  min-width: 28rpx;
+  height: 28rpx;
+  margin-left: 6rpx;
+  padding: 0 6rpx;
+  border-radius: 14rpx;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-xs);
+  line-height: 28rpx;
+  text-align: center;
+}
+
+/* ------------------------------ 列表 ------------------------------ */
+.body {
+  padding: var(--space-sm) var(--space-base) 0;
+}
+
+.order {
+  padding: var(--space-base);
+  margin-bottom: 20rpx;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-base);
+}
+
+.od-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: var(--space-sm);
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.od-no {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.od-st {
+  font-size: var(--font-sm);
+  color: var(--color-primary);
+}
+
+/* 已取消 / 已完成不是「待办」，用中性色，避免整页都在报红 */
+.od-st.st-cancelled,
+.od-st.st-finished {
+  color: var(--color-text-secondary);
+}
+
+.od-body {
+  padding: var(--space-base) 0 0;
+}
+
+.od-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: var(--space-base);
+}
+
+.od-item:last-child {
+  margin-bottom: 0;
+}
+
+.od-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  background: var(--color-bg-muted);
+  flex-shrink: 0;
+}
+
+/* 图片加载失败：留一块浅底，不显示破图 */
+.od-img-ph {
+  background: var(--color-bg-muted);
+}
+
+.od-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.od-name {
+  font-size: var(--font-base);
+  line-height: 38rpx;
+  color: var(--color-text);
+}
+
+.od-spec {
+  display: block;
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.od-price-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.od-price {
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.od-qty {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.od-ft {
+  padding-top: var(--space-sm);
+  border-top: 1rpx solid var(--color-border);
+}
+
+.od-sum {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+}
+
+.od-sum-t {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.od-sum-amt {
+  margin-left: 8rpx;
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-price);
+}
+
+.od-ops {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-base);
+}
+
+/* 操作按钮不许被压缩、不许折字（与后台列表「操作」列同一口径） */
+.btn {
+  flex: 0 0 auto;
+  min-width: 152rpx;
+  height: 60rpx;
+  margin-left: var(--space-sm);
+  padding: 0 24rpx;
+  box-sizing: border-box;
+  border: 1rpx solid var(--color-border);
+  border-radius: 30rpx;
+  font-size: var(--font-sm);
+  line-height: 58rpx;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.btn-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}
+
+/* ------------------------------ 提示与骨架 ------------------------------ */
+.more-tip {
+  padding: var(--space-lg) 0;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.sk-hd {
+  width: 260rpx;
+  height: 28rpx;
+}
+
+.sk-row {
+  display: flex;
+  align-items: flex-start;
+  margin-top: var(--space-base);
+}
+
+.sk-img {
+  width: 160rpx;
+  height: 160rpx;
+  flex-shrink: 0;
+}
+
+.sk-lines {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.sk-t1 {
+  width: 100%;
+  height: 32rpx;
+}
+
+.sk-t2 {
+  width: 40%;
+  height: 28rpx;
+  margin-top: 20rpx;
+}
+
+.sk-ft {
+  width: 100%;
+  height: 60rpx;
+  margin-top: var(--space-base);
+}

@@ -1,0 +1,162 @@
+.page {
+  min-height: 100vh;
+  padding-bottom: 40rpx;
+}
+
+/* ------------------------------ 页签（与订单列表同款几何） ------------------------------ */
+.tabs {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  background: var(--color-bg-card);
+  border-bottom: 1rpx solid var(--color-border);
+}
+
+.tab {
+  position: relative;
+  flex: 1;
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tab-t {
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+}
+
+.tab.on .tab-t {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.tab.on::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 48rpx;
+  height: 6rpx;
+  margin-left: -24rpx;
+  border-radius: 4rpx;
+  background: var(--color-primary);
+}
+
+.tab-badge {
+  min-width: 28rpx;
+  height: 28rpx;
+  margin-left: 6rpx;
+  padding: 0 6rpx;
+  border-radius: 14rpx;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-xs);
+  line-height: 28rpx;
+  text-align: center;
+}
+
+/* ------------------------------ 券 ------------------------------ */
+.body {
+  padding: var(--space-sm) var(--space-base) 0;
+}
+
+.cp {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  margin-bottom: 20rpx;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-base);
+  overflow: hidden;
+}
+
+.cp-face {
+  flex: 0 0 auto;
+  width: 200rpx;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  padding: var(--space-lg) 0;
+  background: var(--color-primary);
+}
+
+.cp-face-n {
+  font-size: 56rpx;
+  font-weight: 600;
+  line-height: 60rpx;
+  color: var(--color-text-inverse);
+}
+
+.cp-face-u {
+  margin-left: 4rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-inverse);
+}
+
+/* 票根分割虚线 */
+.cp-cut {
+  flex: 0 0 auto;
+  width: 0;
+  border-left: 2rpx dashed var(--color-border);
+}
+
+.cp-info {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-base) var(--space-base) var(--space-base) var(--space-base);
+}
+
+.cp-name {
+  display: block;
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.cp-rule {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.cp-meta {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+/* 失效券：整张灰化，一眼可分 */
+.cp-off .cp-face {
+  background: var(--color-disabled);
+}
+
+.cp-off .cp-name,
+.cp-off .cp-rule,
+.cp-off .cp-meta {
+  color: var(--color-text-placeholder);
+}
+
+.cp-stamp {
+  position: absolute;
+  right: 24rpx;
+  top: 50%;
+  margin-top: -34rpx;
+  padding: 4rpx 14rpx;
+  border: 2rpx solid var(--color-text-placeholder);
+  border-radius: 8rpx;
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
+  transform: rotate(-12deg);
+}
+
+.tip {
+  padding: var(--space-base) var(--space-sm) 0;
+  font-size: var(--font-xs);
+  line-height: 34rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+}

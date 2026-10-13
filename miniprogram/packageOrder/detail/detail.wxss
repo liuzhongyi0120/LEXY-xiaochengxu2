@@ -1,0 +1,293 @@
+.page {
+  min-height: 100vh;
+}
+
+/* ------------------------------ 状态头 ------------------------------ */
+.hero {
+  padding: var(--space-lg) var(--space-base);
+  background: var(--color-primary);
+}
+
+/* 已取消不是「进行中」，用中性底色，避免整屏报红 */
+.hero-cancelled {
+  background: var(--color-text-secondary);
+}
+
+.hero-st {
+  display: block;
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--color-text-inverse);
+}
+
+.hero-hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-inverse);
+  opacity: 0.9;
+  line-height: 34rpx;
+}
+
+/* ------------------------------ 区块 ------------------------------ */
+.sec {
+  margin: var(--space-sm) var(--space-base) 0;
+  padding: var(--space-base);
+}
+
+.sec-hd {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-base);
+}
+
+.sec-t {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sec-x {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 收货信息 ------------------------------ */
+/* ------------------------------ 收货信息 ------------------------------ */
+.addr {
+  display: block;
+}
+
+.addr-line1 {
+  display: flex;
+  align-items: baseline;
+}
+
+.addr-name {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.addr-phone {
+  margin-left: 16rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.addr-line {
+  display: block;
+  margin-top: 10rpx;
+  font-size: var(--font-sm);
+  line-height: 34rpx;
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 商品行 ------------------------------ */
+.item {
+  display: flex;
+  align-items: flex-start;
+  padding: var(--space-base) 0;
+  border-top: 1rpx solid var(--color-border);
+}
+
+.item:first-of-type {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.item-img {
+  width: 160rpx;
+  height: 160rpx;
+  border-radius: 12rpx;
+  background: var(--color-bg-muted);
+  flex-shrink: 0;
+}
+
+.item-img-ph {
+  background: var(--color-bg-muted);
+}
+
+.item-info {
+  flex: 1;
+  min-width: 0;
+  margin-left: 20rpx;
+}
+
+.item-name {
+  font-size: var(--font-base);
+  line-height: 38rpx;
+  color: var(--color-text);
+}
+
+.item-spec {
+  display: block;
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.item-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.item-price {
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.item-qty {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 键值行 ------------------------------ */
+.kv {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 12rpx 0;
+}
+
+.kv-k {
+  flex: 0 0 auto;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.kv-v {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--space-base);
+  font-size: var(--font-sm);
+  color: var(--color-text);
+  text-align: right;
+  word-break: break-all;
+}
+
+.kv-cut {
+  color: var(--color-primary);
+}
+
+.kv-total {
+  margin-top: 8rpx;
+  padding-top: var(--space-base);
+  border-top: 1rpx solid var(--color-border);
+}
+
+.kv-amt {
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-price);
+}
+
+.kv-copy {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.kv-copy-t {
+  flex: 0 0 auto;
+  margin-left: 12rpx;
+  padding: 0 14rpx;
+  height: 40rpx;
+  border: 1rpx solid var(--color-border);
+  border-radius: 20rpx;
+  font-size: var(--font-xs);
+  line-height: 38rpx;
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 物流时间线 ------------------------------ */
+.tl {
+  padding-left: 8rpx;
+}
+
+.tl-node {
+  position: relative;
+  display: flex;
+  padding-bottom: var(--space-base);
+  padding-left: 32rpx;
+}
+
+/* 竖线：最后一个节点不画，避免尾巴悬空 */
+.tl-node:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 9rpx;
+  top: 22rpx;
+  bottom: 0;
+  width: 2rpx;
+  background: var(--color-border);
+}
+
+.tl-dot {
+  position: absolute;
+  left: 0;
+  top: 12rpx;
+  width: 20rpx;
+  height: 20rpx;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.tl-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.tl-text {
+  display: block;
+  font-size: var(--font-sm);
+  line-height: 34rpx;
+  color: var(--color-text);
+}
+
+.tl-time {
+  display: block;
+  margin-top: 6rpx;
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+/* ------------------------------ 底部操作栏 ------------------------------ */
+.bottom-hold {
+  height: 40rpx;
+}
+
+.ops {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: var(--space-sm) var(--space-base);
+  box-sizing: border-box;
+}
+
+.btn {
+  flex: 0 0 auto;
+  min-width: 168rpx;
+  height: 68rpx;
+  margin-left: var(--space-sm);
+  padding: 0 28rpx;
+  box-sizing: border-box;
+  border: 1rpx solid var(--color-border);
+  border-radius: 34rpx;
+  font-size: var(--font-base);
+  line-height: 66rpx;
+  text-align: center;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.btn-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}

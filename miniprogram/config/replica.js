@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 09:12:11（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 13:48:03（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -152,7 +152,7 @@ const MINE_BLOCKS = [
         show: false,
         scope: "all",
         icon: "码",
-        real: false,
+        real: true,
         enabled: true
       },
       {
@@ -197,7 +197,7 @@ const MINE_BLOCKS = [
         show: true,
         scope: "all",
         icon: "址",
-        real: false,
+        real: true,
         enabled: true
       },
       {
@@ -206,7 +206,7 @@ const MINE_BLOCKS = [
         show: false,
         scope: "all",
         icon: "电",
-        real: false,
+        real: true,
         enabled: true
       },
       {
@@ -332,6 +332,24 @@ const MINE_BLOCKS = [
         show: true,
         scope: "all",
         icon: "关",
+        real: true,
+        enabled: true
+      },
+      {
+        type: "favorite",
+        title: "我的收藏",
+        show: true,
+        scope: "all",
+        icon: "藏",
+        real: true,
+        enabled: true
+      },
+      {
+        type: "footprint",
+        title: "浏览记录",
+        show: true,
+        scope: "all",
+        icon: "迹",
         real: true,
         enabled: true
       }

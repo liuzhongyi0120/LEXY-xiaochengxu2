@@ -1,0 +1,45 @@
+<!--
+  会员码：只展示**真实存在**的账号标识，不画假二维码、不编会员等级（见 member-code.js 文件头）
+-->
+<view class="page">
+
+  <view wx:if="{{loading}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{!logged}}"
+    text="登录后查看账号编号"
+    desc="账号编号与账号绑定，需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <block wx:else>
+    <view class="card c-main">
+      <view class="who">
+        <image wx:if="{{avatar}}" class="who-av" src="{{avatar}}" mode="aspectFill" />
+        <view wx:else class="who-av who-av-ph"><text class="who-av-t">我</text></view>
+        <text class="who-name">{{nickname}}</text>
+        <text wx:if="{{phoneMasked}}" class="who-phone">{{phoneMasked}}</text>
+        <text wx:else class="who-phone who-link" bindtap="onGoAccount" hover-class="hover" hover-stay-time="80">未绑定手机号 · 去绑定</text>
+      </view>
+
+      <view class="stitle">账号编号</view>
+      <view class="code" bindtap="onCopyCode" hover-class="hover-lite" hover-stay-time="80">
+        <text class="code-g" wx:for="{{codeGroups}}" wx:key="*this">{{item}}</text>
+      </view>
+      <view class="code-tip">点击编号可复制</view>
+    </view>
+
+    <view class="card c-note">
+      <text class="note-i" wx:for="{{notes}}" wx:key="*this">· {{item}}</text>
+    </view>
+
+    <view class="bottom-hold"></view>
+    <view class="footer-bar bar">
+      <view class="btn" bindtap="onGoAccount" hover-class="hover" hover-stay-time="80">账号与安全</view>
+    </view>
+  </block>
+</view>

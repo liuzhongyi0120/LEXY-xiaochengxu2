@@ -12,20 +12,78 @@
  */
 
 const { openLink } = require('./link');
-const { loadGoodsData, TOOL_META } = require('./blocks');
+const { loadGoodsData, TOOL_META, statDef } = require('./blocks');
+const { ROUTES } = require('./constants');
+const { login, logout } = require('./auth');
+const shopSvc = require('../services/shop');
 
 const GOODS_LIST = '/packageGoods/list/list';
 const GOODS_DETAIL = '/packageGoods/detail/detail';
 
 /**
  * 「必备工具」里**真能跳**的工具 → 页面路径。
- * 与 `TOOL_META` 的 `real` 标记配套：两者都对上才跳，任一处没标就走「开发中」提示。
- * ⚠️ 路径必须是 app.json 里真实存在的页面，别写「将来会有」的地址 —— 那只会变成一次转圈。
+ * 与 `TOOL_META` 的 `real` 标记配套：`real: true` 的工具必须要么在这张表里有真实页面，
+ * 要么在下面的 `TOOL_NON_NAV` 里声明用哪种非跳转方式落地 —— 自检会逐个对账。
+ * ⚠️ 路径必须是 app.json 里真实存在的页面。写「将来会有」的地址 = 一次转圈失败，
+ *    比明确告诉用户「这项没有」更糟（这正是 2026-10-13 这一批要修的问题）。
  */
 const TOOL_ROUTE = {
-  cart: '/pages/cart/cart',
-  search: '/pages/category/category'
+  cart: ROUTES.CART,
+  memberCode: ROUTES.MEMBER_CODE,
+  deliveryAddress: ROUTES.ADDRESS_LIST,
+  accountSettings: ROUTES.ACCOUNT,
+  about: ROUTES.ABOUT,
+  favorite: ROUTES.FAVORITE,
+  footprint: ROUTES.FOOTPRINT
 };
+
+/**
+ * 不靠 `navigateTo` 落地的工具 —— 值说明用哪种方式。
+ *   contact —— 「客服聊天」在 templates/blocks.wxml 里就是 `<button open-type="contact">`，
+ *              微信自己拉客服会话，本体不走这里（这里只是「有意不跳转」的登记处）；
+ *   phone   —— 「拨打商家电话」要先去后台取客服号码，再 wx.makePhoneCall（见 callMerchant）。
+ * 这两个是真能用的，只是不用「跳页面」这种形式 —— 不能因为没有路径就当成「未接入」。
+ */
+const TOOL_NON_NAV = {
+  customerServiceChat: 'contact',
+  merchantsCall: 'phone'
+};
+
+/**
+ * 依赖型入口的**如实说明**。
+ *
+ * 以前这些入口点下去只弹一句「该功能开发中」：用户既不知道是谁的问题、也不知道该去哪儿，
+ * 体验上等同于「点了没反应」。现在统一落到 `packageUser/coming` 页，把「缺哪套底座」讲清楚。
+ * 说明文案只有这一处定义（入口侧）—— 「功能未开放」页本身不堆任何 if-else。
+ */
+const NOT_READY = {
+  taskCenter: { name: '任务中心', desc: '任务中心依赖「会员任务 / 成长值」体系：有赞侧由会员中台按签到、下单、分享等行为派发积分与奖励。本店没有这套数据源，做不出真实的进度与奖励发放。' },
+  gifts: { name: '赠品', desc: '赠品依赖「满赠 / 加赠」营销活动：赠品要挂在一场活动上、按订单门槛自动加进订单。本店的营销中台尚未接入，无法真实发放。' },
+  cashBack: { name: '返现', desc: '返现依赖会员资金账户：下单后按比例把钱返还到可在店内消费的余额。本店没有会员钱包，无法真实返还。' },
+  fxCenter: { name: '分销员中心', desc: '分销员中心依赖分销体系（推广关系、佣金计算、提现）。本店未开通分销，没有推广关系与佣金数据可展示。' },
+  offlineStore: { name: '线下门店', desc: '线下门店依赖门店档案与就近库存（门店列表、地址、营业时间）。本店没有门店数据源。' },
+  purchaseColumnAndContent: { name: '课程', desc: '课程依赖知识付费底座（专栏、章节、购买凭证）。本店没有该业务。' },
+  paidContentCertificate: { name: '证书', desc: '证书依赖知识付费底座（完成课程后发证）。本店没有该业务。' },
+  paidContentExamination: { name: '考试', desc: '考试依赖知识付费底座（题库与判卷）。本店没有该业务。' },
+  exchangeGiftCard: { name: '兑换礼品卡', desc: '礼品卡兑换依赖礼品卡账户体系（卡密、余额、核销）。本店没有该业务。' },
+  paidContentExerciseBook: { name: '作业本', desc: '作业本依赖知识付费底座（作业提交与批改）。本店没有该业务。' },
+  blankLine: { name: '留白', desc: '「留白」在有赞里是一个纯占位插件：它不产生任何内容，只在小程序里撑出一块空白。本店用「辅助空白」区块表达同一件事（装修台可添加），所以这一项不单独落地。' },
+  exhibitionReserve: { name: '活动预订', desc: '活动预订依赖预约中台（场次、名额、到店核销）。本店没有该业务。' },
+  restaurantReserve: { name: '预约订座', desc: '预约订座依赖餐饮预约底座（桌位、时段、到店核销）。本店是家电商城，没有该业务。' },
+  referralRewards: { name: '邀请有礼', desc: '邀请有礼依赖分销 / 邀请关系链（邀请人与被邀请人的奖励结算）。本店未开通分销。' },
+  refund: { name: '退款 / 售后', desc: '本店订单状态机只有「待付款 / 待发货 / 待收货 / 已完成 / 已取消」，**没有退款态**：申请退款要由客服在后台核对后人工处理。所以在个人中心里做一个「退款/售后」列表会永远查不到数据，不如把真实路径讲清楚 —— 需要退款请通过「客服聊天」联系我们。' }
+};
+
+/** 兜底说明：新加了清单项却忘了写说明时，也不能显示空白 */
+const NOT_READY_FALLBACK = '这一项依赖本店尚未接入的业务底座（会员 / 营销 / 分销 / 门店 / 知识付费等），接入后会自动开放。';
+
+/** 统一落到「功能未开放」页：把「点了没反应」变成「点了告诉你为什么没有」 */
+function goComing(name, desc) {
+  const url = ROUTES.COMING
+    + '?name=' + encodeURIComponent(name || '功能未开放')
+    + '&desc=' + encodeURIComponent(desc || NOT_READY_FALLBACK);
+  wx.navigateTo({ url: url, fail: () => wx.showToast({ title: (name || '该功能') + '暂未开放', icon: 'none' }) });
+}
 
 const blockPageBehavior = {
   /**
@@ -286,39 +344,148 @@ const blockPageBehavior = {
   /* ------------------------- 个人中心（「我的」页）区块 ------------------------- */
 
   /**
+   * 个人信息区块的登录 / 退出登录（默认实现，页面可覆盖）。
+   *
+   * 为什么默认实现放在这里、而不是只放在「我的」页：
+   *   `templates/blocks.wxml` 是 index / custom / mine **三个页面共用**的，
+   *   `uc_profile` 区块目前只出现在「我的」页。只把处理器写在「我的」页的话，
+   *   别的页面一旦渲染个人信息区块就是**绑了没实现** —— 小程序对这种死绑定是静默的
+   *   （不报错、点了没反应），正是这一批要修的问题。自检 15.80 会把
+   *   「include 进来的模板里每个绑定都必须在宿主页面解析得到」当硬约束查。
+   *   页面可以提供 `loadProfile` / `syncUser` 接管后续（「我的」页就是这么做的：
+   *   登录成功后要拉昵称头像，并把自己那份 data 同步进区块）。
+   */
+  onTapUcLogin() {
+    if (this.data.logging) return;
+    this.setData({ logging: true });
+    wx.showLoading({ title: '登录中', mask: true });
+
+    login(true)
+      .then(() => {
+        wx.hideLoading();
+        this.setData({ logged: true, logging: false });
+        wx.showToast({ title: '登录成功', icon: 'success' });
+        if (typeof this.loadProfile === 'function') return this.loadProfile();
+      })
+      .catch((err) => {
+        wx.hideLoading();
+        this.setData({ logged: false, logging: false });
+        wx.showModal({
+          title: '登录失败',
+          content: (err && err.message) || '网络异常，请稍后重试',
+          confirmText: '重试',
+          cancelText: '取消',
+          success: (r) => { if (r.confirm) this.onTapUcLogin(); }
+        });
+      });
+  },
+
+  onTapUcLogout() {
+    wx.showModal({
+      title: '退出登录',
+      content: '退出后购物车与订单需要重新登录才能查看',
+      success: (r) => {
+        if (!r.confirm) return;
+        logout();
+        this.setData({ logged: false });
+        if (typeof this.syncUser === 'function') this.syncUser({ logged: false });
+        wx.showToast({ title: '已退出登录', icon: 'none' });
+      }
+    });
+  },
+
+  /**
    * 「我的订单」点某个状态入口（含「全部订单」）。
    *
-   * 真正的跳转由页面实现（`onTapOrderStatus`）—— 订单列表页还没交付，
-   * 页面里给的是「订单中心开发中」提示；页面一旦交付，只改页面那一处。
+   * 区块里的 key 是**大写**（ALL / PENDING_PAY / PENDING_SHIP / SHIPPED / FINISHED），
+   * 与后端口径（小写）的映射收在**订单列表页**的 `ENTRY_STATUS` 里一份 ——
+   * 这里只把原样 key 传过去，不重复维护第二张映射表（两处必然会有一天对不上）。
+   *
+   * 「退款 / 售后」不走列表页：本店订单状态机没有退款态（见 NOT_READY.refund），
+   * 列表页做一个永远查不到数据的页签等于骗人。
    */
   onTapUcOrder(e) {
-    const status = String((e.currentTarget.dataset || {}).status || 'ALL');
-    if (typeof this.onTapOrderStatus === 'function') return this.onTapOrderStatus(status);
-    wx.showToast({ title: '订单中心开发中', icon: 'none' });
+    const key = String((e.currentTarget.dataset || {}).status || 'ALL').toUpperCase();
+    if (key === 'REFUND') return goComing(NOT_READY.refund.name, NOT_READY.refund.desc);
+    if (typeof this.onTapOrderStatus === 'function') return this.onTapOrderStatus(key);
+    wx.navigateTo({
+      url: ROUTES.ORDER_LIST + '?status=' + encodeURIComponent(key),
+      fail: () => wx.showToast({ title: '订单列表打开失败，请重试', icon: 'none' })
+    });
+  },
+
+  /**
+   * 「个人资产」点某一项（余额 / 积分 / 权益卡 / 优惠券 / 钱包 / 礼品卡 / 提货卡）。
+   *
+   * 7 项里只有「优惠券」有真实底座（后端 /api/coupon/* + `packageUser/coupon` 页面），
+   * 落点在 `blocks.js` 的 `UC_STAT_DEFS[].route`（唯一一份）里标着 —— 有就真跳，
+   * 没有就落「功能未开放」页，把缺的那套资产体系讲清楚。
+   */
+  onTapUcStat(e) {
+    const ds = e.currentTarget.dataset || {};
+    const key = String(ds.key || '');
+    if (!key) return;
+    const def = statDef(key) || { label: key, route: '', dep: '' };
+    if (def.route) {
+      wx.navigateTo({ url: def.route, fail: () => wx.showToast({ title: '页面打开失败，请重试', icon: 'none' }) });
+      return;
+    }
+    const label = def.label || '该项资产';
+    goComing(label, '「' + label + '」依赖' + (def.dep || '会员资产数据')
+      + '：本店尚未开通这套会员资产底座，所以这里没有真实数值可展示（不是接口失败，是确实没有这项业务）。接入后会显示可用的' + label + '。');
   },
 
   /**
    * 「必备工具」点某一项。
    *
-   * 只有 TOOL_META 里标了 `real: true` 的工具才真的跳转，其余**如实提示「开发中」**——
-   * 与那 34 个依赖型组件同一口径：装修台里能配，真机不假装可用。
-   * 「客服聊天」在 WXML 里用 `<button open-type="contact">` 落地，不走这里。
+   * 三条落地路径，缺一不可（`real: true` 的工具必须命中前两条之一，自检会对账）：
+   *   ① `TOOL_NON_NAV`：客服聊天（wxml 的 open-type 按钮）/ 拨打商家电话（取号码后拨号）；
+   *   ② `TOOL_ROUTE`  + `real`：真实页面，navigateTo；
+   *   ③ 其余：`real:false` 的依赖型入口 → 落「功能未开放」页，把缺什么讲清楚。
+   * 以前 ③ 只弹一句「该功能开发中」，用户不知道是谁的问题 —— 与「点了没反应」没区别。
    */
   onTapToolItem(e) {
-    const key = String((e.currentTarget.dataset || {}).key || '');
+    const ds = e.currentTarget.dataset || {};
+    const key = String(ds.key || '');
     if (!key) return;
     const meta = TOOL_META[key] || { real: false };
 
-    // 关于我们 / 账号与安全由页面自己实现（都是页面级能力，不在公用行为里硬编码文案）
-    if (key === 'about' && typeof this.onTapAbout === 'function') return this.onTapAbout();
-    if (key === 'accountSettings' && typeof this.onTapAccountSettings === 'function') return this.onTapAccountSettings();
+    if (TOOL_NON_NAV[key] === 'phone') return this.callMerchant();
+    // contact 由 wxml 的 <button open-type="contact"> 自己完成，走到这里说明是异常路径，静默返回
+    if (TOOL_NON_NAV[key]) return;
 
     if (meta.real && TOOL_ROUTE[key]) {
-      wx.navigateTo({ url: TOOL_ROUTE[key], fail: () => wx.showToast({ title: '页面暂未开放', icon: 'none' }) });
+      wx.navigateTo({
+        url: TOOL_ROUTE[key],
+        fail: () => wx.showToast({ title: '页面打开失败，请重试', icon: 'none' })
+      });
       return;
     }
-    wx.showToast({ title: '该功能开发中', icon: 'none' });
+    const info = NOT_READY[key] || {};
+    goComing(String(ds.label || '').trim() || info.name || key, info.desc);
+  },
+
+  /**
+   * 「拨打商家电话」：号码取自后台「运营参数」的客服电话
+   * （`GET /api/shop/settings`，公开只读）。取不到号码时说清去哪儿配，不能让按钮点了没反应。
+   */
+  callMerchant() {
+    wx.showLoading({ title: '正在获取号码', mask: true });
+    return shopSvc.fetchSettings()
+      .then((s) => {
+        wx.hideLoading();
+        const phone = String((s && s.servicePhone) || '').trim();
+        if (!phone) {
+          goComing('拨打商家电话', '后台「运营参数」里还没有配置客服电话，所以这里拨不出去。请让运营在装修台「店铺设置 · 运营参数」里填上客服电话后即可使用；也可以先用「客服聊天」联系我们。');
+          return;
+        }
+        wx.makePhoneCall({ phoneNumber: phone, fail: () => {} });
+      })
+      .catch(() => {
+        wx.hideLoading();
+        wx.showToast({ title: '号码获取失败，请重试', icon: 'none' });
+      });
   }
 };
 
-module.exports = { blockPageBehavior };
+module.exports = { blockPageBehavior, TOOL_ROUTE, TOOL_NON_NAV, NOT_READY };

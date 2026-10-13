@@ -1,0 +1,143 @@
+.page {
+  min-height: 100vh;
+  padding-top: var(--space-sm);
+  box-sizing: border-box;
+}
+
+.sec {
+  margin: 0 var(--space-base) var(--space-sm);
+  padding: var(--space-base);
+}
+
+.k {
+  flex: 0 0 auto;
+  font-size: var(--font-base);
+  color: var(--color-text);
+}
+
+.k-danger {
+  color: var(--color-danger);
+}
+
+.v {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--space-base);
+  font-size: var(--font-base);
+  color: var(--color-text-secondary);
+  text-align: right;
+}
+
+.hint {
+  display: block;
+  margin-top: 12rpx;
+  font-size: var(--font-xs);
+  line-height: 32rpx;
+  color: var(--color-text-placeholder);
+}
+
+/* ------------------------------ 头像 ------------------------------ */
+.av-wrap {
+  flex: 0 0 auto;
+  margin-left: var(--space-base);
+}
+
+.av {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: var(--color-bg-muted);
+}
+
+.av-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light);
+}
+
+.av-t {
+  font-size: 36rpx;
+  color: var(--color-primary);
+}
+
+/* ------------------------------ 昵称 ------------------------------ */
+.ipt {
+  flex: 1;
+  min-width: 0;
+  margin-left: var(--space-base);
+  font-size: var(--font-base);
+  color: var(--color-text);
+  text-align: right;
+}
+
+.ipt-ph {
+  color: var(--color-text-placeholder);
+}
+
+.btn-save {
+  margin-top: var(--space-base);
+  height: 72rpx;
+  border-radius: 36rpx;
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+  font-size: var(--font-base);
+  line-height: 70rpx;
+  text-align: center;
+}
+
+.btn-disabled {
+  background: var(--color-disabled);
+}
+
+/* ------------------------------ 微信授权按钮 ------------------------------
+   小程序 button 自带边框、圆角、内边距与 ::after 伪元素描边，
+   要当成普通按钮用必须逐项清掉，否则会出现「双层边框」。
+   font-size 必须显式写：不写会继承 button 默认的 18px（与页面字号不一致）。 */
+.btn-phone {
+  flex: 0 0 auto;
+  margin: 0 0 0 var(--space-base);
+  padding: 0 20rpx;
+  height: 56rpx;
+  border-radius: 28rpx;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  font-size: var(--font-sm);
+  line-height: 56rpx;
+  text-align: center;
+}
+
+.btn-phone::after {
+  border: none;
+}
+
+/* ------------------------------ 链接行 ------------------------------ */
+.link-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 56rpx;
+}
+
+.link-right {
+  display: flex;
+  align-items: center;
+}
+
+.v-arrow {
+  font-size: var(--font-base);
+  color: var(--color-text-placeholder);
+}
+
+/* ------------------------------ 底部说明 ------------------------------ */
+.foot {
+  padding: var(--space-lg) var(--space-lg) 0;
+}
+
+.foot-t {
+  display: block;
+  font-size: var(--font-xs);
+  line-height: 34rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+}

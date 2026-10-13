@@ -1,0 +1,53 @@
+<!-- 关于我们：每个字段都标清来源，没真源的字段不展示（见 about.js 文件头） -->
+<view class="page">
+
+  <!-- 店铺信息（真源：装修台 replica.SHOP） -->
+  <view class="brand">
+    <image wx:if="{{shop.avatar}}" class="brand-logo" src="{{shop.avatar}}" mode="aspectFit" />
+    <view wx:else class="brand-logo brand-logo-ph"><text class="brand-logo-t">LEXY</text></view>
+    <text class="brand-name">{{shop.name}}</text>
+    <text wx:if="{{shop.slogan}}" class="brand-slogan">{{shop.slogan}}</text>
+    <text class="brand-ver">版本 {{version}}</text>
+  </view>
+
+  <!-- 客服（真源：/api/shop/settings，取自后台「运营参数」） -->
+  <view wx:if="{{hasSettings}}" class="card sec">
+    <view class="sec-hd">
+      <text class="sec-t">联系客服</text>
+    </view>
+
+    <view wx:if="{{servicePhone}}" class="kv" bindtap="onCallService" hover-class="hover-lite" hover-stay-time="80">
+      <text class="kv-k">客服电话</text>
+      <view class="kv-right">
+        <text class="kv-v kv-phone">{{servicePhone}}</text>
+        <text class="kv-a">拨打</text>
+      </view>
+    </view>
+
+    <view wx:if="{{servicePhone}}" class="kv" bindtap="onCopyPhone" hover-class="hover-lite" hover-stay-time="80">
+      <text class="kv-k">复制号码</text>
+      <text class="kv-v">发送给朋友或保存</text>
+    </view>
+
+    <view wx:if="{{serviceHours}}" class="kv">
+      <text class="kv-k">服务时间</text>
+      <text class="kv-v">{{serviceHours}}</text>
+    </view>
+
+    <!-- 微信原生客服会话：不自己造聊天页 -->
+    <button class="btn-contact" open-type="contact" hover-class="hover" hover-stay-time="80">在线客服</button>
+  </view>
+
+  <!-- 服务承诺 -->
+  <view wx:if="{{notice}}" class="card sec">
+    <view class="sec-hd">
+      <text class="sec-t">服务承诺</text>
+    </view>
+    <text class="notice">{{notice}}</text>
+  </view>
+
+  <!-- 来源说明：把「哪些是装修台维护、哪些是后台运营参数」写在明面上 -->
+  <view class="foot">
+    <text class="foot-t">店铺信息由装修台「店铺信息」维护，客服与公告由后台「运营参数」维护；两处各自是唯一数据源。</text>
+  </view>
+</view>

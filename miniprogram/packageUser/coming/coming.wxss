@@ -1,0 +1,69 @@
+.page {
+  min-height: 100vh;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 160rpx var(--space-lg) var(--space-lg);
+}
+
+.ring {
+  width: 140rpx;
+  height: 140rpx;
+  margin-bottom: var(--space-lg);
+  border: 4rpx dashed var(--color-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-t {
+  font-size: 64rpx;
+  line-height: 64rpx;
+  color: var(--color-text-placeholder);
+}
+
+.t-name {
+  font-size: var(--font-sm);
+  color: var(--color-text-placeholder);
+}
+
+.t-main {
+  margin-top: 12rpx;
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.t-desc {
+  margin-top: var(--space-base);
+  font-size: var(--font-sm);
+  line-height: 40rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.btns {
+  width: 100%;
+  margin-top: 80rpx;
+}
+
+.btn {
+  height: 88rpx;
+  margin-bottom: var(--space-base);
+  border: 1rpx solid var(--color-border);
+  border-radius: 44rpx;
+  font-size: var(--font-lg);
+  line-height: 86rpx;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.btn-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}

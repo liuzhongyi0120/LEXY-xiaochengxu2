@@ -44,4 +44,22 @@ function queryPay(orderId) {
   return post('/api/pay/query', { orderId });
 }
 
-module.exports = { precreate, fetchList, fetchDetail, fetchCount, cancel, confirm, queryPay };
+/**
+ * 待付款订单「继续支付」：拿到该订单的支付参数
+ * @returns {Promise<{orderId, orderNo, amountFen, sandbox, payment}>}
+ *   `sandbox === true` 表示未配置商户号，参数是沙箱造的 —— `wx.requestPayment` 必然失败，
+ *   页面据此提供「模拟支付成功」入口（真实商户号接入后自动为 false，入口自动消失）。
+ */
+function prepay(orderId) {
+  return post('/api/order/prepay', { orderId });
+}
+
+/**
+ * 联调：模拟支付成功（服务端走与真实回调完全相同的处理路径）
+ * 生产环境已配置商户号时服务端会返回 403，页面必须把失败如实展示出来。
+ */
+function mockPay(orderId) {
+  return post('/api/pay/mock-success', { orderId });
+}
+
+module.exports = { precreate, prepay, mockPay, fetchList, fetchDetail, fetchCount, cancel, confirm, queryPay };

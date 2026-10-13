@@ -904,7 +904,7 @@
         <text class="cu-nick" style="color: {{block.nameFg}};">{{block.user.logged ? (block.user.nickname || '微信用户') : '未登录'}}</text>
         <view class="cu-prof-meta">
           <text wx:if="{{block.levelOn && block.user.logged}}" class="cu-level">普通会员</text>
-          <view class="cu-code" style="color: {{block.codeFg}};" data-key="memberCode" catchtap="onTapToolItem">会员码</view>
+          <view class="cu-code" style="color: {{block.codeFg}};" data-key="memberCode" data-label="会员码" catchtap="onTapToolItem">会员码</view>
         </view>
       </view>
       <view wx:if="{{!block.user.logged}}" class="cu-prof-act" catchtap="onTapUcLogin">{{logging ? '登录中…' : '登录'}}</view>
@@ -913,15 +913,24 @@
     <view class="cu-prof-bar {{block.bar}}"></view>
   </view>
 
-  <!-- ===== 个人资产（依赖会员资产数据，本期无数据源 → 统一显示 —） ===== -->
+  <!-- ===== 个人资产（有底座的项显示真实数值；没底座的项点了说明依赖，不留「点了没反应」） ===== -->
   <view wx:elif="{{block.type === 'uc_stats'}}" class="cu-stats">
     <view class="cu-stats-grid">
-      <view class="cu-stat" wx:for="{{block.items}}" wx:key="key">
+      <view
+        class="cu-stat"
+        wx:for="{{block.items}}"
+        wx:key="key"
+        data-key="{{item.key}}"
+        data-label="{{item.label}}"
+        bindtap="onTapUcStat"
+        hover-class="hover-lite"
+        hover-stay-time="80"
+      >
         <view class="cu-stat-v">{{item.value}}<text class="cu-stat-u">{{item.unit}}</text></view>
         <view class="cu-stat-l">{{item.label}}</view>
       </view>
     </view>
-    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 点击各项看说明</view>
   </view>
 
   <!-- ===== 我的订单 ===== -->
@@ -966,6 +975,7 @@
           class="cu-tool {{block.iconMode}}"
           style="width: {{block.cellW}}%;"
           data-key="{{tl.key}}"
+          data-label="{{tl.label}}"
           bindtap="onTapToolItem"
           hover-class="hover-lite"
           hover-stay-time="80"

@@ -1,0 +1,89 @@
+.page {
+  min-height: 100vh;
+}
+
+.box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 140rpx var(--space-lg) var(--space-lg);
+}
+
+/* 转圈放大一档：这一页只有它一个视觉焦点 */
+.big {
+  width: 72rpx;
+  height: 72rpx;
+  border-width: 6rpx;
+  margin-bottom: var(--space-lg);
+}
+
+.t-main {
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.t-sub {
+  margin-top: 16rpx;
+  font-size: var(--font-sm);
+  line-height: 36rpx;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* 结果圆环：三种结果共用一套几何，只换颜色 */
+.ring {
+  width: 140rpx;
+  height: 140rpx;
+  margin-bottom: var(--space-lg);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-ok {
+  background: var(--color-success);
+}
+
+.ring-wait {
+  background: var(--color-warning);
+}
+
+.ring-err {
+  background: var(--color-danger);
+}
+
+.ring-t {
+  font-size: 72rpx;
+  line-height: 72rpx;
+  color: var(--color-text-inverse);
+}
+
+.ono {
+  margin-top: var(--space-lg);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.btns {
+  width: 100%;
+  margin-top: 80rpx;
+}
+
+.btn {
+  height: 88rpx;
+  margin-bottom: var(--space-base);
+  border: 1rpx solid var(--color-border);
+  border-radius: 44rpx;
+  font-size: var(--font-lg);
+  line-height: 86rpx;
+  text-align: center;
+  color: var(--color-text);
+}
+
+.btn-primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-inverse);
+}

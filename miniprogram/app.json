@@ -19,6 +19,30 @@
       ]
     },
     {
+      "name": "packageOrder",
+      "root": "packageOrder",
+      "pages": [
+        "list/list",
+        "detail/detail",
+        "pay-result/pay-result"
+      ]
+    },
+    {
+      "name": "packageUser",
+      "root": "packageUser",
+      "pages": [
+        "address/list/list",
+        "address/edit/edit",
+        "coupon/coupon",
+        "favorite/favorite",
+        "footprint/footprint",
+        "member-code/member-code",
+        "account/account",
+        "about/about",
+        "coming/coming"
+      ]
+    },
+    {
       "name": "packageNews",
       "root": "packageNews",
       "pages": [
@@ -34,6 +58,10 @@
     "pages/news/news": {
       "network": "all",
       "packages": ["packageNews"]
+    },
+    "pages/mine/mine": {
+      "network": "all",
+      "packages": ["packageOrder", "packageUser"]
     }
   },
   "window": {

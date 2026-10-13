@@ -1,0 +1,117 @@
+.page {
+  min-height: 100vh;
+  padding-top: var(--space-sm);
+  box-sizing: border-box;
+}
+
+.c-main {
+  margin: var(--space-sm) var(--space-base) 0;
+  padding: var(--space-lg) var(--space-base);
+}
+
+.who {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.who-av {
+  width: 140rpx;
+  height: 140rpx;
+  border-radius: 50%;
+  background: var(--color-bg-muted);
+}
+
+.who-av-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-primary-light);
+}
+
+.who-av-t {
+  font-size: 48rpx;
+  color: var(--color-primary);
+}
+
+.who-name {
+  margin-top: var(--space-base);
+  font-size: var(--font-lg);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.who-phone {
+  margin-top: 8rpx;
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.who-link {
+  color: var(--color-primary);
+}
+
+.stitle {
+  margin-top: 48rpx;
+  margin-bottom: var(--space-base);
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+/* 编号按 4 位一组分开排，方便口头报读 */
+.code {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.code-g {
+  margin: 6rpx;
+  padding: 12rpx 20rpx;
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-muted);
+  font-size: var(--font-lg);
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: var(--color-text);
+}
+
+.code-tip {
+  margin-top: var(--space-base);
+  font-size: var(--font-xs);
+  color: var(--color-text-placeholder);
+  text-align: center;
+}
+
+.c-note {
+  margin: var(--space-sm) var(--space-base) 0;
+  padding: var(--space-base);
+}
+
+.note-i {
+  display: block;
+  font-size: var(--font-xs);
+  line-height: 38rpx;
+  color: var(--color-text-secondary);
+}
+
+.bottom-hold {
+  height: 160rpx;
+}
+
+.bar {
+  padding: var(--space-sm) var(--space-base);
+  box-sizing: border-box;
+}
+
+.btn {
+  height: 84rpx;
+  border: 1rpx solid var(--color-border);
+  border-radius: 42rpx;
+  font-size: var(--font-lg);
+  line-height: 82rpx;
+  text-align: center;
+  color: var(--color-text);
+}

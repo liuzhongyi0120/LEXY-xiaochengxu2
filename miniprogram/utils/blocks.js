@@ -43,22 +43,27 @@ const SHELL_FAMILY = {
 /* ================= 个人中心（「我的」页）区块的渲染元信息 =================
  *
  * ⚠️ 这些表是 `server/decorate/yzUserCenter.js` 里对应清单的**真机侧最小子集**：
- *    - `TOOL_META` ⇄ `UC_TOOL_ITEMS`（键集必须逐项一致）
+ *    - `TOOL_META` ⇄ `UC_TOOL_ITEMS`（键集与 real / icon **取值**都必须逐项一致）
  *    - `UC_STAT_DEFS` ⇄ `UC_KINDS.uc_stats` 的 7 个开关
  *    - `UC_ORDER_DEFS` ⇄ `UC_KINDS.uc_order` 的 6 个开关
- *   `real: false` = 自建商城没有这套业务底座，真机渲染入口但点了给「开发中」提示，
- *   绝不假装可用（与 34 个依赖型组件同一口径）。
+ *
+ * `real: false` = 自建商城没有这套业务底座。这类入口**照样渲染**（与有赞同版式），
+ * 但点下去落到 `packageUser/coming` 把「缺哪套数据」讲清楚 —— 以前是弹一句
+ * 「该功能开发中」，用户既不知道是谁的问题也不知道该去哪儿，比没入口还糟。
+ * `real: true` 的必须**真有落点**：要么在 `utils/blockPage.js` 的 `TOOL_ROUTE` 里
+ * 有真实页面，要么在 `TOOL_NON_NAV` 里声明用哪种非跳转方式落地（客服 / 拨号）。
+ * 标 true 却点不动，比标 false 更糟 —— 那是一次「页面暂未开放」的失败跳转。
  */
 
 /** 必备工具：图标 + 是否真的能跳（键集与 UC_TOOL_ITEMS 一致，自检会对账） */
 const TOOL_META = {
-  memberCode: { icon: '码', real: false },
+  memberCode: { icon: '码', real: true },
   taskCenter: { icon: '任', real: false },
   cart: { icon: '车', real: true },
   gifts: { icon: '赠', real: false },
   customerServiceChat: { icon: '服', real: true },
-  deliveryAddress: { icon: '址', real: false },
-  merchantsCall: { icon: '电', real: false },
+  deliveryAddress: { icon: '址', real: true },
+  merchantsCall: { icon: '电', real: true },
   cashBack: { icon: '返', real: false },
   fxCenter: { icon: '销', real: false },
   offlineStore: { icon: '店', real: false },
@@ -72,19 +77,38 @@ const TOOL_META = {
   accountSettings: { icon: '号', real: true },
   restaurantReserve: { icon: '座', real: false },
   referralRewards: { icon: '邀', real: false },
-  about: { icon: '关', real: true }
+  about: { icon: '关', real: true },
+  favorite: { icon: '藏', real: true },
+  footprint: { icon: '迹', real: true }
 };
 
-/** 个人资产 7 项（与有赞面板的 7 个复选项一一对应；数值来自会员资产，本期无数据源） */
+/**
+ * 个人资产 7 项（与有赞面板的 7 个复选项一一对应）。
+ *
+ * `route` = 这一项在本商城的真实落点（有就真跳）；没写 `route` 的项自建商城没有对应
+ * 业务底座，点击统一落「功能未开放」页，并把 `dep`（缺的是哪套数据）写在页面上。
+ * ⚠️ 本表是**唯一一份**：route 只在这里定义，`utils/blockPage.js` 直接 require 本表来跳转
+ *    （那张 `TOOL_ROUTE` 是「必备工具」的，两套条目不是同一批，别混）。
+ */
 const UC_STAT_DEFS = [
-  { k: 'showBalance', key: 'balance', label: '余额', unit: '元' },
-  { k: 'showPoints', key: 'points', label: '积分', unit: '' },
-  { k: 'showCard', key: 'card', label: '权益卡', unit: '张' },
-  { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张' },
-  { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元' },
-  { k: 'showGiftCard', key: 'giftCard', label: '礼品卡', unit: '张' },
-  { k: 'showPickupCard', key: 'pickupCard', label: '提货卡', unit: '张' }
+  { k: 'showBalance', key: 'balance', label: '余额', unit: '元', dep: '会员余额账户' },
+  { k: 'showPoints', key: 'points', label: '积分', unit: '', dep: '积分体系' },
+  { k: 'showCard', key: 'card', label: '权益卡', unit: '张', dep: '付费权益卡' },
+  { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张', route: '/packageUser/coupon/coupon' },
+  { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元', dep: '钱包账户' },
+  { k: 'showGiftCard', key: 'giftCard', label: '礼品卡', unit: '张', dep: '礼品卡' },
+  { k: 'showPickupCard', key: 'pickupCard', label: '提货卡', unit: '张', dep: '提货卡' }
 ];
+
+/**
+ * 个人资产项的静态定义（供页面级跳转 / 说明使用）。
+ * @returns {{key:string,label:string,unit:string,route:string,dep:string}|null}
+ */
+function statDef(key) {
+  const d = UC_STAT_DEFS.filter((x) => x.key === key)[0];
+  if (!d) return null;
+  return { key: d.key, label: d.label, unit: d.unit, route: d.route || '', dep: d.dep || '' };
+}
 
 /** 我的订单 6 个入口（与有赞面板的 6 个开关一一对应） */
 const UC_ORDER_DEFS = [
@@ -714,9 +738,19 @@ function normalizeBlock(b, index) {
     o.bar = ['s1', 's2', 's3'].indexOf(o.barStyle) >= 0 ? o.barStyle : 's1';
     o.user = { logged: false, nickname: '', avatar: '' };
   } else if (kind === 'uc_stats') {
-    /* 个人资产：7 个开关只决定「展示哪几项」，数值来自会员资产（本期无数据源，统一显示 —） */
-    o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false).map((d) => ({ key: d.key, label: d.label, unit: d.unit, value: '—' }));
-    o.dep = String(o.dep || '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡）');
+    /*
+     * 个人资产：7 个开关只决定「展示哪几项」。
+     *   · 有底座的项（优惠券）先给 '—'，页面装配 data 时用 applyStatValues 回填真实数值；
+     *   · 没底座的项保持 '—'，点了落「功能未开放」页并说明缺哪套数据（dep 一起带到页面）。
+     * 每项都是可点的 —— 「点了没反应」比「点了告诉你为什么没有」糟得多。
+     */
+    o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false).map((d) => ({
+      key: d.key, label: d.label, unit: d.unit, value: '—',
+      route: d.route || '',
+      dep: d.dep || ''
+    }));
+    const statMiss = o.items.filter((it) => !it.route).map((it) => it.dep).filter(Boolean);
+    o.dep = String(o.dep || statMiss.join(' / '));
   } else if (kind === 'uc_order') {
     o.title = o.title || '我的订单';
     o.showAllOn = o.showAll !== false;
@@ -1001,7 +1035,29 @@ function applyUserProfile(blocks, user) {
   return blocks;
 }
 
+/**
+ * 把**真实数值**回填到个人资产区块（目前只有「优惠券」有数据源）。
+ *
+ * 与 applyUserProfile 同一模式：装修数据里只有「展示哪些项」，数值是运行态。
+ * 只覆盖传进来的 key —— 没传的项保持 `—`（「未知」和「0」是两件事，
+ * 未登录时接口要令牌、拿不到数，不能显示成 0 张）。
+ *
+ * @param {Array} blocks 已 normalize 的区块数组
+ * @param {object} values 形如 { coupon: 3 }
+ */
+function applyStatValues(blocks, values) {
+  const v = values || {};
+  (blocks || []).forEach((b) => {
+    if (!b || b.type !== 'uc_stats') return;
+    (b.items || []).forEach((it) => {
+      if (Object.prototype.hasOwnProperty.call(v, it.key)) it.value = String(v[it.key]);
+    });
+  });
+  return blocks;
+}
+
 module.exports = {
-  normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, applyUserProfile, sanitizeRich, SIZE_CLASS,
+  normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, applyUserProfile, applyStatValues,
+  sanitizeRich, SIZE_CLASS, statDef,
   SHELL_FAMILY, UC_KIND_LIST, TOOL_META, UC_STAT_DEFS, UC_ORDER_DEFS
 };

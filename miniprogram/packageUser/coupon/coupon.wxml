@@ -1,0 +1,73 @@
+<!-- 我的优惠券：面额分「满减 / 折扣」两种渲染，见 coupon.js 文件头 -->
+<view class="page">
+
+  <view class="tabs">
+    <view
+      class="tab {{status === item.key ? 'on' : ''}}"
+      wx:for="{{tabs}}"
+      wx:key="key"
+      data-key="{{item.key}}"
+      bindtap="onTapTab"
+      hover-class="hover"
+      hover-stay-time="80"
+    >
+      <text class="tab-t">{{item.label}}</text>
+      <text wx:if="{{counts[item.key]}}" class="tab-badge">{{counts[item.key]}}</text>
+    </view>
+  </view>
+
+  <view wx:if="{{loading}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="优惠券加载失败"
+    desc="请检查网络后重试"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <empty-state
+    wx:elif="{{needLogin}}"
+    text="登录后查看优惠券"
+    desc="优惠券与账号绑定，需要先登录"
+    button-text="去登录"
+    bind:action="onGoLogin"
+  />
+
+  <empty-state
+    wx:elif="{{!list.length}}"
+    text="{{status === 'available' ? '暂时没有可用的优惠券' : '这里还是空的'}}"
+    desc="{{status === 'available' ? '去逛逛，下单时也许就有惊喜' : '换个页签看看'}}"
+    button-text="{{status === 'available' ? '去逛逛' : ''}}"
+    bind:action="onTapUse"
+  />
+
+  <view wx:else class="body">
+    <view class="cp {{item.disabled ? 'cp-off' : ''}}" wx:for="{{list}}" wx:key="couponId">
+      <!-- 左侧票面 -->
+      <view class="cp-face">
+        <text class="cp-face-n">{{item.face}}</text>
+        <text class="cp-face-u">{{item.faceUnit}}</text>
+      </view>
+
+      <!-- 中间齿孔：用一条虚线模拟票根分割 -->
+      <view class="cp-cut"></view>
+
+      <!-- 右侧信息 -->
+      <view class="cp-info">
+        <text class="cp-name ellipsis">{{item.name}}</text>
+        <text class="cp-rule">{{item.rule}} · {{item.scope}}</text>
+        <text class="cp-meta">{{item.expireText}}</text>
+        <text wx:if="{{item.reason}}" class="cp-meta">来源：{{item.reason}}</text>
+      </view>
+
+      <!-- 失效印章 -->
+      <view wx:if="{{item.showStamp}}" class="cp-stamp">{{item.statusText}}</view>
+    </view>
+
+    <view class="tip">优惠券在下单时自动匹配可用项，无需手动选择</view>
+  </view>
+</view>

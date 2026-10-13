@@ -59,11 +59,19 @@ const COLOR_RESET = '带「重置」的取色器与有赞一致：重置即回�
  *   show    默认是否勾选（有赞默认值）
  *   scope   all = 所有用户可见；fx = 仅分销员可见（有赞该项可切换）
  *   enabled 有赞侧当前是否可用（「邀请有礼」实测为 false）
- *   real    本小程序是否真有落地能力；false = 点击只提示「功能开发中」，不假装能跳
+ *   real    本小程序是否真有落地能力；false = 点击落到「功能未开放」页并把依赖讲清楚，
+ *           **绝不假装能跳**。标 true 的必须在 TOOL_ROUTE 里有真实页面，或有页面级实现
  *   icon    真机图标用的字（本后台没有图标字体，用名称首字替代，与「我的」页原有做法一致）
+ *
+ * ⚠️ 这里（服务端清单）与 `miniprogram/utils/blocks.js` 的 `TOOL_META`（真机兜底表）
+ *    的**键集与 real / icon 取值都必须逐一相同**（自检 check-all 有两条断言盯着）。
+ *    曾经 `accountSettings` 的两处 real 就打过架：真机说能用、后台标未接入。
  */
 const UC_TOOL_ITEMS = [
-  { type: 'memberCode', title: '会员码', show: false, scope: 'all', enabled: true, real: false, icon: '码' },
+  /* 2026-10-13：以下四项的 real 从 false 改为 true —— 对应的小程序页面这一批才真正建出来
+     （会员码 / 收货地址 / 账号与安全 / 关于我们）。在页面存在之前标 true，
+     点下去就是一次「页面暂未开放」的转圈失败，比标 false 更糟。 */
+  { type: 'memberCode', title: '会员码', show: false, scope: 'all', enabled: true, real: true, icon: '码' },
   { type: 'taskCenter', title: '任务中心', show: true, scope: 'all', enabled: true, real: false, icon: '任' },
   { type: 'cart', title: '购物车', show: true, scope: 'all', enabled: true, real: true, icon: '车' },
   { type: 'gifts', title: '赠品', show: true, scope: 'all', enabled: true, real: false, icon: '赠' },
@@ -73,8 +81,14 @@ const UC_TOOL_ITEMS = [
    * 照搬有赞默认值会把这个入口弄丢（运营在装修台里也不会主动去开），所以改成默认开。
    */
   { type: 'customerServiceChat', title: '客服聊天', show: true, scope: 'all', enabled: true, real: true, icon: '服' },
-  { type: 'deliveryAddress', title: '收货地址', show: true, scope: 'all', enabled: true, real: false, icon: '址' },
-  { type: 'merchantsCall', title: '拨打商家电话', show: false, scope: 'all', enabled: true, real: false, icon: '电' },
+  { type: 'deliveryAddress', title: '收货地址', show: true, scope: 'all', enabled: true, real: true, icon: '址' },
+  /*
+   * 「拨打商家电话」保持有赞的默认值 show:false（运营要自己在面板里打开），
+   * 但 `real` 从 false 改为 true —— 号码取自后台「运营参数」的客服电话
+   * （`GET /api/shop/settings`），拨号是本小程序真能做的事。
+   * 以前标 false 时，运营打开了这一项，点下去也只会得到「该功能开发中」。
+   */
+  { type: 'merchantsCall', title: '拨打商家电话', show: false, scope: 'all', enabled: true, real: true, icon: '电' },
   { type: 'cashBack', title: '返现', show: false, scope: 'all', enabled: true, real: false, icon: '返' },
   { type: 'fxCenter', title: '分销员中心', show: true, scope: 'fx', enabled: true, real: false, icon: '销' },
   { type: 'offlineStore', title: '线下门店', show: true, scope: 'all', enabled: true, real: false, icon: '店' },
@@ -93,7 +107,15 @@ const UC_TOOL_ITEMS = [
    * 换成有赞模板后如果没有这一项，这个入口就没了。补成同一个「必备工具」里的一个插件，
    * 保持原有功能不丢。这是**有意偏离**，记录在案。
    */
-  { type: 'about', title: '关于我们', show: true, scope: 'all', enabled: true, real: true, icon: '关', own: true }
+  { type: 'about', title: '关于我们', show: true, scope: 'all', enabled: true, real: true, icon: '关', own: true },
+  /*
+   * 第 22、23 项也是本项目补的（有赞的必备工具清单里没有这两项，属**有意偏离**）：
+   * 「我的收藏」与「浏览记录」后端 `packageUser/favorite`、`packageUser/footprint`
+   * 早已完整支持（含分页、去重、清空），却不从任何入口可达 —— 等于做了没接。
+   * 它们本来就是个人中心的常驻内容，所以补在必备工具里，默认开启。
+   */
+  { type: 'favorite', title: '我的收藏', show: true, scope: 'all', enabled: true, real: true, icon: '藏', own: true },
+  { type: 'footprint', title: '浏览记录', show: true, scope: 'all', enabled: true, real: true, icon: '迹', own: true }
 ];
 
 /* ============================ 个人中心专属区块 + 补缺组件 ============================ */
@@ -158,13 +180,19 @@ const UC_KINDS = {
     lib: 'assets',
     group: 'uc',
     desc: '余额 / 积分 / 权益卡 / 优惠券 / 钱包等资产入口',
-    dep: '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡）',
+    /*
+     * 依赖说明必须**只列真的没底座的那几项**（2026-10-13 更正）：
+     *   7 项里「优惠券」有完整后端（/api/coupon/*）与小程序页面（packageUser/coupon），
+     *   值是真数、点了真跳；其余 6 项没有会员资产底座，显示 `—` 并点击说明依赖。
+     * 以前这句把「优惠券」也算进依赖里（还漏了「提货卡」），属于把能用的说成不能用。
+     */
+    dep: '会员资产数据（余额 / 积分 / 权益卡 / 钱包 / 礼品卡 / 提货卡）',
     fields: [
       SEC('展示设置', '有赞面板这一栏是 7 个复选项；本后台按同口径拆成 7 个开关，勾选逻辑完全一致'),
       SW('showBalance', '余额', true),
       SW('showPoints', '积分', true),
       SW('showCard', '权益卡', true),
-      SW('showCoupon', '优惠券 / 码', true),
+      SW('showCoupon', '优惠券 / 码', true, '本店**有**真实的券数据：展示可用张数，点击进「我的优惠券」'),
       SW('showWallet', '钱包', true),
       SW('showGiftCard', '礼品卡', false),
       SW('showPickupCard', '提货卡', false)

@@ -1,0 +1,81 @@
+<!-- 收货地址列表：新增 / 编辑 / 删除 / 设默认（见 list.js 文件头） -->
+<view class="page">
+
+  <view wx:if="{{loading}}" class="loading-tip">
+    <view class="spinner"></view>
+    <text>加载中…</text>
+  </view>
+
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="地址加载失败"
+    desc="请检查网络后重试"
+    button-text="重新加载"
+    bind:action="onRetryLoad"
+  />
+
+  <empty-state
+    wx:elif="{{!list.length}}"
+    text="还没有收货地址"
+    desc="添加一个地址，下单时就不用再填了"
+    button-text="新增地址"
+    bind:action="onTapAdd"
+  />
+
+  <block wx:else>
+    <view class="body">
+      <view class="addr" wx:for="{{list}}" wx:key="addressId">
+        <!-- 上部：点进编辑（选择模式下回传上一页） -->
+        <view
+          class="a-main"
+          data-id="{{item.addressId}}"
+          bindtap="onTapItem"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >
+          <view class="a-line1">
+            <text class="a-name">{{item.name}}</text>
+            <text class="a-phone">{{item.phone}}</text>
+            <text wx:if="{{item.isDefault}}" class="a-tag">默认</text>
+          </view>
+          <text class="a-addr">{{item.region}} {{item.detail}}</text>
+        </view>
+
+        <!-- 下部：操作行（设默认 / 编辑 / 删除） -->
+        <view class="a-ops">
+          <view
+            class="op"
+            data-id="{{item.addressId}}"
+            bindtap="onTapSetDefault"
+            hover-class="hover"
+            hover-stay-time="80"
+          >
+            <view class="ck {{item.isDefault ? 'on' : ''}}"></view>
+            <text class="op-t">默认地址</text>
+          </view>
+          <view class="op-right">
+            <text
+              class="op"
+              data-id="{{item.addressId}}"
+              bindtap="onTapEdit"
+              hover-class="hover"
+              hover-stay-time="80"
+            >编辑</text>
+            <text
+              class="op op-del"
+              data-id="{{item.addressId}}"
+              bindtap="onTapDelete"
+              hover-class="hover"
+              hover-stay-time="80"
+            >删除</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view class="bottom-hold"></view>
+    <view class="footer-bar bar">
+      <view class="btn btn-primary btn-full" bindtap="onTapAdd" hover-class="hover" hover-stay-time="80">新增收货地址</view>
+    </view>
+  </block>
+</view>

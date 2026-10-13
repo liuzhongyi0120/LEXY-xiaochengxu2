@@ -199,7 +199,21 @@ async function buildPayment(db, userId, orderId) {
     amountFen: order.amounts.payAmount,
     description: order.items.map((i) => i.name).join('、').slice(0, 60)
   });
-  return { orderId: order.orderId, orderNo: order.orderNo, amountFen: order.amounts.payAmount, payment };
+  /*
+   * `sandbox` 如实告诉小程序端「这次支付参数是沙箱造的」。
+   *
+   * 为什么要下发：未配置商户号时 `unifiedOrder` 返回的是结构完整但**签名无效**的参数，
+   * `wx.requestPayment` 必然失败。前端如果只能看到「支付失败」，
+   * 在联调环境里就永远走不到支付成功那一步；而它是**不能靠猜**的 ——
+   * 真实商户号接入后必须自动变成 false，让前端不再提供「模拟支付」入口。
+   */
+  return {
+    orderId: order.orderId,
+    orderNo: order.orderNo,
+    amountFen: order.amounts.payAmount,
+    sandbox: !wechat.HAS_WX_PAY,
+    payment
+  };
 }
 
 function findOrder(db, userId, orderId) {

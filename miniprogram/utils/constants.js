@@ -79,12 +79,30 @@ const ROUTES = {
   MINE: '/pages/mine/mine',
   GOODS_LIST: '/packageGoods/list/list',
   GOODS_DETAIL: '/packageGoods/detail/detail',
-  ORDER_CONFIRM: '/packageOrder/confirm/confirm',
   ORDER_LIST: '/packageOrder/list/list',
   ORDER_DETAIL: '/packageOrder/detail/detail',
   ORDER_PAY_RESULT: '/packageOrder/pay-result/pay-result',
+  /*
+   * ⚠️ 「确认订单 / 结算」页（原 ORDER_CONFIRM）**已从本表移除**：它从来没被建出来过，
+   *    只在常量表里挂着一个不存在的路径 —— 而「常量表里的路径 ≠ 真有页面」正是这一批
+   *    要修的坑（购物车「结算」与商品详情「立即购买」目前都还是「结算功能开发中」）。
+   *    等下单链路落地时，连同 app.json 的分包注册一起加回来。
+   *    自检里有一条断言：本表**每个**路径都必须在 app.json 里注册过。
+   */
   ADDRESS_LIST: '/packageUser/address/list/list',
-  ADDRESS_EDIT: '/packageUser/address/edit/edit'
+  ADDRESS_EDIT: '/packageUser/address/edit/edit',
+  COUPON: '/packageUser/coupon/coupon',
+  FAVORITE: '/packageUser/favorite/favorite',
+  FOOTPRINT: '/packageUser/footprint/footprint',
+  MEMBER_CODE: '/packageUser/member-code/member-code',
+  ACCOUNT: '/packageUser/account/account',
+  ABOUT: '/packageUser/about/about',
+  /**
+   * 「功能未开放」兜底页（`?name=&desc=`）。
+   * 依赖型入口（任务中心 / 赠品 / 分销员中心 / 线下门店 / 退款售后 …）统一落到它，
+   * 把「点了没反应」变成「点了告诉你为什么没有」。
+   */
+  COMING: '/packageUser/coming/coming'
 };
 
 module.exports = {

@@ -13,11 +13,13 @@
  */
 
 const { syncTabBar } = require('../../utils/tabbar');
-const { isLogged, login, logout } = require('../../utils/auth');
+const { isLogged } = require('../../utils/auth');
 const { fetchProfile } = require('../../services/user');
+const couponSvc = require('../../services/coupon');
+const { ROUTES } = require('../../utils/constants');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
-const { normalizeBlocks, applyShopAvatar, applyUserProfile } = require('../../utils/blocks');
+const { normalizeBlocks, applyShopAvatar, applyUserProfile, applyStatValues } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
 
 /** 店铺头像可能是后台上传的 /uploads/… 相对路径，必须过一遍素材地址解析（首页同理） */
@@ -59,6 +61,8 @@ Page(Object.assign({}, blockPageBehavior, {
     this.setData({ meta: META, shop: SHOP, blocks: blocks, logged: logged }, () => {
       // 商品区块要实时数据，装修时存的是快照（与首页共用同一份实现）
       this.loadGoodsBlocks();
+      // 资产数值要等 blocks 真正落进 data 之后才回填（applyStatValues 读 this.data.blocks）
+      this.loadStatValues();
     });
     if (logged) this.loadProfile();
   },
@@ -69,7 +73,10 @@ Page(Object.assign({}, blockPageBehavior, {
       this.setData({ logged: logged });
       this.syncUser({ logged: logged });
     }
-    if (logged) this.loadProfile();
+    if (logged) {
+      this.loadProfile();
+      this.loadStatValues();
+    }
     // 切页时同步底部导航高亮（自定义 tabBar 的实例每页一份，必须由页面主动通知）
     syncTabBar(this);
   },
@@ -112,89 +119,55 @@ Page(Object.assign({}, blockPageBehavior, {
 
   /* ----------------------- 交互（区块事件见 utils/blockPage.js） ----------------------- */
 
-  /**
-   * 登录：真的去登录并刷新页面状态。
-   * 之前这里只弹一句「登录态已自动获取」—— 静默登录失败时用户没有任何恢复入口。
-   * 失败给「重试」，成功立刻回填昵称头像。
+  /*
+   * 登录 / 退出登录的**实现在 utils/blockPage.js**（个人信息区块是三个页面共用的模板，
+   * 处理器放在共用行为里才不会出现「别的页面上绑了没实现」）。
+   * 这里只提供两个钩子被它调用：loadProfile（登录后拉昵称头像）、syncUser（把「人」写回区块）。
    */
-  onTapUcLogin() {
-    if (this.data.logging) return;
-    this.setData({ logging: true });
-    wx.showLoading({ title: '登录中', mask: true });
-
-    login(true)
-      .then(() => {
-        wx.hideLoading();
-        this.setData({ logged: true, logging: false });
-        wx.showToast({ title: '登录成功', icon: 'success' });
-        return this.loadProfile();
-      })
-      .catch((err) => {
-        wx.hideLoading();
-        this.setData({ logged: false, logging: false });
-        wx.showModal({
-          title: '登录失败',
-          content: (err && err.message) || '网络异常，请稍后重试',
-          confirmText: '重试',
-          cancelText: '取消',
-          success: (r) => { if (r.confirm) this.onTapUcLogin(); }
-        });
-      });
-  },
-
-  onTapUcLogout() {
-    wx.showModal({
-      title: '退出登录',
-      content: '退出后购物车与订单需要重新登录才能查看',
-      success: (r) => {
-        if (!r.confirm) return;
-        logout();
-        this.setData({ logged: false });
-        this.syncUser({ logged: false });
-        wx.showToast({ title: '已退出登录', icon: 'none' });
-      }
-    });
-  },
 
   /**
    * 订单状态入口（「我的订单」区块 + 「全部订单」）。
-   * 订单列表页（packageOrder 分包）不在本期交付范围，先如实提示 ——
-   * 页面交付后把这里换成 `wx.navigateTo({ url: '/packageOrder/list/list?status=' + status })` 即可。
+   *
+   * 状态映射（大写入口 → 后端口径）收在订单列表页的 `ENTRY_STATUS` 一处，
+   * 这里只负责把 key 原样带过去 —— 「退款 / 售后」由 `blockPage.js` 的 onTapUcOrder
+   * 拦下来落「功能未开放」页（本店订单状态机没有退款态）。
    */
   onTapOrderStatus(status) {
-    if (!status) return;
-    wx.showToast({ title: '订单中心开发中', icon: 'none' });
+    const key = String(status || 'ALL').toUpperCase();
+    wx.navigateTo({
+      url: ROUTES.ORDER_LIST + '?status=' + encodeURIComponent(key),
+      fail: () => wx.showToast({ title: '订单列表打开失败，请重试', icon: 'none' })
+    });
   },
 
-  /** 账号与安全：本期只有「退出登录」这一件真实可做的事，不编造页面 */
-  onTapAccountSettings() {
-    if (!this.data.logged) {
-      wx.showToast({ title: '请先登录', icon: 'none' });
-      return this.onTapUcLogin();
+  /** 关于我们 / 账号与安全已经是独立页面（packageUser 分包），跳转表见 utils/blockPage.js */
+
+  /* --------------------- 个人资产的真实数值（只有优惠券有底座） --------------------- */
+
+  /**
+   * 把个人资产里**有真实数据源**的项回填成真实数值（目前只有「优惠券」）。
+   *
+   * 未登录时接口要令牌、拿不到数：`—` 表示「未知」，不是「0 张」——
+   * 两者混在一起会让用户以为自己的券没了。
+   * 失败静默：这是锦上添花的数字，不该因为它弹错误打断用户。
+   */
+  loadStatValues() {
+    if (!isLogged()) {
+      // 退出登录后必须复位成 `—`，否则会把上一个账号的券数留给下一个人看
+      this.syncStatValues({ coupon: '—' });
+      return Promise.resolve();
     }
-    wx.showModal({
-      title: '账号与安全',
-      content: '当前账号已登录。退出后购物车与订单需要重新登录才能查看。',
-      confirmText: '退出登录',
-      cancelText: '取消',
-      success: (r) => { if (r.confirm) this.onTapUcLogout(); }
-    });
+    return couponSvc.fetchList('all')
+      .then((res) => {
+        const counts = (res && res.counts) || {};
+        this.syncStatValues({ coupon: Number(counts.available) || 0 });
+      })
+      .catch(() => {});
   },
 
-  /** 关于我们：只展示**真实存在**的信息，不编造 */
-  onTapAbout() {
-    const shop = this.data.shop || {};
-    wx.showModal({
-      title: '关于我们',
-      content: [
-        shop.name || 'LEXY莱克',
-        shop.slogan || '',
-        '',
-        '版本：' + this.data.version,
-        '正品保障 · 全国联保'
-      ].filter((x) => x !== null && x !== undefined).join('\n'),
-      showCancel: false,
-      confirmText: '知道了'
-    });
+  /** 把数值写进个人资产区块（可能 0 ~ 1 个区块；与 syncUser 同一模式） */
+  syncStatValues(values) {
+    const next = applyStatValues(this.data.blocks || [], values);
+    this.setData({ blocks: next });
   }
 }));
