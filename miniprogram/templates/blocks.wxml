@@ -926,6 +926,12 @@
         hover-class="hover-lite"
         hover-stay-time="80"
       >
+        <image
+          wx:if="{{block.items.length === 1 && item.iconFile}}"
+          class="cu-stat-ic"
+          src="{{item.iconFile}}"
+          mode="aspectFit"
+        />
         <view class="cu-stat-v">{{item.value}}<text class="cu-stat-u">{{item.unit}}</text></view>
         <view class="cu-stat-l">{{item.label}}</view>
       </view>
@@ -949,7 +955,7 @@
         hover-class="hover-lite"
         hover-stay-time="80"
       >
-        <view class="cu-order-ic"><text>{{item.icon}}</text></view>
+        <view class="cu-order-ic"><image class="cu-ic" src="{{item.iconFile}}" mode="aspectFit" /></view>
         <text class="cu-order-lb">{{item.label}}</text>
       </view>
     </view>
@@ -967,7 +973,7 @@
           hover-class="hover-lite"
           hover-stay-time="80"
         >
-          <view class="cu-tool-ic"><text>{{tl.icon}}</text></view>
+          <view class="cu-tool-ic"><image class="cu-ic" src="{{tl.iconFile}}" mode="aspectFit" /></view>
           <text class="cu-tool-lb">{{tl.label}}</text>
         </button>
         <view
@@ -980,7 +986,7 @@
           hover-class="hover-lite"
           hover-stay-time="80"
         >
-          <view class="cu-tool-ic"><text>{{tl.icon}}</text></view>
+          <view class="cu-tool-ic"><image class="cu-ic" src="{{tl.iconFile}}" mode="aspectFit" /></view>
           <text class="cu-tool-lb">{{tl.label}}</text>
         </view>
       </block>

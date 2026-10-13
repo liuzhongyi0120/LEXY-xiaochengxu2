@@ -55,32 +55,84 @@ const SHELL_FAMILY = {
  * 标 true 却点不动，比标 false 更糟 —— 那是一次「页面暂未开放」的失败跳转。
  */
 
-/** 必备工具：图标 + 是否真的能跳（键集与 UC_TOOL_ITEMS 一致，自检会对账） */
+/** 个人中心图标目录（包内资源；浏览器侧由后端 `GET /images/…` 只读路由供同一份） */
+const UC_ICON_DIR = '/images/usercenter/';
+
+/**
+ * 必备工具：图标 + 是否真的能跳（键集与 UC_TOOL_ITEMS 一致，自检会对账）。
+ *
+ * `icon` = **有赞图标的基名**，不是显示文字（2026-10-13 第 52 批复刻）。
+ *   真机与预览都按 `utils/blocks.js` 的 `ucIconFile(base, mode)` 拼成
+ *   `/images/usercenter/<base>[-o].png`：`mode==='line'` 取 `-o`（线性），
+ *   `'fill'` 取无后缀（实色）—— 与有赞 `ICON_MODE_MAP={1:'colorIcon',2:'icon'}` 同义。
+ *
+ * 基名全部来自有赞装修台 JS 的 `WIDGETS_CONFIG_MAP`（**逐项实测**，不是猜的）：
+ *   https://b.yzcdn.cn/wsc-pc-decorate/shop-decorate-manage/usercenter-decorate_84fabe92.js
+ *   例：`{memberCode:{icon:"vip-card-o",colorIcon:"vip-card"},…}` —— 我们去掉 `-o` 后缀存基名。
+ *
+ * ⚠️ 本表是唯一一份；装修数据里 `plugins[].icon` 也存基名（`publish` 时烘入），
+ *    归一化时若发现某个值不在图标库里，会回落到本表（老数据存的是汉字，自动纠正）。
+ */
 const TOOL_META = {
-  memberCode: { icon: '码', real: true },
-  taskCenter: { icon: '任', real: false },
-  cart: { icon: '车', real: true },
-  gifts: { icon: '赠', real: false },
-  customerServiceChat: { icon: '服', real: true },
-  deliveryAddress: { icon: '址', real: true },
-  merchantsCall: { icon: '电', real: true },
-  cashBack: { icon: '返', real: false },
-  fxCenter: { icon: '销', real: false },
-  offlineStore: { icon: '店', real: false },
-  purchaseColumnAndContent: { icon: '课', real: false },
-  paidContentCertificate: { icon: '证', real: false },
-  paidContentExamination: { icon: '考', real: false },
-  exchangeGiftCard: { icon: '兑', real: false },
-  paidContentExerciseBook: { icon: '业', real: false },
-  blankLine: { icon: '白', real: false },
-  exhibitionReserve: { icon: '订', real: false },
-  accountSettings: { icon: '号', real: true },
-  restaurantReserve: { icon: '座', real: false },
-  referralRewards: { icon: '邀', real: false },
-  about: { icon: '关', real: true },
-  favorite: { icon: '藏', real: true },
-  footprint: { icon: '迹', real: true }
+  /* —— 有赞 WIDGETS_CONFIG_MAP 里有的 19 项（基名逐项取自该表）—— */
+  memberCode: { icon: 'vip-card', real: true },              // 有赞 vip-card / 会员码
+  taskCenter: { icon: 'notes', real: false },                // 有赞 notes / 任务中心
+  cart: { icon: 'cart', real: true },                        // 有赞 cart / 购物车
+  gifts: { icon: 'point-gift', real: false },                // 有赞 point-gift / 赠品
+  customerServiceChat: { icon: 'chat', real: true },         // 有赞 chat / 客服聊天
+  deliveryAddress: { icon: 'location', real: true },         // 有赞 location / 收货地址
+  merchantsCall: { icon: 'phone-circle', real: true },       // 有赞 phone-circle / 拨打商家电话
+  cashBack: { icon: 'cash-back-record', real: false },       // 有赞 cash-back-record / 返现
+  fxCenter: { icon: 'smile-comment', real: false },          // 有赞 smile-comment / 分销员中心（有赞确实用这个图标）
+  offlineStore: { icon: 'shop', real: false },               // 有赞 shop / 线下门店
+  purchaseColumnAndContent: { icon: 'newspaper', real: false },   // 有赞 newspaper / 我的课程
+  paidContentCertificate: { icon: 'description', real: false },   // 有赞 description / 证书
+  paidContentExamination: { icon: 'completed', real: false },     // 有赞 completed / 考试
+  exchangeGiftCard: { icon: 'gift-card', real: false },      // 有赞 gift-card / 兑换礼品卡
+  paidContentExerciseBook: { icon: 'records', real: false }, // 有赞 records / 我的作业
+  exhibitionReserve: { icon: 'notes', real: false },         // 有赞 notes / 活动预订（与「任务中心」同图标，有赞本身就这样）
+  accountSettings: { icon: 'setting', real: true },          // 有赞 setting / 账号与安全
+  restaurantReserve: { icon: 'restaurant-booking', real: false }, // 有赞 restaurant-booking / 预约订座
+  referralRewards: { icon: 'gift-card', real: false },       // 有赞 gift-card / 邀请有礼（与「兑换礼品卡」同图标）
+  /* —— 有赞没有、本项目自加的 3 项：图标是**有意选的**，不是有赞的原值 —— */
+  blankLine: { icon: 'todo-list', real: false },             // 有赞「留白」插件本身没有图标；本项目给它一个中性清单图标
+  about: { icon: 'description', real: true },                // 有赞无此项；复用「说明书」图标（有赞本身也复用图标）
+  favorite: { icon: 'bookmark', real: true },                // 有赞无此项；书签
+  footprint: { icon: 'records', real: true }                 // 有赞无此项；复用「记录」图标
 };
+
+/**
+ * 个人中心图标的**唯一拼路径处**（工具 / 订单 / 资产三条链路都走它）。
+ *
+ * 图标是**包内资源**：`miniprogram/images/usercenter/*.png`（95 张，复刻自有赞个人中心
+ * 图标字体 `usercenter-icon`；另有 `stats/*.png` 5 张资产图，有赞那边就是位图不是字体）。
+ * 与底部导航同一套路数：真机读包内文件，浏览器侧（装修台手机壳、`/preview`）靠后端
+ * `GET /images/…` 只读路由读**同一份** —— 两个世界共用一个 URL，才不会出现
+ * 「装修台显示的是另一套图标」。
+ *
+ * @param {string} base 有赞图标基名（如 `cart` / `vip-card`）
+ * @param {string} [mode] `'line'`（线性，取 `-o`）/ `'fill'`（实色，取无后缀）；省略 = 原样拼
+ * @returns {string} 形如 `/images/usercenter/cart-o.png`；base 为空则返回空串（模板据此不渲染）
+ */
+function ucIconFile(base, mode) {
+  const b = String(base || '').trim();
+  if (!b) return '';
+  const name = mode === 'line' ? (b + '-o') : b;
+  return UC_ICON_DIR + name + '.png';
+}
+
+/**
+ * 判断一个值是不是**有赞图标基名**（而不是第 52 批之前装修数据里存的汉字图标）。
+ *
+ * 存在的唯一理由：装修数据里 `plugins[].icon` 是「已烘入」的值，优先级高于 `TOOL_META`；
+ * 图标类型从汉字换成基名以后，老数据里的汉字必须能被识别出来并回落，否则真机还会显示汉字。
+ * 基名的形状 = 全小写字母 / 数字 / 短横线开头是字母（`cart`、`point-gift`、`order__tosend`）。
+ * @param {*} v
+ * @returns {boolean}
+ */
+function isIconBase(v) {
+  return /^[a-z][a-z0-9_-]*$/.test(String(v || ''));
+}
 
 /**
  * 个人资产 7 项（与有赞面板的 7 个复选项一一对应）。
@@ -101,13 +153,18 @@ const TOOL_META = {
  *    口径必须逐项一致，否则运营在预览里调半天、真机却是另一个值。
  */
 const UC_STAT_DEFS = [
-  { k: 'showBalance', key: 'balance', label: '余额', unit: '元', dep: '会员余额账户', def: '0' },
-  { k: 'showPoints', key: 'points', label: '积分', unit: '', dep: '积分体系', def: '0' },
-  { k: 'showCard', key: 'card', label: '权益卡', unit: '张', dep: '付费权益卡' },
-  { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张', route: '/packageUser/coupon/coupon' },
-  { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元', dep: '钱包账户' },
-  { k: 'showGiftCard', key: 'giftCard', label: '礼品卡', unit: '张', dep: '礼品卡' },
-  { k: 'showPickupCard', key: 'pickupCard', label: '提货卡', unit: '张', dep: '提货卡' }
+  /* `icon` = 有赞 STATS_ICON_MAP 里的资产图（有赞这项**不是字体图标，是位图**，
+     实测自 usercenter-decorate JS：points / coupons / cards / giftCard / deliveryCard /
+     balance / change 七个 key，其中 cards·giftCard·deliveryCard 有赞共用同一张图 —— 已照抄）。
+     ⚠️ 有赞的资产行**多项时不显示图标**（只有数值 + 名称），只有单顶时才用 van-cell 带图标；
+     本项目按同口径：`uc_stats` 只有 1 项时才渲染 `iconFile`（见 templates/blocks.wxml）。 */
+  { k: 'showBalance', key: 'balance', label: '余额', unit: '元', dep: '会员余额账户', def: '0', icon: 'stats/balance' },
+  { k: 'showPoints', key: 'points', label: '积分', unit: '', dep: '积分体系', def: '0', icon: 'stats/points' },
+  { k: 'showCard', key: 'card', label: '权益卡', unit: '张', dep: '付费权益卡', icon: 'stats/cards' },
+  { k: 'showCoupon', key: 'coupon', label: '优惠券', unit: '张', route: '/packageUser/coupon/coupon', icon: 'stats/coupons' },
+  { k: 'showWallet', key: 'wallet', label: '钱包', unit: '元', dep: '钱包账户', icon: 'stats/change' },
+  { k: 'showGiftCard', key: 'giftCard', label: '礼品卡', unit: '张', dep: '礼品卡', icon: 'stats/cards' },
+  { k: 'showPickupCard', key: 'pickupCard', label: '提货卡', unit: '张', dep: '提货卡', icon: 'stats/cards' }
 ];
 
 /**
@@ -134,13 +191,24 @@ function defaultStatValues() {
   return v;
 }
 
-/** 我的订单 6 个入口（与有赞面板的 6 个开关一一对应） */
+/**
+ * 我的订单 6 个入口（与有赞面板的 6 个开关一一对应）。
+ *
+ * `icon` = 有赞订单入口的**图标全名**（含 `order__` 前缀），逐项取自装修台 JS：
+ *   `getDefaultOrderItems: [{key:"toPay",icon:"pending-payment",…},
+ *     {key:"toSend",icon:"tosend"},{key:"toReceive",icon:"logistics"},
+ *     {key:"toEvaluate",icon:"smile-comment-o"},{key:"toRefund",icon:"refund-o"}]`
+ *   渲染时 class 是 `if_order__<icon>` —— 我们直接存全名。
+ * ⚠️ 订单图标**不随 `iconMode` 变**（有赞这里只给了一套），别按线性/实色去拼后缀：
+ *   这 5 个里有 3 个不带 `-o`、2 个带，照抄有赞原名才对得上字形。
+ * ⚠️ 另外有第 6 个字形 `order__contact-o`（有赞给「全部订单」用），本项目暂未用到，图标已入库。
+ */
 const UC_ORDER_DEFS = [
-  { k: 'showPendingPay', key: 'PENDING_PAY', label: '待付款', icon: '付' },
-  { k: 'showPendingShip', key: 'PENDING_SHIP', label: '待发货', icon: '发' },
-  { k: 'showShipped', key: 'SHIPPED', label: '待收货', icon: '收' },
-  { k: 'showReview', key: 'FINISHED', label: '待评价', icon: '评' },
-  { k: 'showRefund', key: 'REFUND', label: '退款/售后', icon: '退' }
+  { k: 'showPendingPay', key: 'PENDING_PAY', label: '待付款', icon: 'order__pending-payment' },
+  { k: 'showPendingShip', key: 'PENDING_SHIP', label: '待发货', icon: 'order__tosend' },
+  { k: 'showShipped', key: 'SHIPPED', label: '待收货', icon: 'order__logistics' },
+  { k: 'showReview', key: 'FINISHED', label: '待评价', icon: 'order__smile-comment-o' },
+  { k: 'showRefund', key: 'REFUND', label: '退款/售后', icon: 'order__refund-o' }
 ];
 
 /** 个人中心相关的 9 个区块类型（供自检与页面判断复用） */
@@ -772,14 +840,17 @@ function normalizeBlock(b, index) {
     o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false).map((d) => ({
       key: d.key, label: d.label, unit: d.unit, value: d.def || '—',
       route: d.route || '',
-      dep: d.dep || ''
+      dep: d.dep || '',
+      /* 资产图只在「只剩一项」时才显示（有赞 van-cell 的行为），模板据此判断 */
+      iconFile: ucIconFile(d.icon)
     }));
     const statMiss = o.items.filter((it) => !it.route).map((it) => it.dep).filter(Boolean);
     o.dep = String(o.dep || statMiss.join(' / '));
   } else if (kind === 'uc_order') {
     o.title = o.title || '我的订单';
     o.showAllOn = o.showAll !== false;
-    o.items = UC_ORDER_DEFS.filter((d) => o[d.k] !== false);
+    o.items = UC_ORDER_DEFS.filter((d) => o[d.k] !== false)
+      .map((d) => ({ key: d.key, label: d.label, icon: d.icon, iconFile: ucIconFile(d.icon) }));
     o.cols = o.items.length || 1;
   } else if (kind === 'uc_tools') {
     /*
@@ -795,12 +866,19 @@ function normalizeBlock(b, index) {
       .filter((p) => p && p.show !== false && p.enabled !== false)
       .map((p) => {
         /* icon / real 优先取区块数据里的值（装修数据里已烘入，是唯一真源）；
-           TOOL_META 只作为「本次改动之前发布过的老数据」的兜底。 */
+           TOOL_META 只作为「本次改动之前发布过的老数据」的兜底。
+           ⚠️ 图标从「汉字」改成「有赞基名」以后，判断条件不能再是 `p.icon || meta.icon` ——
+           第 52 批之前发布过的那份装修数据里存的还是汉字（'任' '车' …），照旧写法会把新的
+           基名又盖回汉字。所以这里判的是**值的形状**：像基名（小写字母/数字/短横线）才认，
+           否则一律回落 TOOL_META。这样老数据不用重灌也不会显示成汉字（重灌是**另外**做的，
+           为的是让装修台预览看到同一份值）。 */
         const meta = TOOL_META[p.type] || { icon: '', real: false };
+        const base = isIconBase(p.icon) ? String(p.icon) : meta.icon;
         return {
           key: p.type,
           label: String(p.title || '').trim() || p.type,
-          icon: p.icon || meta.icon,
+          icon: base,
+          iconFile: ucIconFile(base, o.iconMode),
           real: p.real === undefined ? !!meta.real : !!p.real,
           scope: p.scope === 'fx' ? 'fx' : 'all'
         };
@@ -1086,5 +1164,6 @@ function applyStatValues(blocks, values) {
 module.exports = {
   normalizeBlock, normalizeBlocks, loadGoodsData, applyShopAvatar, applyUserProfile, applyStatValues,
   sanitizeRich, SIZE_CLASS, statDef, defaultStatValues,
+  UC_ICON_DIR, ucIconFile, isIconBase,
   SHELL_FAMILY, UC_KIND_LIST, TOOL_META, UC_STAT_DEFS, UC_ORDER_DEFS
 };

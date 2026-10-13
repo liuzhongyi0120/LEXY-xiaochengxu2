@@ -72,7 +72,14 @@ module.exports = [
       const user = users.requireUser(ctx.db, ctx.userId);
       const { nickname, avatar } = ctx.params;
       if (nickname) user.nickname = String(nickname).slice(0, 30);
-      if (avatar) user.avatar = String(avatar);
+      /* ⚠️ 判空要用 `!== undefined`，不能用 `if (avatar)`：
+       *   后者把「没传这个字段」和「显式传空串 = 要清空」混成一件事，
+       *   于是**头像一旦写脏就无法通过接口收回** —— 2026-10-13 实测踩到：
+       *   自检的头像探针把素材库首件（当时恰好是个上传的视频夹具）写成头像，
+       *   想清掉时 `POST { avatar: '' }` 返回 code 0 但值没变，
+       *   只能绕过接口直接改 db.json（而 store 是内存态 + 延迟落盘，改了会被盖回来）。
+       *   语义定死：字段**缺席**=不动；字段**在场且为空串**=清空。 */
+      if (avatar !== undefined && avatar !== null) user.avatar = String(avatar);
       return users.toProfile(user);
     }
   },

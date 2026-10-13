@@ -252,6 +252,29 @@ await sleep(900);
 }
 
 console.log('\n[5] 内置图标 / 自定义图标');
+/*
+ * ⚠️ 内置图标可能被**服务端染色** —— 装修台配的色一旦偏离内置图的源色
+ * （未选中 #8A8A8A / 选中 #C8102E，见 `server/public/shared/pv-tabbar.js` 的
+ * SRC_OFF / SRC_ON），预览的 `<img src>` 就改指 `/navicon/<name>@<色值>.png`
+ * （染色由 `server/lib/navicon.js` 像素级出图，与真机 `utils/navcolor.js` 同规则）。
+ * 所以这里**不能锁死 `/images/tabbar/` 前缀**：运营把选中色调成近黑之后，
+ * 5 项里只有高亮那一项会被染色，写死前缀的断言就红了 ——
+ * 那是**断言过期**，不是代码坏了（口径：锁等价性，不锁当时值）。
+ * 下面统一用两个形态：包内原图，或它的染色变体。
+ */
+const NAV_ICON_RE = /^(\/images\/tabbar\/[a-z0-9_-]+\.png|\/navicon\/[a-z0-9_-]+@[0-9a-f]{6}\.png)$/i;
+const SRC_OFF = '#8a8a8a';
+const SRC_ON = '#c8102e';
+/** 由「内置图标 + 该位置使用的色值」推导出预览里**应当**出现的地址（原图或染色变体） */
+const expectNavIcon = (src, color) => {
+  const s = String(src || '');
+  const m = /^\/images\/tabbar\/([a-z0-9_-]+)\.png$/i.exec(s);
+  if (!m) return s;                                  // 自传 / 外链：原样
+  const ref = /-active$/i.test(m[1]) ? SRC_ON : SRC_OFF;
+  const c = String(color || '').toLowerCase();
+  if (!/^#[0-9a-f]{6}$/.test(c) || c === ref) return s;   // 默认配色：不染
+  return '/navicon/' + m[1] + '@' + c.slice(1) + '.png';
+};
 {
   /*
    * 底部导航图标是**包内资源**（/images/tabbar/…，复刻自有赞「店铺导航」的图标字体），
@@ -261,11 +284,14 @@ console.log('\n[5] 内置图标 / 自定义图标');
    *   · 预览页能取到这些图（/images/… 有只读路由，见 [6] 的图片破损检查）。
    */
   const bar = JSON.parse(await run(tab, BAR));
-  ok(bar.icoCount === 5 && bar.srcs.every((s) => s.indexOf('/images/tabbar/') === 0),
-    '5 项都渲染出内置图标，且地址都是包内路径 /images/tabbar/…', bar.srcs.join(' '));
-  ok(bar.srcs[2] === (pubItems[2] || {}).activeIcon && bar.srcs[0] === (pubItems[0] || {}).icon,
-    '高亮项用「选中图标」(-active)、其余用未选中图标',
-    `${(pubItems[2] || {}).text}=${bar.srcs[2]} ${(pubItems[0] || {}).text}=${bar.srcs[0]}`);
+  ok(bar.icoCount === 5 && bar.srcs.every((s) => NAV_ICON_RE.test(String(s))),
+    '5 项都渲染出内置图标，且地址都是包内路径 /images/tabbar/… 或其染色变体 /navicon/…',
+    bar.srcs.join(' '));
+  const wantOn = expectNavIcon((pubItems[2] || {}).activeIcon, navPub.selectedColor);
+  const wantOff = expectNavIcon((pubItems[0] || {}).icon, navPub.color);
+  ok(bar.srcs[2] === wantOn && bar.srcs[0] === wantOff,
+    '高亮项用「选中图标」(-active)、其余用未选中图标（各自按该位置配色推染色变体）',
+    `${(pubItems[2] || {}).text}=${bar.srcs[2]}（期望 ${wantOn}） ${(pubItems[0] || {}).text}=${bar.srcs[0]}（期望 ${wantOff}）`);
 }
 {
   // 「内置图标」快捷选择：点一下就把地址填进字段（运营不用手打 -active 路径）
@@ -280,9 +306,10 @@ console.log('\n[5] 内置图标 / 自定义图标');
   })()`);
   await sleep(900);
   const bar = JSON.parse(await run(tab, BAR));
-  ok(clicked === 'clicked' && bar.srcs[2] === '/images/tabbar/mine-active.png',
-    '点「选中图标」里的内置「我的」→ 该字段立刻变成 mine-active.png 且手机壳跟着变',
-    `click=${clicked} src=${bar.srcs[2]} strip=${(await run(tab, `document.querySelectorAll('#inspector .presets').length`))}`);
+  const wantMine = expectNavIcon('/images/tabbar/mine-active.png', navPub.selectedColor);
+  ok(clicked === 'clicked' && bar.srcs[2] === wantMine,
+    '点「选中图标」里的内置「我的」→ 该字段立刻变成 mine-active.png 且手机壳跟着变（按配色染色）',
+    `click=${clicked} src=${bar.srcs[2]}（期望 ${wantMine}） strip=${(await run(tab, `document.querySelectorAll('#inspector .presets').length`))}`);
   const field = await run(tab, `(() => {
     const strips = [...document.querySelectorAll('#inspector .presets')];
     const inputs = [...document.querySelectorAll('#inspector input[type=text]')]

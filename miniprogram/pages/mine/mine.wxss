@@ -197,6 +197,15 @@
   padding: 12rpx 0;
 }
 
+/* 资产图标：只在**只剩一项**时出现（有赞多项资产行是「数值 + 名称」不带图标的，
+   只有单项时才用 van-cell 那种「图标 + 文字」的行样式 —— 本项目照同口径）。 */
+.cu-stat-ic {
+  width: 36rpx;
+  height: 36rpx;
+  margin-bottom: 8rpx;
+  display: block;
+}
+
 .cu-stat-v {
   font-size: 34rpx;
   font-weight: 600;
@@ -255,16 +264,21 @@
   padding: 12rpx 0;
 }
 
+/* 订单入口的图标（2026-10-13 第 52 批：复刻有赞的纯图标，去掉原来的汉字 + 圆角色块）。
+   有赞这里是 24px 的字体图标、无底色 —— 我们是同一套字形渲染出的 48rpx PNG，口径一致。 */
 .cu-order-ic {
   width: 56rpx;
   height: 56rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 26rpx;
-  color: var(--color-primary);
-  background: var(--color-primary-light);
-  border-radius: 12rpx;
+}
+
+/* 图标本体：所有 `<image>` 图标共用。48rpx = 有赞的 24px（375 基准 ×2） */
+.cu-ic {
+  width: 48rpx;
+  height: 48rpx;
+  display: block;
 }
 
 .cu-order-lb {
@@ -303,28 +317,22 @@
   border: 0;
 }
 
+/* 工具入口的图标位（2026-10-13 第 52 批：复刻有赞的纯图标，去掉原来的汉字 + 圆形色块）。
+   图标风格由 `iconMode` 决定**取哪张图**（line → `-o` 细线 / fill → 实色），
+   而不是靠 CSS 加边框 —— 有赞的「细线版 / 线框版」本身就是两套字形，
+   以前在这里加 `border` 是「用样式模拟另一套图标」，会变成双层描边。 */
 .cu-tool-ic {
   width: 80rpx;
   height: 80rpx;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28rpx;
-  color: var(--color-text-secondary);
-  background: var(--color-bg);
-  border-radius: 50%;
 }
 
-/* 九宫格版：图标换成圆角方块，底色更浅 */
+/* 九宫格版（3 列）是有赞的卡片式排布，图标带浅底色；经典版（4 列）是纯图标 */
 .cu-tools.cube .cu-tool-ic {
-  border-radius: 20rpx;
   background: var(--color-bg-muted);
-}
-
-/* 线框版：去掉底色，只留描边 */
-.cu-tool.line .cu-tool-ic {
-  background: transparent;
-  border: 2rpx solid var(--color-border);
+  border-radius: 20rpx;
 }
 
 .cu-tool-lb {

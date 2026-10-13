@@ -232,16 +232,32 @@
 
   /* 与 miniprogram/utils/blocks.js 的 UC_STAT_DEFS / UC_ORDER_DEFS 同源同序
      第 4 个元素 = 该项的缺省数值（页面没拿到真数时显示什么），口径与真机逐项一致：
-     余额 / 积分 '0'（新用户的真实状态），其余 '—'（张数未知 ≠ 0 张）。 */
+     余额 / 积分 '0'（新用户的真实状态），其余 '—'（张数未知 ≠ 0 张）。
+     第 5 个元素 = 资产图标（有赞 STATS_ICON_MAP 的位图；有赞这项**不是字体**）。 */
   var UC_STAT_DEFS = [
-    ['showBalance', '余额', '元', '0'], ['showPoints', '积分', '', '0'], ['showCard', '权益卡', '张', '—'],
-    ['showCoupon', '优惠券', '张', '—'], ['showWallet', '钱包', '元', '—'],
-    ['showGiftCard', '礼品卡', '张', '—'], ['showPickupCard', '提货卡', '张', '—']
+    ['showBalance', '余额', '元', '0', 'stats/balance'], ['showPoints', '积分', '', '0', 'stats/points'],
+    ['showCard', '权益卡', '张', '—', 'stats/cards'], ['showCoupon', '优惠券', '张', '—', 'stats/coupons'],
+    ['showWallet', '钱包', '元', '—', 'stats/change'], ['showGiftCard', '礼品卡', '张', '—', 'stats/cards'],
+    ['showPickupCard', '提货卡', '张', '—', 'stats/cards']
   ];
+  /* 第 3 个元素 = 有赞订单入口的图标**全名**（含 order__ 前缀，照抄 getDefaultOrderItems） */
   var UC_ORDER_DEFS = [
-    ['showPendingPay', '待付款', '付'], ['showPendingShip', '待发货', '发'], ['showShipped', '待收货', '收'],
-    ['showReview', '待评价', '评'], ['showRefund', '退款/售后', '退']
+    ['showPendingPay', '待付款', 'order__pending-payment'], ['showPendingShip', '待发货', 'order__tosend'],
+    ['showShipped', '待收货', 'order__logistics'], ['showReview', '待评价', 'order__smile-comment-o'],
+    ['showRefund', '退款/售后', 'order__refund-o']
   ];
+
+  /* 个人中心图标：**包内资源**，与真机同一个 URL（后端 GET /images/… 只读路由读同一份）。
+     口径必须与 miniprogram/utils/blocks.js 的 ucIconFile() 一字不差。 */
+  var UC_ICON_DIR = '/images/usercenter/';
+  function ucIconFile(base, mode) {
+    var b = String(base || '').trim();
+    if (!b) return '';
+    return UC_ICON_DIR + (mode === 'line' ? b + '-o' : b) + '.png';
+  }
+  /* 图标基名的形状判断 —— 装修数据里可能残留「第 52 批之前存的汉字图标」，
+     那种值拼不出文件（会裂图），宁可这一格不画图标。重灌数据后不会再遇到。 */
+  function ucIsIconBase(v) { return /^[a-z][a-z0-9_-]*$/.test(String(v || '')); }
   var UC_SIZE = { sm: '12px', md: '14px', lg: '16px' };
   var UC_ALIGN = { left: 'left', center: 'center', right: 'right' };
 
@@ -291,9 +307,14 @@
 
     if (kind === 'uc_stats') {
       var stats = UC_STAT_DEFS.filter(function (d) { return b[d[0]] !== false; });
+      /* 单项时才画图标 —— 有赞的资产行多项是「数值 + 名称」（无图标），
+         只有单项时才用带图标的 van-cell，本项目照同口径（真机模板同样判 `items.length === 1`）。 */
+      var statIc = stats.length === 1 && ucIsIconBase(stats[0][4])
+        ? '<img src="' + attr(ucIconFile(stats[0][4])) + '" style="width:18px;height:18px;display:block;margin:0 auto 4px">' : '';
       h += '<div style="margin:10px 0;padding:12px 8px;background:#fff">' +
-        '<div style="display:flex;flex-wrap:wrap">' + stats.map(function (d) {
+        '<div style="display:flex;flex-wrap:wrap">' + stats.map(function (d, i) {
           return '<div style="flex:1;min-width:25%;text-align:center;padding:6px 0">' +
+            (i === 0 ? statIc : '') +
             '<div style="font-size:17px;font-weight:600;color:#323233">' + d[3] + '<span style="font-size:10px;font-weight:400;color:#969799">' + d[2] + '</span></div>' +
             '<div style="margin-top:5px;font-size:12px;color:#969799">' + d[1] + '</div></div>';
         }).join('') + '</div>' +
@@ -310,8 +331,11 @@
         '<span style="font-size:15px;font-weight:600;color:#323233">' + esc(b.title || '我的订单') + '</span>' +
         (b.showAll === false ? '' : '<span style="font-size:12px;color:#969799">全部订单 ›</span>') + '</div>' +
         '<div style="display:flex;flex-wrap:wrap">' + items.map(function (d) {
+          /* 订单图标不随 iconMode 变（有赞这里只给一套字形），照抄全名 */
+          var ic = ucIsIconBase(d[2])
+            ? '<img src="' + attr(ucIconFile(d[2])) + '" style="width:24px;height:24px;display:block;margin:0 auto">' : '';
           return '<div style="flex:1;min-width:20%;text-align:center;padding:6px 0">' +
-            '<div style="width:28px;height:28px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:13px;color:#C8102E;background:#FDECEE;border-radius:6px">' + d[2] + '</div>' +
+            '<div style="width:28px;height:28px;margin:0 auto;display:flex;align-items:center;justify-content:center">' + ic + '</div>' +
             '<div style="margin-top:6px;font-size:12px;color:#323233">' + d[1] + '</div></div>';
         }).join('') + '</div></div>';
       return h;
@@ -321,15 +345,17 @@
       var cols = b.mode === 'cube' ? 3 : 4;
       var cellW = Math.floor(100 / cols * 100) / 100;
       var tools = (b.plugins || []).filter(function (p) { return p && p.show !== false && p.enabled !== false; });
-      var lineStyle = b.iconMode === 'line'
-        ? 'background:transparent;border:1px solid #EBEDF0'
-        : (b.mode === 'cube' ? 'background:#F2F3F5' : 'background:#F5F5F5');
-      var radius = b.mode === 'cube' ? '10px' : '50%';
+      var cubeBg = b.mode === 'cube' ? 'background:#F2F3F5;border-radius:10px' : '';
       h += '<div style="margin:10px 0;padding:8px 4px;background:#fff">' +
         '<div style="display:flex;flex-wrap:wrap">' + tools.map(function (t) {
+          /* 图标风格取哪张图由 iconMode 决定（line → -o 细线 / fill → 实色），
+             而不是靠 CSS 描边 —— 与真机 miniprogram/pages/mine/mine.wxss 同口径。 */
+          var base = ucIsIconBase(t.icon) ? String(t.icon) : '';
+          var ic = base
+            ? '<img src="' + attr(ucIconFile(base, b.iconMode)) + '" style="width:24px;height:24px;display:block">'
+            : '<span style="color:#d0d0d0;font-size:10px">无图标</span>';
           return '<div style="width:' + cellW + '%;text-align:center;padding:12px 0">' +
-            '<div style="width:40px;height:40px;margin:0 auto;display:flex;align-items:center;justify-content:center;' +
-            'font-size:14px;color:#969799;border-radius:' + radius + ';' + lineStyle + '">' + esc(t.icon || '') + '</div>' +
+            '<div style="width:40px;height:40px;margin:0 auto;display:flex;align-items:center;justify-content:center;' + cubeBg + '">' + ic + '</div>' +
             '<div style="margin-top:7px;font-size:12px;color:#323233">' + esc(String(t.title || '').trim() || t.type) + '</div></div>';
         }).join('') + '</div>' +
         (tools.length ? '' : '<div style="color:#b8bec8;font-size:12px;padding:8px 0;text-align:center">所有工具都被关掉了</div>') +

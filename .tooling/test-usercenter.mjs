@@ -17,7 +17,7 @@
  */
 
 import { createRequire } from 'node:module';
-import { readFileSync } from 'node:fs';
+import { readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 const req = createRequire(import.meta.url);
@@ -265,6 +265,132 @@ function ctxOf(pageObj, extra) {
     !!resetVals && resetBad.length === 0,
     !resetVals ? 'blocks.js 没有导出 defaultStatValues()'
       : (resetBad.length ? `不一致：${resetBad.map((d) => d.key).join(', ')}` : JSON.stringify(resetVals)));
+}
+
+/* ==========================================================================
+ * 5. 个人中心图标（复刻有赞 usercenter-icon 图标字体）
+ *
+ * 为什么行为测试也要管图标：静态断言只能证明「TOOL_META 里写的是基名、
+ * 文件在包里」，证明不了**点下去渲染出来的那个 URL 真的打得开**。
+ * 图标错一个字符不会报错，真机上就是一块空白；而装修台预览走 /images/…
+ * 读同一份文件 —— 拼错了预览与真机一起白。所以这里把 normalizeBlock()
+ * 真的跑一遍，拿它吐出来的 iconFile 去文件系统里核。
+ * ========================================================================== */
+{
+  const iconRoot = join(MP, 'images', 'usercenter');
+  const fileOk = (rel) => {
+    try { return statSync(join(iconRoot, rel)).isFile(); } catch (e) { return false; }
+  };
+
+  /* (1) 工具项：真机渲染出来的 iconFile 必须指向真实文件（且两种风格都有）。
+   *     ⚠️ 必须走 `TOOL_META`（真机的**兜底表**），不能只走服务端面板清单 ——
+   *     面板清单是装修台给人看的，真机真正回落用的是 TOOL_META。第一版查的是清单，
+   *     于是把 `TOOL_META.cart` 改成不存在的文件时这条**照样绿**（注入验红才抓出来）。
+   *     两侧都要查：清单的 icon 已经被 (8c) 断言焊在 TOOL_META 上，这里再兜一次。 */
+  const toolBad = [];
+  const toolSrcs = [['TOOL_META', blocksLib.TOOL_META || {}],
+    ['服务端清单', Object.fromEntries((UC_TOOL_ITEMS || []).map((t) => [t.type, { icon: t.icon }]))]];
+  toolSrcs.forEach(([srcName, map]) => {
+    Object.keys(map).forEach((k) => {
+      ['line', 'fill'].forEach((mode) => {
+        const blk = blocksLib.normalizeBlock({
+          type: 'uc_tools', iconMode: mode,
+          plugins: [{ type: k, title: k, icon: map[k].icon, show: true, enabled: true }]
+        });
+        const item = (blk.items || [])[0];
+        if (!item || !item.iconFile) { toolBad.push(`${srcName}·${k}(${mode})=无 iconFile`); return; }
+        const rel = String(item.iconFile).replace('/images/usercenter/', '');
+        if (!fileOk(rel)) toolBad.push(`${srcName}·${k}(${mode})→${item.iconFile} 不存在`);
+      });
+    });
+  });
+  check('工具图标：TOOL_META 与服务端清单各 23 项 × 两种风格的 iconFile 都指向真实包内文件',
+    toolBad.length === 0,
+    toolBad.length ? '坏点：' + toolBad.slice(0, 8).join('；')
+      : `${Object.keys(blocksLib.TOOL_META || {}).length} 项 × 2 套 × 2 处来源全部命中`);
+
+  /* (2) 订单项：不随 iconMode 变（有赞只给一套），全名照抄 order__ 前缀 */
+  const orderBlk = blocksLib.normalizeBlock({ type: 'uc_order', iconMode: 'fill' });
+  const orderBad = (orderBlk.items || []).filter((i) => {
+    const rel = String(i.iconFile || '').replace('/images/usercenter/', '');
+    return !rel || !fileOk(rel);
+  }).map((i) => i.key);
+  const orderNames = blocksLib.UC_ORDER_DEFS.map((d) => d.icon);
+  check('订单图标：5 个入口的 iconFile 都真实存在，且用的是有赞 order__ 全名（5 项混用实色/线性）',
+    orderBad.length === 0 && orderNames.length === 5 && orderNames.every((n) => /^order__/.test(n)),
+    orderBad.length ? '坏点：' + orderBad.join(', ') : orderNames.join(' · '));
+
+  /* (3) 资产项：有赞这 7 项是位图（stats/），且 cards·giftCard·deliveryCard 共用一张 */
+  const statBlk = blocksLib.normalizeBlock({
+    type: 'uc_stats', showBalance: true, showCoupon: true, showWallet: true, showCard: true
+  });
+  const statBad = (blocksLib.UC_STAT_DEFS || [])
+    .filter((d) => !fileOk(String(d.icon || '') + '.png'))
+    .map((d) => d.key);
+  check('资产图标：7 项的 stats/ 位图都存在（有赞 STATS_ICON_MAP 本来就是 PNG 不是字体）',
+    statBad.length === 0,
+    statBad.length ? '坏点：' + statBad.join(', ') : blocksLib.UC_STAT_DEFS.map((d) => d.key + '=' + d.icon).join(' · '));
+
+  /* (4) 资产行「多项不显示图标、单项才显示」这条口径（有赞实测如此）。
+   *     实现细节：`o.items = UC_STAT_DEFS.filter((d) => o[d.k] !== false)` —— 是**逐项过滤**，
+   *     所以想造「单项」必须把其余 6 个开关显式关掉（第一版只关了两个，断言自己写错了）。 */
+  const onlyCoupon = { type: 'uc_stats' };
+  blocksLib.UC_STAT_DEFS.forEach((d) => { onlyCoupon[d.k] = (d.key === 'coupon'); });
+  const single = blocksLib.normalizeBlock(onlyCoupon);
+  const allOn = { type: 'uc_stats' };
+  blocksLib.UC_STAT_DEFS.forEach((d) => { allOn[d.k] = true; });
+  const multi = blocksLib.normalizeBlock(allOn);
+  const singleRel = String((single.items[0] || {}).iconFile || '').replace('/images/usercenter/', '');
+  check('资产行：单项配置时那一项的图标真实可用；多项时区块不画图标（有赞同口径）',
+    (single.items || []).length === 1 && !!singleRel && fileOk(singleRel)
+    && (multi.items || []).length === (blocksLib.UC_STAT_DEFS || []).length,
+    `单项 ${(single.items || []).length} 项（${singleRel || '无 iconFile'}）/ 多项 ${(multi.items || []).length} 项`);
+
+  /* (5) 路径出口只有一处：ucIconFile 的后缀口径（写死路径就会绕过它）。
+   *     ⚠️ 口径是「只有 mode==='line' 才加 -o，其余（含省略）原样拼」——
+   *     不是「省略=线性」，第一版照后者写，当场自己报红。 */
+  const fnOk = typeof blocksLib.ucIconFile === 'function'
+    && blocksLib.ucIconFile('cart', 'line') === '/images/usercenter/cart-o.png'
+    && blocksLib.ucIconFile('cart', 'fill') === '/images/usercenter/cart.png'
+    && blocksLib.ucIconFile('cart') === '/images/usercenter/cart.png'      /* 省略 mode = 原样拼 */
+    && blocksLib.ucIconFile('cart', 'other') === '/images/usercenter/cart.png'
+    && blocksLib.ucIconFile('  ') === ''                                   /* 空基名 → 空串（模板据此不渲染） */
+    && blocksLib.ucIconFile('order__tosend', 'fill') === '/images/usercenter/order__tosend.png';
+  check('ucIconFile() 是图标路径的唯一出口（line→-o / 其余原样拼 / 空基名→空串）',
+    fnOk, fnOk ? '口径与有赞 ICON_MODE_MAP={1:colorIcon,2:icon} 同义' : 'ucIconFile 缺失或后缀口径不对');
+
+  /* (6) 老数据回落：本批之前发布的汉字 icon 不许画成裂图 */
+  const legacy = blocksLib.normalizeBlock({
+    type: 'uc_tools', iconMode: 'line',
+    plugins: [{ type: 'cart', title: '购物车', icon: '车', show: true, enabled: true }]
+  });
+  check('老数据回落：装修数据里残留的汉字图标（本批之前发布的）落到 TOOL_META 的基名，不是裂图',
+    legacy.items[0] && legacy.items[0].icon === 'cart'
+    && legacy.items[0].iconFile === '/images/usercenter/cart-o.png',
+    legacy.items[0] ? `"车" → ${legacy.items[0].icon} → ${legacy.items[0].iconFile}` : '归一化后没有 items');
+
+  /* (7) 模板侧：三个区块都必须用 <image>，且不许再把基名当文字画出来。
+   *     ⚠️ 先剥 HTML 注释 —— 注释里正写着要禁用的字面量（§V 的老坑）。 */
+  const tplSrc = readFileSync(join(MP, 'templates', 'blocks.wxml'), 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  /* 诊断行逐条列真实原因；`<text>` 要带 `[^>]*`（真实写法带 class，写死会漏判）。
+   * 第一版这两点都没做，注入验红时失败了却打印「三处均为 <image>」—— 骗人。 */
+  const tplProblems = [
+    /<text[^>]*>\{\{tl\.icon\}\}<\/text>/.test(tplSrc) ? 'uc_tools 仍把 icon 当文本' : '',
+    /<text[^>]*>\{\{item\.icon\}\}<\/text>/.test(tplSrc) ? 'uc_order 仍把 icon 当文本' : '',
+    /<image[^>]*src="\{\{item\.iconFile\}\}"/.test(tplSrc) ? '' : 'uc_order 缺 <image src="{{item.iconFile}}">',
+    /<image[^>]*src="\{\{tl\.iconFile\}\}"/.test(tplSrc) ? '' : 'uc_tools 缺 <image src="{{tl.iconFile}}">'
+  ].filter(Boolean);
+  check('模板侧：uc_stats / uc_order / uc_tools 三个区块的图标都走 <image src="{{…iconFile}}">',
+    tplProblems.length === 0,
+    tplProblems.length ? tplProblems.join('；') : '三处均为 <image> 且绑 iconFile');
+
+  /* (8) 已发布数据：icon 必须已经是基名（改了默认值不重灌 replica＝预览白、真机有） */
+  const pubTools = ((replica.MINE_BLOCKS || []).filter((b) => b.type === 'uc_tools')[0] || {}).plugins || [];
+  const pubBad = pubTools.filter((p) => p && p.icon !== undefined && !blocksLib.isIconBase(p.icon))
+    .map((p) => `${p.type}=${JSON.stringify(p.icon)}`);
+  check('已发布数据：必备工具的 icon 已是图标基名（改了图标必须重灌 replica，否则装修台预览与真机走样）',
+    pubBad.length === 0,
+    pubBad.length ? '仍是旧值：' + pubBad.slice(0, 6).join('；') : `${pubTools.length} 项均为基名`);
 }
 
 /* ------------------------------ 汇总 ------------------------------ */

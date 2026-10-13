@@ -61,7 +61,16 @@ const COLOR_RESET = '带「重置」的取色器与有赞一致：重置即回�
  *   enabled 有赞侧当前是否可用（「邀请有礼」实测为 false）
  *   real    本小程序是否真有落地能力；false = 点击落到「功能未开放」页并把依赖讲清楚，
  *           **绝不假装能跳**。标 true 的必须在 TOOL_ROUTE 里有真实页面，或有页面级实现
- *   icon    真机图标用的字（本后台没有图标字体，用名称首字替代，与「我的」页原有做法一致）
+ *   icon    有赞图标的**基名**（2026-10-13 第 52 批：以前是「名称首字」，现改为真图标）。
+ *           基名逐项取自装修台 JS 的 `WIDGETS_CONFIG_MAP`（`…usercenter-decorate_84fabe92.js`），
+ *           真机与预览都拼成 `/images/usercenter/<基名>[-o].png`：
+ *           `iconMode==='line'` 取 `-o`（细线）、`'fill'` 取无后缀（线框/实色），
+ *           与有赞 `ICON_MODE_MAP={1:'colorIcon',2:'icon'}` 同义。
+ *           图标资源 = 有赞图标字体 `usercenter-icon` 的 95 个字形，由
+ *           `.tooling/make-usercenter-icons.py` 渲染成 66×66 PNG 落在包内。
+ *           ⚠️ 本字段会**烘进区块数据**（见下方 `plugins: UC_TOOL_ITEMS.map(...)`），
+ *           装修台预览与真机都读区块数据本身 —— 改这里之后必须重灌已发布数据，
+ *           否则线上那份还是旧值（老值若是汉字，真机侧会识别并回落到 TOOL_META）。
  *
  * ⚠️ 这里（服务端清单）与 `miniprogram/utils/blocks.js` 的 `TOOL_META`（真机兜底表）
  *    的**键集与 real / icon 取值都必须逐一相同**（自检 check-all 有两条断言盯着）。
@@ -71,51 +80,51 @@ const UC_TOOL_ITEMS = [
   /* 2026-10-13：以下四项的 real 从 false 改为 true —— 对应的小程序页面这一批才真正建出来
      （会员码 / 收货地址 / 账号与安全 / 关于我们）。在页面存在之前标 true，
      点下去就是一次「页面暂未开放」的转圈失败，比标 false 更糟。 */
-  { type: 'memberCode', title: '会员码', show: false, scope: 'all', enabled: true, real: true, icon: '码' },
-  { type: 'taskCenter', title: '任务中心', show: true, scope: 'all', enabled: true, real: false, icon: '任' },
-  { type: 'cart', title: '购物车', show: true, scope: 'all', enabled: true, real: true, icon: '车' },
-  { type: 'gifts', title: '赠品', show: true, scope: 'all', enabled: true, real: false, icon: '赠' },
+  { type: 'memberCode', title: '会员码', show: false, scope: 'all', enabled: true, real: true, icon: 'vip-card' },
+  { type: 'taskCenter', title: '任务中心', show: true, scope: 'all', enabled: true, real: false, icon: 'notes' },
+  { type: 'cart', title: '购物车', show: true, scope: 'all', enabled: true, real: true, icon: 'cart' },
+  { type: 'gifts', title: '赠品', show: true, scope: 'all', enabled: true, real: false, icon: 'point-gift' },
   /*
    * 有赞默认把「客服聊天」关着（show: false）。本项目**有意偏离**：改造前的「我的」页
    * 就有一个 `<button open-type="contact">联系客服</button>`，是真实可用的入口。
    * 照搬有赞默认值会把这个入口弄丢（运营在装修台里也不会主动去开），所以改成默认开。
    */
-  { type: 'customerServiceChat', title: '客服聊天', show: true, scope: 'all', enabled: true, real: true, icon: '服' },
-  { type: 'deliveryAddress', title: '收货地址', show: true, scope: 'all', enabled: true, real: true, icon: '址' },
+  { type: 'customerServiceChat', title: '客服聊天', show: true, scope: 'all', enabled: true, real: true, icon: 'chat' },
+  { type: 'deliveryAddress', title: '收货地址', show: true, scope: 'all', enabled: true, real: true, icon: 'location' },
   /*
    * 「拨打商家电话」保持有赞的默认值 show:false（运营要自己在面板里打开），
    * 但 `real` 从 false 改为 true —— 号码取自后台「运营参数」的客服电话
    * （`GET /api/shop/settings`），拨号是本小程序真能做的事。
    * 以前标 false 时，运营打开了这一项，点下去也只会得到「该功能开发中」。
    */
-  { type: 'merchantsCall', title: '拨打商家电话', show: false, scope: 'all', enabled: true, real: true, icon: '电' },
-  { type: 'cashBack', title: '返现', show: false, scope: 'all', enabled: true, real: false, icon: '返' },
-  { type: 'fxCenter', title: '分销员中心', show: true, scope: 'fx', enabled: true, real: false, icon: '销' },
-  { type: 'offlineStore', title: '线下门店', show: true, scope: 'all', enabled: true, real: false, icon: '店' },
-  { type: 'purchaseColumnAndContent', title: '课程', show: false, scope: 'all', enabled: true, real: false, icon: '课' },
-  { type: 'paidContentCertificate', title: '证书', show: false, scope: 'all', enabled: true, real: false, icon: '证' },
-  { type: 'paidContentExamination', title: '考试', show: false, scope: 'all', enabled: true, real: false, icon: '考' },
-  { type: 'exchangeGiftCard', title: '兑换礼品卡', show: false, scope: 'all', enabled: true, real: false, icon: '兑' },
-  { type: 'paidContentExerciseBook', title: '作业本', show: false, scope: 'all', enabled: true, real: false, icon: '业' },
-  { type: 'blankLine', title: '留白', show: false, scope: 'all', enabled: true, real: false, icon: '白' },
-  { type: 'exhibitionReserve', title: '活动预订', show: false, scope: 'all', enabled: true, real: false, icon: '订' },
-  { type: 'accountSettings', title: '账号与安全', show: true, scope: 'all', enabled: true, real: true, icon: '号' },
-  { type: 'restaurantReserve', title: '预约订座', show: false, scope: 'all', enabled: true, real: false, icon: '座' },
-  { type: 'referralRewards', title: '邀请有礼', show: false, scope: 'all', enabled: false, real: false, icon: '邀' },
+  { type: 'merchantsCall', title: '拨打商家电话', show: false, scope: 'all', enabled: true, real: true, icon: 'phone-circle' },
+  { type: 'cashBack', title: '返现', show: false, scope: 'all', enabled: true, real: false, icon: 'cash-back-record' },
+  { type: 'fxCenter', title: '分销员中心', show: true, scope: 'fx', enabled: true, real: false, icon: 'smile-comment' },
+  { type: 'offlineStore', title: '线下门店', show: true, scope: 'all', enabled: true, real: false, icon: 'shop' },
+  { type: 'purchaseColumnAndContent', title: '课程', show: false, scope: 'all', enabled: true, real: false, icon: 'newspaper' },
+  { type: 'paidContentCertificate', title: '证书', show: false, scope: 'all', enabled: true, real: false, icon: 'description' },
+  { type: 'paidContentExamination', title: '考试', show: false, scope: 'all', enabled: true, real: false, icon: 'completed' },
+  { type: 'exchangeGiftCard', title: '兑换礼品卡', show: false, scope: 'all', enabled: true, real: false, icon: 'gift-card' },
+  { type: 'paidContentExerciseBook', title: '作业本', show: false, scope: 'all', enabled: true, real: false, icon: 'records' },
+  { type: 'blankLine', title: '留白', show: false, scope: 'all', enabled: true, real: false, icon: 'todo-list' },
+  { type: 'exhibitionReserve', title: '活动预订', show: false, scope: 'all', enabled: true, real: false, icon: 'notes' },
+  { type: 'accountSettings', title: '账号与安全', show: true, scope: 'all', enabled: true, real: true, icon: 'setting' },
+  { type: 'restaurantReserve', title: '预约订座', show: false, scope: 'all', enabled: true, real: false, icon: 'restaurant-booking' },
+  { type: 'referralRewards', title: '邀请有礼', show: false, scope: 'all', enabled: false, real: false, icon: 'gift-card' },
   /*
    * 第 21 项是本项目补的：原「我的」页有一个「关于我们」入口（弹出版本号 / 店铺信息），
    * 换成有赞模板后如果没有这一项，这个入口就没了。补成同一个「必备工具」里的一个插件，
    * 保持原有功能不丢。这是**有意偏离**，记录在案。
    */
-  { type: 'about', title: '关于我们', show: true, scope: 'all', enabled: true, real: true, icon: '关', own: true },
+  { type: 'about', title: '关于我们', show: true, scope: 'all', enabled: true, real: true, icon: 'description', own: true },
   /*
    * 第 22、23 项也是本项目补的（有赞的必备工具清单里没有这两项，属**有意偏离**）：
    * 「我的收藏」与「浏览记录」后端 `packageUser/favorite`、`packageUser/footprint`
    * 早已完整支持（含分页、去重、清空），却不从任何入口可达 —— 等于做了没接。
    * 它们本来就是个人中心的常驻内容，所以补在必备工具里，默认开启。
    */
-  { type: 'favorite', title: '我的收藏', show: true, scope: 'all', enabled: true, real: true, icon: '藏', own: true },
-  { type: 'footprint', title: '浏览记录', show: true, scope: 'all', enabled: true, real: true, icon: '迹', own: true }
+  { type: 'favorite', title: '我的收藏', show: true, scope: 'all', enabled: true, real: true, icon: 'bookmark', own: true },
+  { type: 'footprint', title: '浏览记录', show: true, scope: 'all', enabled: true, real: true, icon: 'records', own: true }
 ];
 
 /* ============================ 个人中心专属区块 + 补缺组件 ============================ */

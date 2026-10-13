@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 13:48:03（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 15:28:27（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -151,7 +151,7 @@ const MINE_BLOCKS = [
         title: "会员码",
         show: false,
         scope: "all",
-        icon: "码",
+        icon: "vip-card",
         real: true,
         enabled: true
       },
@@ -160,7 +160,7 @@ const MINE_BLOCKS = [
         title: "任务中心",
         show: true,
         scope: "all",
-        icon: "任",
+        icon: "notes",
         real: false,
         enabled: true
       },
@@ -169,7 +169,7 @@ const MINE_BLOCKS = [
         title: "购物车",
         show: true,
         scope: "all",
-        icon: "车",
+        icon: "cart",
         real: true,
         enabled: true
       },
@@ -178,7 +178,7 @@ const MINE_BLOCKS = [
         title: "赠品",
         show: true,
         scope: "all",
-        icon: "赠",
+        icon: "point-gift",
         real: false,
         enabled: true
       },
@@ -187,7 +187,7 @@ const MINE_BLOCKS = [
         title: "客服聊天",
         show: true,
         scope: "all",
-        icon: "服",
+        icon: "chat",
         real: true,
         enabled: true
       },
@@ -196,7 +196,7 @@ const MINE_BLOCKS = [
         title: "收货地址",
         show: true,
         scope: "all",
-        icon: "址",
+        icon: "location",
         real: true,
         enabled: true
       },
@@ -205,7 +205,7 @@ const MINE_BLOCKS = [
         title: "拨打商家电话",
         show: false,
         scope: "all",
-        icon: "电",
+        icon: "phone-circle",
         real: true,
         enabled: true
       },
@@ -214,7 +214,7 @@ const MINE_BLOCKS = [
         title: "返现",
         show: false,
         scope: "all",
-        icon: "返",
+        icon: "cash-back-record",
         real: false,
         enabled: true
       },
@@ -223,7 +223,7 @@ const MINE_BLOCKS = [
         title: "分销员中心",
         show: true,
         scope: "fx",
-        icon: "销",
+        icon: "smile-comment",
         real: false,
         enabled: true
       },
@@ -232,7 +232,7 @@ const MINE_BLOCKS = [
         title: "线下门店",
         show: true,
         scope: "all",
-        icon: "店",
+        icon: "shop",
         real: false,
         enabled: true
       },
@@ -241,7 +241,7 @@ const MINE_BLOCKS = [
         title: "课程",
         show: false,
         scope: "all",
-        icon: "课",
+        icon: "newspaper",
         real: false,
         enabled: true
       },
@@ -250,7 +250,7 @@ const MINE_BLOCKS = [
         title: "证书",
         show: false,
         scope: "all",
-        icon: "证",
+        icon: "description",
         real: false,
         enabled: true
       },
@@ -259,7 +259,7 @@ const MINE_BLOCKS = [
         title: "考试",
         show: false,
         scope: "all",
-        icon: "考",
+        icon: "completed",
         real: false,
         enabled: true
       },
@@ -268,7 +268,7 @@ const MINE_BLOCKS = [
         title: "兑换礼品卡",
         show: false,
         scope: "all",
-        icon: "兑",
+        icon: "gift-card",
         real: false,
         enabled: true
       },
@@ -277,7 +277,7 @@ const MINE_BLOCKS = [
         title: "作业本",
         show: false,
         scope: "all",
-        icon: "业",
+        icon: "records",
         real: false,
         enabled: true
       },
@@ -286,7 +286,7 @@ const MINE_BLOCKS = [
         title: "留白",
         show: false,
         scope: "all",
-        icon: "白",
+        icon: "todo-list",
         real: false,
         enabled: true
       },
@@ -295,7 +295,7 @@ const MINE_BLOCKS = [
         title: "活动预订",
         show: false,
         scope: "all",
-        icon: "订",
+        icon: "notes",
         real: false,
         enabled: true
       },
@@ -304,7 +304,7 @@ const MINE_BLOCKS = [
         title: "账号与安全",
         show: true,
         scope: "all",
-        icon: "号",
+        icon: "setting",
         real: true,
         enabled: true
       },
@@ -313,7 +313,7 @@ const MINE_BLOCKS = [
         title: "预约订座",
         show: false,
         scope: "all",
-        icon: "座",
+        icon: "restaurant-booking",
         real: false,
         enabled: true
       },
@@ -322,7 +322,7 @@ const MINE_BLOCKS = [
         title: "邀请有礼",
         show: false,
         scope: "all",
-        icon: "邀",
+        icon: "gift-card",
         real: false,
         enabled: false
       },
@@ -331,7 +331,7 @@ const MINE_BLOCKS = [
         title: "关于我们",
         show: true,
         scope: "all",
-        icon: "关",
+        icon: "description",
         real: true,
         enabled: true
       },
@@ -340,7 +340,7 @@ const MINE_BLOCKS = [
         title: "我的收藏",
         show: true,
         scope: "all",
-        icon: "藏",
+        icon: "bookmark",
         real: true,
         enabled: true
       },
@@ -349,7 +349,7 @@ const MINE_BLOCKS = [
         title: "浏览记录",
         show: true,
         scope: "all",
-        icon: "迹",
+        icon: "records",
         real: true,
         enabled: true
       }

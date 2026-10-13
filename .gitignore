@@ -21,6 +21,19 @@ server/data/
 .tooling/*
 !.tooling/*.mjs
 !.tooling/*.cjs
+# 图标资产的**可复跑入口**（第 52 批）：一个负责「有赞图标字体 → 包内 PNG」，
+# 一个负责位级自证（CSS 95 条规则 ↔ 包内 95 张 PNG 逐像素相同）。
+# 不放行的话，克隆后没法复现/校验 miniprogram/images/usercenter/ 里那 100 张图。
+# ⚠️ 只放行这两个，别写成 `!.tooling/*.py` —— 那里还有一批一次性探针脚本。
+!.tooling/make-usercenter-icons.py
+!.tooling/check-usercenter-icons.py
+# 上面两个脚本的**输入**也要放行，否则「可复跑」是空话（字体与原始样式表都是抓取原物、
+# 不入库；这里只放行字体 TTF 与派生出来的 2.7KB 码点表）：
+!.tooling/_yz-font/
+# 该目录里还有别的字体（tabbar 的、以及同一字体的 woff/woff2 副本）：只放行这一份 TTF
+.tooling/_yz-font/*
+!.tooling/_yz-font/_yz-mc-icons.ttf
+!.tooling/_yz-usercenter-icons.json
 # home.json       有赞真实页面抓取值（test-layout.mjs 用它做尺寸口径对账）
 # _yz-panels.json 有赞装修编辑器 54 个组件的中文面板字段原文（组件库对账的依据）
 !.tooling/home.json

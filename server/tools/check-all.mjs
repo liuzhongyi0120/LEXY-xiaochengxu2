@@ -27,7 +27,7 @@
  *   判定实现抽在 tools/expect.mjs（纯函数，可被单测直接覆盖）。
  */
 
-import { writeFileSync, readdirSync, readFileSync, existsSync } from 'node:fs';
+import { writeFileSync, readdirSync, readFileSync, existsSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { judge } from './expect.mjs';
@@ -368,12 +368,29 @@ console.log(` 商品       ${list.data.total} 个在售，首件 ${goodsId}，SK
 /* 5. 登录态基础读点位
  * 头像必须用**站内素材**：曾经在这里写死一个有赞 CDN 地址，于是每跑一轮自检
  * 就把外链写回用户头像 —— 与 check-localized「数据文件零外链」直接打架，
- * 表现为「修好又被写回」反复出现。现在动态取素材库首件的相对路径。 */
-const avatarProbe = await call('GET', '/api/media/list', { auth: false, query: { page: 1, size: 1 }, silent: true });
+ * 表现为「修好又被写回」反复出现。所以动态取素材库首件的相对路径。
+ *
+ * ⚠️ 这一条还必须**收尾还原**，两条原因（2026-10-13 实测踩到）：
+ *   ① `media/list` 的首件是「最近一次上传」—— 自检自己刚上传过视频夹具时它就是个
+ *      `.mp4`，写进「头像」这种本该是图片的字段；
+ *   ② 夹具会被收尾清掉，于是 `db.json` 里留下一条指向**已不存在文件**的
+ *      `/uploads/…mp4` → 与 `check-localized` 第 2 项「本地引用全部落地」打架。
+ *   两条合起来的表现是「跑完自检，本地化自检反而报红」，且只看头像两个字根本查不出来。
+ *   处置：`kind=image` 只挑图片 + 收尾把**原头像**放回去（昵称保持「联调账号」不动，
+ *   它是自检账号的身份标识，见上面 342 行的说明）。 */
+const avatarProbe = await call('GET', '/api/media/list', { auth: false, query: { page: 1, size: 1, kind: 'image' }, silent: true });
 const avatarLocal = ((avatarProbe.data && avatarProbe.data.list) || [])[0]
   ? avatarProbe.data.list[0].url
   : '';
-await call('GET', '/api/user/profile');
+const profileProbe = await call('GET', '/api/user/profile');
+const avatarRestore = (profileProbe.data && profileProbe.data.avatar) || '';
+/* 「显式空串 = 清空」必须是接口能表达的语义 —— 否则头像写脏了就没有收口路径，
+ * 本文件的收尾还原在「原值为空」时也会变成一条永远修不回来的假红。
+ * （接口原来写的是 `if (avatar)`：传空串返回 code 0 但值不变。） */
+const avatarClear = await call('POST', '/api/user/profile', { body: { avatar: '' } });
+assert('用户资料：显式传空头像能清空（「没传」与「要清空」在接口层分得开）',
+  avatarClear.ok && avatarClear.data && avatarClear.data.avatar === '',
+  avatarClear.ok ? `清空后 avatar=${JSON.stringify(avatarClear.data && avatarClear.data.avatar)}` : '接口报错');
 await call('POST', '/api/user/profile', { body: { nickname: '联调账号', avatar: avatarLocal } });
 await call('POST', '/api/user/phone', { body: { code: 'check_phone_code_001' } });
 await call('POST', '/api/auth/refresh');
@@ -2026,13 +2043,20 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
   const pvSrc = readFileSync(join(ROOT_DIR, 'server', 'public', 'shared', 'pv-render.js'), 'utf8');
   const pvStatBlock = (pvSrc.match(/var UC_STAT_DEFS = \[([\s\S]*?)\n  \];/) || [])[1] || '';
   const pvStats = [];
-  pvStatBlock.replace(/\['([^']+)',\s*'([^']*)',\s*'([^']*)'(?:,\s*'([^']*)')?\]/g,
-    (m, k, label, unit, def) => { pvStats.push({ k, label, unit, def: def === undefined ? '—' : def }); return m; });
+  /* 每项最多 5 个元素：键 / 名称 / 单位 / 缺省值 / 图标基名（第 52 批加的图标）。
+     ⚠️ 这个正则**必须跟着真机表长出来** —— 只认 4 个元素的版本在加了图标之后整项失配，
+     断言会红但报的是「不一致」，看不出真正原因是解析没跟上。 */
+  pvStatBlock.replace(/\['([^']+)',\s*'([^']*)',\s*'([^']*)'(?:,\s*'([^']*)')?(?:,\s*'([^']*)')?\]/g,
+    (m, k, label, unit, def, icon) => {
+      pvStats.push({ k, label, unit, def: def === undefined ? '—' : def, icon: icon || '' });
+      return m;
+    });
   const pvBadDef = statDefs.filter((d, i) => {
     const p = pvStats[i];
-    return !p || p.k !== d.k || p.label !== d.label || p.unit !== d.unit || p.def !== (d.def || '—');
+    return !p || p.k !== d.k || p.label !== d.label || p.unit !== d.unit
+      || p.def !== (d.def || '—') || p.icon !== (d.icon || '');
   }).map((d) => d.key);
-  assert('装修台预览里的资产缺省值与真机逐项一致（同源同序，预览不许显示另一个值）',
+  assert('装修台预览里的资产缺省值与图标同真机逐项一致（同源同序，预览不许显示另一个值）',
     pvStats.length === statDefs.length && pvBadDef.length === 0,
     `预览 ${pvStats.length} 项 / 真机 ${statDefs.length} 项`
       + (pvBadDef.length ? `；不一致：${pvBadDef.join(', ')}` : '，键 / 名称 / 单位 / 缺省值逐项一致'));
@@ -2067,6 +2091,129 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     resetOk ? '复位值来自 utils/blocks.js 的 UC_STAT_DEFS[].def'
       : (dashHard ? 'mine.js 里又出现 `—` 字面量 —— 「余额 / 积分缺省 0」这类口径会分家'
         : 'mine.js 里没走 defaultStatValues() 复位'));
+
+  /* -------------------------------------------------------------------------
+   * (10) 第 52 批：个人中心图标（复刻有赞个人中心图标字体 usercenter-icon）
+   *
+   * 背景：以前三个区块的图标是**汉字**（'车' '任' '付' …），画在一个圆角底色块里。
+   * 第 52 批换成有赞的真图标 —— 从有赞图标字体 `usercenter-icon` 复刻的 95 个字形，
+   * 由 `.tooling/make-usercenter-icons.py` 渲染成 66×66 PNG 放包内
+   * （`miniprogram/images/usercenter/`，另有 `stats/` 5 张资产位图 —— 有赞那 7 项资产
+   * 用的本来就是 PNG 不是字体）。
+   *
+   * 为什么每条都要断：图标拼错一个字符**不会报错**，真机上就是一块空白（静默裂图），
+   * 而且装修台预览走 `/images/…` 只读路由读同一份文件 —— 路径错了预览与真机一起白。
+   * ----------------------------------------------------------------------- */
+  const UC_ICON_ROOT = join(ROOT_DIR, 'miniprogram', 'images', 'usercenter');
+  const iconExists = (rel) => {
+    try { return statSync(join(UC_ICON_ROOT, rel)).isFile(); } catch (e) { return false; }
+  };
+
+  /* (10a) 工具图标：**两种风格都要有文件** —— 预览与真机按 iconMode 取 -o（线性）/ 无后缀（实色） */
+  const metaMap = blocksLib.TOOL_META || {};
+  const toolIconMissing = [];
+  Object.keys(metaMap).forEach((k) => {
+    const base = String(metaMap[k].icon || '');
+    if (!base) { toolIconMissing.push(k + '→(空基名)'); return; }
+    if (!iconExists(base + '.png')) toolIconMissing.push(k + '→' + base + '.png');
+    if (!iconExists(base + '-o.png')) toolIconMissing.push(k + '→' + base + '-o.png');
+  });
+  assert('必备工具的图标是真实存在的包内文件（线性 -o 与实色两套都要有：iconMode 决定取哪张）',
+    toolIconMissing.length === 0,
+    toolIconMissing.length ? '缺文件：' + toolIconMissing.join('；')
+      : `${Object.keys(metaMap).length} 项 × 2 套 = ${Object.keys(metaMap).length * 2} 个文件齐全`);
+
+  /* (10b) 订单图标：不随 iconMode 变，照抄有赞 getDefaultOrderItems 的全名 */
+  const orderIconMissing = (blocksLib.UC_ORDER_DEFS || [])
+    .filter((d) => !iconExists(String(d.icon || '') + '.png')).map((d) => `${d.key}→${d.icon}.png`);
+  assert('我的订单 5 个入口的图标文件都存在（全名照抄有赞 order__ 前缀，不按风格拼后缀）',
+    orderIconMissing.length === 0,
+    orderIconMissing.length ? '缺文件：' + orderIconMissing.join('；')
+      : (blocksLib.UC_ORDER_DEFS || []).map((d) => d.label + '=' + d.icon).join(' · '));
+
+  /* (10c) 资产图标：有赞 STATS_ICON_MAP 的位图（cards / giftCard / deliveryCard 有赞共用一张） */
+  const statIconMissing = (blocksLib.UC_STAT_DEFS || [])
+    .filter((d) => !iconExists(String(d.icon || '') + '.png')).map((d) => `${d.key}→${d.icon}.png`);
+  assert('个人资产 7 项的图标文件都存在（有赞这 7 项用的是位图不是字体）',
+    statIconMissing.length === 0,
+    statIconMissing.length ? '缺文件：' + statIconMissing.join('；')
+      : (blocksLib.UC_STAT_DEFS || []).map((d) => d.label + '=' + d.icon).join(' · '));
+
+  /* (10d) 拼路径只有一处：ucIconFile() 必须真的按模式给对后缀 */
+  const iconFnOk = typeof blocksLib.ucIconFile === 'function'
+    && blocksLib.ucIconFile('cart', 'line') === '/images/usercenter/cart-o.png'
+    && blocksLib.ucIconFile('cart', 'fill') === '/images/usercenter/cart.png'
+    && blocksLib.ucIconFile('') === '';
+  assert('ucIconFile() 是图标路径的唯一出口（line→-o / fill→无后缀 / 空基名→空串）',
+    iconFnOk,
+    iconFnOk ? '口径与有赞 ICON_MODE_MAP={1:colorIcon,2:icon} 同义' : 'ucIconFile 不存在或后缀口径不对');
+
+  /* (10e) 「老数据回落到 TOOL_META」这条兜底必须真的在 —— 否则第 52 批之前发布的汉字会一直显示 */
+  const legacyBlock = blocksLib.normalizeBlock({
+    type: 'uc_tools', iconMode: 'line',
+    plugins: [{ type: 'cart', title: '购物车', icon: '车', show: true, enabled: true }]
+  });
+  const legacyOk = legacyBlock.items.length === 1 && legacyBlock.items[0].icon === 'cart'
+    && legacyBlock.items[0].iconFile === '/images/usercenter/cart-o.png';
+  assert('装修数据里残留的「汉字图标」（本批之前发布的）会回落到 TOOL_META 的基名，不会画成裂图',
+    legacyOk,
+    legacyOk ? '老值 "车" → "cart"' : `回落失败：${JSON.stringify(legacyBlock.items)}`);
+
+  /* (10f) 图标库规模：包内至少 95 个字形 + 5 张资产图（写 >= 而不是 ==，将来补图标不该红） */
+  let iconCount = 0, statCount = 0;
+  try {
+    iconCount = readdirSync(UC_ICON_ROOT).filter((f) => f.endsWith('.png')).length;
+    statCount = readdirSync(join(UC_ICON_ROOT, 'stats')).filter((f) => f.endsWith('.png')).length;
+  } catch (e) { /* 目录不存在 → count 保持 0，下面报红 */ }
+  assert('个人中心图标库齐备（有赞图标字体复刻的 95 个字形 + 5 张资产位图）',
+    iconCount >= 95 && statCount >= 5,
+    `字体图标 ${iconCount} 个 / 资产位图 ${statCount} 个`);
+
+  /* (10g) 模板不许再把图标当**文字**画出来。
+   *      `{{tl.icon}}` 这种写法在换成基名之后会直接显示成「cart」这串英文 —— 不报错、只是丑。
+   *      ⚠️ 先剥 HTML 注释（注释里正写着要禁用的字面量，这是 §V 踩过的老坑）。 */
+  const tplRaw = readFileSync(join(ROOT_DIR, 'miniprogram', 'templates', 'blocks.wxml'), 'utf8');
+  const tplSrc = tplRaw.replace(/<!--[\s\S]*?-->/g, '');
+  /* ⚠️ 诊断行必须**逐条列真实原因**，不能「没问题就打印一句『都对』」——
+   * 第一版就是这么写的，注入验红时失败了却打印「uc_order / uc_tools 均用 <image>」，
+   * 骗人（PITFALLS §V 的「诊断行复用同一条」）。
+   * ⚠️ `<text>` 的正则也要带 `[^>]*`：真实写法是 `<text class="cu-ic">{{tl.icon}}</text>`，
+   * 写死 `<text>` 会漏判（第一版注入的正是带 class 的那种）。 */
+  const tplProblems = [
+    /<text[^>]*>\{\{tl\.icon\}\}<\/text>/.test(tplSrc) ? 'uc_tools 仍把 icon 当文本渲染' : '',
+    /<text[^>]*>\{\{item\.icon\}\}<\/text>/.test(tplSrc) ? 'uc_order 仍把 icon 当文本渲染' : '',
+    /<image[^>]*src="\{\{item\.iconFile\}\}"/.test(tplSrc) ? '' : 'uc_order 没有 <image src="{{item.iconFile}}">',
+    /<image[^>]*src="\{\{tl\.iconFile\}\}"/.test(tplSrc) ? '' : 'uc_tools 没有 <image src="{{tl.iconFile}}">'
+  ].filter(Boolean);
+  assert('模板里三个区块的图标都走 <image src="{{…iconFile}}">（不再把基名当文字画出来）',
+    tplProblems.length === 0,
+    tplProblems.length ? tplProblems.join('；') : 'uc_order / uc_tools 均用 <image>，且都绑 iconFile');
+
+  /* (10h) 装修台预览与真机同口径：预览侧也必须走 ucIconFile（不能自己拼路径或显示汉字） */
+  const pvIconOk = /function ucIconFile\(/.test(pvSrc)
+    && /var UC_ICON_DIR = '\/images\/usercenter\/'/.test(pvSrc)
+    && /ucIconFile\(d\[2\]\)/.test(pvSrc)          /* 订单 */
+    && /ucIconFile\(base, b\.iconMode\)/.test(pvSrc); /* 工具：按风格取 */
+  assert('装修台预览的图标口径与真机一致（同一个 ucIconFile + 同一个 /images/usercenter/ 目录）',
+    pvIconOk,
+    pvIconOk ? '预览侧订单 / 工具都走 ucIconFile' : 'pv-render.js 的图标路径口径与真机分家了');
+
+  /* (10i) 已发布的装修数据里 icon 必须已经是**基名** —— 改了代码不重灌 replica 就是「预览白、真机有」。
+   *      这是「默认值改了要重灌」那条老规矩在图标上的同一形态。
+   *      ⚠️ 真源必须在本块内**自己取**：15.80 是独立的 `{ }` 块，上面那段 15.7x 里的
+   *      `plugins` 是另一个块的局部变量，跨块引用只会得到 `plugins is not defined`
+   *      —— 而这个异常会被「自检中断」那条兜住，表现为「断言总数莫名腰斩」，
+   *      非常难查（本轮实测 566 → 294）。 */
+  const pubReplica = requireFromHere(join(MP_ROOT, 'config', 'replica.js'));
+  const pubPlugins = (((pubReplica.MINE_BLOCKS || []).filter((b) => b.type === 'uc_tools')[0] || {}).plugins) || [];
+  const pubTools = pubPlugins.filter((p) => p && p.type);
+  const pubBadIcon = pubPlugins
+    .filter((p) => p && p.icon !== undefined && !blocksLib.isIconBase(p.icon))
+    .map((p) => `${p.type}=${JSON.stringify(p.icon)}`);
+  assert('已发布的必备工具数据里 icon 已是图标基名（改图标必须重灌 replica，否则装修台预览与真机走样）',
+    pubBadIcon.length === 0,
+    pubBadIcon.length ? '仍是旧值（汉字）：' + pubBadIcon.slice(0, 6).join('；')
+      : `${pubTools.length} 项均为基名`);
 }
 
 /* ---------------------------------------------------------------------------
@@ -2486,6 +2633,14 @@ if (adCmt) {
 assert('后台 · 回复评价可用（仅挑无回复的评价，测完立即清空）',
   adReplyOk,
   adCmt ? '已对一条无回复评价完成「回复 → 清空」' : '当前无未回复评价，跳过');
+
+/* —— 收尾：把第 5 节的「头像探针」写回原值 ——
+ * 不放回去的话，自检每跑一轮就把头像重新绑到素材库首件上；那个素材一旦被运营删掉，
+ * `db.json` 就留下悬空的 /uploads 引用（第 5 节注释里记了完整因果）。 */
+const avatarBack = await call('POST', '/api/user/profile', { body: { nickname: '联调账号', avatar: avatarRestore }, silent: true });
+assert('自检收尾把头像探针写回原值（不把素材库首件长期绑在用户头像上）',
+  avatarBack.ok && avatarBack.data && (avatarBack.data.avatar || '') === (avatarRestore || ''),
+  `头像 ${JSON.stringify(avatarRestore)} ← 探针曾用 ${JSON.stringify(avatarLocal)}`);
 
 /* —— 收尾：真实用户数据规模必须未变 —— */
 const adOrder1 = await call('GET', '/api/admin/order/list', { auth: false, query: { page: 1, size: 1 } });
