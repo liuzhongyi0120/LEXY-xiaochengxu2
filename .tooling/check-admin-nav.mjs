@@ -218,13 +218,24 @@ await sleep(1800);
     '属性面板 = 图标样式三态 + 导航项列表 + 配色（默认「图标+文字」）');
 }
 
+/*
+ * [3]~[6] 的断言都要对照**已发布的导航数据**（第 3 项叫什么、用哪张图标、选中色是什么）——
+ * 别写死「资讯」「news-active.png」「#C8102E」：运营在装修台改个名、换个图标、调个色，
+ * 写死的断言就红了，那是**断言过期**不是代码坏了（口径：锁等价性，不锁当时值）。
+ * 这里读一次，全脚本共用。
+ */
+const navData = await (await fetch(SITE + '/api/decorate/page?key=nav',
+  { headers: { Authorization: 'Bearer ' + ADMIN_TOKEN } })).json();
+const navPub = (navData.data || {}).published || {};
+const pubItems = navPub.items || [];
+
 console.log('\n[3] 点区块树第 3 项 → 底部导航高亮跟随');
 await run(tab, `document.querySelectorAll('#tree .tnode')[2].click(); 'ok'`);
 await sleep(900);
 {
   const bar = JSON.parse(await run(tab, BAR));
-  ok(bar.onText === '资讯' && bar.texts.split(' / ')[2].indexOf('★') > -1,
-    '选中第 3 项后底部导航高亮「资讯」（按路径同步，不是按序号）', bar.texts);
+  ok(bar.onText === (pubItems[2] || {}).text && bar.texts.split(' / ')[2].indexOf('★') > -1,
+    `选中第 3 项后底部导航高亮「${(pubItems[2] || {}).text}」（按路径同步，不是按序号）`, bar.texts);
   const panel = await run(tab, `document.getElementById('inspector').innerText.replace(/\\s+/g, ' ').slice(0, 60)`);
   ok(/导航名称/.test(panel) && /跳转页面/.test(panel), '属性面板切换为该导航项的字段（名称 / 跳转页面 / 两个图标）', panel);
 }
@@ -252,8 +263,9 @@ console.log('\n[5] 内置图标 / 自定义图标');
   const bar = JSON.parse(await run(tab, BAR));
   ok(bar.icoCount === 5 && bar.srcs.every((s) => s.indexOf('/images/tabbar/') === 0),
     '5 项都渲染出内置图标，且地址都是包内路径 /images/tabbar/…', bar.srcs.join(' '));
-  ok(bar.srcs[2] === '/images/tabbar/news-active.png' && bar.srcs[0] === '/images/tabbar/home.png',
-    '高亮项用「选中图标」(-active)、其余用未选中图标', `资讯=${bar.srcs[2]} 首页=${bar.srcs[0]}`);
+  ok(bar.srcs[2] === (pubItems[2] || {}).activeIcon && bar.srcs[0] === (pubItems[0] || {}).icon,
+    '高亮项用「选中图标」(-active)、其余用未选中图标',
+    `${(pubItems[2] || {}).text}=${bar.srcs[2]} ${(pubItems[0] || {}).text}=${bar.srcs[0]}`);
 }
 {
   // 「内置图标」快捷选择：点一下就把地址填进字段（运营不用手打 -active 路径）
@@ -307,11 +319,32 @@ await sleep(900);
 await close(tab);
 
 console.log('\n[6] 预览页 /preview 高亮跟随');
+/*
+ * ⚠️ 别把「选中色」「第几项指向哪一页」写死在断言里 —— 这两个值运营在装修台随时会改。
+ * 原来的断言写死「#C8102E」与「第 3 项 = 资讯页」：运营把选中色改成近黑（#080808）、
+ * 又把「资讯」项指到自定义页 p288 之后，断言就红了 —— 那是**断言过期**，不是代码坏了
+ * （口径：锁等价性，不锁当时值）。现在统一从**已发布导航数据**推导：
+ * 色值取 replica.TABBAR.selectedColor（按浏览器算出的 rgb 串比），
+ * 高亮项按 path 反查是哪一项，任何一项都不指向内置资讯页时就断言「打开它不该有高亮」。
+ * 下面自定义页那段本来就是从数据里读的（同一口径，注释在那边）。
+ */
+/* 色值与高亮项都从上面（[3] 之前）读的那份已发布导航数据推导 */
+/* #RRGGBB → 浏览器渲染出来的 rgb(r, g, b) 串：比颜色要按同一种写法比 */
+const hexToRgbStr = (h) => {
+  const m = /^#?([0-9a-f]{6})$/i.exec(String(h || ''));
+  if (!m) return '';
+  const n = parseInt(m[1], 16);
+  return 'rgb(' + ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255) + ')';
+};
+const wantOnColor = hexToRgbStr(navPub.selectedColor);
+const newsIdx = pubItems.findIndex((it) => String(it.path) === '/pages/news/news');
+
 tab = await open(SITE + '/preview/', 2800);
 {
   const a = JSON.parse(await run(tab, BAR));
-  ok(a.count === 5 && a.onText === '首页' && a.onColor === 'rgb(200, 16, 46)',
-    '首页：第 1 项高亮且用选中色 #C8102E', `${a.texts} · ${a.onColor}`);
+  ok(a.count === 5 && a.onText === (pubItems[0] || {}).text && a.onColor === wantOnColor,
+    '首页：第 1 项高亮，且用的是已发布的选中色 ' + navPub.selectedColor,
+    `${a.texts} · ${a.onColor} ｜ 期望 ${wantOnColor}`);
   await run(tab, `(() => {
     const hit = [...document.querySelectorAll('#pvPages .pv-item')].find((x) => /资讯/.test(x.textContent));
     if (hit) hit.click(); return 'ok';
@@ -319,20 +352,22 @@ tab = await open(SITE + '/preview/', 2800);
   await sleep(1800);
   {
     const b = JSON.parse(await run(tab, BAR));
-    ok(b.onText === '资讯', '切到「资讯」页后高亮跟到第 3 项（按路径匹配，不是按序号）', b.texts);
+    if (newsIdx >= 0) {
+      ok(b.onText === pubItems[newsIdx].text,
+        `切到「资讯」页后高亮跟到第 ${newsIdx + 1} 项（按路径匹配，不是按序号）`, b.texts);
+    } else {
+      ok(b.onText === '',
+        '没有任何导航项指向内置「资讯」页（运营把它指到了自定义页）→ 打开它时不该有任何项高亮', b.texts);
+    }
   }
 
   /*
-   * 导航项指向**自定义页**时（当前第 4 项「产品」→ 微页面），光看内置页验不出来：
-   * 预览里的「产品」页是 /pages/product/product，与第 4 项的目标路径不是同一个 ——
-   * 点它**理应不高亮**。所以这里从**已发布的导航数据**里读出那条自定义页目标，
-   * 打开它对应的预览页，高亮必须跟过去。
+   * 导航项指向**自定义页**时，光看内置页验不出来：预览里的内置页路径与那条
+   * 自定义页目标不是同一个 —— 点它**理应不高亮**。所以这里从**已发布的导航数据**里
+   * 读出那条自定义页目标，打开它对应的预览页，高亮必须跟过去。
    * 这就是「指定微页面被选为底部导航跳转页时也展示底部导航」那件事的端到端验证。
    */
-  const navData = await (await fetch(SITE + '/api/decorate/page?key=nav',
-    { headers: { Authorization: 'Bearer ' + ADMIN_TOKEN } })).json();
-  const customItem = (((navData.data || {}).published || {}).items || [])
-    .filter((it) => String(it.path).indexOf('/pages/custom/index?key=') === 0)[0];
+  const customItem = pubItems.filter((it) => String(it.path).indexOf('/pages/custom/index?key=') === 0)[0];
   if (customItem) {
     const hit = await run(tab, `(() => {
       const row = [...document.querySelectorAll('#pvPages .pv-item')]
@@ -345,7 +380,7 @@ tab = await open(SITE + '/preview/', 2800);
     ok(hit === 'clicked' && d.onText === customItem.text,
       '导航项指向自定义页时，打开那个微页面高亮跟到对应项（' + customItem.text + ' → ' + customItem.path + '）',
       `click=${hit} onText=${d.onText} · ${d.texts}`);
-    // 反过来：点内置「产品」页不高亮任何项（它的路径不是第 4 项的目标）—— 这正是易错处
+    // 反过来：内置「产品」页该不该高亮，取决于**有没有**导航项指向它（同样是数据决定，不写死项号）
     await run(tab, `(() => {
       const row = [...document.querySelectorAll('#pvPages .pv-item')]
         .find((x) => ((x.querySelector('small') || {}).textContent || '') === '/pages/product/product');
@@ -353,7 +388,12 @@ tab = await open(SITE + '/preview/', 2800);
     })()`);
     await sleep(1500);
     const e = JSON.parse(await run(tab, BAR));
-    ok(e.onText === '', '内置「产品」页不高亮任何导航项（第 4 项指向的是微页面，不是这个页面）', e.texts);
+    const prodIdx = pubItems.findIndex((it) => String(it.path) === '/pages/product/product');
+    ok(prodIdx < 0 ? e.onText === '' : e.onText === pubItems[prodIdx].text,
+      prodIdx < 0
+        ? '没有任何导航项指向内置「产品」页 → 打开它时不该有任何项高亮'
+        : `内置「产品」页被第 ${prodIdx + 1} 项指向 → 打开它应高亮那一项`,
+      e.texts);
   } else {
     console.log('    （当前导航没有指向自定义页的项，跳过那两条断言）');
   }

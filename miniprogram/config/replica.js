@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-12 17:30:20（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 09:12:11（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -3406,7 +3406,7 @@ const PAGE_META = {
 /** ---------------- 店铺导航（底部 tabBar 外观，装修后台「店铺导航」面板） ---------------- */
 const TABBAR = {
   color: "#8A8A8A",
-  selectedColor: "#C8102E",
+  selectedColor: "#080808",
   background: "#FFFFFF",
   borderColor: "#EEEEEE",
   iconMode: "always",
@@ -3424,7 +3424,7 @@ const TABBAR = {
       activeIcon: "/images/tabbar/lexy-active.png"
     },
     {
-      path: "/pages/news/news",
+      path: "/pages/custom/index?key=p288",
       text: "资讯",
       icon: "/images/tabbar/news.png",
       activeIcon: "/images/tabbar/news-active.png"

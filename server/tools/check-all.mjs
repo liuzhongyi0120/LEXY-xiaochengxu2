@@ -3030,6 +3030,54 @@ const navCtbDefault = navRunComponent(true);
 assert('真机组件：默认配色下不产生任何 filter（改造前后像素零变化）',
   (navCtbDefault.items || []).every((i) => !/filter:/.test(i.styleOff || '') && (i.styleOn || '') === ''),
   (navCtbDefault.items || []).map((i) => i.styleOff || '(空)').slice(0, 3).join(' | '));
+
+/*
+ * ---- G. 「页面布局」浮层底部那个入口按页面类型分流（2026-10-13）----
+ *
+ * 起因（运营实测）：「导航装修的时候点这个页面设置没反应，点击应该是导航的整体属性设置」。
+ * 根因：导航页的 schema 是 TABBAR_NODE、**没有 meta 字段**（导航是全局配置，不是页面），
+ *      而入口无条件 `locate('meta')` → 在导航页上必然落空，只弹一句红字
+ *      「该页面没有页面级设置」、属性面板一动不动（取证前后 `#inspectorPath` 都是「页面设置」）。
+ * 修法：导航下改成「回整体属性」（`select('__root__')`）＋一句普通提示；入口文案与属性面板的
+ *      根视图标签都随页面类型切换。
+ *
+ * 行为级验收在 `.tooling/_nav-pagesetting-probe.mjs`（真浏览器 11 条，带「首页」对照组）。
+ * 这里锁的是**静态骨架**：分流存在、判断在 `locate('meta')` **之前**（放后面就永远不执行）、
+ * 文案真随页面类型切、静态兜底文案还在；并顺手锁住「导航没有 meta」这个**分流的前提** ——
+ * 将来谁给 nav 加了 meta，这条会红，提醒他回来重新审视这个分流。
+ */
+const navPsIndexHtml = readFileSync(join(PUB, 'admin', 'index.html'), 'utf8');
+/*
+ * 「导航没有 meta」这条同时锁**源码**与**服务返回值**：
+ * 只锁服务的话，改了 schema.js 不重启服务照样绿（同一节「配色两组默认展开」踩过这个坑，
+ * 见 .workbuddy/memory/PITFALLS.md —— 「改后端必须重启」的断言侧镜像）。
+ */
+const navTabbarNodeSeg = (navSchemaSrc.match(/const TABBAR_NODE = \{[\s\S]*?\n\};/) || [''])[0];
+/*
+ * 「分流在 locate('meta') 之前」用**逐行**判定，而不是 `indexOf` 比字符位置：
+ * 上面那段注释里就写着 `locate('meta')` 这个字面量，indexOf 会把它当成代码、
+ * 把顺序判反（「源码文本断言必须先剥注释」，PITFALLS 有记；这里用「整行就是那条语句」
+ * 来天然避开注释行 —— 注释行以 * / // / 中文开头，匹配不上 `^\s*var loc = ...`）。
+ */
+const navAdminLines = navAdminJs.split(/\r?\n/);
+const navPsLineDivert = navAdminLines.findIndex((L) => /^\s*if \(isNav\) \{\s*$/.test(L));
+const navPsLineMeta = navAdminLines.findIndex((L) => /^\s*var loc = locate\('meta'\);\s*$/.test(L));
+const navPsDivert = navPsLineDivert >= 0 && /select\('__root__'\)/.test(navAdminLines[navPsLineDivert + 1] || '');
+const navPsDivertBeforeMeta = navPsLineDivert >= 0 && navPsLineMeta > navPsLineDivert;
+assert('店铺导航：schema 里没有「页面设置」（meta）—— 这正是入口必须分流的前提（同时锁源码与服务返回值）',
+  navTabbarNodeSeg.length > 0 && !/k: 'meta'/.test(navTabbarNodeSeg) && navFields.every((f) => f.k !== 'meta'),
+  `源码 TABBAR_NODE 段 ${navTabbarNodeSeg.length} 字符 ｜ 服务返回 ${navFields.map((f) => f.k || ('group:' + f.label)).join(' / ')}`);
+assert('「页面设置」入口在导航页上分流到「导航整体属性」，且判断在 locate(\'meta\') 之前（放后面就永远不执行）',
+  navPsDivert && navPsDivertBeforeMeta,
+  `分流存在=${navPsDivert} ｜ 在 locate('meta') 之前=${navPsDivertBeforeMeta}`);
+assert('入口文案与属性面板根视图标签都随页面类型切换（导航 → 「导航整体属性」；其它页仍是「页面设置」）',
+  /btnPageSetting'\)\.innerHTML[\s\S]{0,80}?isNav \? '导航整体属性' : '页面设置'/.test(navAdminJs) &&
+  /S\.sel === '__root__'[\s\S]{0,140}?S\.cur\.meta\.nav[\s\S]{0,60}?'导航整体属性' : '页面设置'/.test(navAdminJs),
+  'btnPageSetting 文案随 isNav 切 ＋ inspectorPath 根视图标签随 isNav 切');
+assert('「页面设置」的静态兜底文案仍在（JS 没跑起来 / 其它页面看到的仍是「页面设置」）',
+  /<div class="layout-foot" id="btnPageSetting">[\s\S]{0,120}?页面设置\s*<\/div>/.test(navPsIndexHtml),
+  'index.html 的 #btnPageSetting 静态文案 = 页面设置');
+
 const navPathField = (() => {
   const items = navFields.filter((f) => f.k === 'items')[0];
   return items && items.item && (items.item.fields || []).filter((f) => f.k === 'path')[0];

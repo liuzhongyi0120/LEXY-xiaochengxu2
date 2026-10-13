@@ -731,6 +731,14 @@
      * （判断与 addComponent() 用同一个 findBlocksNode，口径天然一致。）
      */
     $('viewEdit').classList.toggle('no-blocks', !findBlocksNode(S.cur && S.cur.schema));
+    /*
+     * 「页面布局」浮层底部那个入口的文案跟着页面类型切换：
+     * 普通页面承载的是「页面设置」（meta），店铺导航没有 meta、承载的是「导航整体属性」。
+     * 文案不切的话，运营在导航页上看到的仍是「页面设置」——他点它想看到的是导航的
+     * 配色与顺序，点下去却只弹一句「该页面没有页面级设置」（原缺陷）。
+     * 图标（.ic-gear）是静态装饰，跟着一起写回，别只改文字把图标弄丢。
+     */
+    $('btnPageSetting').innerHTML = '<i class="ic-gear"></i>' + (isNav ? '导航整体属性' : '页面设置');
     renderTabbar();
   }
 
@@ -1180,7 +1188,10 @@
     var host = $('inspector');
     host.innerHTML = '';
     if (!S.cur) return;
-    $('inspectorPath').textContent = S.sel === '__root__' ? '页面设置' : S.sel;
+    /* 根视图的标签：导航是全局配置，说的是「导航整体属性」而不是「页面设置」 */
+    $('inspectorPath').textContent = S.sel === '__root__'
+      ? ((S.cur.meta && S.cur.meta.nav) ? '导航整体属性' : '页面设置')
+      : S.sel;
 
     var loc = locate(S.sel);
     if (!loc.node) {
@@ -1883,7 +1894,29 @@
 
   /* ----------------------------- 页面设置面板 ----------------------------- */
 
+  /**
+   * 「页面布局」浮层底部的那个入口（`#btnPageSetting`）。
+   *
+   * 它在不同页面承载的东西**不是同一个**：
+   *   - 普通页面 → 页面级设置（schema 里的 `meta`，写回 replica.PAGE_META）；
+   *   - 店铺导航 → **导航整体属性**（导航是全局配置 `key:'nav'`，schema 里根本没有
+   *     `meta` 字段，它的根节点本身就是「图标样式 / 导航项 / 图标色 / 背景色」）。
+   *
+   * 原来这里无条件 `locate('meta')`：在导航页上必然找不到节点，只弹一句红字
+   * 「该页面没有页面级设置」、属性面板一动不动 —— 运营的原话就是「点了没反应」
+   * （取证见 `.tooling/_nav-pagesetting-probe.mjs`：点前点后 `#inspectorPath` 都是
+   * 「页面设置」、面板内容逐字不变，只多出一个 err toast）。
+   *
+   * 修法：按页面类型分流；导航下回「整体属性」并给一句明确反馈 —— 因为从某个导航项
+   * 切回整体属性时面板会变，而**本来就在整体属性上时面板不会变**，没有反馈就还是「没反应」。
+   */
   function pageSetting() {
+    var isNav = !!(S.cur && S.cur.meta && S.cur.meta.nav);
+    if (isNav) {
+      select('__root__');
+      toast('已切到「店铺导航」的整体属性');
+      return;
+    }
     var loc = locate('meta');
     if (!loc.node) { toast('该页面没有页面级设置', 'err'); return; }
     select('meta');
