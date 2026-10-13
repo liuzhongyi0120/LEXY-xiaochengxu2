@@ -51,6 +51,14 @@ die() { printf '\n\033[1;31m[x] %s\033[0m\n' "$*" >&2; exit 1; }
 
 [ "$(id -u)" = "0" ] || die "请用 root 执行"
 
+# curl 是本脚本的探测工具（公网 IP、结尾三个探针）。缺了就装 —— 它没有 certbot 那种
+# 「装出第二份、和既有体系打架」的风险。
+if ! command -v curl >/dev/null 2>&1; then
+  log "安装 curl（探测用）"
+  apt-get update -qq
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq curl
+fi
+
 # ────────────────────────────────────────────────── 0. 域名格式 + 本机 IP
 echo "$DOMAIN" | grep -qE '^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$' \
   || die "DOMAIN 格式不对：$DOMAIN"
@@ -67,7 +75,26 @@ done
 [ -n "$PUBIP" ] || die "探测不到本机公网 IP（三个源都不通）。可手工指定：PUBIP=1.2.3.4 bash $0"
 log "本机公网 IP = $PUBIP"
 
-# ────────────────────────────────────────────────── 1. DNS 是否已指向本机
+# ────────────────────────────────────────────────── 1. certbot（前置条件：先把工具确认好，再去碰 DNS）
+#
+# ⚠️ 这台机器上 certbot **不在 PATH 里**：实测它是 Python venv 装的，位于
+#    /opt/certbot-venv/bin/certbot，由 stopwatch-cert-renew.timer 每 30 分钟调一次续期。
+#    所以必须**逐个候选路径探测**（不能用 `command -v`，也不能一上来 apt 装）——
+#    apt-get install certbot 会装出**第二个** certbot，与既有 /etc/letsencrypt/renewal 体系打架。
+CERTBOT=""
+for c in /opt/certbot-venv/bin/certbot /snap/bin/certbot /usr/local/bin/certbot /usr/bin/certbot; do
+  if [ -x "$c" ]; then CERTBOT="$c"; break; fi
+done
+if [ -z "$CERTBOT" ]; then
+  CERTBOT="$(command -v certbot 2>/dev/null || true)"
+fi
+[ -n "$CERTBOT" ] || die "这台机器上找不到 certbot。**不要用 apt 装**（会与既有体系冲突）。
+     建议按机器惯例装到独立 venv，例如：
+       python3 -m venv /opt/lexy-certbot-venv && /opt/lexy-certbot-venv/bin/pip install certbot
+     装好后重跑本脚本即可。"
+log "certbot = $CERTBOT（$("$CERTBOT" --version 2>&1 | awk '{print $2}')）"
+
+# ────────────────────────────────────────────────── 2. DNS 是否已指向本机
 log "校验 $DOMAIN 的 A 记录"
 RESOLVED="$(getent ahostsv4 "$DOMAIN" 2>/dev/null | awk '{print $1}' | sort -u | tr '\n' ' ' || true)"
 if [ -z "${RESOLVED// /}" ]; then
@@ -80,14 +107,6 @@ if ! echo " $RESOLVED " | grep -q " $PUBIP "; then
      要么加 A 记录，要么换成已指向本机的域名。**不跳过**：HTTP-01 校验必然失败，签不出证书。"
 fi
 log "DNS 已指向本机 ✓"
-
-# ────────────────────────────────────────────────── 2. certbot
-if ! command -v certbot >/dev/null 2>&1; then
-  log "安装 certbot"
-  apt-get update -qq
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq certbot
-fi
-log "certbot $(certbot --version 2>&1 | awk '{print $2}')"
 
 # ────────────────────────────────────────────────── 3. 80 端口块（HTTP-01 用）
 log "写 80 端口 server 块 → $F80"
@@ -123,9 +142,14 @@ if [ -f "$LIVE/fullchain.pem" ]; then
   log "证书已存在（$LIVE），跳过签发（续期由 certbot 定时器负责）"
 else
   log "向 Let's Encrypt 申请证书：$DOMAIN"
-  if ! certbot certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
+  # --deploy-hook 会写进**这张证书自己的** renewal conf（只对它生效），不碰共享的
+  # certbot 配置。机器既有 stopwatch-cert-renew.timer 跑的是 `certbot renew`，
+  # 它会遍历 /etc/letsencrypt/renewal/ 下所有配置 → 我们这张也会被自动续期，
+  # 续完由这个 hook 校验并 reload nginx。
+  if ! "$CERTBOT" certonly --webroot -w "$WEBROOT" -d "$DOMAIN" \
        --email "$ACME_EMAIL" --agree-tos --no-eff-email \
-       --non-interactive --keep-until-expiring; then
+       --non-interactive --keep-until-expiring \
+       --deploy-hook "nginx -t && systemctl reload nginx"; then
     die "签发失败。常见原因：
      · 80 端口从公网不可达（腾讯云安全组 / 云防火墙要放行 80）
      · A 记录刚改、还没生效（等 1~10 分钟再跑，本脚本可重复执行）
@@ -205,30 +229,31 @@ nginx -t || { rm -f "$ENAB/lexy-mall-domain-443"; die "nginx 配置校验失败�
 systemctl reload nginx
 log "443 块已生效"
 
-# ────────────────────────────────────────────────── 6. 续期保障
-HOOK=/etc/letsencrypt/renewal-hooks/deploy/10-reload-nginx.sh
-if [ ! -f "$HOOK" ]; then
-  log "加全局续期钩子（续期后校验并 reload nginx）"
-  mkdir -p "$(dirname "$HOOK")"
-  cat > "$HOOK" <<'EOF'
-#!/usr/bin/env bash
-# 由 enable-domain-https.sh 添加：任何证书续期成功后，校验并 reload nginx。
-# 注意：只做 reload，不改任何站点配置。
-set -euo pipefail
-nginx -t && systemctl reload nginx
-EOF
-  chmod +x "$HOOK"
+# ────────────────────────────────────────────────── 6. 续期保障（**不新增全局钩子**）
+#
+# 这台机器已有 stopwatch-cert-renew.timer（每 30 分钟）跑：
+#   /opt/certbot-venv/bin/certbot renew --quiet --deploy-hook /usr/local/sbin/stopwatch-cert-deploy
+# `certbot renew` 会遍历 /etc/letsencrypt/renewal/ 下**所有**配置，所以我们这张证书到期前
+# 会被它一并续期；续完由第 4 步写进我们自己 renewal conf 的 deploy-hook 负责 reload nginx。
+#
+# 刻意**不往 /etc/letsencrypt/renewal-hooks/ 放全局脚本**：那是共享资源，会波及别人的业务。
+# 这一节只「核实」，不改动别人的东西。
+RENEWAL_CONF="/etc/letsencrypt/renewal/$DOMAIN.conf"
+if [ -f "$RENEWAL_CONF" ] && grep -q 'reload nginx' "$RENEWAL_CONF"; then
+  log "续期钩子已写进 $RENEWAL_CONF ✓（到期自动续 + 自动 reload nginx）"
 else
-  log "续期钩子已存在，跳过"
+  warn "没在 $RENEWAL_CONF 里看到 reload nginx 的钩子 —— 证书续期后 nginx 可能仍用旧证书"
+  warn "手工在 $RENEWAL_CONF 的 [renewalparams] 段补一行即可："
+  warn "    renew_hook = nginx -t && systemctl reload nginx"
 fi
 
-if systemctl list-timers --all 2>/dev/null | grep -q 'certbot'; then
-  log "certbot 定时器在跑 ✓（$(systemctl list-timers --all | grep certbot | awk '{print $1, $2, $3}' | head -1)）"
+if systemctl list-timers --all 2>/dev/null | grep -qiE 'certbot|stopwatch-cert-renew'; then
+  log "续期定时器在跑 ✓ $(systemctl list-timers --all 2>/dev/null | grep -iE 'certbot|stopwatch-cert-renew' | head -1 | awk '{print $1, $2, $3}')"
 else
-  warn "没找到 certbot 定时续期器 —— 手工加一条 cron 兜底"
-  cat > /etc/cron.d/lexy-cert-renew <<'EOF'
+  warn "没找到任何续期定时器 —— 加一条 cron 兜底（用上面探测到的 certbot 绝对路径）"
+  cat > /etc/cron.d/lexy-cert-renew <<EOF
 # 每天 03:17 与 15:17 尝试续期（certbot 自身只在临期 30 天内才真正续）
-17 3,15 * * * root certbot renew -q --deploy-hook "nginx -t && systemctl reload nginx"
+17 3,15 * * * root $CERTBOT renew -q --deploy-hook "nginx -t && systemctl reload nginx"
 EOF
   log "已写 /etc/cron.d/lexy-cert-renew"
 fi
