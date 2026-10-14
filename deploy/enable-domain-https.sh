@@ -23,12 +23,22 @@
 # 那台机器是**团队共用机**（quality-platform / kingclean-* / video-canvas / postgres 都跑在上面）。
 # 新增**独立配置文件 + symlink**，出错只需删 symlink，不会动到任何人的配置、也不会改默认 server。
 #
+# ⚠️ symlink 名**刻意以 zz- 开头**（zz-lexy-mall-domain-443）—— 不是随手起的，别改回去：
+#   nginx 的 443 默认 server = 「配置加载时**第一个 listen 443** 的块」（这机器上没人显式写 default_server）。
+#   sites-enabled 按**文件名字母序**加载：名字若叫 lexy-mall-domain-443，会排在 stopwatch-lab **之前**，
+#   于是**抢走 443 默认 server** —— 裸 IP 访问（浏览器/curl 用 IP 时**不发 SNI**）会落到本块，
+#   拿到 mall.lexy.cn 证书（IP 链路当场 ERR_TLS_CERT_ALTNAME_INVALID），
+#   而且 stopwatch-lab 里那条 `location / → 127.0.0.1:80` 的 catch-all（/stopwatch/v1/* 等）**全变 404**。
+#   实测过：2026-10-14 首次上线即踩此坑，秒表接口与 IP 链路同时坏。
+#   排在最后 ⇒ 默认 server 仍是 stopwatch-lab；而 SNI=mall.lexy.cn 的请求**按 server_name 精确匹配**，
+#   与加载顺序无关 —— 两头都对。**理由不成立前不要改这个名字。**
+#
 # ⚠️ 前置条件（脚本自己校验，**拿不准就退出**，不猜）：
 #   · 域名 A 记录已指向本机公网 IP —— 否则 HTTP-01 必失败
 #   · 域名已完成 ICP 备案 —— 微信侧要求（本脚本不查备案状态，那是你自己确认的事）
 #
 # 回滚（任一步出错都安全）：
-#   rm -f /etc/nginx/sites-enabled/lexy-mall-domain-80 /etc/nginx/sites-enabled/lexy-mall-domain-443
+#   rm -f /etc/nginx/sites-enabled/lexy-mall-domain-80 /etc/nginx/sites-enabled/zz-lexy-mall-domain-443
 #   nginx -t && systemctl reload nginx
 #   （证书留着无害，下次重跑直接复用。）
 #
@@ -42,6 +52,9 @@ AVAIL=/etc/nginx/sites-available
 ENAB=/etc/nginx/sites-enabled
 F80="$AVAIL/lexy-mall-domain-80"
 F443="$AVAIL/lexy-mall-domain-443"
+# symlink 名刻意与文件名不同：必须排在 stopwatch-lab **之后**（原因见文件头注释）。
+# 80 端口不需要这招 —— 那台的 `default` 块已显式写了 `listen 80 default_server`，不受顺序影响。
+L443="$ENAB/zz-lexy-mall-domain-443"
 LIVE="/etc/letsencrypt/live/$DOMAIN"
 STAMP="$(date +%Y%m%d-%H%M%S)"
 
@@ -184,7 +197,7 @@ cat > "$F443" <<EOF
 #     /mall-api/uploads/x.png   → /uploads/x.png
 #   所以小程序端 BASE_URL 必须带 /mall-api 这一段（与 IP 链路完全一致）。
 #
-# 回滚：rm -f $ENAB/lexy-mall-domain-443 && nginx -t && systemctl reload nginx
+# 回滚：rm -f $ENAB/zz-lexy-mall-domain-443 && nginx -t && systemctl reload nginx
 server {
 $LISTEN443
   server_name $DOMAIN;
@@ -224,8 +237,10 @@ $LISTEN443
 }
 EOF
 
-ln -sfn "$F443" "$ENAB/lexy-mall-domain-443"
-nginx -t || { rm -f "$ENAB/lexy-mall-domain-443"; die "nginx 配置校验失败，已撤销 443 块（原服务未受影响）"; }
+# 清掉历史/错误命名的 symlink —— 名字排在 stopwatch-lab 之前会抢走 443 默认 server（见文件头注释）
+rm -f "$ENAB/lexy-mall-domain-443"
+ln -sfn "$F443" "$L443"
+nginx -t || { rm -f "$L443"; die "nginx 配置校验失败，已撤销 443 块（原服务未受影响）"; }
 systemctl reload nginx
 log "443 块已生效"
 
@@ -314,7 +329,7 @@ cat <<EOF
       新增：https://$DOMAIN
 
   回滚：
-      rm -f $ENAB/lexy-mall-domain-80 $ENAB/lexy-mall-domain-443 \\
+      rm -f $ENAB/lexy-mall-domain-80 $ENAB/zz-lexy-mall-domain-443 \\
         && nginx -t && systemctl reload nginx
       （IP 链路 https://14.103.50.137/mall-api 全程没动，随时可切回去。）
 ────────────────────────────────────────────────────────────────
