@@ -1,0 +1,33 @@
+{
+  "_说明": "微信侧「只能人工办」的外部事实登记表 —— 供 .tooling/preflight-wechat.mjs 读取。",
+  "_为什么需要": "这些事脚本查不到（工信部不给接口、微信后台拿不到），但都办完了。不登记 → 体检永远报「需人工处理」= 假红，分不清「还剩什么没办」 vs「早办完了」。",
+  "_维护约定": "办完一项就把 status 改成 done 并补 doneAt；未办写 pending。只登记**公开信息**（备案号、域名、日期），**禁止写入任何密钥 / 证书 / 序列号 / APIv3 密钥**。",
+  "_字段": "status: done|pending　doneAt: YYYY-MM-DD　no: 备案号等公开编号（可空）　note: 一句话说明",
+
+  "items": {
+    "beian": {
+      "status": "done",
+      "doneAt": "2026-10-15",
+      "no": null,
+      "note": "工信部小程序备案：平台初审 → 12381 短信核验 → 江苏省通信管理局终审通过。备案号（苏ICP备…）待补录。上线后微信会自动在小程序「更多资料」页展示，开发者无需自行悬挂（官方《小程序备案操作指引》(六)）"
+    },
+    "cert": {
+      "status": "done",
+      "doneAt": "2026-10-14",
+      "no": null,
+      "note": "微信认证通过（企业主体）；是备案 / 支付商户号 / 客服 / 手机号快速验证的系统前置"
+    },
+    "requestDomain": {
+      "status": "done",
+      "doneAt": "2026-10-14",
+      "no": null,
+      "note": "request 与 downloadFile 合法域名均填 https://mall.lexy.cn（不带路径、不带端口）；本项目企业主体每月 50 次修改额度"
+    },
+    "domainIcp": {
+      "status": "done",
+      "doneAt": "2026-10-14",
+      "no": null,
+      "note": "lexy.cn 已 ICP 备案（主体=莱克电气股份有限公司，与小程序主体不同但微信不要求一致）；服务器 Let's Encrypt 证书有效期至 2027-01-12"
+    }
+  }
+}

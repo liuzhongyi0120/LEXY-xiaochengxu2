@@ -136,6 +136,17 @@ try {
       '内网 DNS 缺记录 → 找 IT 补；本机应急 → 临时换 DNS 或加 hosts。');
   } else if (/SELF_SIGNED|UNABLE_TO_VERIFY|CERT|SSL|TLS/i.test(code + ' ' + e.message)) {
     block('HTTPS 证书不可信', code + ' —— iOS 端连自签名证书都连不上，正式版必失败；要换受信任 CA 证书（如 Let\'s Encrypt / 腾讯云免费证书）');
+  } else if (/ECONNRESET|socket hang up/i.test(code + ' ' + e.message)) {
+    /* 2026-10-14 已定位：**不是服务器故障**，是公司出口设备按 SNI 拦本域名。
+     * 对照实验（同一 IP:443）：无 SNI / SNI=www.baidu.com / SNI=任意不存在域名 三者全部握手成功，
+     * 只有 SNI=mall.lexy.cn 被 RST（4/4 复现）。真机与平台审核走公共 DNS，不受影响 → 不影响上线。
+     * 这条提示单独给口径，否则每次体检看到 ECONNRESET 都会有人跑去服务器查证书（白忙）。 */
+    warn('连不上线上后端（' + (code || 'ECONNRESET') + '）',
+      '**已知原因、非后端故障**：公司出口设备按 SNI 拦本域名（同 IP:443 下，无 SNI / SNI=www.baidu.com / ' +
+      '任意不存在域名全都能握手，只有 mall.lexy.cn 被 RST，4/4 复现）→ 只影响本机开发者工具，**真机与审核不受影响**。' +
+      '反证：在服务器上执行 curl -s -o /dev/null -w "%{http_code}" https://mall.lexy.cn/mall-api/api/health 应得 200。' +
+      '本机应急：电脑连手机热点，或临时切 IP 链路 node .tooling/switch-env.mjs --url=https://14.103.50.137/mall-api --allow-ip（验完切回）。' +
+      '详见 deploy/添加子域名操作单.md 第七节 7.1');
   } else {
     warn('连不上线上后端', code || String(e.message).slice(0, 80) + '（本机网络/未部署时属预期，上传前务必再跑一次）');
   }
@@ -254,12 +265,33 @@ if (fs.existsSync(sm)) {
 
 /* ─────────── H. 人工项（脚本给结论，动作在微信后台/工信部） ─────────── */
 rows.push({ level: 'head', name: 'H. 只能人工办的前置条件' });
-[
-  ['小程序 ICP 备案（工信部）', '2023-09-01 起所有新上线小程序必须**先备案再提审**：后台「设置-基础设置-小程序备案」→ 平台初审 → 12381 短信核验（24 小时内）→ 管局终审（1~20 工作日）'],
-  ['域名 ICP 备案 + 受信任 HTTPS 证书', '服务器域名只需**已 ICP 备案**即可 —— 微信**不要求**域名备案主体与小程序主体相同（这是两条独立的主体线，别混）；不支持 IP / localhost；iOS 不认自签名证书'],
-  ['微信认证（企业 300 元/年）', '备案的前置条件，也是开通支付/客服/手机号的前提'],
-  ['request 合法域名', '把后端域名填进「开发-开发设置-服务器域名-request 合法域名」；每个类型每月最多改 5 次']
-].forEach(([n, d]) => warn(n, d));
+
+/* 这些事脚本查不到（工信部不给接口、微信后台拿不到），但**办完了就不该一直报红**——
+ * 否则体检永远显示「需人工处理 N 项」，分不清「还剩什么没办」和「早就办完了」（假红）。
+ * 已办完的事实登记在 deploy/wechat-external.json（**只放公开信息**：备案号/域名/日期）。 */
+const EXT_PATH = path.join(ROOT, 'deploy', 'wechat-external.json');
+let EXT = null;
+try { EXT = readJson(EXT_PATH); } catch { /* 缺失时全部按未办提示（保守方向，不会漏报） */ }
+const extDone = (k) => {
+  const it = EXT && EXT.items && EXT.items[k];
+  if (!it || it.status !== 'done') return '';
+  return [it.doneAt || '日期未记', it.no, it.note].filter(Boolean).join('　·　');
+};
+const extRow = (key, name, pendingHint) => {
+  const d = extDone(key);
+  if (d) ok(name + '（已完成）', d);
+  else warn(name, pendingHint);
+};
+if (!EXT) warn('deploy/wechat-external.json 缺失', '外部事实登记表不在 → 下列各项一律按「未办」提示（保守，不会漏报）；见该文件 _说明');
+
+extRow('beian', '小程序 ICP 备案（工信部）',
+  '2023-09-01 起所有新上线小程序必须**先备案再提审**：后台「设置-基础设置-小程序备案」→ 平台初审 → 12381 短信核验（24 小时内）→ 管局终审（1~20 工作日）');
+extRow('domainIcp', '域名 ICP 备案 + 受信任 HTTPS 证书',
+  '服务器域名只需**已 ICP 备案**即可 —— 微信**不要求**域名备案主体与小程序主体相同（这是两条独立的主体线，别混）；不支持 IP / localhost；iOS 不认自签名证书');
+extRow('cert', '微信认证（企业 300 元/年）',
+  '备案的前置条件，也是开通支付/客服/手机号的前提');
+extRow('requestDomain', 'request 合法域名',
+  '把后端域名填进「开发-开发设置-服务器域名-request 合法域名」；每个类型每月最多改 5 次');
 
 /* ─────────── 输出 ─────────── */
 const mark = { ok: '  OK  ', warn: ' WARN ', block: ' FAIL ', head: '' };
