@@ -197,7 +197,9 @@ async function buildPayment(db, userId, orderId) {
     openid: user.openid,
     orderNo: order.orderNo,
     amountFen: order.amounts.payAmount,
-    description: order.items.map((i) => i.name).join('、').slice(0, 60)
+    description: order.items.map((i) => i.name).join('、').slice(0, 60),
+    // 让微信侧与本地订单**同时**过期：只靠本地兜底，用户可能对着一个微信已经关掉的单反复付款
+    expireAt: order.payExpireAt
   });
   /*
    * `sandbox` 如实告诉小程序端「这次支付参数是沙箱造的」。

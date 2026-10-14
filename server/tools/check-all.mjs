@@ -54,6 +54,7 @@ let seq = 0;
  *    auth    true=小程序用户令牌（默认）；false=不带用户令牌
  *    admin   null=按路径自动（管理前缀带管理员令牌）；true=强制带；false=强制不带
  *    bearer  直接指定令牌（用于「校验某个令牌是否有效」这类场景）
+ *    extraHeaders  额外请求头（用于支付回调的 Wechatpay-* 验签头这类场景）
  *
  *  expectFail：预期被拦截（配合 expectHttp / expectCode 做精确双断言）
  *  raw / contentType：原始请求体，用于「非法 JSON / 非对象 JSON」这类解析回归
@@ -66,7 +67,7 @@ async function call(method, path, opts = {}) {
     query, body, raw = null, contentType = '',
     auth = true, admin = null, bearer = '',
     expectFail = '', expectHttp = null, expectCode = null,
-    silent = false, form = null
+    silent = false, form = null, extraHeaders = null
   } = opts;
 
   let url = BASE + path;
@@ -84,6 +85,8 @@ async function call(method, path, opts = {}) {
   if (bearer) headers.Authorization = `Bearer ${bearer}`;
   else if (useAdmin && adminToken) headers.Authorization = `Bearer ${adminToken}`;
   else if (auth && token) headers.Authorization = `Bearer ${token}`;
+  // 额外头最后合并 —— 允许用例覆盖 Content-Type 之外的任意头（如 Wechatpay-*）
+  if (extraHeaders) Object.assign(headers, extraHeaders);
 
   let payload;
   if (form) {
@@ -495,21 +498,93 @@ if (order2.ok) {
   await call('POST', '/api/order/cancel', { body: { orderId: order2.data.orderId }, expectFail: '重复取消被拦截', expectHttp: 200, expectCode: 2000 });
 }
 
-/* 11. 支付回调点位（独立下单后触发） */
+/* 11. 支付回调点位（独立下单后触发）
+ *
+ * ⚠️ 这条路径**只能锁「拒绝」，不能锁「成功」**，理由是它同时踩了两个坑：
+ *   1) `auth: false` —— 微信服务器不带用户令牌调用，所以它**公网开放**；
+ *   2) 旧实现 `verifyNotifySignature()` 是 `return !HAS_WX_PAY` —— 没配商户号就**直接放行**，
+ *      于是任何人 POST 一个订单号就能把订单标成已支付（已修）。
+ * 现在：沙箱模式一律拒绝；真实模式严格验签（时间戳 ±5 分钟防重放 + RSA-SHA256 验签）。
+ * 真实回调的**成功分支**由 `.tooling/test-wxpay.mjs` 在单元层覆盖（自造 RSA 密钥对扮演微信，
+ * 含 AES-GCM 解密往返 + 篡改一字节必拒）。这里验的是**安全属性**：
+ * 伪造通知进不来、且即便进过也改不动订单。
+ * 入账与幂等改走 `/api/pay/mock-success`（与真实回调**同一条** `orderLib.markPaid` 路径）。
+ */
 const order3 = await call('POST', '/api/order/precreate', {
   body: { items: [{ goodsId, skuId: sku.skuId, quantity: 1 }], addressId, remark: '回调测试' }
 });
 if (order3.ok) {
-  const notify = await call('POST', '/api/pay/notify', {
-    auth: false,
-    body: { orderNo: order3.data.orderNo, transactionId: 'CHECKTX_' + order3.data.orderNo, payAmountFen: order3.data.amounts.payAmount }
+  const forgeBody = {
+    orderNo: order3.data.orderNo,
+    transactionId: 'CHECKTX_' + order3.data.orderNo,
+    payAmountFen: order3.data.amounts.payAmount
+  };
+  const salesOf = (list) => {
+    const hit = (list || []).find((g) => g.goodsId === goodsId);
+    return hit ? hit.sales : null;
+  };
+  /* 伪造通知**之前**的销量基线：用来证明「被拒的回调一点副作用都没留下」 */
+  const salesBeforeForge = await readAllSales();
+
+  /* 11a 连验签头都没有的伪造通知 —— 必须被拒（这条就是上面第 2 个坑的回归锁） */
+  const forged = await call('POST', '/api/pay/notify', {
+    auth: false, body: forgeBody,
+    expectFail: '未验签的支付回调被拒', expectHttp: 403
   });
-  assert('支付回调返回 SUCCESS', notify.ok && notify.data.errmsg === 'SUCCESS', `code=${notify.json && notify.json.code}`);
-  const dup = await call('POST', '/api/pay/notify', {
-    auth: false,
-    body: { orderNo: order3.data.orderNo, transactionId: 'CHECKTX_' + order3.data.orderNo, payAmountFen: order3.data.amounts.payAmount }
+  assert('伪造的支付回调被拒（HTTP 403 + FAIL，沙箱下绝不放行）',
+    forged.httpStatus === 403 && !!forged.json && forged.json.code === 'FAIL' && !!forged.json.message,
+    `HTTP ${forged.httpStatus} / ${JSON.stringify(forged.json)}`);
+
+  /* 11b 验签头四件套齐备但签名是编的 —— 不能写成「只看头在不在」 */
+  const forged2 = await call('POST', '/api/pay/notify', {
+    auth: false, body: forgeBody,
+    extraHeaders: {
+      'Wechatpay-Serial': 'PUB_KEY_ID_FORGED',
+      'Wechatpay-Timestamp': String(Math.floor(Date.now() / 1000)),
+      'Wechatpay-Nonce': 'forgednonce',
+      'Wechatpay-Signature': 'Zm9yZ2Vk'
+    },
+    expectFail: '验签头齐全但签名是编的，同样被拒', expectHttp: 403
   });
-  assert('重复回调幂等（duplicated=true）', dup.ok && dup.data.duplicated === true, `duplicated=${dup.data && dup.data.duplicated}`);
+  assert('凑齐四个验签头但签名伪造 → 仍被拒（不是「有头就放行」）',
+    forged2.httpStatus === 403 && !!forged2.json && forged2.json.code === 'FAIL',
+    `HTTP ${forged2.httpStatus} / ${JSON.stringify(forged2.json)}`);
+
+  /* 11c 真正的安全属性：被拒之后订单不得被标成已支付、也不得留下任何入账副作用。
+   * 这两条是 11a/11b 的「后果断言」—— 只断言「返回了 403」挡不住
+   * 「返回 403 但订单已经悄悄入账」这种实现。 */
+  const untouched = await call('POST', '/api/pay/query', { body: { orderId: order3.data.orderId } });
+  const salesAfterForge = await readAllSales();
+  assert('被拒的回调没有改变订单支付状态（仍为待付款）',
+    untouched.ok && untouched.data.status === 'pending_pay',
+    `实际 ${untouched.data && untouched.data.status}`);
+  assert('被拒的回调没有留下入账副作用（销量未被累加）',
+    salesBeforeForge !== null && salesAfterForge !== null &&
+    salesOf(salesAfterForge) === salesOf(salesBeforeForge),
+    `销量 ${salesOf(salesBeforeForge)} → ${salesOf(salesAfterForge)}` +
+    `（基线取不到时为 null，同样判失败）`);
+
+  /* 11d 入账 + 幂等：走联调入口连发两次（与真实回调同一条 markPaid 路径）。
+   * 说明白它的边界，免得后人以为是「强断言」：markPaid 对重复通知有**两道早退**
+   * （① 同 transactionId 已在 payLogs；② 订单状态已不是待付款），所以「第二次不重复入账」
+   * 在当前实现下不是靠这条断言发现的。这条锁的是「重复调用不得报错 + 三个可见值不变」，
+   * 作为「有人把早退删掉 / 让重复调用抛错」时的回归锁 —— 真正的入账副作用由 11c 那条兜。 */
+  const payOnce = await call('POST', '/api/pay/mock-success', { body: { orderId: order3.data.orderId } });
+  const afterFirst = await call('GET', '/api/order/detail', { query: { orderId: order3.data.orderId } });
+  const salesFirst = await readAllSales();
+  const again = await call('POST', '/api/pay/mock-success', { body: { orderId: order3.data.orderId } });
+  const afterAgain = await call('GET', '/api/order/detail', { query: { orderId: order3.data.orderId } });
+  const salesAgain = await readAllSales();
+  assert('支付成功入账后订单转为待发货',
+    payOnce.ok && afterFirst.data.status === 'pending_ship',
+    `实际 ${afterFirst.data && afterFirst.data.status}`);
+  assert('重复的支付成功通知幂等：状态/支付时间/销量三者都不变（重复调用不报错、不重复入账）',
+    again.ok && afterAgain.data.status === 'pending_ship' &&
+    !!afterAgain.data.paidAt && afterAgain.data.paidAt === afterFirst.data.paidAt &&
+    salesAgain !== null && salesOf(salesAgain) === salesOf(salesFirst),
+    `状态 ${afterAgain.data && afterAgain.data.status}` +
+    `｜paidAt ${afterFirst.data && afterFirst.data.paidAt} → ${afterAgain.data && afterAgain.data.paidAt}` +
+    `｜sales ${salesOf(salesFirst)} → ${salesOf(salesAgain)}`);
 }
 
 /* 12. 收藏 / 足迹 */

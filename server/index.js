@@ -17,7 +17,8 @@ const fs = require('node:fs');
 const nodePath = require('node:path');
 const { URL } = require('node:url');
 
-const { parseBody, parseQuery, ok, fail, preflight, BizError, ERR } = require('./lib/http');
+const { parseBody, parseRawBody, parseQuery, ok, fail, preflight, send, isRawHttp,
+  BizError, ERR } = require('./lib/http');
 const authLib = require('./lib/auth');
 const adminAuth = require('./lib/adminAuth');
 const store = require('./lib/store');
@@ -554,9 +555,14 @@ const server = http.createServer(async (req, res) => {
   try {
     const query = parseQuery(req.url);
     // raw 点位（文件上传）自己读原始流，不能用 JSON 解析器消耗掉
+    // rawBody 点位（签名 / 验签，如微信支付回调）要保留**原始字符串**：
+    //   重新 stringify 会改变字节，验签必然失败 —— 这类点位同样不能走 JSON 解析器
     let body = {};
     let deleteBody = {};
-    if (!route.raw) {
+    let rawBody = '';
+    if (route.rawBody) {
+      rawBody = await parseRawBody(req);
+    } else if (!route.raw) {
       body = method === 'GET' || method === 'DELETE' ? {} : await parseBody(req);
       // DELETE 允许把参数放 body（wx.request 的 DELETE 行为），也兼容 query
       deleteBody = method === 'DELETE' ? await parseBody(req) : {};
@@ -580,12 +586,25 @@ const server = http.createServer(async (req, res) => {
       userId,
       params,
       query,
-      body: Object.assign({}, body, deleteBody)
+      body: Object.assign({}, body, deleteBody),
+      rawBody
     };
 
     const data = await route.handler(ctx);
     // 请求过程中可能产生数据变更（含惰性过期），统一提交
     store.commit();
+
+    /*
+     * 自行掌控应答的点位（如微信支付回调）：
+     * 微信要求应答体是 `{"code":"SUCCESS","message":"成功"}`，
+     * 用统一结构 `{code:0,msg,data}` 包装就不符合规范了 → 原样发出，不打包装。
+     */
+    if (isRawHttp(data)) {
+      const status = data.status || 200;
+      send(res, status, data.body === undefined ? null : data.body);
+      log(`${method} ${path} → ${status} (${Date.now() - started}ms)`);
+      return;
+    }
 
     ok(res, data);
     log(`${method} ${path} → 200 (${Date.now() - started}ms)`);

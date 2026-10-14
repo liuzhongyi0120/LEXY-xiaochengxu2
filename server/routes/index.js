@@ -68,6 +68,7 @@ function withSample(r) {
     adminRole: isAdmin ? adminAuth.minRoleFor(r.method, r.path) : '',
     dev: !!r.dev,
     raw: !!r.raw, // 按原始流读取（文件上传类点位，调试台不套 JSON 头）
+    rawBody: !!r.rawBody, // 保留原始字符串（签名/验签类点位，如微信支付回调）
     desc: r.desc || '',
     note: s.note || '',
     sample: { query: s.query || null, body: s.body || null }

@@ -6,12 +6,13 @@
  *   - 未配置                       → 走本地模拟实现，返回可预测的 openid，
  *                                    小程序端全链路可跑通，无需等待商户资料
  *
- * 支付同理：配置了 WX_MCH_ID + 证书则生成真实 JSAPI 支付参数，
- * 否则返回沙箱参数并把订单标记为「可模拟支付成功」，便于联调回调链路。
+ * 支付：真实支付的**协议细节全部在 lib/wxpay.js**（v3 签名 / 下单 / 公钥验签 / AES-GCM 解密），
+ * 本文件只决定「走真实还是走沙箱」。是否走真实由 lib/wxpay.HAS_V3 决定（五项凭据缺一即回落沙箱）。
  */
 
 const crypto = require('node:crypto');
 const { BizError, ERR } = require('./http');
+const wxpay = require('./wxpay');
 
 const WX_APPID = process.env.WX_APPID || '';
 const WX_SECRET = process.env.WX_SECRET || '';
@@ -19,7 +20,18 @@ const WX_MCH_ID = process.env.WX_MCH_ID || '';
 const WX_PAY_KEY = process.env.WX_PAY_KEY || '';
 
 const HAS_WX_LOGIN = !!(WX_APPID && WX_SECRET);
-const HAS_WX_PAY = !!(WX_APPID && WX_MCH_ID && WX_PAY_KEY);
+
+/**
+ * 「真实支付可用」= 所有凭据齐备（见 lib/wxpay.js 的 HAS_V3）。
+ *
+ * ⚠️ 判据刻意收紧成「全有或全无」：只差公钥时会**整体回落沙箱**。
+ *    否则会出现最坏的一种状态 —— 下单成功、回调验签必失败，
+ *    用户付了钱而订单还是「待付款」。宁可明确走沙箱，也不要「半通」。
+ */
+const HAS_WX_PAY = !!(WX_APPID && WX_MCH_ID && WX_PAY_KEY && wxpay.HAS_V3);
+if (WX_MCH_ID && WX_PAY_KEY && !wxpay.HAS_V3) {
+  console.warn('[warn] 已填商户号/密钥但真实支付未启用，缺少：' + wxpay.missingPieces().join('、'));
+}
 
 /**
  * code2Session：用 wx.login 的 code 换 openid / session_key
@@ -86,24 +98,24 @@ async function getPhoneNumber(code, fallback = '') {
 
 /**
  * JSAPI 统一下单，返回小程序 wx.requestPayment 所需参数
- * @param {object} p { openid, orderNo, amountFen, description }
+ * @param {object} p { openid, orderNo, amountFen, description, expireAt }
  */
-async function unifiedOrder({ openid, orderNo, amountFen, description }) {
+async function unifiedOrder({ openid, orderNo, amountFen, description, expireAt }) {
   if (!HAS_WX_PAY) {
     // 联调模式：返回结构完整的沙箱参数，前端可照常走通「拉起支付」之外的流程
     const sandbox = `prepay_sandbox_${orderNo.slice(-10)}`;
     return buildPayParams(sandbox, false);
   }
-  // 真实环境：此处接微信支付 v3 JSAPI 下单（需商户私钥签名）
-  // 生产接入点：POST https://api.mch.weixin.qq.com/v3/pay/transactions/jsapi
-  throw new Error('微信支付 v3 证书未配置：请设置 WX_MCH_CERT 与 WX_MCH_KEY_PATH 后再启用');
+  // 真实环境：APIv3 JSAPI 下单（商户私钥 RSA-SHA256 签名）→ 再用私钥签小程序支付参数
+  const prepayId = await wxpay.jsapiPrepay({ openid, orderNo, amountFen, description, expireAt });
+  return wxpay.buildPayParams(prepayId);
 }
 
 function nonceStr() {
   return crypto.randomBytes(16).toString('hex');
 }
 
-/** 生成 wx.requestPayment 参数（真实模式必须用商户私钥 RSA 签名，此处仅沙箱占位） */
+/** 生成 wx.requestPayment 参数（**沙箱占位**；真实参数由 lib/wxpay.buildPayParams 产出） */
 function buildPayParams(prepayId, real) {
   const params = {
     timeStamp: String(Math.floor(Date.now() / 1000)),
@@ -123,16 +135,40 @@ function buildPayParams(prepayId, real) {
   return params;
 }
 
-/** 支付回调验签（真实模式接微信 v3 平台证书验签） */
-function verifyNotifySignature() {
-  return !HAS_WX_PAY; // 未配置商户时视为沙箱回调，直接放行
+/**
+ * 支付回调验签 —— **安全关键路径**
+ *
+ * ⚠️ 这里修掉了一个真实存在的漏洞。旧实现只有一行 `return !HAS_WX_PAY`，
+ *    意思是「没配商户号就放行」。而 `/api/pay/notify` 是公网开放点位（`auth: false`），
+ *    于是任何人都能 POST 一个订单号把订单标成「已支付」—— 白拿商品。
+ *    「当前是沙箱环境」不构成理由：联调走的是 `/api/pay/mock-success`
+ *    （需登录，且服务端走**与真实回调完全相同**的处理路径），根本不需要开放 notify。
+ *
+ * 现在的口径：沙箱模式一律拒绝并说明；真实模式严格验签（三项判据见 lib/wxpay.verifyNotify）。
+ *
+ * @param {object} headers 原始请求头
+ * @param {string} rawBody 原始请求体字符串（**不能**用重新序列化的 JSON：字节不同则签名必不匹配）
+ * @returns {Promise<{ok:boolean, reason:string}>}
+ */
+async function verifyNotify(headers, rawBody) {
+  if (!HAS_WX_PAY) {
+    return { ok: false, reason: '未启用真实微信支付，支付回调已关闭（联调请用 /api/pay/mock-success）' };
+  }
+  return wxpay.verifyNotify(headers, rawBody);
+}
+
+/** 主动查单（回调丢失时的兜底），未启用真实支付时返回 ok:false */
+async function queryPayment(orderNo) {
+  if (!HAS_WX_PAY) return { ok: false, status: 0, trade: null };
+  return wxpay.queryByOutTradeNo(orderNo);
 }
 
 module.exports = {
   code2Session,
   getPhoneNumber,
   unifiedOrder,
-  verifyNotifySignature,
+  verifyNotify,
+  queryPayment,
   HAS_WX_LOGIN,
   HAS_WX_PAY,
   WX_APPID,

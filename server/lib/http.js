@@ -122,6 +122,53 @@ function parseQuery(url) {
   return numericize(raw);
 }
 
+/**
+ * 读取原始请求体**字符串**（不解析）。给「签名/验签」类点位用。
+ *
+ * 为什么必须单独有一个（不能复用 parseBody 的产物）：
+ *   微信支付回调的验签，签的是**微信发来的那串字节**。
+ *   如果拿 `JSON.parse` 之后再 `JSON.stringify` 回去，键顺序、空格、转义都可能变
+ *   —— 字符串一变，验签必然失败，而且失败得毫无线索（看着像密钥配错了）。
+ *   所以这类路由必须拿到**原样**的 body。
+ */
+function parseRawBody(req, limit = MAX_JSON_BODY) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    let size = 0;
+    let settled = false;
+    const done = (fn, v) => { if (!settled) { settled = true; fn(v); } };
+
+    req.on('data', (chunk) => {
+      size += chunk.length;
+      if (size > limit) {
+        req.destroy();
+        done(reject, new BizError('请求体过大', ERR.PARAM, 413));
+        return;
+      }
+      chunks.push(chunk);
+    });
+    req.on('end', () => done(resolve, Buffer.concat(chunks).toString('utf8')));
+    req.on('error', () => done(reject, new BizError('读取请求体失败', ERR.PARAM, 400)));
+  });
+}
+
+/**
+ * 「自行掌控 HTTP 应答」的哨兵。
+ *
+ * 绝大多数点位适合统一响应 `{code,msg,data}`，但**微信支付回调**不行：
+ * 它要求应答体形如 `{"code":"SUCCESS","message":"成功"}`，用统一结构包装会不符合规范。
+ * 用 Symbol 而不是普通字符串键，是为了**结构上不可能与业务字段撞名**
+ * （`Symbol.for` 走全局注册表，跨模块拿到的是同一个）。
+ * 用法：`return rawHttp(200, { code: 'SUCCESS', message: '成功' })`
+ */
+const RAW_HTTP = Symbol.for('lexy.rawHttp');
+function rawHttp(status, body) {
+  return { [RAW_HTTP]: true, status, body };
+}
+function isRawHttp(v) {
+  return !!(v && v[RAW_HTTP]);
+}
+
 function corsHeaders() {
   return {
     'Access-Control-Allow-Origin': '*',
@@ -162,10 +209,14 @@ module.exports = {
   ERR,
   BizError,
   parseBody,
+  parseRawBody,
   parseQuery,
   send,
   ok,
   fail,
   preflight,
-  corsHeaders
+  corsHeaders,
+  RAW_HTTP,
+  rawHttp,
+  isRawHttp
 };
