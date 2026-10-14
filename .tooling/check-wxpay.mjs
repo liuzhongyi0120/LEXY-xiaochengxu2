@@ -194,6 +194,59 @@ if (WANT_ORDER) {
   }
 }
 
+/* ── 5. 公钥验签实测 ─────────────────────────────────────────────────── */
+/* 这一节回答一个关键问题：**这把公钥到底能不能验通微信的签名**。
+ * 公钥只用于「验签微信的应答/回调」，与产品权限**无关** → 所以 JSAPI 权限还没开通时
+ * 也能把这条链路完整验完（等待审核期间唯一能提前验完的一环）。
+ * 做法：发一次只读请求，把**微信应答的原始头 + 原始体**拿来做一次完整验签，并加一条
+ * 「篡改原始体必须验签失败」的反面对照 —— 否则「验签通过」可能只是验签器根本没在比对。 */
+console.log('\n【5】公钥验签实测');
+const pubPath = PUB_PATH || (fs.existsSync(APP_DIR + '/cert/pub_key.pem') ? APP_DIR + '/cert/pub_key.pem' : '');
+let pubKeyPem = '';
+if (!pubPath) {
+  bad('找不到公钥文件（WX_PAY_PUBLIC_KEY_PATH 未配，且 ' + APP_DIR + '/cert/pub_key.pem 不存在）');
+} else {
+  try {
+    pubKeyPem = fs.readFileSync(pubPath, 'utf8');
+    if (!/-----BEGIN PUBLIC KEY-----/.test(pubKeyPem)) throw new Error('不是 PEM 公钥（缺少 BEGIN PUBLIC KEY 头）');
+    const pk = crypto.createPublicKey(pubKeyPem);
+    const bits = (pk.asymmetricKeyDetails && pk.asymmetricKeyDetails.modulusLength) || 0;
+    ok(`公钥可解析 —— ${pubPath}${bits ? '（' + bits + ' bit）' : ''}`);
+  } catch (e) {
+    pubKeyPem = '';
+    bad('公钥无法解析：' + (e.message || e));
+  }
+}
+
+if (pubKeyPem && MCH_ID && privateKey) {
+  try {
+    const p5 = '/v3/merchant-service/complaints-v2?begin_date=2026-10-01&end_date=2026-10-14&limit=1';
+    const r5 = await fetch('https://api.mch.weixin.qq.com' + p5, { headers: { ...H, Authorization: auth('GET', p5) } });
+    const raw5 = await r5.text();
+    const serial5 = r5.headers.get('wechatpay-serial') || '';
+    const t5 = r5.headers.get('wechatpay-timestamp') || '';
+    const n5 = r5.headers.get('wechatpay-nonce') || '';
+    const sig5 = r5.headers.get('wechatpay-signature') || '';
+    if (!sig5) {
+      bad('微信应答没带 Wechatpay-Signature，无法验签（HTTP ' + r5.status + '）');
+    } else {
+      info('微信应答头 Wechatpay-Serial = ' + serial5);
+      if (/^PUB_KEY_ID_/.test(serial5)) info('形态：微信支付**公钥**模式（与新版商户一致 ✓）');
+      else if (/^[0-9A-Fa-f]{32}$/.test(serial5)) info('形态：32 位十六进制 → **平台证书**模式（老商户路线）');
+      else info('形态：未知 —— 需人工确认');
+      const msg5 = `${t5}\n${n5}\n${raw5}\n`;
+      const pass = crypto.createVerify('RSA-SHA256').update(msg5).verify(pubKeyPem, sig5, 'base64');
+      if (pass) ok('★ 用这把公钥验签微信应答 → **验签通过**（公钥真实有效 + 验签代码正确）');
+      else bad('验签不通过（公钥与微信当前签名不匹配 —— 确认下载的是本商户号的公钥）');
+      const tampered = crypto.createVerify('RSA-SHA256').update(`${t5}\n${n5}\n${raw5} \n`).verify(pubKeyPem, sig5, 'base64');
+      if (!tampered) ok('反面对照：篡改原始体后验签失败（证明验签器真的在比对，不是恒真）');
+      else bad('反面对照失败：篡改后仍通过 → 验签实现有问题');
+    }
+  } catch (e) {
+    bad('发起验签实测失败：' + (e.message || e));
+  }
+}
+
 /* ── 汇总 ────────────────────────────────────────────────────────────── */
 console.log('\n' + '─'.repeat(56));
 if (fails) {
