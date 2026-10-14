@@ -187,6 +187,10 @@ if (WANT_ORDER) {
       bad(`下单失败 HTTP ${r.status} ${code}：${msg}`);
       if (/产品权限未开通|NO_AUTH/.test(code + msg)) {
         info('→ 去商户平台「产品中心」开通「JSAPI 支付」（需先绑定 AppID）');
+        info('   ⚠️ 若该平台**根本没有「产品中心」**（顶部导航只有「账户中心 / 数据中心」）→');
+        info('      这是「开不了产品权限」的号（多为服务商模式的特约/子商户、或平台协助入驻的号），');
+        info('      去「产品中心」这个提示指向一个进不去的入口。先跑 `node .tooling/probe-mch.mjs`');
+        info('      看能力分层；处置见 deploy/微信支付接入清单.md 第零节（出路=另开「普通商户」号）。');
       } else if (/APPID_MCHID_NOT_MATCH|appid/i.test(code + msg)) {
         info('→ 商户平台「产品中心 → AppID账号管理」绑定 ' + APPID + '，并到小程序后台确认（双向）');
       }
