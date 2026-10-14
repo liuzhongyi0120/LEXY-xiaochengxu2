@@ -11,6 +11,7 @@
 | `enable-nginx-mall.sh` | 把上面那段插进 `sites-available/lexy-official-site`（先带时间戳备份 → 插入 → `nginx -t` → reload → 本机 http/https 双探针）。幂等，重复执行会跳过 |
 | `enable-domain-https.sh` | **给已备案域名挂 HTTPS**（微信「服务器域名」不接受 IP，见 `域名上线手册.md`）。用法：`DOMAIN=mall.lexy.cn bash enable-domain-https.sh`。先校验 A 记录**真的**指向本机公网 IP（不通过就退出，不猜）→ 80 块（acme webroot）→ `certbot certonly` 签**该域名**的证书 → 443 块直接反代 3000。**独立配置文件 + symlink**，不碰同机别人的站点、也**不碰** 443 上那张 `14.103.50.137` 的 IP 证书。幂等、可单独回滚 |
 | `域名上线手册.md` | 换域名的完整方案：三条路径对比 / 分工表 / 三步操作 / 验证清单 / 回滚 / 时间线 / 常见卡点 |
+| `添加子域名操作单.md` | **「怎么加这条 A 记录」的逐格操作单**：易名中国控制台入口（含免主账号的 `ename.net/dns` 入口）/ 每格填什么 / 四个会踩的坑 / 加完怎么验 / **可直接转发给 IT 的消息模板** |
 | `.build/` | 打包产物 `lexy-backend.tar.gz`，**不入 Git**（每次部署重新打） |
 
 完整部署步骤、机器信息、端口/证书链路、回滚方式见 `../server/README.md` 的「八、已部署实例（腾讯云 CVM）」。
