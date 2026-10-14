@@ -69,6 +69,34 @@ if (unreachable.length) {
 }
 console.log('');
 
+/* ── 本机系统解析（getaddrinfo）—— 与上面的公共 DNS 检查**不是同一件事** ──────
+ *   公共 DNS 通 = 权威记录已生效 → 服务器脚本 / 微信真机 / 平台审核都够用；
+ *   系统解析通  = **你本机**（开发者工具、本机 curl）能连上。
+ * 2026-10-14 实测踩到：IT 加完记录、三个公共 DNS 全 ✓，本机 lookup 却仍 ENOTFOUND
+ *   （本机 DNS 是内网 192.168.0.7 / 192.168.2.7，负缓存未过期或上游不通）
+ *   → preflight 的「线上健康」当场报红，极易被误读成「服务器挂了 / 证书签错了」。
+ * 所以单独查一次、单独给口径：**它不阻塞上线**，只影响本机预览。
+ */
+const sysLookup = (name) =>
+  new Promise((res) => dns.lookup(name, (err, addr) => res(err ? { err: err.code } : { addr })));
+
+console.log('本机系统解析（开发者工具 / 本机 curl 用的那条路）');
+const sysServers = dns.getServers();
+console.log('  系统 DNS：' + (sysServers.length ? sysServers.join(', ') : '(读不到)'));
+const sl = await sysLookup(DOMAIN);
+if (sl.addr) {
+  console.log('  ' + DOMAIN + ' → ' + sl.addr + (sl.addr === EXPECT ? '  ✓' : '  ✗ 不等于 ' + EXPECT));
+  console.log('  ✓ 本机也能解析 —— 开发者工具可直接连。');
+} else {
+  console.log('  ' + DOMAIN + ' → ' + sl.err + '  ⚠️');
+  console.log('  ⚠️ 本机解析不了这个域名。**这不阻塞上线**（真机 / 平台审核走公共 DNS，上面已验证正常），');
+  console.log('     但**本机开发者工具（模拟器）会直接请求失败**。任选一条处置：');
+  console.log('       a) 等负缓存过期（一般 5~10 分钟）再试 —— 先清缓存：ipconfig /flushdns');
+  console.log('       b) 把本机 DNS 临时改成 223.5.5.5 / 119.29.29.29（改完同样 /flushdns）');
+  console.log('       c) hosts 加一行（仅本机开发用，用完删）：' + EXPECT + ' ' + DOMAIN);
+}
+console.log('');
+
 if (responders === 0) {
   console.log('✗ 一个 DNS 都没问通 —— 本机网络可能挡了外部 DNS 查询。');
   console.log('  换台机器/手机热点再试，或直接用 nslookup ' + DOMAIN + ' 8.8.8.8 手工确认。');

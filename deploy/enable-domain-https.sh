@@ -259,6 +259,31 @@ EOF
 fi
 
 # ────────────────────────────────────────────────── 7. 本机探针（不依赖公网 DNS）
+#
+# ⚠️ 先等 443 真的切过来。`systemctl reload nginx` 是**异步**的：它发完 HUP 就返回，
+#    master 这时才去解析新配置、拉起新 worker；在这个窗口里**旧 worker 仍在接受连接**，
+#    于是立刻探测会拿到**旧配置**（那张 14.103.50.137 的 IP 证书）→ curl 报
+#      curl: (60) SSL: no alternative certificate subject name matches target host name
+#    本轮实测踩到：脚本内探针报红、30 秒后手工复测全绿（HTTP 200 / ssl_verify=0）。
+#    这种「假红」最坑人 —— 会让人以为证书签错了，跑去删配置重签。
+#    判据：不是看「nginx -t 通过」，而是看 **443 上是否已经在回报本域名的证书**。
+log "等待 443 生效（reload 异步，旧 worker 会短暂用旧配置应答）"
+wait_cert() {
+  for _ in $(seq 1 15); do
+    subj="$(echo | openssl s_client -connect 127.0.0.1:443 -servername "$DOMAIN" 2>/dev/null \
+             | openssl x509 -noout -subject 2>/dev/null || true)"
+    case "$subj" in *"$DOMAIN"*) return 0 ;; esac
+    sleep 1
+  done
+  return 1
+}
+if wait_cert; then
+  log "443 已在回报 $DOMAIN 的证书 ✓"
+else
+  warn "等 15 秒仍没看到 $DOMAIN 的证书 —— 下面的探针可能仍报 SNI 不匹配"
+  warn "（多半还是 reload 竞态，直接重跑本脚本即可；证书已签好，重跑不会重复申请）"
+fi
+
 log "探针 1/3：走本机解析的 HTTPS 请求（--resolve，绕开公网 DNS 缓存）"
 curl -fsS -m 10 --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/mall-api/api/health"
 echo

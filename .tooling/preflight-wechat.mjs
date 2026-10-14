@@ -123,7 +123,18 @@ try {
 } catch (e) {
   rows.push({ level: 'head', name: 'D. 线上健康（GET ' + BASE_URL + '/api/health）' });
   const code = (e && (e.code || (e.cause && e.cause.code))) || '';
-  if (/SELF_SIGNED|UNABLE_TO_VERIFY|CERT|SSL|TLS/i.test(code + ' ' + e.message)) {
+  if (/ENOTFOUND|ENODATA/i.test(code)) {
+    /* 「域名解析不了」≠「后端挂了」。这两件事的处理方式完全相反，混在一起会把人带偏：
+     * 2026-10-14 实测：IT 在公网 DNS（易名）加好 A 记录、三个公共 DNS 全 ✓、服务器侧三个探针
+     * 全绿，但**本机** lookup 仍 ENOTFOUND —— 因为 lexy.cn 在**公司内网**还有一套自建权威 DNS
+     * （cnszknad01 / kingcleandc01.kingclean.com），那套**没有** mall 记录。
+     * 若把它笼统报成「连不上线上后端」，人会跑去服务器反复折腾证书（白忙一场）。
+     * 所以单独给口径：不影响上线，只影响本机（开发者工具）。 */
+    warn('本机解析不了 ' + new URL(BASE_URL).hostname + '（' + code + '）',
+      '**不是后端故障**：真机与平台审核走公共 DNS，不受影响；受影响的是本机开发者工具。' +
+      '先跑 node .tooling/check-domain-dns.mjs（它会同时查公共 DNS 与内网 DNS）；' +
+      '内网 DNS 缺记录 → 找 IT 补；本机应急 → 临时换 DNS 或加 hosts。');
+  } else if (/SELF_SIGNED|UNABLE_TO_VERIFY|CERT|SSL|TLS/i.test(code + ' ' + e.message)) {
     block('HTTPS 证书不可信', code + ' —— iOS 端连自签名证书都连不上，正式版必失败；要换受信任 CA 证书（如 Let\'s Encrypt / 腾讯云免费证书）');
   } else {
     warn('连不上线上后端', code || String(e.message).slice(0, 80) + '（本机网络/未部署时属预期，上传前务必再跑一次）');
@@ -245,7 +256,7 @@ if (fs.existsSync(sm)) {
 rows.push({ level: 'head', name: 'H. 只能人工办的前置条件' });
 [
   ['小程序 ICP 备案（工信部）', '2023-09-01 起所有新上线小程序必须**先备案再提审**：后台「设置-基础设置-小程序备案」→ 平台初审 → 12381 短信核验（24 小时内）→ 管局终审（1~20 工作日）'],
-  ['域名 ICP 备案 + 受信任 HTTPS 证书', '服务器域名必须与小程序主体备案一致；不支持 IP / localhost；iOS 不认自签名证书'],
+  ['域名 ICP 备案 + 受信任 HTTPS 证书', '服务器域名只需**已 ICP 备案**即可 —— 微信**不要求**域名备案主体与小程序主体相同（这是两条独立的主体线，别混）；不支持 IP / localhost；iOS 不认自签名证书'],
   ['微信认证（企业 300 元/年）', '备案的前置条件，也是开通支付/客服/手机号的前提'],
   ['request 合法域名', '把后端域名填进「开发-开发设置-服务器域名-request 合法域名」；每个类型每月最多改 5 次']
 ].forEach(([n, d]) => warn(n, d));
