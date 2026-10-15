@@ -41,6 +41,68 @@ function fromNow(ts) {
   return Math.floor(diff / 86400000) + ' 天前';
 }
 
+/* ============================== 头像 ============================== */
+
+/**
+ * 头像单元格（客户 / 订单 / 评价三处共用）。
+ *
+ * ⚠️ 为什么不能直接写 `<img class="avatar" src="{{avatar}}">`：
+ *   后台数据里大量客户**根本没有头像**（小程序虚拟用户、从未授权头像），
+ *   而 `<img src="">` 在浏览器里不是「空白」而是**「加载失败」** ——
+ *   渲染出来是一枚带裂图图标的灰色虚框。客户管理、评价管理两页各挂着几枚，
+ *   整张表看着就像坏了。所以：
+ *     · 没地址      → 直接渲染首字母文字块（.avatar.letter）
+ *     · 有地址但失败 → 由 sweepImages() 兜底换成同样的文字块
+ */
+function avatarHtml(url, name) {
+  const ch = esc(String(name == null ? '' : name).trim().slice(0, 1) || '客');
+  if (!url) return '<span class="avatar letter">' + ch + '</span>';
+  // 只带一个 data-ch 标记，真正替换交给 sweepImages()——在属性里拼 HTML 极易引号转义出错
+  return '<img class="avatar" src="' + esc(url) + '" alt="" data-ch="' + ch + '">';
+}
+
+/**
+ * 把「已确定加载失败」的图片处理掉。
+ *
+ * 必须主动扫一遍，不能只听 error 事件：图片 URL 失败会被缓存，**同一 URL 再次插入**时
+ * 浏览器直接以 complete=true / naturalWidth=0 落地、不再重发 error 事件，
+ * 于是「列表翻页后第二页的破图又回来了」。所以在每次视图渲染完成后扫一次。
+ *
+ * 两类：
+ *   · img.avatar            → 换成首字母文字块（人是主体，不能只剩一个框）
+ *   · img[data-optional]    → 直接移除（分类图标这类**装饰性**小图，认不出是哪张也无所谓，
+ *                             留个破图框反而更糟；演示数据里的分类图标还是 placehold.co 外链，
+ *                             断网 / 内网环境必然加载不到）
+ */
+function sweepImages(root) {
+  const scope = root || document;
+  scope.querySelectorAll('img.avatar').forEach((im) => {
+    if (!im.complete || im.naturalWidth > 0) return;
+    const span = document.createElement('span');
+    span.className = 'avatar letter';
+    span.textContent = im.getAttribute('data-ch') || '客';
+    im.replaceWith(span);
+  });
+  scope.querySelectorAll('img[data-optional]').forEach((im) => {
+    if (!im.complete || im.naturalWidth > 0) return;
+    im.remove();
+  });
+}
+
+/* error 事件不冒泡，必须在捕获阶段接；用于「渲染后才失败的图」（sweep 已扫过一遍） */
+document.addEventListener('error', (e) => {
+  const el = e.target;
+  if (!el || el.tagName !== 'IMG') return;
+  if (el.classList.contains('avatar')) {
+    const span = document.createElement('span');
+    span.className = 'avatar letter';
+    span.textContent = el.getAttribute('data-ch') || '客';
+    el.replaceWith(span);
+  } else if (el.hasAttribute('data-optional')) {
+    el.remove();
+  }
+}, true);
+
 /* ============================== 管理员会话 ============================== */
 
 /**
@@ -277,7 +339,11 @@ function renderWho() {
     // ⚠️ 不要用 hidden 属性切换 —— 「.tag」自带 display，会盖过 UA 的 [hidden]{display:none}
     tag.textContent = whoText(me).text;
     tag.title = whoText(me).title;
-    tag.className = 'tag ' + (me ? 'on' : 'ghost');
+    /* 已登录用 .id（中性）而不是 .on（绿）：
+     * .on 在整套后台里表示「上架 / 发放中 / 正常」这类**业务状态**，
+     * 拿来标「超级管理员」会让身份看着像一个状态，且顶栏右侧多出一块绿，抢注意力。
+     * 身份回答的是「我是谁」，中性色就够；未登录才需要描边（.ghost）提示「这里要处理」。 */
+    tag.className = 'tag ' + (me ? 'id' : 'ghost');
   }
 }
 
@@ -896,6 +962,8 @@ const App = {
       body.innerHTML = '<div class="card"><div class="card-b"><div class="empty-state"><div class="ic">⚠</div>' +
         '加载失败：' + esc(e.message) + '<div style="margin-top:10px"><button class="btn" onclick="App.render()">重试</button></div></div></div></div>';
     }
+    /* 渲染完成后统一兜底图片（失败图被缓存时不会再发 error 事件，只能主动扫） */
+    sweepImages(body);
   },
 
   /** 侧栏角标（待发货等） */
@@ -989,11 +1057,13 @@ App.views.dashboard = {
       '<div class="sub" style="margin-top:8px">近 ' + days + ' 天累计 GMV ' + money(totalGmv) +
         ' · 订单 ' + d.trend.reduce((s, x) => s + x.orders, 0) + ' 笔</div></div></div>' +
 
+      /* 计数为 0 的待办加 .zero 降级（灰色）——「不需要处理的事」不该用品牌红抢注意力，
+       * 三条里只有真有待办的那条是红的，一眼就能扫出该点哪一条。 */
       '<div class="grid c2">' +
         '<div class="card"><div class="card-h"><h2>待办</h2></div><div class="card-b">' +
-          '<div class="todo-item"><span class="n">' + d.todo.pendingShip + '</span><span class="t"><b>待发货订单</b><span>客户已付款，等待你发货</span></span><button class="btn sm" data-goto="orders" data-status="pending_ship">去处理</button></div>' +
-          '<div class="todo-item"><span class="n">' + d.todo.pendingPay + '</span><span class="t"><b>待付款订单</b><span>超时未付可关闭并释放库存</span></span><button class="btn sm" data-goto="orders" data-status="pending_pay">去看看</button></div>' +
-          '<div class="todo-item"><span class="n">' + d.todo.lowStock + '</span><span class="t"><b>库存预警商品</b><span>库存 ≤ 10 件，及时补货</span></span><button class="btn sm" data-goto="goods" data-lowstock="1">去补货</button></div>' +
+          '<div class="todo-item"><span class="n' + (d.todo.pendingShip ? '' : ' zero') + '">' + d.todo.pendingShip + '</span><span class="t"><b>待发货订单</b><span>客户已付款，等待你发货</span></span><button class="btn sm" data-goto="orders" data-status="pending_ship">去处理</button></div>' +
+          '<div class="todo-item"><span class="n' + (d.todo.pendingPay ? '' : ' zero') + '">' + d.todo.pendingPay + '</span><span class="t"><b>待付款订单</b><span>超时未付可关闭并释放库存</span></span><button class="btn sm" data-goto="orders" data-status="pending_pay">去看看</button></div>' +
+          '<div class="todo-item"><span class="n' + (d.todo.lowStock ? '' : ' zero') + '">' + d.todo.lowStock + '</span><span class="t"><b>库存预警商品</b><span>库存 ≤ 10 件，及时补货</span></span><button class="btn sm" data-goto="goods" data-lowstock="1">去补货</button></div>' +
         '</div></div>' +
         '<div class="card"><div class="card-h"><h2>热销商品 Top 5</h2><div class="grow"></div><span class="hint">按已付款订单销量</span></div>' +
           '<div class="card-b tight"><div class="table-wrap"><table class="tb"><thead><tr><th>商品</th><th class="num">销量</th><th class="num">销售额</th></tr></thead><tbody>' +
@@ -1081,8 +1151,11 @@ App.views.settings = {
            * 走新窗口（<a target="_blank">）：这三项的真源在装修台，进来是要**动手改**的，
            * 在当前页切视图会把运营手上的「店铺设置」页挤掉，改完还得自己找回来。
            * 新窗口里改完点「生成代码」再回来，两边互不打扰。
+           *
+           * 用普通按钮（不是 .btn.primary）：它是「去别处改」的**跳转**，不是本页的主操作。
+           * 品牌红实底在本页应该是「保存设置」那一枚；两个红按钮并排会让人不知道该点哪个。
            */
-          '<a class="btn primary" href="/admin" target="_blank" rel="noopener">去装修台修改 ↗</a>' +
+          '<a class="btn" href="/admin" target="_blank" rel="noopener">去装修台修改 ↗</a>' +
           '<span class="sub" style="align-self:center">在新窗口打开装修台；改完点「生成代码」写回 replica.SHOP</span>' +
         '</div>' +
       '</div></div>' +
@@ -1094,9 +1167,9 @@ App.views.settings = {
       '<div class="grid c2">' +
         '<div class="card"><div class="card-h"><h2>服务参数</h2><div class="grow"></div>' +
           '<span class="hint">存放于 server/data/catalog.json</span></div><div class="card-b">' +
-          row('客服电话', SERVER_SAVED, '<input type="text" class="w160" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
-          row('客服时间', SERVER_SAVED, '<input type="text" class="w160" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
-          row('店铺公告', SERVER_SAVED + '；要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" class="w220" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
+          row('客服电话', SERVER_SAVED, '<input type="text" style="flex:1" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
+          row('客服时间', SERVER_SAVED, '<input type="text" style="flex:1" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
+          row('店铺公告', SERVER_SAVED + '；要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
         '</div></div>' +
 
         '<div class="card"><div class="card-h"><h2>交易设置</h2><div class="grow"></div>' +

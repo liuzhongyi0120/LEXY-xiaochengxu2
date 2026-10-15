@@ -2982,17 +2982,24 @@ assert('「装修」类链接有样式兜底（a.btn 去下划线 + 对齐盒模
   /a\.btn\s*\{/.test(decoCssNoComment) && /a\.pname\s*\{/.test(decoCssNoComment),
   '缺了会出现「同一行按钮高矮不齐 / 装修二字带下划线」');
 
-/* ---- 控制台侧：至少要留一条「新窗口打开装修台」的路 ---- */
+/* ---- 控制台侧：至少要留一条「新窗口打开装修台」的路 ----
+ * ⚠️ 判据只锁「有一个 .btn 形态的 <a> 指向 /admin 且 target="_blank"」，**不锁具体配色类**。
+ *    原来写死 `class="btn primary"`，于是把这个按钮从「品牌红实底」降级成普通按钮
+ *    （它只是「去别处开工」的跳转，不是本页主操作）就会假红 —— 断言的意图是
+ *    「别把入口删了」，跟按钮什么颜色无关。 */
 assert('控制台有指向装修台（/admin）的新窗口入口',
-  /<a class="btn primary" href="\/admin" target="_blank"/.test(consoleJsNoComment),
+  /<a class="btn[^"]*" href="\/admin" target="_blank"/.test(consoleJsNoComment),
   '一个都没有的话，运营只能靠手输地址');
 assert('「店铺设置」的「去装修台修改」是新窗口链接（不再在当前页切视图，也不再绑 App.go）',
   /href="\/admin" target="_blank"[\s\S]{0,90}?去装修台修改/.test(consoleJsNoComment) &&
   !/data-goto-decorate/.test(consoleJsNoComment));
 assert('控制台侧栏的「装修台 /admin」也是新窗口入口（点它不该把控制台从当前标签页挤走）',
   /<a href="\/admin" target="_blank"/.test(readFileSync(join(__dirname, '..', 'public', 'console', 'index.html'), 'utf8')));
+/* ⚠️ iframe 允许带 ?embed=1：那个参数让装修台藏起自己的顶栏（否则本页会出现
+ *    两份「店铺装修台 / 超级管理员 / 退出」）。判据的意图是「这里内嵌了装修台」，
+ *    不是「src 必须一字不差地是 /admin」。 */
 assert('「店铺装修」视图仍内嵌装修台（一眼看到页面列表 / 草稿状态）且保留「刷新」按钮',
-  /class="frame-wrap"><iframe src="\/admin"/.test(consoleModSrc) && /data-frame-reload/.test(consoleModSrc));
+  /class="frame-wrap"><iframe src="\/admin(\?embed=1)?"/.test(consoleModSrc) && /data-frame-reload/.test(consoleModSrc));
 assert('「店铺装修」视图的入口文案写明是「新窗口」打开（口径要写在运营看得到的地方）',
   /在新窗口<\/b>打开编辑器|在新窗口打开装修台/.test(consoleModSrc));
 /* 高度写错=装修台底部的「生成代码」被顶出屏幕（运营点不到发布按钮），所以连数值一起锁 */

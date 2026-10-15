@@ -66,7 +66,11 @@ a { color: var(--blue); text-decoration: none; }
   border-left: 3px solid transparent;
 }
 .nav-item:hover { background: rgba(255, 255, 255, .06); color: #fff; }
-.nav-item.on { background: rgba(200, 16, 46, .18); color: #fff; border-left-color: var(--primary); font-weight: 600; }
+/* 选中态：**中性亮底 + 左侧品牌色条**，不再是「一整块暗红」。
+ * 原写法 `rgba(200,16,46,.18)` 会在侧栏留下一块低饱和暗红，和「危险/删除」的红按钮
+ * 视觉上撞成一片（侧栏是导航，不该有警示色）；改成中性亮底后，「我在哪」靠色条 + 亮度表达，
+ * 侧栏整体干净下来，品牌红只出现在这一根 3px 的定位条上。 */
+.nav-item.on { background: rgba(255, 255, 255, .10); color: #fff; border-left-color: var(--primary); font-weight: 600; }
 /* 图标位：现在装的是内联 SVG，必须 flex 居中并去掉行内元素基线留白 */
 .nav-item .ico {
   display: inline-flex; align-items: center; justify-content: center;
@@ -80,8 +84,13 @@ a { color: var(--blue); text-decoration: none; }
   margin-left: auto; background: var(--primary); color: #fff;
   font-size: 10px; padding: 1px 5px; border-radius: 8px; font-weight: 600;
 }
-.nav-group { padding: 12px 16px 5px; font-size: 11px; color: #6b7280; letter-spacing: .5px; }
+/* 分组标题：原 #6b7280 在 #1b1e23 上对比度约 3.3:1，11px 小字基本读不出来，提到 #8b93a1（≈5.2:1） */
+.nav-group { padding: 12px 16px 5px; font-size: 11px; color: #8b93a1; letter-spacing: .5px; font-weight: 600; }
 .side-foot { padding: 10px 16px 14px; font-size: 11px; color: var(--sidebar-sub); border-top: 1px solid rgba(255,255,255,.08); }
+/* 侧栏底部两个外链：原来写死在 HTML 的内联 style="color:#fff" 上（改色要翻 HTML），收到这里 */
+.side-foot a { color: #c9cfd8; text-decoration: none; }
+.side-foot a:hover { color: #fff; text-decoration: underline; }
+.side-foot .sf-row { margin-top: 3px; }
 
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .top {
@@ -155,13 +164,18 @@ a { color: var(--blue); text-decoration: none; }
  */
 .table-wrap { overflow: auto; max-height: calc(100vh - 250px); }
 table.tb { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+/* 表头：#fafbfc 与卡片白底几乎同色（差 2 个色阶），1440 宽的长表扫行时找不准列。
+ * 提到 #f4f6f9 并把字色压深一档，一眼能分出表头带；同时保持「浅」以免显得重。 */
 table.tb th {
-  text-align: left; font-weight: 600; color: #5a6472; background: #fafbfc;
+  text-align: left; font-weight: 600; color: #4a5361; background: #f4f6f9;
   padding: 9px 12px; border-bottom: 1px solid var(--line); white-space: nowrap;
   position: sticky; top: 0; z-index: 1;
 }
 table.tb td { padding: 10px 12px; border-bottom: 1px solid #f1f3f5; vertical-align: middle; }
-table.tb tr:hover td { background: #fcfcfd; }
+/* 行 hover：#fcfcfd 与白底只差 1 个色阶，等于没有反馈；#f7f9fc 能看出「鼠标在哪一行」 */
+table.tb tr:hover td { background: #f7f9fc; }
+/* 最后一行不再画分隔线：卡片本身有圆角与边框，表格底部再压一条线会显得「双层」 */
+table.tb tbody tr:last-child td { border-bottom: 0; }
 table.tb .num { text-align: right; font-variant-numeric: tabular-nums; }
 table.tb .nowrap { white-space: nowrap; }
 table.tb .empty { text-align: center; color: var(--sub); padding: 34px 0; }
@@ -169,15 +183,25 @@ table.tb .empty { text-align: center; color: var(--sub); padding: 34px 0; }
 /* ⚠️ 必须写成 img.thumb —— 这是给表格里 <img class="thumb"> 的小方图（42px）用的。
  * 一旦写成裸 .thumb，任何「用 .thumb 当容器类名」的卡片都会被按 42px 排版。 */
 img.thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; background: #f0f2f5; display: block; }
-.avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #f0f2f5; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; background: #f0f2f5; flex: 0 0 auto; }
+/* 首字母头像：没有头像（或有地址但加载失败）时的兜底。
+ * ⚠️ 不兜底就会渲染成破图 —— `<img src="">` 在浏览器里是「加载失败」而不是「空白」，
+ *    客户 / 订单 / 评价三处会各挂一枚带裂图图标的灰色虚框，整张表看着像坏了。 */
+.avatar.letter {
+  display: inline-flex; align-items: center; justify-content: center;
+  background: #eef1f6; color: #5a6472; font-size: 12px; font-weight: 600;
+  line-height: 1; user-select: none;
+}
 .cell-main { display: flex; align-items: center; gap: 9px; min-width: 0; }
 .cell-main .tt { min-width: 0; }
 .cell-main .tt b { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 300px; }
 .cell-main .tt span { display: block; color: var(--sub); font-size: 11.5px; }
 .sub { color: var(--sub); font-size: 11.5px; }
-/* 只读值（店铺设置里「由装修台维护」的字段）：看起来像输入框但明显不可编辑 */
+/* 只读值（店铺设置里「由装修台维护」的字段）：看起来像输入框但明显不可编辑。
+ * flex:1 让它跟同一列里可编辑的输入框**等宽** —— 原来靠 min-width:120px + 内容自适应，
+ * 「店铺名称」（较长）和「店铺标语」会各撑出一个不同宽度，一列里几种宽度并排就不整齐了。 */
 .ro {
-  display: inline-block; min-width: 120px; padding: 5px 10px;
+  display: inline-block; flex: 1; min-width: 120px; padding: 5px 10px;
   background: #f5f6f8; border: 1px solid var(--line); border-radius: 6px;
   font-size: 12.5px; color: var(--text);
 }
@@ -196,6 +220,16 @@ img.thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; ba
 .tag.red { background: var(--primary-soft); color: var(--primary); }
 .tag.blue { background: var(--blue-soft); color: #1849a9; }
 .tag.ghost { background: transparent; border: 1px solid var(--line-strong); }
+/* 分类层级标签（一级 / 二级）：同一族的深浅两档。
+ * 原来是「一级 = 蓝底实心 / 二级 = 灰描边」，同一列里并列出现时看着像
+ * 一个是按钮、一个是标签，层级关系反而读不出来。改成同族深浅后，
+ * 「深色在上、浅色在下」自然对应树形的父子层级。 */
+.tag.lv1 { background: #e7ebf2; color: #3c4654; font-weight: 600; }
+.tag.lv2 { background: #f2f4f7; color: #6b7280; }
+/* 顶栏「当前身份」专用：中性色。
+ * 不用 .tag.on（绿）—— 那个绿在整套后台里是「上架 / 发放中 / 正常」的业务状态色，
+ * 拿来标「超级管理员」会让身份看起来像一个状态，且顶栏右侧凭空多一块绿抢注意力。 */
+.tag.id { background: #eef1f6; color: #48505c; }
 
 /* -------------------------------- 按钮 -------------------------------- */
 
@@ -232,11 +266,19 @@ input[type=text], input[type=number], input[type=date], select, textarea {
 }
 textarea { height: auto; padding: 7px 9px; line-height: 1.55; resize: vertical; }
 input:focus, select:focus, textarea:focus { border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft); }
-input[type=text].w160 { width: 160px; }
-input[type=text].w220 { width: 220px; }
+input[type=text].w160, textarea.w160 { width: 160px; }
+input[type=text].w220, textarea.w220 { width: 220px; }
 input[type=number].w90 { width: 90px; }
 select.w120 { width: 120px; }
 select.w150 { width: 150px; }
+/*
+ * ⚠️ 宽度类必须同时写 textarea。原来只写了 `input[type=text].w220`，
+ * 而「店铺公告」是 <textarea class="w220" style="flex:1">：类名不命中 → 宽度只能靠内联
+ * flex:1 撑到容器满宽，于是同一列里出现 160 / 160 / 467 三种宽度，一眼看去就是不齐。
+ */
+/* 选中态 tab 里的计数：`.sub` 的灰（#8a919e）压在品牌红底上对比度只有 ≈2.4:1，
+ * 数字基本糊进按钮里。选中态改成「白字 85%」，既读得清、又比主文案弱一档。 */
+.btn.primary .sub { color: rgba(255, 255, 255, .82); }
 label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; }
 
 .form-row { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px dashed #f0f2f5; }
@@ -319,6 +361,10 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 }
 .todo-item:last-child { border-bottom: 0; }
 .todo-item .n { font-size: 17px; font-weight: 700; color: var(--primary); min-width: 40px; font-variant-numeric: tabular-nums; }
+/* 计数为 0：降级成中性灰。
+ * 三条待办里如果「待付款 0」也顶着品牌红大字，整卡就是三坨红，
+ * 真正要处理的那条反而淹在里面；0 是「不用管」，不该抢注意力。 */
+.todo-item .n.zero { color: var(--sub); font-weight: 500; }
 .todo-item .t { flex: 1; }
 .todo-item .t b { display: block; font-weight: 500; }
 .todo-item .t span { color: var(--sub); font-size: 11.5px; }

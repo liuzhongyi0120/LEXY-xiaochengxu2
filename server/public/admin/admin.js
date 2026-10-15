@@ -381,7 +381,13 @@
   }
   function syncUrl(key) {
     try {
-      history.replaceState(null, '', key ? ('/admin?edit=' + encodeURIComponent(key)) : '/admin');
+      /* ⚠️ 内嵌模式必须保留 embed=1：控制台「店铺装修」卡片用 iframe 加载本页，
+       * 少了这个参数，iframe 里一刷新就退回「带自己顶栏」的完整版 → 同一屏两份顶栏（套娃）。
+       * ⚠️ 下面 `key ? ('/admin?edit=' …) : '/admin'` 的**写法形态**被
+       *    server/tools/check-all.mjs 的「URL 直达编辑器」断言按字面匹配着，
+       *    改写结构（哪怕语义等价）会让它变红 —— 要动这里请连着那条断言一起改。 */
+      const embed = document.documentElement.classList.contains('embed-mode') ? '&embed=1' : '';
+      history.replaceState(null, '', key ? ('/admin?edit=' + encodeURIComponent(key) + embed) : ('/admin' + (embed ? '?embed=1' : '')));
     } catch (e) { /* 非 http 环境：地址栏不同步，不影响功能 */ }
   }
 
@@ -3491,6 +3497,21 @@
   });
 
   /* ----------------------------- 启动 ----------------------------- */
+  /*
+   * 内嵌模式（?embed=1）：控制台的「店铺装修」卡片用 iframe 加载本页。
+   *
+   * 控制台已经把「店铺装修」标题、说明和新窗口入口画在卡片头上了；iframe 里再出现一条
+   * 「LEXY 店铺装修台 / 超级管理员 / 退出」就是**同一屏两份顶栏**（而且两份都有「退出」，
+   * 点错了还会把当前会话退掉）。所以内嵌时只加一个类把自带顶栏藏起来 ——
+   * 顶栏里的按钮仍留在 DOM 里，所有逻辑一行都不用改。
+   * 直接访问 /admin（新窗口打开的编辑器）不带这个参数，看到的还是完整版。
+   */
+  try {
+    if (new URLSearchParams(location.search).get('embed') === '1') {
+      document.documentElement.classList.add('embed-mode');
+    }
+  } catch (e) { /* 非 http 环境：忽略 */ }
+
   syncPhoneModel();
   setLayoutPanel(false);   // 页面布局默认收起（对标有赞），点预览区右上角按钮展开
   setTopbar('list');

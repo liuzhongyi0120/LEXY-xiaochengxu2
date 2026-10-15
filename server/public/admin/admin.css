@@ -84,6 +84,14 @@ code { font-family: Consolas, Monaco, "Courier New", monospace; background: var(
   color: var(--ink-2);
   font-size: 13px;
   transition: .15s;
+  /*
+   * 不换行 + 不被 flex 父容器压缩。
+   * 列表页顶部那一行元素很多（标题 / 统计 ×3 / 两个外链 / 刷新按钮），
+   * 窗口或 iframe 窄一点，「刷新」就被压成竖排的「刷\n新」——
+   * 按钮永远不该换行，要挤就让旁边的说明文字换行。
+   */
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 .btn:hover { border-color: var(--blue-border); color: var(--blue); }
 .btn.primary { background: var(--blue); border-color: var(--blue); color: #fff; }
@@ -140,12 +148,12 @@ a.btn {
   background: #fff;
   border-bottom: 1px solid var(--line);
 }
-.lt-title { display: flex; flex-direction: column; gap: 2px; }
+.lt-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .lt-title b { font-size: 16px; }
-.stat { font-size: 12px; color: var(--gray-2); }
+.stat { font-size: 12px; color: var(--gray-2); white-space: nowrap; }
 .stat code { background: var(--line-2); }
-.topnav { display: flex; gap: 12px; }
-.topnav a { font-size: 12px; color: var(--blue); text-decoration: none; }
+.topnav { display: flex; gap: 12px; flex: 0 0 auto; }
+.topnav a { font-size: 12px; color: var(--blue); text-decoration: none; white-space: nowrap; }
 .topnav a:hover { text-decoration: underline; }
 
 /*
@@ -355,6 +363,17 @@ a.pname { text-decoration: none; }
 .topbar.mode-list .tb-edit-only { display: none !important; }
 .topbar.mode-list .tb-brand { display: block; }
 .topbar.mode-list .tb-list-title { display: inline; }
+
+/*
+ * 内嵌模式（控制台「店铺装修」卡片用 iframe 加载 /admin?embed=1）：藏掉自带顶栏。
+ *
+ * 控制台已经把「店铺装修」标题、说明和「在新窗口打开」画在卡片头上了；
+ * iframe 里再出现一条「LEXY 店铺装修台 / 超级管理员 / 退出」= 同一屏**两份顶栏**，
+ * 视觉上是套娃，风险上两份都有「退出」（点错会把当前会话退掉）。
+ * 只藏顶栏、不动 DOM：顶栏里那些按钮仍留在文档里，admin.js 的逻辑一行都不用改；
+ * 直接访问 /admin（新窗口里的编辑器）不带 embed=1，看到的还是完整版。
+ */
+html.embed-mode .topbar { display: none !important; }
 
 /* ============================ 二、编辑器三栏（对标有赞） ============================ */
 

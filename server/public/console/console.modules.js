@@ -353,9 +353,9 @@ App.views.categories = {
       (rows.length ? rows.map((r) =>
         '<tr><td style="padding-left:' + (14 + r.level * 26) + 'px">' +
           (r.level ? '<span class="sub">└ </span>' : '') + '<b style="font-weight:' + (r.level ? 400 : 600) + '">' + esc(r.name) + '</b>' +
-          (r.icon ? ' <img src="' + esc(r.icon) + '" style="width:16px;height:16px;border-radius:3px;vertical-align:-3px" alt="">' : '') +
+          (r.icon ? ' <img src="' + esc(r.icon) + '" data-optional style="width:16px;height:16px;border-radius:3px;vertical-align:-3px" alt="">' : '') +
           '</td>' +
-          '<td>' + (r.level ? '<span class="tag ghost">二级</span>' : '<span class="tag blue">一级</span>') + '</td>' +
+          '<td>' + (r.level ? '<span class="tag lv2">二级</span>' : '<span class="tag lv1">一级</span>') + '</td>' +
           '<td class="num">' + r.count + '</td>' +
           '<td class="nowrap">' +
             (r.level ? '' : '<button class="btn text sm" data-addchild="' + esc(r.id) + '">加子分类</button>') +
@@ -429,7 +429,9 @@ App.views.orders = {
         '<input type="text" class="w220" placeholder="订单号 / 收货人 / 手机号 / 商品名" data-kw value="' + esc(state.keyword || '') + '">' +
         '<div class="field"><label>下单时间</label><input type="date" data-from value="' + esc(state.from ? new Date(Number(state.from)).toISOString().slice(0, 10) : '') + '">' +
         '<span class="sub">~</span><input type="date" data-to value="' + esc(state.to ? new Date(Number(state.to)).toISOString().slice(0, 10) : '') + '"></div>' +
-        '<select class="w120" data-sort><option value="">下单时间</option><option value="amount"' + (state.sort === 'amount' ? ' selected' : '') + '>金额高→低</option></select>' +
+        /* 排序下拉的默认项原来叫「下单时间」—— 与本行左边的「下单时间」筛选标签**重名**，
+         * 扫一眼会以为是个重复控件。改成与商品页一致的「默认排序」。 */
+        '<select class="w120" data-sort><option value="">默认排序</option><option value="amount"' + (state.sort === 'amount' ? ' selected' : '') + '>金额高→低</option></select>' +
         '<div style="flex:1"></div>' +
         '<button class="btn" data-ship>批量发货</button>' +
         '<button class="btn" data-export>导出 CSV</button>' +
@@ -442,7 +444,10 @@ App.views.orders = {
         '<tr>' +
           '<td>' + (o.status === 'pending_ship' ? '<input type="checkbox" data-ck="' + esc(o.orderId) + '">' : '') + '</td>' +
           '<td class="nowrap">' + esc(o.orderNo) + (o.merchantRemark ? ' <span class="tag ghost" title="' + esc(o.merchantRemark) + '">备注</span>' : '') + '</td>' +
-          '<td><div class="cell-main"><img class="avatar" src="' + esc(o.customer.avatar || o.items[0] && o.items[0].image || '') + '" alt="">' +
+          /* 头像只用**客户自己的**头像，没有就渲染首字母块。
+           * 原来拿「第一个商品的主图」当兜底 —— 客户列里出现一排商品照/深色圆点：
+           * 既像加载失败，又是在错误的位置传递错误的信息（那是商品，不是这个人）。 */
+          '<td><div class="cell-main">' + avatarHtml(o.customer.avatar, o.customer.name || o.customer.nickname) +
             '<div class="tt"><b>' + esc(o.customer.name || o.customer.nickname || '—') + '</b><span>' + esc(o.customer.phone || '') + '</span></div></div></td>' +
           '<td class="sub">' + esc((o.items[0] && o.items[0].name || '').slice(0, 14)) + (o.itemCount > 1 ? ' 等 ' + o.itemCount + ' 件' : '') + '</td>' +
           '<td class="num money red">' + money(o.payAmount) + '</td>' +
@@ -578,7 +583,7 @@ App.views.orders = {
             '<div>' + esc(a.name || '') + ' <span class="sub">' + esc(a.phone || '') + '</span></div>' +
             '<div class="sub">' + esc([a.province, a.city, a.district, a.detail].filter(Boolean).join(' ')) + '</div>' +
             '<h3 style="margin:12px 0 8px;font-size:13px">客户</h3>' +
-            '<div class="cell-main"><img class="avatar" src="' + esc(d.customer.avatar || '') + '" alt="">' +
+            '<div class="cell-main">' + avatarHtml(d.customer.avatar, d.customer.nickname || d.customer.userId) +
               '<div class="tt"><b>' + esc(d.customer.nickname || d.customer.userId) + '</b><span>累计 ' + d.customer.orderCount + ' 单 · 消费 ' + money(d.customer.paidAmount) + '</span></div></div>' +
             (d.merchantRemark ? '<div style="margin-top:10px" class="tag warn">商家备注：' + esc(d.merchantRemark) + '</div>' : '') +
           '</div>' +
@@ -638,7 +643,7 @@ App.views.customers = {
       '</tr></thead><tbody>' +
       (d.list.length ? d.list.map((c) =>
         '<tr>' +
-          '<td><div class="cell-main"><img class="avatar" src="' + esc(c.avatar) + '" alt="">' +
+          '<td><div class="cell-main">' + avatarHtml(c.avatar, c.nickname || '匿名用户') +
             '<div class="tt"><b>' + esc(c.nickname || '匿名用户') + '</b><span>' + esc(c.userId) + '</span></div></div></td>' +
           '<td>' + esc(c.phone || '—') + '</td>' +
           '<td class="num">' + c.orderCount + (c.paidCount !== c.orderCount ? ' <span class="sub">(付' + c.paidCount + ')</span>' : '') + '</td>' +
@@ -826,7 +831,7 @@ App.views.comments = {
       '<div class="card-b">' + (d.list.length ? d.list.map((c) =>
         '<div style="padding:12px 0;border-bottom:1px dashed #f0f2f5" data-c="' + esc(c.commentId) + '">' +
           '<div style="display:flex;gap:10px;align-items:center">' +
-            '<img class="avatar" src="' + esc(c.avatar || '') + '" alt="">' +
+            avatarHtml(c.avatar, c.author) +
             '<b>' + esc(c.author) + '</b>' +
             '<span class="tag warn">' + '★'.repeat(c.score) + '</span>' +
             '<span class="sub">' + esc(c.goodsName) + ' · ' + esc(c.specText || '') + '</span>' +
@@ -1316,14 +1321,17 @@ App.views.decorate = {
     body.innerHTML =
       '<div class="card"><div class="card-h"><h2>店铺装修</h2><div class="grow"></div>' +
         '<span class="hint">在下面点页面行的「装修」会在<b>新窗口</b>打开编辑器，改完点「生成代码」写回 replica.js</span>' +
-        '<a class="btn primary" href="/admin" target="_blank" rel="noopener" title="在新窗口打开装修台">在新窗口打开 ↗</a>' +
+        /* 用普通按钮：这是「去别处开工」的入口，本页并没有主操作，红色实底会跟卡片里的
+         * 其它按钮抢注意力。真正要动手时下面每一行都有「装修」按钮。 */
+        '<a class="btn" href="/admin" target="_blank" rel="noopener" title="在新窗口打开装修台">在新窗口打开 ↗</a>' +
         '<button class="btn" data-frame-reload title="重新加载装修台（未保存的界面状态会丢失，草稿不受影响）">↻ 刷新</button>' +
       '</div>' +
-      '<div class="card-b tight"><div class="frame-wrap"><iframe src="/admin" title="店铺装修台"></iframe></div></div></div>';
+      /* iframe 带 ?embed=1：让装修台藏起自带顶栏（否则本页会出现两份「店铺装修台 / 超级管理员 / 退出」） */
+      '<div class="card-b tight"><div class="frame-wrap"><iframe src="/admin?embed=1" title="店铺装修台"></iframe></div></div></div>';
 
     body.querySelector('[data-frame-reload]').addEventListener('click', () => {
       const f = body.querySelector('.frame-wrap iframe');
-      if (f) f.src = '/admin';   // 重设 src 即重新加载
+      if (f) f.src = '/admin?embed=1';   // 重设 src 即重新加载（保留内嵌模式）
       toast('装修台已重新加载');
     });
   }
