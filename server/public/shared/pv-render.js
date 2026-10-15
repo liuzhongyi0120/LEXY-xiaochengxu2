@@ -21,7 +21,7 @@
   'use strict';
 
   /** 渲染上下文：编辑态与展示态的唯一差异来源 */
-  var CTX = { edit: false, sel: '', slide: {}, brand: 0 };
+  var CTX = { edit: false, sel: '', slide: {}, brand: 0, shop: null };
 
   /** 跳转目标清单（装修台从 /api/decorate/link-options 加载），仅编辑态的角标文案需要 */
   var LINK_OPTS = null;
@@ -32,6 +32,7 @@
     CTX.sel = o.sel || '';
     CTX.slide = o.slide || {};
     CTX.brand = Number(o.brand) || 0;
+    CTX.shop = o.shop || null;
   }
 
   /* ----------------------------- 工具 ----------------------------- */
@@ -1269,6 +1270,81 @@
     return pvPageBg(d, inner);
   }
 
+  /**
+   * 店铺笔记预览：店长区（店名 / 头像 / 进店按钮 / 标题 / 发布时间 / 标签）+ 笔记正文 + 组件流。
+   *
+   * 三段与真机 `miniprogram/packageNews/note/note.wxml` **逐段对应** ——
+   * 装修台看到的顺序与内容与真机一致（这里按装修台手机壳的口径近似样式，
+   * 真机那一份由 /preview 直接编译 note.wxml 得到，两条链路各有分工）。
+   *
+   * ⚠️ 与自定义页（pvCustom）的区别：自定义页整页只有一个组件流；
+   *    笔记有**固定头部 + 固定正文**，只有第三段能自由增删排序。
+   *    这也是笔记不复用 pages/custom 的原因。
+   *
+   * ⚠️ 「浏览量 / 点赞数 / 推荐商品」三个开关**这里与真机都不渲染**：
+   *    本店没有笔记计数器和推荐引擎。面板里保留它们只是为了与有赞的面板一致，
+   *    绝不在预览或真机上编一个「0 浏览 / 0 赞」出来。
+   *
+   * `shop` 由调用方传入（真源 replica.SHOP，装修台经 /api/admin/settings 取一次）。
+   */
+  function pvNote(d, shop) {
+    var h = (d && d.header) || {};
+    var body = (d && d.body) || {};
+    var full = String(body.full === undefined ? '1' : body.full) === '1';
+    var name = (shop && shop.name) || '';
+    var avatar = (shop && shop.avatar) || '';
+
+    var head = '<div class="pv-block' + cls('header') + '" data-path="header" style="position:relative;background:#fff;padding:12px 16px 10px;border-bottom:1px solid #eef0f3">' +
+      '<div style="display:flex;align-items:center">' +
+        (avatar
+          ? img(avatar, 'width:32px;height:32px;border-radius:50%;flex:none')
+          : '<span style="width:32px;height:32px;border-radius:50%;background:#f0f2f5;color:#8a919e;display:flex;align-items:center;justify-content:center;flex:none;font-size:12px">店</span>') +
+        '<b style="margin-left:8px;flex:1;min-width:0;font-size:13px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">' + esc(name) + '</b>' +
+        (h.showEnterShop === false ? ''
+          : '<span style="flex:none;margin-left:8px;padding:2px 10px;border:1px solid #C8102E;border-radius:999px;color:#C8102E;font-size:11px">进店逛逛</span>') +
+      '</div>' +
+      (h.showTitle === false ? ''
+        : '<div style="margin-top:10px;font-size:19px;font-weight:600;line-height:1.4;word-break:break-all">' + esc(h.title || '（未填标题）') + '</div>') +
+      (h.showPublishTime === false || !d.publishedAt ? ''
+        : '<div style="margin-top:5px;font-size:12px;color:#9aa1ad">发布于 ' + esc(dateText(d.publishedAt)) + '</div>') +
+      (String(h.tags || '').trim() ? '<div style="margin-top:8px">' + tagsRow(h.tags) + '</div>' : '') +
+    '</div>';
+
+    var html = String(body.html || '');
+    var bodyHtml = html
+      ? '<div class="pv-block' + cls('body') + '" data-path="body" style="position:relative;padding:10px ' + (full ? 0 : 12) + 'px 0;background:' + attr(body.bg || '#ffffff') + '">' +
+          pvRich(html) +
+        '</div>'
+      : '';
+
+    var blocksHtml = '';
+    ((d && d.blocks) || []).forEach(function (b, i) { blocksHtml += pvBlock(b, i); });
+
+    if (!bodyHtml && !blocksHtml) {
+      blocksHtml = '<div class="insp-empty" style="padding:40px 16px;line-height:2">' +
+        '正文还没写，也还没有加组件<br><span style="color:#b8bec8">在右侧「笔记正文」里写正文，或从左侧「组件库」加组件</span></div>';
+    }
+    // 笔记没有 meta（页面设置），底色走 pvPageBg 的默认档 —— 与真机 note.wxss 的 .note-page 同值
+    return pvPageBg(d, head + bodyHtml + blocksHtml);
+  }
+
+  /** 标签串（「洗地机,吸尘器」）→ 一排小标签；空串给空 */
+  function tagsRow(tags) {
+    var list = String(tags || '').split(/[,，\s]+/).filter(Boolean);
+    if (!list.length) return '';
+    return list.map(function (t) {
+      return '<span style="display:inline-block;margin:0 6px 4px 0;padding:1px 8px;border-radius:4px;background:#FDECEE;color:#C8102E;font-size:11px">' + esc(t) + '</span>';
+    }).join('');
+  }
+
+  /** 发布时间（毫秒）→ YYYY-MM-DD，与真机 utils/format.js 的 formatTime(...).slice(0,10) 同口径 */
+  function dateText(ts) {
+    var d2 = new Date(Number(ts));
+    if (isNaN(d2.getTime())) return '';
+    var p = function (v) { return String(v).padStart(2, '0'); };
+    return d2.getFullYear() + '-' + p(d2.getMonth() + 1) + '-' + p(d2.getDate());
+  }
+
   function pvLexy(d) {
     var h = '';
     (d.series || []).forEach(function (s, i) {
@@ -1397,11 +1473,17 @@
     ensureScrollCss(typeof document !== 'undefined' ? document : null);
     data = data || {};
     var fn = PAGE_RENDERERS[key];
-    // 非内置页：装修台的页面带 meta.custom 标记；预览页只知道 key，
-    // 所以再兜一层「有 blocks 数组就当区块流页面渲染」，否则自定义页会白屏。
+    /*
+     * 非内置页的分派顺序**必须先看 shopnote 再看 custom**：
+     *   笔记与自定义页都带 `custom: true`（两者复用同一条装修链路），
+     *   先判 custom 会把笔记当成「整页一个组件流」渲染 —— 店长区与正文整体消失。
+     * 预览页（/preview）只知道 key，所以还留一层兜底：有 blocks 数组就按区块流渲染，
+     * 不然自定义页会白屏。
+     */
+    if (!fn && opts && opts.shopnote) fn = pvNote;
     if (!fn && ((opts && opts.custom) || Array.isArray(data.blocks))) fn = pvCustom;
     if (!fn) return '<div class="insp-empty">该页面暂不支持预览</div>';
-    return fn(data);
+    return fn(data, CTX.shop);
   }
 
   root.PvRender = {

@@ -52,6 +52,7 @@
     <div class="stat" id="statTarget">目标文件：—</div>
     <div class="stat" id="statData">草稿 — · 版本 —</div>
     <div class="stat" id="statCustom">自定义页 — / —</div>
+    <div class="stat" id="statNote">店铺笔记 — / —</div>
     <nav class="topnav">
       <a href="/debug" target="_blank">接口调试台</a>
       <!-- 「线上预览」这个名字不成立：/ 是本机后端渲染出来的本地效果，与已发布的小程序不是一回事 -->
@@ -80,6 +81,10 @@
       <button class="btn ghost" id="btnResetFilter">重置</button>
     </div>
     <button class="btn primary" id="btnCreatePage" title="新建一个自定义页面（发布后小程序端可访问）">+ 新建页面</button>
+    <!-- 店铺笔记：内容型页面（固定头部 + 固定正文 + 可自由增删的组件），
+         对标有赞「内容管理 → 店铺笔记」。与「新建页面」并列，因为它们是同一层级的两种内容。
+         建好后同样在下面的页面列表里（归属 = 店铺笔记），点「装修」走的就是同一个可视化编辑器。 -->
+    <button class="btn" id="btnCreateNote" title="新建一篇店铺笔记（装修完点「生成代码」才下发到小程序）">+ 新建笔记</button>
   </div>
 
   <div class="table-wrap">

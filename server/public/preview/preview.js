@@ -23,7 +23,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var SCREEN = { w: 375, h: 718 };
 
-  /** 内置 5 个 tab 页 → 真机页面路径；自定义页统一走 pages/custom */
+  /** 内置 5 个 tab 页 → 真机页面路径；自定义页 / 店铺笔记由后端页面元信息给出 */
   var BUILTIN = [
     { key: 'home', name: '首页', path: '/pages/index/index', tab: 0 },
     { key: 'lexy', name: '莱克', path: '/pages/lexy/lexy', tab: 1 },
@@ -31,6 +31,17 @@
     { key: 'product', name: '产品', path: '/pages/product/product', tab: 3 },
     { key: 'mine', name: '我的', path: '/pages/mine/mine', tab: 4 }
   ];
+
+  /**
+   * 非内置页的地址表：页面 key → 后端给的 `path`（形如 `packageNews/note/note?id=3`）。
+   *
+   * ⚠️ 刻意**不在这里拼地址**（不写 `'/packageNews/note/note?id=' + id`）：
+   *    地址的真源是后端页面定义（自定义页在 customPages、笔记在 shopnotes 的 PATH_PREFIX），
+   *    这里再拼一份就等于把同一个地址定义成两处 —— 后台改个前缀，预览就指向 404。
+   */
+  var PAGE_PATH = {};
+  /** 页面 key → 显示名（targetOf 要用；与左栏列表同一份数据） */
+  var PAGE_NAME = {};
 
   var CUR = { key: '', target: null, meta: null, hasDraft: false, publishedAt: null, tabbar: null };
   var SWIPER = {};   // 页面 key → 当前轮播页码（真机自动播放，这里手动翻）
@@ -100,9 +111,32 @@
   }
 
   /** 页面 key → 真机页面路径（自定义页带 ?key= 参数） */
+  /**
+   * 页面 key → 真机页面路径 + query。
+   *
+   * 内置页在这里硬编码（它们就是固定的 5 个 tab 页）；
+   * 自定义页（pages/custom/index?key=…）与店铺笔记（packageNews/note/note?id=…）
+   * 都取后端下发的 `path`，再拆成 path / query 两段 —— 两者格式一致，处理方式也就一致。
+   */
   function targetOf(key) {
     var b = BUILTIN.filter(function (x) { return x.key === key; })[0];
     if (b) return { path: b.path, query: {}, tab: b.tab, name: b.name, builtin: true };
+    var p = PAGE_PATH[key];
+    if (p) {
+      var segs = String(p).split('?');
+      var q = {};
+      (segs[1] || '').split('&').forEach(function (kv) {
+        if (!kv) return;
+        var i = kv.indexOf('=');
+        var k = i < 0 ? kv : kv.slice(0, i);
+        q[decodeURIComponent(k)] = decodeURIComponent(i < 0 ? '' : kv.slice(i + 1));
+      });
+      return {
+        path: '/' + segs[0], query: q, tab: -1,
+        name: PAGE_NAME[key] || key, builtin: false, rawPath: p
+      };
+    }
+    // 兜底：拿不到元信息时按自定义页走（老行为，避免整页白屏）
     return { path: '/pages/custom/index', query: { key: key }, tab: -1, name: key, builtin: false };
   }
 
@@ -112,6 +146,8 @@
     return req('/api/decorate/pages').then(function (d) {
       // 「店铺导航」是全局配置不是页面，不列进左栏（它体现在每个 tab 页的底部导航上）
       var list = (d.list || []).filter(function (p) { return !p.nav; });
+      // 记住每个页面的真机地址与显示名（targetOf 要用；不在这里拼第二份地址）
+      list.forEach(function (p) { PAGE_PATH[p.key] = p.path || ''; PAGE_NAME[p.key] = p.name || p.key; });
       renderList(list);
       var sig = list.map(function (p) {
         return p.key + ':' + (p.lastVersion ? p.lastVersion.at : 0) + ':' + (p.hasDraft ? 1 : 0);
@@ -128,12 +164,15 @@
     host.innerHTML = list.map(function (p) {
       var isCustom = !BUILTIN.filter(function (x) { return x.key === p.key; }).length;
       var badges = '';
-      if (isCustom) badges += '<span class="pv-badge custom">自定义页</span>';
+      /* 笔记与自定义页都带 custom: true，得先看 shopnote 才能标对（否则笔记会被写成「自定义页」） */
+      if (p.shopnote) badges += '<span class="pv-badge custom">店铺笔记</span>';
+      else if (isCustom) badges += '<span class="pv-badge custom">自定义页</span>';
       if (p.hasDraft) badges += '<span class="pv-badge draft">有未发布草稿</span>';
       badges += '<span class="pv-badge">' + p.blockCount + ' 个内容块</span>';
       return '<button class="pv-item' + (p.key === CUR.key ? ' on' : '') + '" data-key="' + esc(p.key) + '">' +
         '<b>' + esc(p.name) + '</b>' +
-        '<small>' + esc(targetOf(p.key).path + (isCustom ? '?key=' + p.key : '')) + '</small>' +
+        // 地址直接显示后端给的那一份（含 query），不在这里拼 —— 与 targetOf 同源
+        '<small>' + esc(targetOf(p.key).rawPath || targetOf(p.key).path) + '</small>' +
         '<div class="pv-badges">' + badges + '</div>' +
         '</button>';
     }).join('');

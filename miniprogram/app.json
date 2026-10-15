@@ -46,7 +46,8 @@
       "name": "packageNews",
       "root": "packageNews",
       "pages": [
-        "detail/detail"
+        "detail/detail",
+        "note/note"
       ]
     }
   ],

@@ -1,0 +1,118 @@
+/* 店铺笔记 · 详情页样式
+ *
+ * 区块样式（图片广告 / 富文本 / 辅助线 / 语音 / 视频 …）**复用首页那一份**：
+ * 笔记的组件面板里那 7 个组件与首页 / 自定义页共用 templates/blocks.wxml 的同一段 markup，
+ * 样式必须跟着走，否则「装修台看得见、真机走样」。
+ *
+ * 「文本」区块（.cu-text 系列）与「我的」页共用——它原本写在 mine.wxss 里，
+ * 已在 styles/blocks-cu.wxss 里只留一份，两边都从这里引。
+ *
+ * ⚠️ @import 必须排在其它规则之前（与 CSS 同）。
+ */
+@import "../../pages/index/index.wxss";
+@import "../../styles/blocks-cu.wxss";
+
+/* 页面底色：笔记在装修台里没有「页面设置」（那是自定义页才有的 meta），所以这一档写死。
+ *
+ * ⚠️ 必须与装修台预览的默认页底**逐字一致** —— 真源是 /shared/pv-render.js 的
+ *    `PAGE_BG_DEF = '#F5F6F8'`（自定义页没设底色时也用它）。两处不同向，
+ *    运营在装修台照着一种灰调、真机是另一种灰，改完还以为没生效
+ *    —— 复刻 03「创业故事」时就是这个坑（见 pv-render.js 里 pvPageBg 的注释）。
+ *    门禁：check-all 会断言这里的字面与 pv-render.js 的 PAGE_BG_DEF 相同，改一处不改另一处会红。 */
+.note-page {
+  background: #F5F6F8;
+  padding-bottom: 40rpx;
+}
+
+/* ==================== 1. 店长区 ==================== */
+.nt-head {
+  background: var(--color-bg-card);
+  padding: 28rpx 32rpx 24rpx;
+  border-bottom: 2rpx solid var(--color-border);
+}
+
+.nt-shoprow {
+  display: flex;
+  align-items: center;
+}
+
+.nt-avatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: var(--color-bg-muted);
+  flex: none;
+}
+
+/* 店铺没设头像时的占位（不要留一个空框，也不要编一张图） */
+.nt-avatar-ph {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nt-avatar-t {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.nt-shopname {
+  margin-left: 16rpx;
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-base);
+  color: var(--color-text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* 进店按钮：描边小按钮，不抢标题的视觉重量 */
+.nt-enter {
+  flex: none;
+  margin-left: 16rpx;
+  padding: 8rpx 24rpx;
+  border: 2rpx solid var(--color-primary);
+  border-radius: 999rpx;
+  font-size: var(--font-sm);
+  color: var(--color-primary);
+}
+
+.nt-title {
+  margin-top: 24rpx;
+  font-size: 40rpx;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--color-text);
+  word-break: break-all;
+}
+
+.nt-time {
+  margin-top: 12rpx;
+}
+
+.nt-time-t {
+  font-size: var(--font-sm);
+  color: var(--color-text-secondary);
+}
+
+.nt-tags {
+  margin-top: 16rpx;
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.nt-tag {
+  margin: 0 12rpx 8rpx 0;
+  padding: 4rpx 16rpx;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-light);
+  font-size: var(--font-xs);
+  color: var(--color-primary);
+}
+
+/* ==================== 2. 笔记正文 ==================== */
+/* 正文**没有专属样式**：它整段复用首页「富文本」区块的 `.c-rich` / `.cr-body`
+   （上内边距 20rpx / 字号 16px / 行高 1.5 都在那儿，三端逐字一致），
+   左右内边距与底色由 WXML 的行内 style 按装修数据给。
+   这里刻意不写空规则 —— 一个没有规则的类名只会让人以为「这里有样式要改」。 */

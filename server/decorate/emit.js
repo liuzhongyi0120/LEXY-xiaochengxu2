@@ -100,6 +100,19 @@ function emitReplica(data, opt = {}) {
     L.push('');
   }
 
+  /*
+   * 店铺笔记（装修台「内容管理 → 店铺笔记」创建）：按笔记 id 索引的完整内容
+   * （header 笔记头部 / body 笔记正文 / blocks 自定义组件 / 封面 …）。
+   * 与 CUSTOM_PAGES 同理：一条笔记都没有时整段省略，
+   * replica.js 与加这个功能之前完全一致（向后兼容）。
+   */
+  const hasNotes = !!(data.SHOPNOTES && Object.keys(data.SHOPNOTES).length);
+  if (hasNotes) {
+    L.push('/** ---------------- 店铺笔记（id → { header, body, blocks }，由装修台「店铺笔记」创建） ---------------- */');
+    L.push('const SHOPNOTES = ' + jsExpr(data.SHOPNOTES) + ';');
+    L.push('');
+  }
+
   if (data.PAGE_META !== undefined) {
     L.push('/** ---------------- 页面级设置（装修后台「页面设置」面板，key = 页面 key） ---------------- */');
     L.push('const PAGE_META = ' + jsExpr(data.PAGE_META) + ';');
@@ -129,6 +142,7 @@ function emitReplica(data, opt = {}) {
   const fields = ['SHOP', 'HOME_BLOCKS', 'MINE_BLOCKS', 'LEXY_SERIES', 'NEWS', 'PRODUCT_NAV_LOGO', 'PRODUCT_BRANDS'];
   if (hasCustom) fields.push('CUSTOM_PAGES');
   if (hasAlias) fields.push('CUSTOM_PAGE_ALIASES');
+  if (hasNotes) fields.push('SHOPNOTES');
   if (data.PAGE_META !== undefined) fields.push('PAGE_META');
   if (data.TABBAR !== undefined) fields.push('TABBAR');
 

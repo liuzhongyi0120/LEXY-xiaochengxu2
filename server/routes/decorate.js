@@ -18,6 +18,15 @@
  *   POST /api/decorate/page/rename        改名称 / 备注 / 页面标识（改标识会登记旧标识别名）
  *   POST /api/decorate/page/delete        删除自定义页面（被引用时须 force 才删）
  *
+ *   ── 店铺笔记（对标有赞「内容管理 → 店铺笔记」，数据写入 replica.SHOPNOTES）──
+ *   GET  /api/decorate/notes              笔记列表 + 配额（装修台「店铺笔记」模块首屏）
+ *   POST /api/decorate/note/create        新建笔记（只建后台条目，装修完生成代码才下发）
+ *   POST /api/decorate/note/delete        删除笔记（按页面标识 note-<id>；连带草稿与版本记录，重建 replica.js）
+ *
+ *   说明：笔记与自定义页面**共用同一套装修链路**（字段 schema / 草稿 / 版本 / 发布 / 预览）。
+ *   笔记页面的 key 形如 `note-<id>`，由 shopnotes.pageKeyOf(id) 生成，所以新建/删除只是
+ *   在注册表上增删条目，装修与发布走的仍是 /api/decorate/page、/draft、/publish 那几支。
+ *
  * 说明：装修后台属于运营管理功能，**全部要求管理员身份与角色**：
  *   - 由 `server/index.js` 统一拦截（见 lib/adminAuth.js），这里不再逐个标注；
  *   - 读操作 viewer 即可；存草稿 / 改数据 operator；发布、回滚、新建/改名/删除页面属高危，须 owner。
@@ -40,12 +49,15 @@ module.exports = [
     method: 'GET',
     path: '/api/decorate/pages',
     auth: false,
-    desc: '装修页面列表（页面名称/归属/状态/区块数/草稿/更新时间）+ 自定义页配额 + 新建模板 + 组件库清单',
+    desc: '装修页面列表（页面名称/归属/状态/区块数/草稿/更新时间）+ 自定义页配额 + 笔记配额 + 新建模板 + 组件库清单',
     async handler() {
       return {
         list: decorate.listPages(),
         stats: decorate.stats(),
         custom: decorate.customStats(),
+        /* 笔记配额：跟自定义页一样随首屏一起下发。
+           后台顶部那行统计要显示「店铺笔记 x / 50」，单独再发一个请求不值当。 */
+        notes: decorate.noteStats(),
         templates: decorate.templates(),
         lib: schema.componentLib(),
         /* 页面级组件库：目前只有「我的」（个人中心）自带一份独立清单。
@@ -159,6 +171,49 @@ module.exports = [
       // 编译 replica.js 失败、回读校验失败这类真·服务端异常会被一起吞成 HTTP 200，
       // 既丢掉了「已自动回滚」的真实原因，也让自检的失败被当成「预期拦截」。
       return decorate.removeCustomPage(key, { force: ctx.params.force });
+    }
+  },
+
+  /* ---------------- 店铺笔记（装修台「内容管理 → 店铺笔记」） ---------------- */
+
+  {
+    method: 'GET',
+    path: '/api/decorate/notes',
+    auth: false,
+    desc: '店铺笔记列表（id / 标题 / 标签 / 更新时间）+ 配额（已用 / 上限）；新的排前面',
+    async handler() {
+      return { list: decorate.listNotes(), stats: decorate.noteStats() };
+    }
+  },
+
+  {
+    method: 'POST',
+    path: '/api/decorate/note/create',
+    auth: false,
+    desc: '新建店铺笔记。只建后台条目（先不写 replica.js），装修完点「生成代码」才下发到小程序',
+    async handler(ctx) {
+      /*
+       * 同 page/create：**刻意不兜 try/catch**。
+       * shopnotes.create 自己抛 BizError（标题必填/超长 = 1001，超配额 = 2000），
+       * 再兜一层会把「生成 replica.js 失败」这类真·服务端异常压成「运营填错了」。
+       */
+      return decorate.createNote({
+        title: ctx.params.title,
+        summary: ctx.params.summary,
+        tags: ctx.params.tags
+      });
+    }
+  },
+
+  {
+    method: 'POST',
+    path: '/api/decorate/note/delete',
+    auth: false,
+    desc: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js（页面标识不存在报 404）',
+    async handler(ctx) {
+      // 与 /page/delete 同口径：按**页面标识**（note-<id>）删，而不是暴露注册表内部的数字 id。
+      // 不是笔记标识时由 store.removeNote 抛 404（'笔记不存在：xxx'），提示比 1001 更准确。
+      return decorate.removeNote(needKey(ctx.params));
     }
   },
 

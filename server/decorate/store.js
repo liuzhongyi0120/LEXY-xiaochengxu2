@@ -15,7 +15,9 @@ const vm = require('node:vm');
 const schema = require('./schema');
 const emit = require('./emit');
 const customPages = require('./customPages');
+const shopnotes = require('./shopnotes');
 const atomic = require('../lib/atomicFile');
+const util = require('../lib/util');
 const { BizError, ERR } = require('../lib/http');
 
 const ROOT = nodePath.join(__dirname, '..', '..');
@@ -99,7 +101,9 @@ function publishedAll() {
   const R = readReplica();
   const out = {};
   schema.allPages().forEach((p) => {
-    out[p.key] = p.custom ? customPublished(p.key) : schema.clone(p.from(R));
+    out[p.key] = p.shopnote ? shopnotePublished(p.key)
+      : p.custom ? customPublished(p.key)
+      : schema.clone(p.from(R));
   });
   return out;
 }
@@ -115,9 +119,24 @@ function customPublished(key) {
   });
 }
 
+/**
+ * 单条笔记的已发布数据（注意分支判据是 `p.shopnote`，**不是** `p.custom`）。
+ *
+ * 笔记与自定义页都带 `custom: true`（都走「注册表 + 草稿」这条路），
+ * 但内容形态完全不同：自定义页是 { blocks, meta }，笔记是 { header, body, blocks, … }。
+ * 若这里也用 customPublished()，笔记会被硬塞成 { blocks:[], meta:{} }，
+ * 打开编辑器时标题、封面、正文全部消失（只剩组件流）。
+ */
+function shopnotePublished(key) {
+  const id = shopnotes.idOfKey(key);
+  if (!id) return schema.clone(shopnotes.normalizeContent({}));
+  return schema.clone(shopnotes.publishedContent(id));
+}
+
 function publishedOf(key) {
   const p = schema.get(key);
   if (!p) return null;
+  if (p.shopnote) return shopnotePublished(key);
   return p.custom ? customPublished(key) : schema.clone(p.from(readReplica()));
 }
 
@@ -361,6 +380,24 @@ const REQUIRED = {
 function validate(key, data) {
   const page = schema.get(key);
   if (!page) return '未知页面：' + key;
+  /*
+   * 店铺笔记：先校验「标题」，再走区块流校验。
+   *
+   * ⚠️ 这一条必须落在 validate() 里，**不能只在 setPublished() 里拦**：
+   *    publish() 的顺序是「先 writeReplica、后回写注册表」，
+   *    若把标题校验放到回写那一步，运营清空标题点「生成代码」时，
+   *    replica.js 已经写出去了才报错 —— 文件与注册表当场不一致（最难修的一种）。
+   *    validate() 在 writeReplica 之前被调用，拦在这里等于「什么都没发生」。
+   */
+  if (page.shopnote) {
+    // 标题真源是 data.header.title（与 schema 的字段树一致，见 shopnotes.HEADER_KEYS）；
+    // 兼容读取上一轮存下的平铺草稿（data.title）—— 与 normalizeContent 同一口径。
+    const h = (data && util.isPlainObject(data.header)) ? data.header : {};
+    const raw = h.title !== undefined ? h.title : (data && data.title);
+    const t = shopnotes.checkTitle(String(raw === undefined || raw === null ? '' : raw).trim());
+    if (t) return t;
+    return checkBlocks(data);
+  }
   // 自定义页面统一是「区块流」结构，与首页共用同一套校验规则
   if (page.custom) return checkBlocks(data);
   const fn = REQUIRED[key];
@@ -388,11 +425,16 @@ function listPages() {
     const draft = state.drafts[meta.key];
     const pub = published[meta.key];
     /*
-     * 「已发布」对自定义页是个容易被误读的说法：
-     * 注册表里的页面刚建好就有 published 字段（那是初始内容），但它**还没写进 replica.js**，
+     * 「已发布」对自定义页 / 店铺笔记是个容易被误读的说法：
+     * 注册表里的条目刚建好就有 published 字段（那是初始内容），但它**还没写进 replica.js**，
      * 小程序端其实打不开。所以用 generated 明确区分「已写进代码包」与「只在后台」。
+     *
+     * 两者写进 replica 的落点不同：自定义页在 CUSTOM_PAGES[key]，笔记在 SHOPNOTES[<id>]。
+     * 笔记若照自定义页那样去查 CUSTOM_PAGES，会永远显示「未生成代码」。
      */
-    const generated = meta.custom ? !!inReplica[meta.key] : true;
+    const generated = meta.shopnote
+      ? !!(R.SHOPNOTES && R.SHOPNOTES[String(meta.key).slice(shopnotes.KEY_PREFIX.length)])
+      : meta.custom ? !!inReplica[meta.key] : true;
     return Object.assign({}, meta, {
       status: meta.custom ? (generated ? '代码已生成' : '未生成代码') : '已发布',
       generated: generated,
@@ -437,9 +479,20 @@ function getPage(key) {
   const state = loadState();
   const published = publishedOf(key);
   const draft = state.drafts[key];
-  const data = draft && draft.data ? schema.clone(draft.data) : schema.clone(published);
+  let data = draft && draft.data ? schema.clone(draft.data) : schema.clone(published);
   // 盘上可能存着结构升级前的老草稿（轮播 images 还是字符串数组），打开时先升级
   schema.upgradePageData(data);
+  /*
+   * 笔记的草稿再做一次「形状归位」：把顶层的内容键（title / tags / covers …）
+   * 搬进 header，与字段树一致。
+   *
+   * ⚠️ 必须放在**读**这一侧：盘上已经存着的草稿是按旧形状写的（当时内容平铺在顶层），
+   *    不归位的话运营打开编辑器会看到标题那一格是空的 —— 而标题其实还在，
+   *    只是躺在 data.title 上；他要是随手填一个再发布，旧标题就真没了。
+   *    saveDraft() 里也做了同样的搬运（保证新草稿就是规范形状），
+   *    两处都留着是因为「历史数据」与「新写入」各有各的入口。
+   */
+  if (page.shopnote) data = shopnotes.hoistHeader(data);
 
   // 列表项标题由服务端算好（连带 path 一起给出，前端不必实现 title 函数）
   const titles = {};
@@ -520,7 +573,13 @@ function saveDraft(key, data) {
   if (err) throw new BizError('数据校验未通过：' + err, ERR.PARAM);
 
   const state = loadState();
-  state.drafts[key] = { data: schema.clone(data), at: now() };
+  /*
+   * 笔记草稿存**规范形状**（内容键在 header 下，与字段树一致）。
+   * 不搬的话，用平铺写法存进来的草稿再打开时，面板上标题/摘要/标签那几格是空的
+   * （数据还在，只是躺在顶层键上）—— 与 getPage() 的读侧归位配套。
+   */
+  const stored = page.shopnote ? shopnotes.hoistHeader(data) : schema.clone(data);
+  state.drafts[key] = { data: stored, at: now() };
   saveState(state);
   return { key, at: state.drafts[key].at, atText: stampOf(state.drafts[key].at) };
 }
@@ -636,6 +695,13 @@ function publish(key, note) {
   /* 组装全量数据：该页面用草稿，其余页面用各自的已发布数据 */
   const pageData = publishedAll();
   pageData[key] = schema.clone(draft.data);
+  /*
+   * 店铺笔记的「发布时间」= 这一次生成代码的时刻，必须**在写 replica 之前**填进内容里。
+   * 原因：真机的笔记详情页要显示发布时间，而 replica.SHOPNOTES[id] 只带内容本身 ——
+   * 注册表的时间戳不下发到小程序。写文件那一刻才填的值，才是真机能看到的那个。
+   * （放在 writeReplica 之后填就晚了：文件里已经是 0。）
+   */
+  if (page.shopnote) pageData[key].publishedAt = now();
 
   const res = writeReplica(pageData, key);
   const version = recordVersion(state, key, res.ts, note || '发布', pageData);
@@ -643,11 +709,20 @@ function publish(key, note) {
   saveState(state);
 
   /*
-   * 自定义页：把「已发布数据」回写注册表。
-   * 注册表才是自定义页的数据真源（草稿清掉后全靠它），漏了这一步，
+   * 自定义页 / 店铺笔记：把「已发布数据」回写注册表。
+   * 注册表才是这一类页面的数据真源（草稿清掉后全靠它），漏了这一步，
    * 下次发布别的页面时这一页就会被还原成空白页。
+   *
+   * ⚠️ 笔记必须先于自定义页判断：两者都带 `custom: true`，
+   *    先判 custom 会把 note-1 喂给 customPages.setPublished()，
+   *    而它只认自定义页的 key，直接抛「页面不存在：note-1」——发布当场失败。
    */
-  if (page.custom) customPages.setPublished(key, pageData[key]);
+  if (page.shopnote) {
+    const id = shopnotes.idOfKey(key);
+    if (id) shopnotes.setPublished(id, pageData[key]);
+  } else if (page.custom) {
+    customPages.setPublished(key, pageData[key]);
+  }
 
   return {
     ok: true,
@@ -842,6 +917,94 @@ function removeCustomPage(key, opt) {
   };
 }
 
+/* ---------------- 店铺笔记（装修台「内容管理 → 店铺笔记」） ---------------- */
+
+/**
+ * 新建店铺笔记。
+ *
+ * 与 createCustomPage 同一套路：**只建后台条目，先不写 replica.js**，
+ * 装修完点「生成代码」才下发到小程序（这一步不是上线，见 README）。
+ */
+function createNote(input) {
+  const def = shopnotes.create(input || {});
+  const key = shopnotes.pageKeyOf(def.id);
+  const page = schema.get(key);
+  return {
+    /*
+     * page 用**页面元信息**而不是注册表记录本身：
+     * 注册表记录里没有 custom / shopnote / desc / source 这几个「页面级」标记，
+     * 直接回传的话调用方（后台弹层、自检、外部集成）就分不出这是一篇笔记还是普通自定义页。
+     * 走 schema.metaOf 与列表页拿到的是同一个投影，不会两处各长一样。
+     */
+    page: schema.metaOf(page),
+    key: key,
+    schema: schema.serialize(page),
+    published: publishedOf(key)
+  };
+}
+
+/** 笔记列表（装修台「店铺笔记」模块用；新的排前面） */
+function listNotes() {
+  return shopnotes.summaries().sort((a, b) => b.id - a.id);
+}
+
+/**
+ * 笔记配额与体积（后台提示用）。
+ *
+ * 顺手把几个「会显示给运营看」的长度口径一起带出去（标题 5~40 / 标签 8 / 封面 9）——
+ * 后台弹层里要是自己硬编码一遍，改了下限就会出现「前端说 5~40、后端按 3~40 判」的分叉。
+ * 真源只有 server/decorate/shopnotes.js 顶上那几个常量。
+ */
+function noteStats() {
+  return Object.assign({}, shopnotes.stats(), {
+    belongs: shopnotes.BELONGS,
+    titleMin: shopnotes.TITLE_MIN,
+    titleMax: shopnotes.TITLE_MAX,
+    tagMax: shopnotes.TAG_MAX,
+    coverMax: shopnotes.COVER_MAX,
+    coverSizeTip: shopnotes.COVER_SIZE_TIP
+  });
+}
+
+/**
+ * 删除笔记。
+ *
+ * ⚠️ 入参是**页面标识**（`note-<id>`）而不是注册表内部的数字 id ——
+ *    与 removeCustomPage(key) 保持同一个口径。装修台手里只有 key（页面列表的每一行都由它索引），
+ *    数字 id 是 shopnotes 的内部实现细节，暴露出去就等于把注册表结构写进了接口契约。
+ *
+ * 顺序与 removeCustomPage 一致，且同样是硬要求：
+ * **先让 replica.js 去掉这一条，再删注册表** —— 反过来的话一旦写 replica 失败，
+ * 笔记数据就永久找不回来了（注册表已删、草稿与版本快照也没了）。
+ * 同时 replica 必须重建，否则已删笔记的数据会留在 SHOPNOTES 里，
+ * 小程序端按旧 id 还能打开一个「幽灵笔记」。
+ */
+function removeNote(key) {
+  const id = shopnotes.idOfKey(key);
+  if (!id || !shopnotes.has(id)) throw new BizError('笔记不存在：' + key, ERR.NOT_FOUND, 404);
+
+  const pageData = publishedAll();
+  delete pageData[key];
+  const res = writeReplica(pageData, '');
+
+  const gone = shopnotes.remove(id);
+
+  const state = loadState();
+  delete state.drafts[key];
+  const before = state.versions.length;
+  state.versions = state.versions.filter((v) => v.pageKey !== key);
+  saveState(state);
+
+  return {
+    key: key,
+    id: gone.id,
+    title: gone.title,
+    backup: res.backup,
+    bytes: res.bytes,
+    removedVersions: before - state.versions.length
+  };
+}
+
 /** 版本快照体积信息（后台提示用） */
 function stats() {
   const state = loadState();
@@ -877,5 +1040,9 @@ module.exports = {
   customStats,
   createCustomPage,
   updateCustomPage,
-  removeCustomPage
+  removeCustomPage,
+  createNote,
+  listNotes,
+  noteStats,
+  removeNote
 };

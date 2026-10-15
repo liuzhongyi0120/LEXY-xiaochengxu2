@@ -364,6 +364,19 @@ module.exports = {
     body: { key: '{{pageKey}}' }
   },
 
+  /* ------------------- 店铺笔记（营销与内容 → 店铺笔记） ------------------- */
+  'GET /api/decorate/notes': {
+    note: '店铺笔记列表（key / 标题 / 标签 / 更新时间）+ 配额（已用 count / 上限 max）；新的排前面。装修台「店铺笔记」模块首屏就靠它'
+  },
+  'POST /api/decorate/note/create': {
+    note: '新建店铺笔记：只建后台条目，**先不写 replica.js**（装修完点「生成代码」才下发到小程序）。标题必填且 ≤40 字；返回体带派生地址 key=note-<id> 与真机 path=packageNews/note/note?id=<id>',
+    body: { title: '莱克洗地机实测', summary: '一句话卖点', tags: '洗地机,吸尘器' }
+  },
+  'POST /api/decorate/note/delete': {
+    note: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js。key 传**页面标识**（note-<id>，不是内部数字 id）；不存在报 404',
+    body: { key: '{{noteKey}}' }
+  },
+
   /* ------------------------------- 运维 ------------------------------- */
   'GET /api/health': {
     note: '健康检查：服务状态、已注册点位数、微信能力（登录 / 支付是真机还是 mock）'

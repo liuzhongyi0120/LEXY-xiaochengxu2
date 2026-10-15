@@ -1,0 +1,77 @@
+<!--
+  店铺笔记 · 详情页（对标有赞「店铺笔记」的小程序端呈现）
+
+  版式与装修台的预览一致，三段固定顺序（取证见 deploy/有赞店铺笔记装修页-取证.md 第三节）：
+    店长区（标题 + 发布时间 + 进店按钮）
+    笔记正文（富文本，固定不可删）
+    笔记组件（可自由增删排序，只放有赞那 7 个组件）
+
+  ⚠️ 与自定义页（pages/custom）的分工：自定义页整页就是一个组件流，没有固定区域；
+     笔记有**固定头部 + 固定正文**，只有第三段可拼 —— 所以是独立页面，不是复用自定义页。
+
+  ⚠️ 「浏览量 / 点赞数 / 推荐商品」三个开关在装修台里保留（面板与有赞一致），
+     但真机**不渲染任何东西**：本店没有笔记计数器与推荐引擎。
+     宁可什么都不显示，也不显示一个编出来的「0 浏览 / 0 赞」。
+-->
+<view class="page note-page">
+
+  <!-- 装修数据还没下发：多半是运营建了笔记但没点「生成代码」，或链接里的编号过期了 -->
+  <empty-state
+    wx:if="{{missing}}"
+    text="笔记不存在或尚未发布"
+    desc="请到装修台「店铺笔记」确认这篇笔记已「生成代码」，并重新上传发布小程序新版本"
+  />
+
+  <block wx:else>
+
+    <!-- ==================== 1. 店长区 ==================== -->
+    <view class="nt-head">
+      <view class="nt-shoprow">
+        <image wx:if="{{note.shopAvatar}}" class="nt-avatar" src="{{note.shopAvatar}}" mode="aspectFill" />
+        <view wx:else class="nt-avatar nt-avatar-ph"><text class="nt-avatar-t">店</text></view>
+        <text class="nt-shopname">{{note.shopName}}</text>
+        <view
+          wx:if="{{note.showEnterShop}}"
+          class="nt-enter"
+          bindtap="onEnterShop"
+          hover-class="hover-lite"
+          hover-stay-time="80"
+        >进店逛逛</view>
+      </view>
+
+      <view wx:if="{{note.showTitle && note.title}}" class="nt-title">{{note.title}}</view>
+
+      <view wx:if="{{note.showPublishTime && note.publishText}}" class="nt-time">
+        <text class="nt-time-t">发布于 {{note.publishText}}</text>
+      </view>
+
+      <!--
+        标签：有赞那边「标签」是**笔记列表**上的角标。本店暂时没有笔记列表页，
+        所以放在店长区下方展示（有意偏离，见 deploy/店铺笔记-交付说明.md）——
+        不然运营在装修台填了标签，哪里都看不到。
+      -->
+      <view wx:if="{{note.tags.length}}" class="nt-tags">
+        <text wx:for="{{note.tags}}" wx:key="*this" class="nt-tag">{{item}}</text>
+      </view>
+    </view>
+
+    <!-- ==================== 2. 笔记正文 ==================== -->
+    <!-- 复用首页「富文本」区块的类名（.c-rich / .cr-body），上内边距 20rpx 是那里实测过的口径；
+         「全屏显示」= 左右不留页面边距（装修台里叫「显示」）。
+         注意这里**不加专属类名**：正文没有任何专属样式，加了反而会让人以为有。 -->
+    <view
+      wx:if="{{note.bodyNodes}}"
+      class="c-rich"
+      style="padding: 20rpx {{note.bodyPadRpx}}rpx 0; background: {{note.bodyBg}};"
+    >
+      <rich-text class="cr-body" nodes="{{note.bodyNodes}}"></rich-text>
+    </view>
+
+    <!-- ==================== 3. 笔记组件 ====================
+         与首页 / 自定义页共用同一份区块渲染，避免三处各写一套后逐渐走样。
+         前提：本页 data 里有 blocks（已过 utils/blocks.js），且实现了 onTapBlock 等事件
+         （来自 utils/blockPage.js 的 blockPageBehavior）。 -->
+    <include src="../../templates/blocks.wxml" />
+
+  </block>
+</view>

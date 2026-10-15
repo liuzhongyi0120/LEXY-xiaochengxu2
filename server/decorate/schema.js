@@ -32,6 +32,7 @@
  */
 
 const customPages = require('./customPages');
+const shopnotes = require('./shopnotes');
 const {
   UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS
 } = require('./yzUserCenter');
@@ -1683,6 +1684,207 @@ const HOME_BLOCKS_NODE = {
   sortable: true, addable: true
 };
 
+/* ============================ 店铺笔记的固定区块（头部 / 正文） ============================ */
+
+/**
+ * 笔记头部 —— 对标有赞店铺笔记的「基础设置」面板。
+ * 字段逐条取自实测（`deploy/有赞店铺笔记装修页-取证.md` 第四节）：
+ *   标题（5-40 字）/ 摘要（选填，仅封面展示）/ 标签（8 字以内）/
+ *   封面图片（多图·单图，推荐 350×350，最多 9 张）/ 封面展示商品卡片 / 商品详情页展示该笔记，
+ *   以及「更多设置」那一组显示开关（标题 / 发布时间 / 浏览量 / 点赞数 / 进店按钮 / 推荐商品）。
+ *
+ * ⚠️ 这是**固定区块**：不可删除、不可排序 —— 有赞的预览里它同样没有拖拽手柄。
+ *    因此它写成 root.fields 里的一个普通 object，而不是 blocks 数组的一项；
+ *    真做成 blocks 的一项，运营就能把笔记头部删掉，标题封面全没了。
+ */
+const SHOPNOTE_HEADER_NODE = {
+  k: 'header', label: '笔记头部', type: 'object',
+  hint: '标题 / 摘要 / 标签 / 封面 —— 对标有赞笔记的「基础设置」面板',
+  /*
+   * ⚠️ 这个节点的 `k: 'header'` 决定了面板读写的是 **data.header.xxx**。
+   *    字段树与数据形状必须逐键对齐（`server/decorate/shopnotes.js` 的
+   *    HEADER_KEYS + normalizeContent 就是照着这里写的）——
+   *    曾经把「标题 / 摘要 / 标签 / 封面 / 两个商品开关」平铺在 data 顶层，
+   *    结果面板上这 7 个字段全是空的、改完被静默丢弃，且不报任何错。
+   *    对账脚本：`.tooling/_probe-note-paths.cjs`；门禁见 check-all 的字段对账一节。
+   */
+  fields: [
+    {
+      k: 'title', label: '标题', type: 'text',
+      // 长度口径不在这里写死：真源是 shopnotes 顶上的常量（有赞的 placeholder 也是 5-40 字）
+      hint: `建议 ${shopnotes.TITLE_MIN}~${shopnotes.TITLE_MAX} 字（与有赞一致）`
+    },
+    { k: 'summary', label: '摘要', type: 'text', hint: '选填，仅在笔记封面展示' },
+    { k: 'tags', label: '标签', type: 'text', hint: `${shopnotes.TAG_MAX} 个字以内` },
+    {
+      k: 'coverMode', label: '封面图片', type: 'radiobutton', def: 'multi',
+      options: [{ value: 'multi', label: '多图' }, { value: 'single', label: '单图' }]
+    },
+    {
+      k: 'covers', label: '封面图', type: 'list', max: shopnotes.COVER_MAX, imageList: true,
+      item: {
+        type: 'object',
+        title: (v, i) => '封面 ' + (i + 1),
+        fields: [{ k: 'image', label: '图片', type: 'image' }]
+      },
+      hint: `推荐使用 ${shopnotes.COVER_SIZE_TIP}×${shopnotes.COVER_SIZE_TIP} 像素的图片，最多上传 ${shopnotes.COVER_MAX} 张（用于笔记列表的封面，笔记详情页不重复展示）`
+    },
+    {
+      k: 'showGoodsCard', label: '封面展示商品卡片', type: 'switch', def: false,
+      hint: '仅展示第一个关联商品（笔记里加了「商品」组件才有）'
+    },
+    { k: 'showNoteOnGoods', label: '商品详情页展示该笔记', type: 'switch', def: false },
+    {
+      type: 'group', label: '更多设置',
+      fields: [
+        { k: 'showTitle', label: '显示标题', type: 'switch', def: true },
+        { k: 'showPublishTime', label: '显示发布时间', type: 'switch', def: true },
+        /* ⚠️ 下面三个是**面板对齐项**：有赞店铺笔记的「更多设置」里确实有它们，
+           但自建商城没有对应的数据源 —— 笔记没有浏览量 / 点赞数计数器，
+           也没有个性化推荐引擎。按项目约定（不假装可用），它们**不会**在真机上
+           渲染出数字或推荐位；保留开关是为了「面板与有赞一致 + 以后接入时不用改数据」。
+           真机上宁可什么都不显示，也不显示一个编出来的「0 浏览 / 0 赞」。 */
+        {
+          k: 'showBrowseCount', label: '显示浏览量', type: 'switch', def: true,
+          hint: '暂无数据源（需要笔记浏览计数后端），接入前真机不显示数字'
+        },
+        {
+          k: 'showThumbsUpCount', label: '显示点赞数', type: 'switch', def: true,
+          hint: '暂无数据源（需要点赞后端），接入前真机不显示数字'
+        },
+        { k: 'showEnterShop', label: '显示进店按钮', type: 'switch', def: true },
+        {
+          k: 'showRecommendItems', label: '显示推荐商品', type: 'switch', def: true,
+          hint: '暂无数据源（需要个性化推荐引擎），接入前真机不显示推荐位'
+        }
+      ]
+    }
+  ]
+};
+
+/**
+ * 笔记正文 —— 固定区块。
+ *
+ * 字段与首页「富文本」区块**逐字同构**（html / bg / full），
+ * 所以小程序端与预览可以直接复用富文本那一段渲染逻辑，不必为笔记正文再写一套。
+ * 数据侧同样按这三个键存（见 server/decorate/shopnotes.js 的 BODY_DEFAULT）。
+ */
+const SHOPNOTE_BODY_NODE = {
+  k: 'body', label: '笔记正文', type: 'object',
+  hint: '小程序端笔记正文展示以实际效果为准，左侧预览仅供参考',
+  fields: [
+    {
+      k: 'html', label: '正文内容', type: 'textarea', rows: 10,
+      hint: '支持 HTML 片段：<p>文字</p> / <b>加粗</b> / <img src="…" /> / <br/>；<script> 会被过滤'
+    },
+    { k: 'bg', label: '背景颜色', type: 'color', def: '#ffffff' },
+    {
+      k: 'full', label: '全屏显示', type: 'radiobutton', def: '1',
+      options: [{ value: '1', label: '显示' }, { value: '0', label: '隐藏' }],
+      hint: '「显示」= 内容占满整宽（忽略页面边距）'
+    }
+  ]
+};
+
+/* ==================== 店铺笔记 · 组件面板（有赞实测 7 个组件） ==================== */
+
+/**
+ * 笔记装修页左侧能拼的组件 —— **逐项照抄有赞的 7 个**（取证报告第四节的表格）。
+ *
+ * 有赞实测是 2 组共 7 个：
+ *   基础组件：文本 / 图片广告 / 富文本
+ *   其他　　：辅助线 / 辅助空白 / 语音 / 视频
+ *
+ * 为什么**不能**直接复用首页那 58 个 kind：有赞店铺笔记装修页的组件面板就是另一份独立清单
+ * （和「个人中心」一样）—— 把首页的电梯导航 / 品牌分类 / 商品分组混进来，
+ * 运营会以为笔记里能放这些，而它们在笔记的版式里根本没有对应位置。
+ *
+ * ⚠️ 这 7 个 kind 在本项目**都已实现**（真机有渲染、装修台有属性面板），
+ *    其中 `text` / `blank` 原本只被「我的」页用到（在 UC_KINDS 里），
+ *    所以笔记的小程序页面必须把「我的」页那份组件样式也带上，否则「文本」区块会没样式。
+ */
+const SHOPNOTE_LIB_GROUPS = [
+  {
+    name: '基础组件',
+    items: [{ n: '文本', kind: 'text' }, { n: '图片广告', kind: 'swiper' }, { n: '富文本', kind: 'rich_text' }]
+  },
+  {
+    name: '其他',
+    items: [{ n: '辅助线', kind: 'line' }, { n: '辅助空白', kind: 'blank' }, { n: '语音', kind: 'audio' }, { n: '视频', kind: 'video' }]
+  }
+];
+
+/** 放行的 kind 清单（顺序 = 面板顺序，供 tree/union 用） */
+const SHOPNOTE_LIB_KINDS = [];
+SHOPNOTE_LIB_GROUPS.forEach((g) => {
+  g.items.forEach((it) => { if (SHOPNOTE_LIB_KINDS.indexOf(it.kind) < 0) SHOPNOTE_LIB_KINDS.push(it.kind); });
+});
+
+/** 与 componentLib().kinds 同构的元信息（装修台卡片要 label / icon / desc / dep） */
+function shopnoteLibKinds() {
+  return SHOPNOTE_LIB_KINDS.map((k) => {
+    const d = MINE_BLOCK_KINDS[k] || {};
+    return {
+      kind: k, label: d.label, lib: d.lib,
+      icon: ICONS[d.lib] || ICONS.image_ad,
+      desc: d.desc, dep: d.dep || '', depTag: d.depTag || '',
+      group: 'note'
+    };
+  });
+}
+
+/** 笔记的页面级组件库（形态与 mineComponentLib 一致，装修台零改动复用） */
+function shopnoteComponentLib() {
+  const total = SHOPNOTE_LIB_GROUPS.reduce((n, g) => n + g.items.length, 0);
+  return {
+    tabs: [{
+      key: 'note', name: '笔记组件', count: total, grouped: true,
+      desc: '对标有赞「店铺笔记」装修页实测 7 个组件（基础 3 / 其他 4）'
+    }],
+    groups: SHOPNOTE_LIB_GROUPS.map((g) => ({
+      name: g.name,
+      count: g.items.length,
+      items: g.items.map((it) => ({
+        n: it.n, ok: 1, kind: it.kind, group: g.name, max: YZ_MAX[it.n] || 0,
+        dep: depTagOf((MINE_BLOCK_KINDS[it.kind] || {}).dep || '')
+      }))
+    })),
+    kinds: shopnoteLibKinds(),
+    icons: ICONS,
+    total
+  };
+}
+
+/**
+ * 笔记「页面区块」的 union kinds（与上面的组件库严格一致，多了会在区块树里冒出加不进来的东西）。
+ *
+ * ⚠️ `label` 用**有赞的组件名**（`it.n`，如「辅助线」）覆盖掉内部名（「辅助分割」）：
+ *    同一个编辑器里，左侧面板写「辅助线」、加进来后区块树写「辅助分割」，
+ *    运营会以为加错了组件。字段定义仍复用 MINE_BLOCK_KINDS 那一份（不复制 fields）。
+ */
+const SHOPNOTE_UNION_KINDS = {};
+SHOPNOTE_LIB_GROUPS.forEach((g) => {
+  g.items.forEach((it) => {
+    SHOPNOTE_UNION_KINDS[it.kind] = Object.assign({}, MINE_BLOCK_KINDS[it.kind], { label: it.n });
+  });
+});
+
+/**
+ * 笔记的可增删组件流 —— 与首页的 HOME_BLOCKS_NODE 同构，只换 kinds。
+ * 字段名必须是 `blocks`：真机渲染（utils/blocks.js）、区块计数（store.countBlocks）都认这个键。
+ */
+const SHOPNOTE_BLOCKS_NODE = {
+  k: 'blocks', label: '笔记组件', type: 'list',
+  item: { type: 'union', kindField: 'type', kinds: SHOPNOTE_UNION_KINDS },
+  title: (v, i) => {
+    const label = SHOPNOTE_UNION_KINDS[v.type] ? SHOPNOTE_UNION_KINDS[v.type].label : '未知组件';
+    if (!v.height) return label;
+    const unit = ['swiper', 'video', 'line'].indexOf(v.type) >= 0 ? 'rpx' : 'px';
+    return label + ' · ' + v.height + unit;
+  },
+  sortable: true, addable: true
+};
+
 /* ============================ 店铺导航（底部 tabBar，全局配置） ============================ */
 
 /**
@@ -2294,17 +2496,74 @@ function customPageDef(def) {
   };
 }
 
-/** 全部页面：内置 5 个 + 运营新建的自定义页（每次调用取最新，增删立即可见） */
-function allPages() {
-  return PAGES.concat(customPages.list().map(customPageDef));
+/**
+ * 由一条笔记记录（server/decorate/shopnotes.js）生成页面对象。
+ *
+ * 结构与自定义页（customPageDef）**完全同构**，这是刻意的：
+ *   - `custom: true` 让 store.js 的 publishedAll()/publishedOf() 走注册表分支；
+ *   - `root` 用字段树描述「笔记头部 → 笔记正文 → 自定义组件」三段，
+ *     于是装修台的属性面板 / 区块树 / 手机预览全部自动生成，
+ *     「存草稿 → 看变更 → 发布 → 回滚」四件事也免费复用，一行都不用重写。
+ *
+ * 数据落点：`replica.SHOPNOTES[<id>]`（与自定义页写 replica.CUSTOM_PAGES 同一套思路）。
+ * 注册表（shopnotes.json）只管「有哪几条笔记」＋「已发布的那一版长什么样」。
+ *
+ * ⚠️ 页面 key 用 `note-<id>`（shopnotes.pageKeyOf），**不能用标题**：
+ *    标题会改、会重复、还有中文与空格，而 key 要当草稿键、版本键与地址段用。
+ */
+function shopnoteDef(n) {
+  return {
+    key: shopnotes.pageKeyOf(n.id),
+    // name / path / tags 都由 shopnotes 的 record() / pathOf() 统一派生，这里不再各拼一份
+    name: n.name || n.title || ('笔记 #' + n.id),
+    note: n.tags || '',
+    belongs: shopnotes.BELONGS,
+    path: shopnotes.pathOf(n.id),
+    desc: '店铺笔记（内容型：固定头部 + 固定正文 + 可自由增删的组件）',
+    source: 'replica.SHOPNOTES.' + n.id,
+    custom: true,
+    shopnote: true,
+    /* 页面级组件库：笔记只放有赞那 7 个组件，不用首页的 58 个（见 SHOPNOTE_LIB_GROUPS 注释） */
+    lib: shopnoteComponentLib(),
+    from(R) {
+      const all = (R && R.SHOPNOTES) || {};
+      const d = all[n.id];
+      /*
+       * replica 里还没有这一条（新笔记、一次都没发布过）时回落到注册表基线，
+       * 而不是给空白 —— 否则「新建笔记 → 填好标题封面 → 先存草稿 → 再打开编辑器」
+       * 会看到一片空白，运营以为自己的内容丢了。
+       */
+      return clone(shopnotes.normalizeContent(d || n.published || {}));
+    },
+    to(data, out) {
+      if (!out.SHOPNOTES) out.SHOPNOTES = {};
+      out.SHOPNOTES[n.id] = shopnotes.normalizeContent(data);
+    },
+    root: {
+      type: 'object',
+      fields: [SHOPNOTE_HEADER_NODE, SHOPNOTE_BODY_NODE, SHOPNOTE_BLOCKS_NODE]
+    }
+  };
 }
 
-/** 按 key 查页面定义（内置优先，其次自定义） */
+/** 全部页面：内置 5 个 + 运营新建的自定义页 + 店铺笔记（每次调用取最新，增删立即可见） */
+function allPages() {
+  return PAGES
+    .concat(customPages.list().map(customPageDef))
+    .concat(shopnotes.list().map(shopnoteDef));
+}
+
+/** 按 key 查页面定义（内置优先，其次店铺笔记，最后自定义页） */
 function findPage(key) {
   const k = String(key === undefined || key === null ? '' : key);
   if (!k) return null;
   const hit = PAGES.filter((p) => p.key === k)[0];
   if (hit) return hit;
+  const nid = shopnotes.idOfKey(k);
+  if (nid) {
+    const n = shopnotes.get(nid);
+    return n ? shopnoteDef(n) : null;
+  }
   const def = customPages.get(k);
   return def ? customPageDef(def) : null;
 }
@@ -2394,8 +2653,8 @@ function linkOptions(replica, catalogStore) {
 /* ============================ 对外接口 ============================ */
 
 /** 页面列表元信息（不含 schema 里的函数，避免 JSON 化后丢失） */
-function list() {
-  return allPages().map((p) => ({
+function metaOf(p) {
+  return {
     key: p.key,
     name: p.name,
     note: p.note,
@@ -2404,8 +2663,16 @@ function list() {
     desc: p.desc,
     source: p.source,
     custom: !!p.custom,
+    /* 笔记与自定义页**都带 custom: true**（装修链路复用同一套），
+       所以前端要区分「内容型笔记页」必须另看这个标记：
+       有它才显示「笔记」角标、才能在列表里走笔记专属的删除端点。 */
+    shopnote: !!p.shopnote,
     nav: !!p.nav
-  }));
+  };
+}
+
+function list() {
+  return allPages().map(metaOf);
 }
 
 /** 单个页面的完整 schema（含字段定义；函数字段在 JSON 序列化时会丢失，前端只用其输出） */
@@ -2453,7 +2720,7 @@ function clone(v) {
   return v === undefined ? undefined : JSON.parse(JSON.stringify(v));
 }
 
-module.exports = { PAGES, allPages, findPage, customPageDef, CUSTOM_META_DEFAULT, list, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, TABBAR_ICON_DIR, TABBAR_ICON_FILES, TABBAR_PRESET_OFF, TABBAR_PRESET_ON, tabbarIconName, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
+module.exports = { PAGES, allPages, findPage, customPageDef, shopnoteDef, SHOPNOTE_HEADER_NODE, SHOPNOTE_BODY_NODE, SHOPNOTE_BLOCKS_NODE, SHOPNOTE_LIB_GROUPS, SHOPNOTE_LIB_KINDS, shopnoteComponentLib, CUSTOM_META_DEFAULT, list, metaOf, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, TABBAR_ICON_DIR, TABBAR_ICON_FILES, TABBAR_PRESET_OFF, TABBAR_PRESET_ON, tabbarIconName, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
   /* 个人中心（「我的」页）：区块类型表 / 组件库 / 默认区块 / 字段节点 / 页面级组件库 */
   MINE_BLOCK_KINDS, MINE_BLOCKS_NODE, MINE_UNION_KINDS, MINE_LIB_KINDS, mineComponentLib, cloneDefaultMineBlocks,
   pageLibs, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };

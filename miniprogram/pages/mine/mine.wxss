@@ -6,6 +6,19 @@
  * 所以类名统一带 `cu-` 前缀，避免与首页区块样式互相污染。
  */
 
+/* ⚠️ 必须把首页那份区块样式引进来。
+   「我的」页的组件面板里不只有 .cu- 专属区块，**还挂着 15 个首页区块**
+   （富文本 / 图片广告 / 魔方 / 图文导航 / 商品搜索 / 公告 / 语音 / 视频 / 店铺信息 …，
+   见 schema 的 MINE_LIB_KINDS ∩ HOME_BLOCK_KINDS）——那些 markup 用的全是 .c-* 系列。
+   以前这里没有这行：运营在「我的」页加一个「富文本」，真机就是一段没字号的裸文字，
+   而开发者工具与装修台都不报错。custom/index.wxss 一直是这么引的，这里漏了。
+   @import 必须排在其它规则之前；本页自己的 .page 在下面，同优先级下后者生效。 */
+@import "../../pages/index/index.wxss";
+
+/* 「文本」区块的样式要与店铺笔记页共用，本体存在 styles/blocks-cu.wxss。
+   @import 放在文件顶部：WXSS 与 CSS 一样，导入语句必须排在其它规则之前。 */
+@import "../../styles/blocks-cu.wxss";
+
 .page {
   min-height: 100vh;
   padding-bottom: 60rpx;
@@ -341,39 +354,10 @@
   color: var(--color-text);
 }
 
-/* ================= 文本 ================= */
-.cu-text {
-  margin: 12rpx 0;
-}
-
-.cu-text-in {
-  display: flex;
-  padding: 20rpx 24rpx;
-  border-radius: var(--radius-base);
-}
-
-.cu-text-t {
-  flex: 1;
-  line-height: 1.6;
-  word-break: break-all;
-}
-
-.cu-text-in.s-sm {
-  font-size: var(--font-sm);
-}
-
-.cu-text-in.s-md {
-  font-size: var(--font-base);
-}
-
-.cu-text-in.s-lg {
-  font-size: var(--font-xl);
-}
-
-.cu-split {
-  height: 2rpx;
-  background: var(--color-border);
-}
+/* ================= 文本 =================
+ * 样式本体已抽到 styles/blocks-cu.wxss（见文件顶部的 @import）——
+ * 店铺笔记的组件面板里也有「文本」区块，两个页面共用一份，避免「改了一处、另一处走样」。
+ */
 
 /* ================= 关联链接 ================= */
 .cu-links {

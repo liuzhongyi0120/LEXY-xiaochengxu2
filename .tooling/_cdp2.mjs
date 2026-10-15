@@ -171,6 +171,9 @@ switch (cmd) {
     await connect();
     const f = await shot(rest[0], rest[1], {
       w: +(rest[2] || 375), h: +(rest[3] || 812), dpr: +(rest[4] || 2), full: cmd === 'full',
+      /* rest[5] = mobile 开关：桌面后台（有赞装修台这类）传 0，
+         否则默认按手机视口截（H5 预览用） */
+      mobile: rest[5] === undefined ? true : rest[5] !== '0',
     });
     show({ saved: f });
     break;

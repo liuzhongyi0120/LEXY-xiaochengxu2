@@ -803,6 +803,87 @@ assert('删除后仍保留 6 个内置装修字段',
 const afterCustom = ((await call('GET', '/api/decorate/pages', { auth: false })).data.list || []).filter((x) => x.custom).length;
 assert('自检未改变自定义页数量（可重复运行）', afterCustom === baseCustom, `${baseCustom} → ${afterCustom}`);
 
+/* ---------------- 店铺笔记（营销与内容 → 店铺笔记） ----------------
+ *
+ * 为什么这一节要紧跟自定义页：笔记**是接进页面体系做的**（custom: true + 注册表 + 草稿/版本/发布
+ * 全部复用），它的三个点位（列表 / 新建 / 删除）如果不在这里走一遍真实 HTTP，
+ * 「已注册点位」里就会永远挂着 3 个未覆盖项，而且新建时漏写 key / path 这类错
+ * 只有走到接口那一层才看得见（数据层自检直接调函数，绕过了路由的参数拼装）。
+ *
+ * 清理口径与自定义页一致：**认标题前缀**（自检笔记），不按 id 猜 ——
+ * 运营自己建的笔记不能被自检删掉。
+ */
+const NOTE_TITLE = '自检笔记 · 联调';
+const notesPre = await call('GET', '/api/decorate/notes', { auth: false });
+assert('店铺笔记列表点位返回列表 + 配额（已用 / 上限）',
+  notesPre.ok && Array.isArray(notesPre.data.list) && notesPre.data.stats.count === notesPre.data.list.length
+  && notesPre.data.stats.max > 0,
+  notesPre.ok ? `${notesPre.data.list.length} 篇 / 上限 ${notesPre.data.stats.max}`
+    : notesPre.json.msg);
+
+for (const n of (notesPre.data.list || []).filter((x) => x.title === NOTE_TITLE || /^自检笔记/.test(x.title || ''))) {
+  await call('POST', '/api/decorate/note/delete', { body: { key: n.key } });
+}
+const baseNotes = ((await call('GET', '/api/decorate/notes', { auth: false })).data.list || []).length;
+
+const noteMake = await call('POST', '/api/decorate/note/create', {
+  body: { title: NOTE_TITLE, summary: '一句话卖点', tags: '洗地机,吸尘器' }
+});
+/*
+ * 断言里必须同时锁住 key 与 path：
+ *   两者都是**从 id 派生**的（note-<id> / packageNews/note/note?id=<id>），
+ *   任一处漏补，装修台拿到 create 响应就会 openPage(undefined) 跳到 /admin?edit=undefined，
+ *   或者真机跳到一个不存在的地址。这类「派生字段漏填」只有走 HTTP 才暴露。
+ *
+ * ⚠️ id 从 key 里解出来，而不是读 create 响应的顶层 id —— createNote 的返回体只有
+ *    page / key / schema / published（对外契约里 id 不单独暴露，key 就是它的载体）；
+ *    第一版这里写了 `noteMake.data.id`（undefined → 0），断言必然红，是自检自己写错。
+ */
+const noteKey = noteMake.ok ? noteMake.data.key : '';
+const noteId = /^note-(\d+)$/.test(noteKey) ? Number(noteKey.slice('note-'.length)) : 0;
+assert('新建店铺笔记成功，并带出派生地址（key=note-<id> / 真机 path）',
+  noteMake.ok && noteId > 0 && noteMake.data.page.path === 'packageNews/note/note?id=' + noteId
+  && noteMake.data.page.key === noteKey && noteMake.data.page.belongs === '店铺笔记',
+  noteMake.ok ? `${noteKey}（id=${noteId}）→ ${noteMake.data.page.path}` : (noteMake.json.msg || 'create 失败'));
+assert('笔记内容落位：标题住在 published.header.title（面板按 header.title 读写）',
+  noteMake.ok && noteMake.data.published.header.title === NOTE_TITLE
+  && noteMake.data.published.title === undefined
+  && noteMake.data.published.header.tags === '洗地机,吸尘器',
+  noteMake.ok ? `header.title=${noteMake.data.published.header.title}` : 'create 失败');
+/* 「只建后台条目、先不写 replica.js」是产品口径（装修完点生成代码才下发），必须在接口层锁住 */
+assert('新建笔记后 replica.js 里还没有这篇（装修完「生成代码」才下发）',
+  readFileSync(REPLICA_FILE, 'utf8').indexOf(noteKey) < 0,
+  `replica.js 中不应出现 ${noteKey}`);
+
+const noteBlankTitle = await call('POST', '/api/decorate/note/create', {
+  body: { title: '' }, expectFail: '空标题', expectHttp: 200, expectCode: 1001
+});
+assert('笔记标题必填（空标题被拒，不会生成一篇叫「笔记 #N」的空笔记）',
+  /必填/.test(noteBlankTitle.json.msg || ''), noteBlankTitle.json.msg);
+
+const noteLongTitle = await call('POST', '/api/decorate/note/create', {
+  body: { title: 'x'.repeat(41) }, expectFail: '超长标题', expectHttp: 200, expectCode: 1001
+});
+assert('笔记标题超过 40 字被拒（有赞那个「5-40 字」里 40 是硬上限）',
+  /40/.test(noteLongTitle.json.msg || ''), noteLongTitle.json.msg);
+
+const noteDelMiss = await call('POST', '/api/decorate/note/delete', {
+  body: { key: 'note-999999' }, expectFail: '笔记不存在', expectHttp: 404, expectCode: 404
+});
+assert('删除不存在的笔记报 404（而不是静默成功）',
+  /不存在/.test(noteDelMiss.json.msg || ''), noteDelMiss.json.msg);
+
+const noteDel = await call('POST', '/api/decorate/note/delete', { body: { key: noteKey } });
+assert('删除店铺笔记成功（按页面标识 note-<id>，不是内部数字 id）',
+  noteDel.ok && noteDel.data.id === noteId && noteDel.data.title === NOTE_TITLE,
+  noteDel.ok ? `${noteDel.data.key} / ${noteDel.data.title}` : noteDel.json.msg);
+
+const notesAfter = await call('GET', '/api/decorate/notes', { auth: false });
+assert('自检未改变笔记数量（可重复运行），且 replica.js 里没有测试笔记残留',
+  notesAfter.ok && notesAfter.data.list.length === baseNotes
+  && readFileSync(REPLICA_FILE, 'utf8').indexOf(noteKey) < 0,
+  `${baseNotes} → ${notesAfter.ok ? notesAfter.data.list.length : '?'}｜残留=${readFileSync(REPLICA_FILE, 'utf8').indexOf(noteKey) >= 0}`);
+
 const adminJsSrc = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
 assert('装修台含「新建页面」入口与自定义页改名 / 删除操作',
   adminJsSrc.indexOf('btnCreatePage') >= 0 && adminJsSrc.indexOf('data-rename') >= 0 && adminJsSrc.indexOf('data-del') >= 0);
@@ -1301,29 +1382,11 @@ const scopeHoverIssues = [];
 let scopeChecked = 0;
 let scopeHoverChecked = 0;
 
-const ALL_WXML = WALK(MP_ROOT).filter((f) => f.endsWith('.wxml'));
-
-ALL_WXML.forEach((f) => {
-  const rel = f.replace(/\\/g, '/').split('/miniprogram/')[1];
-  const isComponent = rel.startsWith('components/');
-  const isFragment = rel.startsWith('templates/');
-  const ownWxss = f.replace(/\.wxml$/, '.wxss');
-  // 组件：只吃自己那份 wxss；页面：app.wxss + 本页 wxss；
-  // 片段（<include> 复用）：app.wxss + 所有包含它的页面的 wxss
-  let allowed;
-  if (isComponent) {
-    allowed = wxssClasses(ownWxss);
-  } else if (isFragment) {
-    allowed = new Set(appWxssClasses);
-    includersOf(f, ALL_WXML).forEach((host) => {
-      for (const c of wxssClasses(host.replace(/\.wxml$/, '.wxss'))) allowed.add(c);
-    });
-  } else {
-    allowed = new Set([...appWxssClasses, ...wxssClasses(ownWxss)]);
-  }
-
-  const src = readFileSync(f, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
-  for (const m of src.matchAll(/\b(class|hover-class)\s*=\s*"([^"]*)"/g)) {
+/** 抽出一个 wxml 片段里用到的全部 class / hover-class（{{ }} 内只认字符串字面量） */
+function classRefsOf(src) {
+  const out = new Map(); // cls -> attr（hover-class 的失败要单独归到另一条断言）
+  const clean = String(src).replace(/<!--[\s\S]*?-->/g, '');
+  for (const m of clean.matchAll(/\b(class|hover-class)\s*=\s*"([^"]*)"/g)) {
     const attr = m[1];
     const value = m[2];
     const names = [];
@@ -1334,12 +1397,137 @@ ALL_WXML.forEach((f) => {
     }
     for (const cls of names) {
       if (!cls || cls === 'none' || /\{\{/.test(cls)) continue;
-      if (attr === 'hover-class') scopeHoverChecked++; else scopeChecked++;
-      if (!allowed.has(cls)) {
-        (attr === 'hover-class' ? scopeHoverIssues : scopeIssues).push(`${rel} ${attr}="${cls}"`);
-      }
+      if (!out.has(cls)) out.set(cls, attr);
     }
   }
+  return out;
+}
+
+/**
+ * 扫一个 wxml 文件里用到的 class / hover-class，逐个对照 allowed 集合。
+ *
+ * `label` 是写进失败信息里的位置描述 —— 片段要带上「被哪个页面引用」，
+ * 否则只看文件名根本不知道是哪一个作用域缺样式。
+ */
+function scanClassRefs(file, label, allowed, refsIn) {
+  const refs = refsIn instanceof Map ? refsIn : classRefsOf(readFileSync(file, 'utf8'));
+  for (const [cls, attr] of refs) {
+    if (attr === 'hover-class') scopeHoverChecked++; else scopeChecked++;
+    if (!allowed.has(cls)) {
+      (attr === 'hover-class' ? scopeHoverIssues : scopeIssues).push(`${label} ${attr}="${cls}"`);
+    }
+  }
+}
+
+/*
+ * 片段（templates/*.wxml）的 class 该跟谁对账？
+ *
+ * templates/blocks.wxml 是**全站区块 markup 的并集**：首页（.c-* 系列）、「我的」（.cu-* 系列）、
+ * 店铺笔记（7 个组件）四类页面 <include> 同一份。每个页面只会渲染自己组件面板里允许的区块类型，
+ * 所以「每一页都必须定义片段里全部 class」是**事实错误** —— 实测会一口气报出 52~169 条假红
+ * （假红比不检查更糟，见 PITFALLS A）。
+ *
+ * 但只按「所有包含页的并集」查又是真漏洞：那样只要**任意一个**页面定义了某个 class，
+ * 别的页面压根没这份样式也照样绿 —— 实测漏掉过 templates/blocks.wxml 里的「文本」区块
+ * （.cu-text 系列）：店铺笔记的组件面板里有「文本」，note.wxss 却没有那份样式，
+ * 真机是文字挤在一起、没内边距没底色，而自检 100% 绿。
+ *
+ * 正确判据是**按区块类型对账**：把片段按顶层 wx:if / wx:elif 切成段、标出每段服务哪些
+ * block.type，页面允许哪些 kind 就只对账那些段 —— 既不会假红，也不会漏。
+ */
+function fragmentSegmentsByKind(file) {
+  const raw = readFileSync(file, 'utf8').replace(/<!--[\s\S]*?-->/g, '');
+  /* 先把「跨行的标签」折成一行：标签内的换行对解析无意义，而 wx:elif 折行的写法
+     （`<view` / `  wx:elif="{{block.type === 'image' …}}"`）会让「按行找段首」直接漏掉 5 处。
+     {{ }} 里的 `>` / `<` 不是标签边界，所以要先记住当前是否在 {{ }} 里。 */
+  let flat = '';
+  let inTag = false;
+  let inTpl = 0;
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === '{' && raw[i + 1] === '{') inTpl++;
+    else if (c === '}' && raw[i + 1] === '}') inTpl = Math.max(0, inTpl - 1);
+    if (!inTpl) {
+      if (c === '<') inTag = true;
+      else if (c === '>') inTag = false;
+      else if (c === '\n' && inTag) { flat += ' '; continue; }
+    }
+    flat += c;
+  }
+  const segs = [];
+  let cur = { kinds: new Set(), lines: [] };
+  segs.push(cur);
+  flat.split(/\r?\n/).forEach((L) => {
+    // 顶层子节点缩进恰好 2 空格；嵌套的 wx:if（如轮播提示样式）缩进更深，不算段首
+    if (/^  <[a-z-]+\b[^>]*\bwx:(if|elif)="/.test(L)) {
+      const kinds = new Set();
+      for (const m of L.matchAll(/block\.type\s*===\s*'([^']+)'/g)) kinds.add(m[1]);
+      cur = { kinds, lines: [L] };
+      segs.push(cur);
+      return;
+    }
+    cur.lines.push(L); // 含 WXML 内置的 wx:else 分支：跟随上一段的类型
+  });
+  return segs.map((s) => ({ kinds: s.kinds, refs: classRefsOf(s.lines.join('\n')) }))
+    .filter((s) => s.refs.size);
+}
+
+/* schema 在这里还不能用 requireFromHere（它 1486 行才定义，踩 TDZ），自己建一个即可 */
+const fragSchema = (await import('node:module')).createRequire(import.meta.url)(
+  join(__dirname, '..', 'decorate', 'schema.js'));
+/** 页面 → 它组件面板里允许的区块类型（真源就是 schema 里那几张 kind 表，不在这里抄第二份） */
+const FRAG_HOST_KINDS = {
+  'pages/index/index.wxml': () => Object.keys(fragSchema.HOME_BLOCK_KINDS),
+  'pages/custom/index.wxml': () => Object.keys(fragSchema.HOME_BLOCK_KINDS),
+  'pages/mine/mine.wxml': () => fragSchema.MINE_LIB_KINDS.slice(),
+  'packageNews/note/note.wxml': () => fragSchema.SHOPNOTE_LIB_KINDS.slice()
+};
+
+const ALL_WXML = WALK(MP_ROOT).filter((f) => f.endsWith('.wxml'));
+
+ALL_WXML.forEach((f) => {
+  const rel = f.replace(/\\/g, '/').split('/miniprogram/')[1];
+  const isComponent = rel.startsWith('components/');
+  const isFragment = rel.startsWith('templates/');
+  const ownWxss = f.replace(/\.wxml$/, '.wxss');
+
+  if (isFragment) {
+    /*
+     * 见上方 fragmentSegmentsByKind 的说明：逐页查，但**只查这一页真的会渲染的区块类型**。
+     * 兜底段（段首没有任何 block.type 条件，例如外层 `<view class="blk">`）里的 class
+     * 是所有包含页共用的，每一页都必须能解析。
+     */
+    const segs = fragmentSegmentsByKind(f);
+    const commonRefs = new Map();
+    segs.filter((s) => !s.kinds.size).forEach((s) => s.refs.forEach((a, c) => commonRefs.set(c, a)));
+    const kindsRefs = new Map(); // kind -> Map(cls, attr)
+    segs.filter((s) => s.kinds.size).forEach((s) => {
+      s.kinds.forEach((k) => {
+        if (!kindsRefs.has(k)) kindsRefs.set(k, new Map());
+        s.refs.forEach((a, c) => kindsRefs.get(k).set(c, a));
+      });
+    });
+    includersOf(f, ALL_WXML).forEach((host) => {
+      const hostRel = host.replace(/\\/g, '/').split('/miniprogram/')[1];
+      const allowed = new Set([...appWxssClasses, ...wxssClasses(host.replace(/\.wxml$/, '.wxss'))]);
+      const pageKinds = FRAG_HOST_KINDS[hostRel] ? FRAG_HOST_KINDS[hostRel]() : null;
+      const refs = new Map(commonRefs);
+      // pageKinds === null（将来新加的页面没登记）：保守起见查全片段，宁可多问一句也别漏样式
+      const useKinds = pageKinds || [...kindsRefs.keys()];
+      useKinds.forEach((k) => {
+        const m = kindsRefs.get(k);
+        if (m) m.forEach((a, c) => { if (!refs.has(c)) refs.set(c, a); });
+      });
+      scanClassRefs(f, `${rel}（被 ${hostRel} 引用）`, allowed, refs);
+    });
+    return;
+  }
+
+  // 组件：只吃自己那份 wxss；页面：app.wxss + 本页 wxss
+  const allowed = isComponent
+    ? wxssClasses(ownWxss)
+    : new Set([...appWxssClasses, ...wxssClasses(ownWxss)]);
+  scanClassRefs(f, rel, allowed);
 });
 
 assert('小程序 wxml 的 class 引用都在正确作用域内有定义（组件不吃 app.wxss 的 class）',
@@ -1349,6 +1537,20 @@ assert('小程序 wxml 的 class 引用都在正确作用域内有定义（组�
 assert('小程序 hover-class 全部有对应样式（否则是「点了没反应」的哑点击态）',
   scopeHoverIssues.length === 0,
   scopeHoverIssues.length ? `未定义：${scopeHoverIssues.join(' | ')}` : `${scopeHoverChecked} 处 hover-class 全部有定义`);
+
+/*
+ * 片段包含页必须在 FRAG_HOST_KINDS 里登记过。
+ * 漏登记不会漏样式（兜底是「查全片段」，更严），但会一次性报出上百条假红 ——
+ * 与其让下一个人对着一屏假红猜，不如在这里指名道姓地说「XX 页没登记区块类型表」。
+ */
+const fragHostRel = new Set();
+ALL_WXML.filter((f) => f.replace(/\\/g, '/').indexOf('/templates/') >= 0)
+  .forEach((f) => includersOf(f, ALL_WXML).forEach((h) => fragHostRel.add(h.replace(/\\/g, '/').split('/miniprogram/')[1])));
+const unregisteredHosts = [...fragHostRel].filter((h) => !FRAG_HOST_KINDS[h]);
+assert('片段（templates/*.wxml）的包含页都登记了「自己能渲染哪些区块类型」',
+  unregisteredHosts.length === 0,
+  unregisteredHosts.length ? '未登记：' + unregisteredHosts.join(', ')
+    : `${fragHostRel.size} 个包含页已登记：${[...fragHostRel].join(', ')}`);
 
 // 设计令牌：凡是被 var(--x) 引用的令牌，必须在 styles/variables.wxss 里有定义。
 // 漏定义不会报错，只会让那一处颜色静默失效 —— 只有静态比对才抓得到。
@@ -2378,6 +2580,165 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     pubBadIcon.length === 0,
     pubBadIcon.length ? '仍是旧值（汉字）：' + pubBadIcon.slice(0, 6).join('；')
       : `${pubTools.length} 项均为基名`);
+}
+
+/* ---------------------------------------------------------------------------
+ * 15.81 店铺笔记（对标有赞「内容管理 → 店铺笔记」）
+ *
+ * 为什么单开一节：笔记是**接进「页面」体系**做的（custom: true + 注册表 + 草稿/版本/发布
+ * 全部复用），所以它踩的坑和别的页面不是一类：
+ *   · 它有自己的真机页面（packageNews/note/note），地址口径必须与 app.json 的分包注册对得上；
+ *   · 它的内容住在 `data.header` 里（字段树写的是 header.title），一旦数据平铺回顶层，
+ *     装修台面板上那 7 个字段会**显示为空、改完静默丢弃、且不报任何错**（实测发生过）；
+ *   · 它跟自定义页都带 `custom: true`，任何「先判 custom 再判 shopnote」的地方都会把它认错
+ *     （store.publishedAll / preview.js 的角标 / pv-render 的分派都各是一处）。
+ * 这些都不是「业务流程跑不通」，而是「看起来是好的」，只能靠静态对账与形状断言抓。
+ * ------------------------------------------------------------------------- */
+{
+  const snReq = requireFromHere(join(__dirname, '..', 'decorate', 'shopnotes.js'));
+  const schReq = requireFromHere(join(__dirname, '..', 'decorate', 'schema.js'));
+  const mpNoteDir = join(MP_ROOT, 'packageNews', 'note');
+  /*
+   * ⚠️ 这三个源码必须在本块内**自己读**。
+   *    15.10 那段里的 `pvSrc` / `previewSrc` / `adminSrc` 是模块级 const，
+   *    但声明位置在**本块之后**（15.10 在第 3000 多行）—— 直接引用会踩 TDZ，
+   *    抛 ReferenceError 被「自检中断」兜住，表现为「断言总数莫名腰斩」，极难查
+   *    （15.80 的注释里记过同一坑：566 → 294）。
+   */
+  const PUBDIR = join(__dirname, '..', 'public');
+  const pvRenderSrc = readFileSync(join(PUBDIR, 'shared', 'pv-render.js'), 'utf8');
+  const pvPageSrc = readFileSync(join(PUBDIR, 'preview', 'preview.js'), 'utf8');
+  const adminJsSrc = readFileSync(join(PUBDIR, 'admin', 'admin.js'), 'utf8');
+
+  /* (a) 真机地址：PATH_PREFIX 与 app.json 的分包页必须对得上（地址只定义一处，这里是交叉验证） */
+  const appJson = JSON.parse(readFileSync(join(MP_ROOT, 'app.json'), 'utf8'));
+  const pkgNews = (appJson.subPackages || []).filter((p) => p.name === 'packageNews')[0] || { pages: [] };
+  const noteRel = 'note/note';
+  const addrPrefix = String(snReq.PATH_PREFIX);
+  const pathOk = addrPrefix.indexOf(pkgNews.root + '/' + noteRel) === 0;
+  assert('笔记真机地址口径一致：PATH_PREFIX 指向 app.json 里已注册的分包页',
+    pathOk && pkgNews.pages.indexOf(noteRel) >= 0 && /^packageNews\/note\/note\?id=$/.test(addrPrefix),
+    pathOk && pkgNews.pages.indexOf(noteRel) >= 0
+      ? `PATH_PREFIX="${addrPrefix}"，packageNews.pages 含 "${noteRel}"`
+      : `PATH_PREFIX="${addrPrefix}" / packageNews.pages=[${pkgNews.pages.join(',')}]（分包页没注册 → 真机跳转必失败）`);
+
+  /* (b) 小程序端四件套齐（缺任一个，开发者工具只在打开那一页时才报错） */
+  const missingFiles = ['note.js', 'note.wxml', 'note.wxss', 'note.json']
+    .filter((f) => !existsSync(join(mpNoteDir, f)));
+  assert('笔记详情页四件套齐全（js / wxml / wxss / json）',
+    missingFiles.length === 0,
+    missingFiles.length ? '缺：' + missingFiles.join(', ') : 'note.js / note.wxml / note.wxss / note.json 均在');
+
+  /* (c) 「笔记头部」的形状：字段树的 header 节点与数据必须逐键对齐。
+   *     判据取「字段树叶子在数据里取不到值」的条数 —— 这正是那次面板空白的成因。 */
+  const walkLeaves = (node, base, out) => {
+    if (!node) return out;
+    if (node.type === 'object') {
+      (node.fields || []).forEach((f) => {
+        if (f.type === 'group') { walkLeaves({ type: 'object', fields: f.fields }, base, out); return; }
+        const p = base ? base + '.' + f.k : f.k;
+        out.push(p);
+        walkLeaves(f, p, out);
+      });
+    }
+    return out;
+  };
+  const getPathOf = (o, p) => String(p).split('.').reduce((acc, s) => (acc == null ? undefined : acc[s]), o);
+  const pubReplicaForNote = requireFromHere(join(MP_ROOT, 'config', 'replica.js'));
+  const deadFields = [];
+  let leafTotal = 0;
+  schReq.allPages().forEach((p) => {
+    let d;
+    try { d = p.from(pubReplicaForNote); } catch (e) { deadFields.push(`${p.key} from() 抛异常`); return; }
+    const leaves = walkLeaves(p.root, '', []);
+    leafTotal += leaves.length;
+    leaves.forEach((lp) => { if (getPathOf(d, lp) === undefined) deadFields.push(`${p.key} 的 ${lp}`); });
+  });
+  assert('所有页面的字段树叶子在数据里都取得到值（面板不会出现「看着是空的、改了不生效」）',
+    deadFields.length === 0,
+    deadFields.length ? '取不到：' + deadFields.slice(0, 8).join('；')
+      : `${schReq.allPages().length} 个页面 / ${leafTotal} 个叶子字段全部命中`);
+
+  /* (d) 笔记数据顶层**不许**再平铺 title / tags / covers —— 那样是「两处数据、只认一处」 */
+  const noteDefShape = schReq.SHOPNOTE_HEADER_NODE.fields.map((f) => f.k);
+  /* 归一化的输出里**顶层**只允许 publishedAt —— 用空入参探一次就够，不必逐键构造 */
+  const normTopKeys = Object.keys(snReq.normalizeContent({}));
+  const flatLeaked = normTopKeys.filter((k) => k !== 'publishedAt' && k !== 'header' && k !== 'body' && k !== 'blocks');
+  assert('笔记内容一律住在 data.header 下（顶层不再平铺那 7 个内容键）',
+    flatLeaked.length === 0 && String(snReq.HEADER_KEYS.join(',')) ===
+      'title,summary,tags,coverMode,covers,showGoodsCard,showNoteOnGoods' &&
+    noteDefShape.join(',').indexOf('title,summary,tags') === 0,
+    flatLeaked.length ? '顶层仍出现：' + flatLeaked.join(', ')
+      : `HEADER_KEYS=${snReq.HEADER_KEYS.length} 项，字段树 header 首三项 = ${noteDefShape.slice(0, 3).join(',')}`);
+
+  /* (e) 标题必填是硬约束（空标题曾被静默接受，列表里多出一篇叫「笔记 #3」的空笔记） */
+  const titleChecks = [
+    snReq.checkTitle('') !== '',
+    snReq.checkTitle('x'.repeat(snReq.TITLE_MAX + 1)) !== '',
+    snReq.checkTitle('莱克洗地机实测') === ''
+  ];
+  assert('笔记标题：必填 + 不超过 40 字（早先那个「可以关掉必填」的开关已彻底删掉）',
+    titleChecks.every(Boolean),
+    '空=' + snReq.checkTitle('') + ' / 超长=' + snReq.checkTitle('x'.repeat(41)));
+
+  /* (f) 笔记页底色必须与装修台预览的默认页底逐字一致（两处不同向＝运营照着一种灰调、真机另一种） */
+  const noteWxssSrc = readFileSync(join(mpNoteDir, 'note.wxss'), 'utf8');
+  const bgInWxss = (noteWxssSrc.match(/\.note-page\s*\{[^}]*background:\s*([^;]+);/) || [])[1] || '';
+  const pvBgDef = (pvRenderSrc.match(/var PAGE_BG_DEF = '([^']+)'/) || [])[1] || '';
+  assert('笔记页底色与装修台预览默认页底逐字一致（否则装修台与真机不是一个底色）',
+    !!bgInWxss && bgInWxss.trim() === pvBgDef,
+    `note.wxss 的 .note-page background=${JSON.stringify(bgInWxss.trim())}，pv-render 的 PAGE_BG_DEF=${JSON.stringify(pvBgDef)}`);
+
+  /* (g) 预览链路：笔记必须走 pvNote（不是 pvCustom），且分派顺序是「先 shopnote 后 custom」 */
+  const pvNoteOk = /function pvNote\(/.test(pvRenderSrc)
+    && /if \(!fn && opts && opts\.shopnote\) fn = pvNote;/.test(pvRenderSrc)
+    && pvRenderSrc.indexOf('fn = pvNote') < pvRenderSrc.indexOf('fn = pvCustom');
+  assert('装修台预览：笔记走 pvNote（店长区 + 正文 + 组件流），分派先判 shopnote 再判 custom',
+    pvNoteOk,
+    pvNoteOk ? 'pvNote 已就位且分派顺序正确' : 'pv-render.js 里笔记会被当成自定义页渲染（店长区与正文整体消失）');
+  const pvNoteBodyOk = /data-path="header"/.test(pvRenderSrc) && /data-path="body"/.test(pvRenderSrc);
+  assert('预览里的「笔记头部 / 笔记正文」带 data-path（点得中、能选中）',
+    pvNoteBodyOk, pvNoteBodyOk ? 'header / body 均有 data-path' : '缺 data-path，面板里点不中这两段');
+
+  /* (h) 预览页（/preview）：非内置页地址取后端元信息，不在这里拼第二份。
+   *     判据**必须剥注释再判字面**：这个文件的注释里为了讲清「不要拼地址」，
+   *     逐字写着 `'/packageNews/note/note?id='`。不剥注释就会把「说明文字」当成违规
+   *     （本案第一次跑就正是这样假红）。要抓的是**字符串字面量**，不是这几个汉字。 */
+  const stripJs = (s) => String(s)
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
+  const pvPageCode = stripJs(pvPageSrc);
+  const hardCodedPath = (pvPageCode.match(/['"]\/?packageNews[^'"]*['"]/g) || []);
+  const pvTargetOk = /var PAGE_PATH = \{\}/.test(pvPageCode)
+    && /PAGE_PATH\[p\.key\] = p\.path/.test(pvPageCode)
+    && hardCodedPath.length === 0;
+  assert('/preview 的非内置页地址取自后端元信息（没有在前端拼第二份 packageNews/… 地址）',
+    pvTargetOk,
+    pvTargetOk
+      ? `剥注释后：PAGE_PATH 元信息表在，硬编码地址 0 处（注释里的反例已忽略）`
+      : (hardCodedPath.length ? '代码里硬编码了地址：' + hardCodedPath.join(', ')
+        : 'preview.js 没找到 PAGE_PATH 元信息表'));
+
+  /* (i) 装修台：认得出笔记，且「改名」不给（改了会与「标题在编辑器里改」两处打架） */
+  const adminNoteOk = /meta\.shopnote/.test(adminJsSrc)
+    && /shopnote: !!\(S\.cur\.meta && S\.cur\.meta\.shopnote\)/.test(adminJsSrc);
+  assert('装修台把 shopnote 标记传给了预览分派（笔记与自定义页都带 custom，必须另看这个标记）',
+    adminNoteOk, adminNoteOk ? 'admin.js 已透传 shopnote' : 'admin.js 没透传 shopnote → 笔记预览会走成自定义页');
+
+  /* (j) 路由点位：三个笔记端点都在（新加的端点漏注册＝后台按钮点了 404） */
+  const routeList = registered.map((r) => r.path);
+  const need = ['/api/decorate/notes', '/api/decorate/note/create', '/api/decorate/note/delete'];
+  const missingRoutes = need.filter((p) => routeList.indexOf(p) < 0);
+  assert('店铺笔记三个点位都已注册（列表 / 新建 / 删除）',
+    missingRoutes.length === 0,
+    missingRoutes.length ? '未注册：' + missingRoutes.join(', ') : need.join(' / '));
+
+  /* (k) 装修台「组件面板」是笔记专属那一份（7 个组件），不是首页那 58 个 */
+  const lib = schReq.shopnoteComponentLib();
+  const libKinds = (lib.groups || []).reduce((n, g) => n + (g.items || []).length, 0);
+  assert('笔记的组件面板 = 有赞实测的 7 个（基础 3 / 其他 4），不是首页那 58 个',
+    lib.total === 7 && libKinds === 7,
+    `total=${lib.total} groups=${libKinds}`);
 }
 
 /* ---------------------------------------------------------------------------

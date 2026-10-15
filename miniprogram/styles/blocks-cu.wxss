@@ -1,0 +1,50 @@
+/* 个人中心（.cu- 系列）里**会被别的页面用到**的区块样式
+ *
+ * 为什么单独抽一个文件：
+ *   `.cu-text` 这套样式原本写在 pages/mine/mine.wxss 里，因为「文本」区块当时只在
+ *   「我的」页出现过。现在店铺笔记的组件面板里也有「文本」（有赞店铺笔记装修页的基础组件之一），
+ *   而笔记详情页是 pages/mine 之外的另一页 —— 每个页面只能读到自己的 wxss + app.wxss，
+ *   不抽出来的话笔记里的「文本」区块**会完全没有样式**（文字挤在一起、没有内边距与底色）。
+ *
+ * 抽到这里而不是「让 note.wxss 直接 @import mine.wxss」的原因：
+ *   mine.wxss 里那 400 行是标题栏 / 个人资产 / 订单入口等**只属于「我的」页**的东西，
+ *   整份 import 进来会让笔记页的样式表里躺着几百行永远用不到的规则，
+ *   而且它自己的 `.page { padding-bottom: 60rpx }` 还会和首页那份打架。
+ *
+ * 使用方：pages/mine/mine.wxss、packageNews/note/note.wxss
+ * ⚠️ 改这里的样式等于同时改「我的」页与笔记页 —— 两个页面必须一起看。
+ */
+
+/* ================= 文本（templates/blocks.wxml 的 block.type === 'text'） ================= */
+.cu-text {
+  margin: 12rpx 0;
+}
+
+.cu-text-in {
+  display: flex;
+  padding: 20rpx 24rpx;
+  border-radius: var(--radius-base);
+}
+
+.cu-text-t {
+  flex: 1;
+  line-height: 1.6;
+  word-break: break-all;
+}
+
+.cu-text-in.s-sm {
+  font-size: var(--font-sm);
+}
+
+.cu-text-in.s-md {
+  font-size: var(--font-base);
+}
+
+.cu-text-in.s-lg {
+  font-size: var(--font-xl);
+}
+
+.cu-split {
+  height: 2rpx;
+  background: var(--color-border);
+}
