@@ -34,6 +34,12 @@
       "doneAt": null,
       "no": null,
       "note": "新「普通商户」号已提交申请、审核中（2026-10-15 起，1~2 工作日）；等待期内核对申请表经营场景勾「小程序」+ 填 AppID。到手后：产品中心开通 JSAPI 支付 → 绑 AppID → 取三样凭据 → 换线上 .env 5 值。商户号与凭据一律不写入本表"
+    },
+    "privacyGuide": {
+      "status": "pending",
+      "doneAt": null,
+      "no": null,
+      "note": "微信后台《用户隐私保护指引》需逐项申报 3 类：① 读取你的剪切板（wx.setClipboardData）② 收集你的昵称、头像（type=nickname）③ 收集你的手机号（open-type=getPhoneNumber）。另建议按「访问你的摄像头」口径一并申报 wx.scanCode。2023-10-17 起未申报的隐私接口在真机直接被禁用、审核也容易被驳。**办完把 status 改成 done**（+ 补 doneAt）：E 节据此从「阻塞」转「通过」—— 脚本扫得到源码、但查不到微信后台的申报状态，只能靠本表，不登记会一直报红"
     }
   }
 }

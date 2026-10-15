@@ -14,9 +14,17 @@
  *   · 线上健康 → GET <BASE_URL>/api/health（微信登录/支付是真接口还是模拟、JWT 是否默认密钥）
  *   · 隐私接口 → 扫 miniprogram/ 下 js/wxml（**先剥注释**）再对官方「处理的信息 ↔ 接口」对照表
  *   · 导航图标 → 读 PNG 头（魔数 + IHDR 宽高）
+ *
+ * ⚠️ 本机（公司内网）**出口按 SNI 拦本域名** → 直连电商域名必得 ECONNRESET。
+ *    原实现此时整段跳进 catch，D 节（登录/支付/JWT/门控）**一条判据都不执行** ——
+ *    那是「假绿」里最坏的一种：2026-10-15 线上 `wechat.pay` 明明是 `mock`（连带
+ *    `/api/pay/mock-success` 在公网开着 = 资损），体检却只平静地报一句「连不上」。
+ *    故直连失败时**自动再走一次替代路径**（空 SNI + Host 头，只读 GET，永不写）。
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import dns from 'node:dns';
+import https from 'node:https';
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const MP = path.join(ROOT, 'miniprogram');
@@ -104,19 +112,105 @@ if (pinEnv === 'mock' || pinEnv === 'local') {
   }
 }
 
-/* 真发一次请求：既验链路通不通，也看重定向后的证书是否可信 */
+/**
+ * 替代探测路径（**只读**，2026-10-15 加）：绕开「公司出口按 SNI 拦本域名」。
+ *
+ * 为什么必须加：直连失败会让**整段 D 节判据被跳过**（登录/支付/JWT/门控一条都不跑）。
+ * 那是「假绿」里最坏的一种 —— 体检只平静地报一句「连不上」，人以为「只是本机网络的已知小问题」，
+ * 而线上真实状态（`wechat.pay = mock`、`/api/pay/mock-success` 公网开着 ＝ 资损）**从来没被看见过**。
+ *
+ * 做法：TCP 连该域名的 IP，但 TLS **不发 SNI**（出口设备正是按 SNI 判的），
+ * 再用 `Host: <域名>` 让 nginx 路由到正确 server 块。**只发这一个 GET，不做任何写操作。**
+ * 注：SNI 为空时拿回的是默认 server 的证书 → 域名必然对不上 → 关掉校验（仅此探针）。
+ */
+function healthViaHostHeader(base) {
+  return new Promise((resolve, reject) => {
+    const u = new URL(base);
+    dns.lookup(u.hostname, (dnsErr, address) => {
+      if (dnsErr) return reject(dnsErr);
+      const req = https.request(
+        {
+          host: address,
+          port: u.port || 443,
+          method: 'GET',
+          path: u.pathname.replace(/\/+$/, '') + '/api/health',
+          servername: '',
+          headers: { Host: u.host },
+          rejectUnauthorized: false
+        },
+        (res) => {
+          let b = '';
+          res.on('data', (c) => (b += c));
+          res.on('end', () => {
+            try {
+              resolve({ status: res.statusCode, body: JSON.parse(b) });
+            } catch (err) {
+              reject(err);
+            }
+          });
+        }
+      );
+      req.on('error', reject);
+      req.setTimeout(8000, () => req.destroy(new Error('TIMEOUT')));
+      req.end();
+    });
+  });
+}
+
+/** 两条路都连不上时的诊断 —— 把「DNS 解析不了」与「后端挂了」分开，否则人会跑错方向 */
+function reportHealthError(e) {
+  rows.push({ level: 'head', name: 'D. 线上健康（GET ' + BASE_URL + '/api/health）' });
+  const code = (e && (e.code || (e.cause && e.cause.code))) || '';
+  const u = new URL(BASE_URL);
+  if (/ENOTFOUND|ENODATA/i.test(code)) {
+    /* 2026-10-14 实测：公网 DNS（易名）已加好 A 记录、三个公共 DNS 全 ✓、服务器侧探针全绿，
+     * 但**本机** lookup 仍 ENOTFOUND —— 因为 lexy.cn 在公司内网还有一套自建权威 DNS，
+     * 那套没有 mall 记录。把它笼统报成「连不上线上后端」，人会跑去服务器反复折腾证书（白忙）。 */
+    warn('本机解析不了 ' + u.hostname + '（' + code + '）',
+      '**不是后端故障**：真机与平台审核走公共 DNS，不受影响；受影响的是本机开发者工具。' +
+      '先跑 node .tooling/check-domain-dns.mjs（同时查公共 DNS 与内网 DNS）；内网 DNS 缺记录 → 找 IT 补；' +
+      '本机应急 → 临时换 DNS 或加 hosts。⚠️ 替代路径此刻同样无效（它也得先解析出 IP）。');
+  } else if (/SELF_SIGNED|UNABLE_TO_VERIFY|CERT|SSL|TLS/i.test(code + ' ' + e.message)) {
+    block('HTTPS 证书不可信', code + ' —— iOS 端连自签名证书都连不上，正式版必失败；要换受信任 CA 证书（如 Let\'s Encrypt / 腾讯云免费证书）');
+  } else {
+    warn('直连与替代路径都没连上（' + (code || String(e.message).slice(0, 60)) + '）',
+      '⚠️ **这次 D 节的登录 / 支付 / JWT / 门控判据一条都没跑，别把本次体检当完整结论。** ' +
+      '先在服务器上验后端：curl -s -o /dev/null -w "%{http_code}" https://' + u.host + u.pathname.replace(/\/+$/, '') + '/api/health（应得 200）。' +
+      '本机为何直连不了域名（出口按 SNI 拦）见 deploy/添加子域名操作单.md 第六之二节。');
+  }
+}
+
+/* 真发一次请求：既验链路通不通，也看重定向后的证书是否可信。
+ * 直连失败（本机被出口按 SNI 拦）→ 自动退一次替代路径，保证 D 节判据真的被执行。 */
+let health = null;
+let healthVia = '';
 try {
   const res = await fetch(BASE_URL + '/api/health', { signal: AbortSignal.timeout(8000) });
-  const body = await res.json();
-  const d = body && body.data ? body.data : body;
-  rows.push({ level: 'head', name: 'D. 线上健康（GET ' + BASE_URL + '/api/health）' });
-  if (res.status !== 200) block('健康检查返回 ' + res.status, JSON.stringify(d).slice(0, 160));
+  health = { status: res.status, body: await res.json() };
+} catch (e) {
+  try {
+    health = await healthViaHostHeader(BASE_URL);
+    healthVia = '　⚙️ 经替代路径取得（空 SNI + Host 头；本机直连被公司出口按 SNI 拦，非后端故障）';
+  } catch (e2) {
+    reportHealthError(e);
+  }
+}
+if (health) {
+  const d = health.body && health.body.data ? health.body.data : health.body;
+  rows.push({ level: 'head', name: 'D. 线上健康（GET ' + BASE_URL + '/api/health）' + healthVia });
+  if (health.status !== 200) block('健康检查返回 ' + health.status, JSON.stringify(d).slice(0, 160));
   else ok('健康检查 200', 'service=' + d.service + '  uptime=' + d.uptime + 's');
   if (d.wechat) {
     if (d.wechat.login === 'real') ok('微信登录 = 真实接口', 'WX_APPID/WX_SECRET 已配置');
     else block('微信登录 = 本地模拟', '未配置 WX_APPID/WX_SECRET → 真机 wx.login 拿不到 openid，登录链路整条不通');
     if (d.wechat.pay === 'real') ok('微信支付 = 真实接口', 'WX_MCH_ID/WX_PAY_KEY 已配置');
-    else block('微信支付 = 本地模拟', '未配置商户号 → wx.requestPayment 必然失败；上线前要设 WX_APPID/WX_MCH_ID/WX_PAY_KEY(+证书)');
+    else block('微信支付 = 本地模拟（**发布前必须解决**）',
+      '未配商户号 → wx.requestPayment 必然失败、前端弹「联调环境」弹窗。' +
+      '🔴 更要紧的是**资损**：线上 `ALLOW_MOCK_PAY=1`（deploy/setup-server.sh 的默认值）时 ' +
+      '`/api/pay/mock-success` 在公网开着（只需登录），任何用户都能把自己的订单**免费标成已支付**，' +
+      '订单状态 / 库存 / 销量都是真改。发布前二选一：' +
+      '① 接通真实支付（推荐 —— `HAS_WX_PAY` 一变真，代码**自动关闭**模拟，不用人去删 .env）；' +
+      '② 急着先上 → 先设 `ALLOW_MOCK_PAY=0` **并藏掉支付入口**（否则用户点付款只会看到报错）。');
   }
   if (d.jwtSecret === 'default(dev-only)') block('JWT 用的是开发默认密钥', '上线前必须设自定义 JWT_SECRET（默认值等于任何人可伪造登录态）');
   else ok('JWT 密钥已自定义');
@@ -126,44 +220,18 @@ try {
     else ok('后台口令已自定义', '凭证 ' + a.credentials + ' / 可写 ' + a.writable);
   }
   ok('页面门控', 'debugPage=' + d.debugPage + '  adminPage=' + d.adminPage + '（线上应为 off）');
-} catch (e) {
-  rows.push({ level: 'head', name: 'D. 线上健康（GET ' + BASE_URL + '/api/health）' });
-  const code = (e && (e.code || (e.cause && e.cause.code))) || '';
-  if (/ENOTFOUND|ENODATA/i.test(code)) {
-    /* 「域名解析不了」≠「后端挂了」。这两件事的处理方式完全相反，混在一起会把人带偏：
-     * 2026-10-14 实测：IT 在公网 DNS（易名）加好 A 记录、三个公共 DNS 全 ✓、服务器侧三个探针
-     * 全绿，但**本机** lookup 仍 ENOTFOUND —— 因为 lexy.cn 在**公司内网**还有一套自建权威 DNS
-     * （cnszknad01 / kingcleandc01.kingclean.com），那套**没有** mall 记录。
-     * 若把它笼统报成「连不上线上后端」，人会跑去服务器反复折腾证书（白忙一场）。
-     * 所以单独给口径：不影响上线，只影响本机（开发者工具）。 */
-    warn('本机解析不了 ' + new URL(BASE_URL).hostname + '（' + code + '）',
-      '**不是后端故障**：真机与平台审核走公共 DNS，不受影响；受影响的是本机开发者工具。' +
-      '先跑 node .tooling/check-domain-dns.mjs（它会同时查公共 DNS 与内网 DNS）；' +
-      '内网 DNS 缺记录 → 找 IT 补；本机应急 → 临时换 DNS 或加 hosts。');
-  } else if (/SELF_SIGNED|UNABLE_TO_VERIFY|CERT|SSL|TLS/i.test(code + ' ' + e.message)) {
-    block('HTTPS 证书不可信', code + ' —— iOS 端连自签名证书都连不上，正式版必失败；要换受信任 CA 证书（如 Let\'s Encrypt / 腾讯云免费证书）');
-  } else if (/ECONNRESET|socket hang up/i.test(code + ' ' + e.message)) {
-    /* 2026-10-14 已定位：**不是服务器故障**，是公司出口设备按 SNI 拦本域名。
-     * 对照实验（同一 IP:443）：无 SNI / SNI=www.baidu.com / SNI=任意不存在域名 三者全部握手成功，
-     * 只有 SNI=mall.lexy.cn 被 RST（4/4 复现）。真机与平台审核走公共 DNS，不受影响 → 不影响上线。
-     * 这条提示单独给口径，否则每次体检看到 ECONNRESET 都会有人跑去服务器查证书（白忙）。 */
-    warn('连不上线上后端（' + (code || 'ECONNRESET') + '）',
-      '**已知原因、非后端故障**：公司出口设备按 SNI 拦本域名（同 IP:443 下，无 SNI / SNI=www.baidu.com / ' +
-      '任意不存在域名全都能握手，只有 mall.lexy.cn 被 RST，4/4 复现）→ **真机与平台审核不受影响**。' +
-      '反证：在服务器上执行 curl -s -o /dev/null -w "%{http_code}" https://mall.lexy.cn/mall-api/api/health 应得 200。' +
-      '**本机后果与已做的处置（2026-10-15）**：内网机器拉不到任何 /uploads/… 素材，' +
-      '而首页那 11 个区块**全是图片/视频、一个文字都没有** → 开发者工具的模拟器整页空白，' +
-      '看起来像「小程序坏了」，其实编译是通过的（工具日志里 simulator app compile 是成功的）。' +
-      '现已改成**按运行环境自动选档**：模拟器 → http://127.0.0.1:3000（本机后端，不受出口拦截影响）；' +
-      '真机 / 线上构建 → 本域名。所以这条 WARN 现在**只影响命令行工具**（本体检脚本、deploy-data 抓线上数据等）；' +
-      '那些场景才需要连手机热点，或临时切 IP：' +
-      'node .tooling/switch-env.mjs --url=https://14.103.50.137/mall-api --allow-ip（验完切回）。' +
-      '详见 deploy/添加子域名操作单.md 第六之二节（本机开发现状 —— 注意那里的「7.1 补内网 DNS」已经完成，' +
-      '卡住的是 SNI 这一层，补 DNS 治不了）');
-  } else {
-    warn('连不上线上后端', code || String(e.message).slice(0, 80) + '（本机网络/未部署时属预期，上传前务必再跑一次）');
-  }
 }
+/* 注：旧版这里有一整段「直连失败」的诊断分支。2026-10-15 起已抽成上面的
+ * reportHealthError()，并且**只有在直连与替代路径都不通时才会走到** —— 因为原来那段
+ * 会让整个 D 节判据被静默跳过（体检报「阻塞 3」，真实的第 4 项资损风险从未被发现）。 */
+
+/* ── 外部事实登记表（**只放公开信息**：备案号 / 域名 / 日期；禁写任何密钥）──────────
+ * 有些项脚本**永远查不到**「用户是否已在微信后台办完」—— 办了却没登记就会一直报红（假红），
+ * 分不清「还没办」和「早办完了」。E 节（隐私指引申报）与 H 节（备案 / 认证 / 域名 / 商户号）
+ * **共用这一张表**，所以在这里就先读进来。 */
+const EXT_PATH = path.join(ROOT, 'deploy', 'wechat-external.json');
+let EXT = null;
+try { EXT = readJson(EXT_PATH); } catch { /* 缺失 → 一律按「未办」提示（保守方向，不会漏报） */ }
 
 /* ─────────── E. 隐私接口 → 需申报的信息类型 ─────────── */
 rows.push({ level: 'head', name: 'E. 隐私接口（《用户隐私保护指引》逐项申报，2023-10-17 起未申报即禁用）' });
@@ -220,11 +288,23 @@ for (const f of srcFiles) {
     }
   }
 }
+/* 「已申报」脚本查不到（微信后台不给接口）→ 靠登记表。不登记就一直报红 = 假红；
+ * 反过来**不许因为登记了就不看源码** —— 源码扫描永远执行，登记表只决定「红还是绿」。 */
+const PRIVACY_DECLARED = !!(EXT && EXT.items && EXT.items.privacyGuide && EXT.items.privacyGuide.status === 'done');
 if (!found.size) {
   ok('未扫到任何隐私接口', '提审时可勾选「未采集用户隐私」（仍建议人工复核一遍）');
+} else if (PRIVACY_DECLARED) {
+  const it = EXT.items.privacyGuide;
+  for (const [info, apis] of found) {
+    ok('已申报：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； ')
+      + '　← 登记于 deploy/wechat-external.json（' + [it.doneAt, it.note].filter(Boolean).join('　·　') + '）');
+  }
 } else {
   for (const [info, apis] of found) {
-    block('必须申报：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； '));
+    block('必须申报：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； ')
+      + '　→ 微信后台「设置 → 服务内容声明 → 用户隐私保护指引」逐项勾选并写清用途；'
+      + '**办完请把 deploy/wechat-external.json 的 items.privacyGuide 改成 status="done"**（补 doneAt + note），'
+      + '否则这里会**一直报红** —— 脚本查不到微信后台的申报状态，只能靠这张登记表。');
   }
 }
 // 官方对照表未逐字列出的一个：wx.scanCode 会拉起相机取景
@@ -281,10 +361,8 @@ rows.push({ level: 'head', name: 'H. 只能人工办的前置条件' });
 
 /* 这些事脚本查不到（工信部不给接口、微信后台拿不到），但**办完了就不该一直报红**——
  * 否则体检永远显示「需人工处理 N 项」，分不清「还剩什么没办」和「早就办完了」（假红）。
- * 已办完的事实登记在 deploy/wechat-external.json（**只放公开信息**：备案号/域名/日期）。 */
-const EXT_PATH = path.join(ROOT, 'deploy', 'wechat-external.json');
-let EXT = null;
-try { EXT = readJson(EXT_PATH); } catch { /* 缺失时全部按未办提示（保守方向，不会漏报） */ }
+ * 已办完的事实登记在 deploy/wechat-external.json（**只放公开信息**：备案号/域名/日期）。
+ * ⚠️ `EXT_PATH` / `EXT` 已在 **E 节之前**读取（E 节也要用同一张表），此处**不重复定义**。 */
 const extDone = (k) => {
   const it = EXT && EXT.items && EXT.items[k];
   if (!it || it.status !== 'done') return '';
