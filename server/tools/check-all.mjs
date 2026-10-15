@@ -2344,6 +2344,52 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
   const bpMod = requireFromHere(join(MP_ROOT, 'utils', 'blockPage.js'));
   const blocksLib = requireFromHere(join(MP_ROOT, 'utils', 'blocks.js'));
 
+  /* (0) 运行档位必须「按环境自动选」，且 **真机恒为 server**。
+   *
+   *     2026-10-15 的真实故障：开发者工具里首页一片空白、连素材都看不到。根因不在小程序，
+   *     在网络层 —— `lexy.cn` 在公司内网有自建权威 DNS，且**出口按 SNI 过滤**：
+   *     裸 IP 的 TCP 443 连得上（20ms），一带 hostname 做 TLS 握手就被 ECONNRESET（43ms）。
+   *     而 `ENV` 自 2026-10-14 切域名那次起被钉死成 'server'，于是模拟器拉不到任何素材；
+   *     首页那 11 个区块又**全是图片/视频、一个文字区块都没有** → 素材一挂整页空白。
+   *
+   *     判据只能用 `platform === 'devtools'`，**不能用 `envVersion === 'develop'`**：
+   *     真机「开发版」（扫码预览）的 envVersion 同样是 'develop'，用它判会把**手机**
+   *     也指到 127.0.0.1（手机上那是手机自己）→ 全空且无任何报错。
+   *     所以下面逐个环境试，**真机那两条才是主判据**，devtools 只是顺带。 */
+  const ENV_CONST_FILE = join(MP_ROOT, 'utils', 'constants.js');
+  const envWith = (wxStub) => {
+    const key = requireFromHere.resolve(ENV_CONST_FILE);
+    delete requireFromHere.cache[key];
+    const hadWx = Object.prototype.hasOwnProperty.call(globalThis, 'wx');
+    const prevWx = globalThis.wx;
+    if (wxStub === undefined) delete globalThis.wx; else globalThis.wx = wxStub;
+    try {
+      return requireFromHere(ENV_CONST_FILE).ENV;
+    } finally {
+      if (hadWx) globalThis.wx = prevWx; else delete globalThis.wx;
+      delete requireFromHere.cache[key];
+    }
+  };
+  const ENV_CASES = [
+    ['真机 Android（**开发版也走这条**）', { getSystemInfoSync: () => ({ platform: 'android' }) }, 'server'],
+    ['真机 iOS', { getSystemInfoSync: () => ({ platform: 'ios' }) }, 'server'],
+    ['真机 Windows 微信', { getSystemInfoSync: () => ({ platform: 'windows' }) }, 'server'],
+    ['开发者工具模拟器（旧接口）', { getSystemInfoSync: () => ({ platform: 'devtools' }) }, 'local'],
+    ['开发者工具模拟器（新接口 getDeviceInfo）', { getDeviceInfo: () => ({ platform: 'devtools' }) }, 'local'],
+    ['模拟器：新接口不返回 platform，旧接口兜住',
+      { getDeviceInfo: () => ({}), getSystemInfoSync: () => ({ platform: 'devtools' }) }, 'local'],
+    ['模拟器：新接口抛错，旧接口兜住',
+      { getDeviceInfo: () => { throw new Error('boom'); }, getSystemInfoSync: () => ({ platform: 'devtools' }) }, 'local'],
+    ['Node / 命令行工具（无 wx）', undefined, 'server'],
+    ['接口抛异常', { getSystemInfoSync: () => { throw new Error('boom'); } }, 'server'],
+    ['接口返回空对象', { getSystemInfoSync: () => ({}) }, 'server']
+  ];
+  const envWrong = ENV_CASES.filter(([, stub, want]) => envWith(stub) !== want)
+    .map(([name, , want]) => `${name}（期望 ${want}）`);
+  assert('utils/constants.js 的运行档位按环境自动选，且**真机恒为 server**（选错＝手机上全空且不报错）',
+    envWrong.length === 0,
+    envWrong.length ? `选错：${envWrong.join('；')}` : `${ENV_CASES.length} 个环境全部选对`);
+
   /* app.json 里所有注册过的页面路径（主包 + 分包） */
   const allPages = [];
   (appJson.pages || []).forEach((p) => allPages.push('/' + p));

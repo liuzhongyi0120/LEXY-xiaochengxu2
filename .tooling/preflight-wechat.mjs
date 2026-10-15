@@ -77,13 +77,19 @@ else ok('总计 ' + MB(total), '上限 20MB');
 /* ─────────── C. 后端地址 ─────────── */
 rows.push({ level: 'head', name: 'C. 后端地址（正式版只接受「已备案域名 + 有效 HTTPS」）' });
 const constSrc = read(path.join(MP, 'utils', 'constants.js'));
-const ENV = (/const\s+ENV\s*=\s*'([^']+)'/.exec(constSrc) || [])[1] || '?';
-const baseUrl = new RegExp('\\b' + ENV + "\\s*:\\s*'([^']*)'").exec(constSrc);
+/* 档位自 2026-10-15 起是「**按运行环境自动选**」：真机/正式版 → server，开发者工具模拟器 → local。
+ * 体检判的是「**上传后用户会连哪儿**」，所以永远看 server 那一档的值，
+ * 而不是常量 ENV 的求值结果 —— 它在源码里已没有字面量（Node 侧恒为 'server'），
+ * 拿旧正则去抠会抠到空串，进而把「BASE_URL 不是 HTTPS」误报出来（典型的假红）。 */
+const pinEnv = (/const\s+ENV_OVERRIDE\s*=\s*'([^']*)'/.exec(constSrc) || [])[1] || '';
+const ENV = pinEnv || 'server';
+const baseUrl = /\bserver\s*:\s*'([^']*)'/.exec(constSrc);
 const BASE_URL = baseUrl ? baseUrl[1] : '';
-ok('ENV', ENV + ' → BASE_URL = ' + (BASE_URL || '(空，走 mock)'));
+ok('ENV', (pinEnv ? ('手动钉死为 ' + pinEnv) : '自动（真机 → server / 开发者工具 → local）')
+  + ' → 线上档 BASE_URL = ' + (BASE_URL || '(空，走 mock)'));
 
-if (ENV === 'mock' || ENV === 'local') {
-  warn('当前是 ' + ENV + ' 档', '不会连线上后端，上传前记得切回 server');
+if (pinEnv === 'mock' || pinEnv === 'local') {
+  warn('常量被手动钉死成 ' + pinEnv + ' 档', '上传后真机会去连本机地址、必然一片空白 —— 上传前把它改回空（自动）或 server');
 } else if (!/^https:\/\//.test(BASE_URL)) {
   block('BASE_URL 不是 HTTPS', BASE_URL);
 } else {
@@ -143,10 +149,17 @@ try {
      * 这条提示单独给口径，否则每次体检看到 ECONNRESET 都会有人跑去服务器查证书（白忙）。 */
     warn('连不上线上后端（' + (code || 'ECONNRESET') + '）',
       '**已知原因、非后端故障**：公司出口设备按 SNI 拦本域名（同 IP:443 下，无 SNI / SNI=www.baidu.com / ' +
-      '任意不存在域名全都能握手，只有 mall.lexy.cn 被 RST，4/4 复现）→ 只影响本机开发者工具，**真机与审核不受影响**。' +
+      '任意不存在域名全都能握手，只有 mall.lexy.cn 被 RST，4/4 复现）→ **真机与平台审核不受影响**。' +
       '反证：在服务器上执行 curl -s -o /dev/null -w "%{http_code}" https://mall.lexy.cn/mall-api/api/health 应得 200。' +
-      '本机应急：电脑连手机热点，或临时切 IP 链路 node .tooling/switch-env.mjs --url=https://14.103.50.137/mall-api --allow-ip（验完切回）。' +
-      '详见 deploy/添加子域名操作单.md 第七节 7.1');
+      '**本机后果与已做的处置（2026-10-15）**：内网机器拉不到任何 /uploads/… 素材，' +
+      '而首页那 11 个区块**全是图片/视频、一个文字都没有** → 开发者工具的模拟器整页空白，' +
+      '看起来像「小程序坏了」，其实编译是通过的（工具日志里 simulator app compile 是成功的）。' +
+      '现已改成**按运行环境自动选档**：模拟器 → http://127.0.0.1:3000（本机后端，不受出口拦截影响）；' +
+      '真机 / 线上构建 → 本域名。所以这条 WARN 现在**只影响命令行工具**（本体检脚本、deploy-data 抓线上数据等）；' +
+      '那些场景才需要连手机热点，或临时切 IP：' +
+      'node .tooling/switch-env.mjs --url=https://14.103.50.137/mall-api --allow-ip（验完切回）。' +
+      '详见 deploy/添加子域名操作单.md 第六之二节（本机开发现状 —— 注意那里的「7.1 补内网 DNS」已经完成，' +
+      '卡住的是 SNI 这一层，补 DNS 治不了）');
   } else {
     warn('连不上线上后端', code || String(e.message).slice(0, 80) + '（本机网络/未部署时属预期，上传前务必再跑一次）');
   }

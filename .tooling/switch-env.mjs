@@ -40,7 +40,11 @@ const arg = (n) => {
 
 const show = argv.includes('--show');
 const url = arg('url').trim();
-const envName = arg('env').trim() || 'server';
+/* ⚠️ `--env` **不传就保持自动档**（详见下面 ① 步）—— 所以这里默认空串，不再默认 'server'：
+ *   否则「只想把地址切回 IP」的人会顺手把自动档钉死成 server，模拟器又去连内网访问不了的域名、整页空白。 */
+const envName = arg('env').trim();
+/** 要改地址的是「线上那一档」（server）—— 它才是 IP ⇄ 域名 来回切的对象 */
+const targetTier = envName || 'server';
 /* --allow-ip：**只为回滚开的口子**。正常切换一律拒绝 IP（微信不收 IP），
  * 但域名链路一旦抽风要「秒切回 IP 让业务先活着」，手改一处 + 两处注释很容易漏 → 给个显式开关。 */
 const allowIp = argv.includes('--allow-ip');
@@ -89,22 +93,29 @@ if (!/\/mall-api$/.test(url)) {
 
 const src = readFileSync(FILE, 'utf8');
 const before = current();
+/** 改之前**手动钉死**的档位（空串 = 自动）。这个值在 Node 侧读不到，只能从源码里取。 */
+const pinBefore = (/const\s+ENV_OVERRIDE\s*=\s*'([^']*)'/.exec(src) || [])[1];
 
-/* ① ENV
- * ⚠️ 这里必须**先测模式在不在**，不能靠「replace 之后字符串没变」反推「没找到」——
- *    当 ENV 本来就是目标值（如都是 server）时，replace 后字符串必然相同，
- *    那样会把「无需改动」误报成「结构变了」。实测踩过一次。 */
-const envRe = /^const ENV = '[^']*';/m;
-if (!envRe.test(src)) {
-  console.error('[x] 没找到 `const ENV = ...;` —— constants.js 结构变了，先人工看一眼');
-  process.exit(1);
+/* ① 档位。自 2026-10-15 起 constants.js 的档位是**按运行环境自动选**的
+ *    （真机 / 线上构建 → server；开发者工具的模拟器 → local），
+ *    手动钉死的那个常量叫 `ENV_OVERRIDE`，**留空 = 自动**。
+ *    ⚠️ 只有显式传了 `--env=xxx` 才动它；不传时**连碰都不碰**。
+ *    （同一条铁律的另一面：锚点必须显式测在不在，不能靠「replace 后串没变」反推「没找到」——
+ *      当钉死值本来就是目标值时 replace 后必然相同，那样会把「无需改动」误报成「结构变了」。） */
+let out = src;
+if (envName) {
+  const envRe = /^const ENV_OVERRIDE = '[^']*';/m;
+  if (!envRe.test(out)) {
+    console.error('[x] 没找到 `const ENV_OVERRIDE = ...;` —— constants.js 结构变了，先人工看一眼');
+    process.exit(1);
+  }
+  out = out.replace(envRe, `const ENV_OVERRIDE = '${envName}';`);
 }
-let out = src.replace(envRe, `const ENV = '${envName}';`);
 
 /* ② BASE_URL_MAP 里那一档 */
-const mapRe = new RegExp(`(\\b${envName}:\\s*')[^']*(')`);
+const mapRe = new RegExp(`(\\b${targetTier}:\\s*')[^']*(')`);
 if (!mapRe.test(out)) {
-  console.error('[x] BASE_URL_MAP 里没有 `' + envName + '` 这一档');
+  console.error('[x] BASE_URL_MAP 里没有 `' + targetTier + '` 这一档');
   process.exit(1);
 }
 out = out.replace(mapRe, `$1${url}$2`);
@@ -117,30 +128,15 @@ out = out.replace(
   `$1${host}，腾讯云 CVM$2`
 );
 
-/* ④ 文件头「联调前置 2)」那段。
- *    原文写「14.103.50.137 是 IP 不是域名，**必须临时关校验**」—— 那是 IP 时代的结论。
- *    换成已备案域名并在 mp 后台配好 request 合法域名之后，这句就**是错的**，
- *    读注释的人会以为正式版也得关校验。整段重写，别只改数字。
- *    （锚点用后一行「⚠️ 图片地址由…」，非贪婪匹配到它为止 → 天然幂等，
- *      因为重写后的文本同样以「 *   2) 微信开发者工具」开头。） */
-const preRe = /( \*   2\) 微信开发者工具[\s\S]*?)(?= \* ⚠️ 图片地址)/;
-if (!preRe.test(out)) {
-  console.error('[x] 没找到文件头「联调前置 2)」段 —— constants.js 结构变了，先人工看一眼');
-  process.exit(1);
-}
-out = out.replace(
-  preRe,
-  ' *   2) 微信开发者工具 → 详情 → 本地设置 → 勾选\n' +
-  ' *      「不校验合法域名、web-view、TLS 版本以及 HTTPS 证书」\n' +
-  (isIpHost
-    /* IP 档（只可能是 --allow-ip 回滚）：保持原文口径，这样 IP ⇄ 域名 可无损来回切 */
-    ? ' *      （' + host + ' 是 IP 不是域名，未在 mp 后台配置 request 合法域名，必须临时关校验；\n' +
-      ' *       真机上则用「右上角胶囊 → 开发调试 → 打开」绕过）\n'
-    : ' *      （联调期勾上更省事；但**正式版不需要它** —— BASE_URL 主机 ' + host + '\n' +
-      ' *       已在 mp 后台「开发设置 → 服务器域名」配好 request 合法域名，\n' +
-      ' *       模拟器与真机都直连即可，真机也无需开「胶囊 → 开发调试」）\n') +
-  ' *\n'   /* ← 保留原文里那行空注释（分隔「联调前置」与下方 ⚠️ 段），别顺手删掉 */
-);
+/* ④ 文件头「联调前置 2)」段 —— **本脚本不再重写它**。
+ *    自 2026-10-15 起那段注释已改成「按运行环境自动选档」的口径：
+ *      模拟器 → local（http://127.0.0.1:3000，既非 HTTPS 也非备案域名 → **必须勾不校验**）；
+ *      真机 / 正式版 → server（已备案域名 → **不需要**勾）。
+ *    它现在**不依赖 host**（模拟器永远走 local），所以 IP ⇄ 域名 来回切时不需要动它。
+ *
+ *    ⚠️ 更要紧的是：那段注释里本来就要出现 `mall.lexy.cn`，而下面 ⑤ 的「残留旧主机」
+ *       全文检测会把注释一起算进去 —— 「脚本整段重写注释」和「全文不许残留旧主机」
+ *       是两条会互相打架的规则。注释交给人维护，脚本只负责值与闸门。 */
 
 /* ⑤ 最后一道闸：文件里**不许残留旧主机**。
  *    上面 ②③④ 是按已知的三处逐个替换的 —— 万一以后有人在别处又写了一句旧地址
@@ -164,12 +160,15 @@ if (out === src) {
 /* ── 自检：真的读得回来才算数 ── */
 delete require_.cache[require_.resolve(FILE)];
 const after = current();
-const okEnv = after.ENV === envName;
+/* ⚠️ 档位**不能用 `after.ENV` 验**：Node 侧没有 wx → detectEnv() 恒为兜底的 'server'，
+ *    它反映的是「命令行环境」，不是源码里钉死了什么。所以直接看源码那一行。 */
+const pinAfter = (/const\s+ENV_OVERRIDE\s*=\s*'([^']*)'/.exec(readFileSync(FILE, 'utf8')) || [])[1];
+const okEnv = envName ? pinAfter === envName : true;
 const okUrl = after.BASE_URL === url;
-console.log('  改前：ENV=' + before.ENV + '  BASE_URL=' + (before.BASE_URL || '(空)'));
-console.log('  改后：ENV=' + after.ENV + '  BASE_URL=' + after.BASE_URL);
+console.log('  改前：钉死档=' + (pinBefore || '自动') + '   线上地址=' + (before.BASE_URL || '(空)'));
+console.log('  改后：钉死档=' + (pinAfter || '自动') + '   线上地址=' + after.BASE_URL);
 if (!okEnv || !okUrl) {
-  console.error('[x] 改完读回来的值和期望不一致（ENV 对了=' + okEnv + '，URL 对了=' + okUrl + '）');
+  console.error('[x] 改完读回来的值和期望不一致（档位对了=' + okEnv + '，URL 对了=' + okUrl + '）');
   process.exit(1);
 }
 
