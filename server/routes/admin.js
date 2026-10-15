@@ -15,6 +15,7 @@
 
 const admin = require('../lib/admin');
 const adminAuth = require('../lib/adminAuth');
+const members = require('../lib/members');
 const catalog = require('../lib/catalog');
 const catalogStore = require('../lib/catalogStore');
 const decorate = require('../decorate/store');
@@ -28,11 +29,26 @@ module.exports = [
     method: 'POST',
     path: '/api/admin/login',
     auth: false,
-    desc: '管理员登录（口令换会话令牌；生产环境需先设置 ADMIN_PASSWORD）',
+    desc: '管理员登录（成员账号 + 口令；留空账号则用共享口令，二者都换会话令牌）',
     note: T,
     async handler(ctx) {
-      const token = adminAuth.login(ctx.params.password);
-      return { token, role: 'owner', roleLabel: adminAuth.ROLE_LABEL.owner, ttl: adminAuth.ADMIN_TTL };
+      /* 两种登录方式共用一个点位：
+       *   带 username → 查成员表（角色由成员配置决定）
+       *   不带       → 共享口令 ADMIN_PASSWORD（登录即超级管理员）
+       * 返回的角色必须**按实际登录方式回显**，不能写死 owner —— 成员账号登录后
+       * 前端顶栏会照着它显示身份，写死会让「只读」成员一眼看着像超级管理员。 */
+      const uname = String(ctx.params.username || '').trim();
+      const token = adminAuth.login(ctx.params.password, uname);
+      const m = uname ? members.findByName(uname) : null;
+      const role = m ? m.role : 'owner';
+      return {
+        token,
+        role,
+        roleLabel: adminAuth.ROLE_LABEL[role],
+        name: m ? (m.name || m.username) : '',
+        username: m ? m.username : '',
+        ttl: adminAuth.ADMIN_TTL
+      };
     }
   },
   {
@@ -44,7 +60,109 @@ module.exports = [
     async handler(ctx) {
       const s = adminAuth.read(ctx.req);
       if (!s) throw new BizError('未登录管理员', ERR.UNAUTHORIZED, 401);
-      return { role: s.role, roleLabel: adminAuth.ROLE_LABEL[s.role], name: s.name, source: s.source };
+      return {
+        role: s.role,
+        roleLabel: adminAuth.ROLE_LABEL[s.role],
+        name: s.name,
+        source: s.source,
+        username: s.username || '',
+        /* 能不能自己改口令：只有成员账号可以（共享口令 / 长期令牌没有「个人口令」这回事） */
+        canChangePassword: s.source === 'member'
+      };
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/me/password',
+    auth: false,
+    desc: '修改自己的登录口令（成员账号专用；需验旧口令）',
+    note: T,
+    async handler(ctx) {
+      const s = adminAuth.read(ctx.req);
+      if (!s) throw new BizError('未登录管理员', ERR.UNAUTHORIZED, 401);
+      if (s.source !== 'member') {
+        throw new BizError('当前身份不是成员账号（用共享口令或长期令牌登录时没有个人口令可改）', ERR.FORBIDDEN, 403);
+      }
+      return members.changeOwnPassword(s.username, ctx.params.oldPassword, ctx.params.newPassword);
+    }
+  },
+
+  /* ---------------------------- 成员管理 ---------------------------- */
+  {
+    method: 'GET',
+    path: '/api/admin/members',
+    auth: false,
+    desc: '成员列表（后台管理员账号；只读，绝不含口令与哈希）+ 角色说明 + 账号规则',
+    note: T,
+    async handler() {
+      return {
+        list: members.list(),
+        roles: members.ROLES.map((r) => ({ value: r, label: members.ROLE_LABEL[r] })),
+        rules: {
+          usernameRe: String(members.USERNAME_RE),
+          pwdMin: members.PWD_MIN,
+          pwdMax: members.PWD_MAX,
+          nameMax: members.NAME_MAX,
+          max: members.MAX_MEMBERS
+        },
+        /* 前端据此禁掉「删除 / 禁用」按钮，别让人点了才被服务端拒 —— 服务端那道仍然在 */
+        activeOwners: members.activeOwnerCount(),
+        envTokens: adminAuth.tokenCount(),
+        /* ⚠️ 判据要与 login() 同源（走 adminAuth 的 PASSWORD 常量），
+         *    不能写 `!!process.env.ADMIN_PASSWORD` —— 开发环境用的是内置默认口令、
+         *    环境变量为空，那样写会显示成「没有共享口令」，而实际能登。 */
+        sharedPassword: adminAuth.sharedPasswordUsable()
+      };
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/members/save',
+    auth: false,
+    desc: '新建 / 修改成员（id 为空=新建，否则=修改；改口令才传 password）',
+    note: T,
+    async handler(ctx) {
+      const p = ctx.params || {};
+      if (!p.id) {
+        return members.create({
+          username: p.username, name: p.name, role: p.role,
+          password: p.password, enabled: p.enabled
+        });
+      }
+      return members.update(p.id, {
+        username: p.username, name: p.name, role: p.role,
+        password: p.password, enabled: p.enabled
+      });
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/members/status',
+    auth: false,
+    desc: '启用 / 停用成员（最后一个启用中的超级管理员不可停用）',
+    note: T,
+    async handler(ctx) {
+      return members.update(ctx.params.id, { enabled: !!ctx.params.enabled });
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/members/password',
+    auth: false,
+    desc: '重置成员口令（需超级管理员）',
+    note: T,
+    async handler(ctx) {
+      return members.update(ctx.params.id, { password: ctx.params.password });
+    }
+  },
+  {
+    method: 'POST',
+    path: '/api/admin/members/delete',
+    auth: false,
+    desc: '删除成员（最后一个启用中的超级管理员不可删除）',
+    note: T,
+    async handler(ctx) {
+      return members.remove(ctx.params.id);
     }
   },
 

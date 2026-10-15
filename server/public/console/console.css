@@ -86,6 +86,16 @@ a { color: var(--blue); text-decoration: none; }
 }
 /* 分组标题：原 #6b7280 在 #1b1e23 上对比度约 3.3:1，11px 小字基本读不出来，提到 #8b93a1（≈5.2:1） */
 .nav-group { padding: 12px 16px 5px; font-size: 11px; color: #8b93a1; letter-spacing: .5px; font-weight: 600; }
+/*
+ * 未登录时其它栏目置灰不可点。
+ * 用 `opacity + cursor` 表达「现在进不去」，**不用** `display:none` ——
+ * 藏起来的话运营根本不知道后台有这些功能，只会以为「系统就长这样」。
+ * `pointer-events` 保持可点：点了会走 App.go → gate → 停在登录页，
+ * 弹一句提示比「点了没反应」清楚。
+ */
+.nav-item.locked { opacity: .42; cursor: not-allowed; }
+.nav-item.locked:hover { background: transparent; color: #b6bcc7; }
+.nav-item.locked .ico { opacity: .6; }
 .side-foot { padding: 10px 16px 14px; font-size: 11px; color: var(--sidebar-sub); border-top: 1px solid rgba(255,255,255,.08); }
 /* 侧栏底部两个外链：原来写死在 HTML 的内联 style="color:#fff" 上（改色要翻 HTML），收到这里 */
 .side-foot a { color: #c9cfd8; text-decoration: none; }
@@ -260,7 +270,10 @@ img.thumb { width: 42px; height: 42px; border-radius: 6px; object-fit: cover; ba
 .filter { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--line); }
 .field { display: flex; align-items: center; gap: 6px; }
 .field > label { color: var(--sub); font-size: 12px; white-space: nowrap; }
-input[type=text], input[type=number], input[type=date], select, textarea {
+/* ⚠️ password 必须列进来：登录页是第一个真正用 <input type="password"> 的地方
+ *    （此前口令框只出现在弹层里，靠 .modal 的样式兜着）。漏掉的话登录页的
+ *    「口令」框会是个没有边框的裸输入条，跟旁边的「账号」框明显不是一套。 */
+input[type=text], input[type=number], input[type=date], input[type=password], select, textarea {
   height: 30px; padding: 0 9px; border: 1px solid var(--line-strong);
   border-radius: 6px; background: #fff; outline: none; min-width: 0;
 }
@@ -286,6 +299,24 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 .form-row > .lbl { flex: 0 0 92px; color: #5a6472; padding-top: 5px; text-align: right; }
 .form-row > .ctl { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .form-row .tip { color: var(--sub); font-size: 11.5px; width: 100%; }
+
+/* -------------------------------- 登录页 -------------------------------- */
+/* 被 401 顶到登录页时带上的一句上下文（「会话已过期」这类）：
+ * 用中性信息色而不是红色 —— 它说明的是「为什么在这」，不是「你做错了」。 */
+.login-note {
+  margin: 0 0 6px; padding: 8px 11px; border-radius: 6px;
+  background: var(--blue-soft); color: #1849a9; font-size: 12.5px; line-height: 1.5;
+}
+/* 表单里的分隔说明（「或者：用长期令牌直接进入」）
+ * 用 flex + 两侧虚线，而不是绝对定位 + 白底压线 —— 后者依赖 z-index 与堆叠上下文，
+ * 换个父容器（比如带背景的卡片）就会露馅。 */
+.login-sep {
+  display: flex; align-items: center; gap: 10px;
+  margin: 16px 0 4px; color: var(--sub); font-size: 11.5px;
+}
+.login-sep::before, .login-sep::after {
+  content: ''; flex: 1; border-top: 1px dashed var(--line);
+}
 
 /* -------------------------------- 弹层 -------------------------------- */
 

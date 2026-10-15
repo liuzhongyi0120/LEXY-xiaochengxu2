@@ -151,9 +151,45 @@ function publishedOf(key) {
  */
 function assemble(pageDataMap, opt) {
   const out = {};
+  /*
+   * ★ 笔记的「生成代码」门（2026-10-15 修）。
+   *
+   * 问题（实测取证）：建 A、建 B 两篇笔记 → 只给 **B** 点一次「生成代码」→
+   *   replica.js 里同时出现了 A；`/api/decorate/pages` 随即把 A 判成「代码已生成」。
+   *   删除任意一篇笔记同样会把 A 扫进去。也就是说：运营在编、还没打算发布的笔记，
+   *   会被任何一次「写 replica.js」悄悄下发到小程序。
+   *
+   * 根因：publishedAll() 为了让编辑器一打开就有内容，会把**每一篇已注册笔记**
+   *   （shopnotes.publishedContent(id) —— 建号时的初始内容 / 上次发布的内容）都返回；
+   *   而这里又**整份**拿它去组装 replica ——「注册表里有」被当成了「已经下发」。
+   *
+   * 判据（只会少写、不会多写）—— 一篇笔记要写进产物，必须满足其一：
+   *   ① 它就是本次正在发布的那一篇（opt.keepKey，publish() 传进来）；
+   *   ② 它**当前已经在 replica.js 里**（上一次「生成代码」留下的）。
+   * ② 是防回归的关键：写别的页面时，已经下发的笔记绝不能被顺手抹掉 ——
+   *   那会让线上正在用的笔记凭空消失，比原来的 bug 更严重。
+   *
+   * ⚠️ id 类型：replica 里 SHOPNOTES 的键是**字符串**（Object.keys），
+   *    这里统一 String() 归一，别拿 Number 去 has()（那会一条都命不中，
+   *    表现成「已经下发的笔记被悄悄删掉」——正好是 ② 要防的那件事）。
+   *
+   * ★ 自定义页是**同一个坑**（实测：建一个自定义页 → 删一篇无关笔记触发整份重建 →
+   *   那个从没发布过的页面就出现在 CUSTOM_PAGES 里，接口同时判它「代码已生成」）。
+   *   它自己的文档也写着「只建注册表条目，先不写 replica.js…否则手滑建一个空页面
+   *   就会把线上数据覆盖掉」——所以用同一条规则。两边写在同一个循环里，免得将来只改一边。
+   */
+  const R0 = readReplica();
+  const generatedNoteIds = new Set(Object.keys(R0.SHOPNOTES || {}).map(String));
+  const liveCustomKeys = new Set(Object.keys(R0.CUSTOM_PAGES || {}));
+  const keepKey = (opt && opt.keepKey) || '';
   schema.allPages().forEach((p) => {
     const d = pageDataMap[p.key];
     if (d === undefined || d === null) return;
+    if (p.shopnote) {
+      if (p.key !== keepKey && !generatedNoteIds.has(String(shopnotes.idOfKey(p.key)))) return;
+    } else if (p.custom) {
+      if (p.key !== keepKey && !liveCustomKeys.has(p.key)) return;
+    }
     p.to(d, out);
   });
 
@@ -454,6 +490,19 @@ function listPages() {
       draftAtText: draft ? stampOf(draft.at) : '',
       publishedAt: draft && draft.baseAt ? draft.baseAt : null,
       blockCount: countBlocks(meta.key, pub),
+      /*
+       * 草稿里的区块数（无草稿 = null）。
+       *
+       * 为什么要多一个字段，而不是让 blockCount 直接读草稿：
+       *   blockCount 的口径是「**已生成代码里**有几个区块」，它与状态列
+       *   「已生成 / 未生成代码」是同一条事实的两个面，两个消费方（装修台列表、
+       *   控制台笔记列表）都靠它。把它的数据源换成草稿，会顺手改掉装修台的既有口径。
+       *
+       * 但笔记只出现在控制台，而运营最常处的状态恰恰是「改了草稿、还没生成代码」——
+       * 这时只报「0 个组件」（草稿里的 5 个看不见）等于没回答问题。
+       * 所以：**加字段**，由展示层决定显示哪一个（见 console.modules.js 的 noteRow）。
+       */
+      draftBlockCount: (draft && draft.data) ? countBlocks(meta.key, draft.data) : null,
       fields: countFields(pub),
       lastVersion: (state.versions.filter((v) => v.pageKey === meta.key)[0] || null)
     });
@@ -609,7 +658,9 @@ function discardDraft(key) {
  * 任一步失败都自动回滚到原文件，绝不把工程留在「replica.js 是坏的」状态。
  * @param {object} pageData 全量页面数据（含本次要写入的页面）
  * @param {string} validateKey 回读时用哪个页面的规则校验（空串则不校验）
- * @param {{dropAliasOf?:string}} [opt] 见 assemble()：删除页面时要把指向它的别名一并滤掉
+ * @param {{dropAliasOf?:string, keepKey?:string}} [opt]
+ *        dropAliasOf：删除页面时要把指向它的别名一并滤掉；
+ *        keepKey：本次正在发布的页面标识 —— 见 assemble() 里笔记的「生成代码」门。
  * @returns {{ code, bytes, backup, ts }}
  */
 function writeReplica(pageData, validateKey, opt) {
@@ -713,7 +764,8 @@ function publish(key, note) {
    */
   if (page.shopnote) pageData[key].publishedAt = now();
 
-  const res = writeReplica(pageData, key);
+  /* keepKey：告诉 assemble()「这一篇是本次正在发布的」，别被「生成代码」门挡掉 */
+  const res = writeReplica(pageData, key, { keepKey: key });
   const version = recordVersion(state, key, res.ts, note || '发布', pageData);
   delete state.drafts[key];
   saveState(state);
@@ -855,9 +907,18 @@ function updateCustomPage(key, patch) {
     });
     saveState(state);
 
-    // 重新生成 replica，让 CUSTOM_PAGES / CUSTOM_PAGE_ALIASES 的键名同步
-    // （新键的数据从注册表读，不会丢；别名表已在上一步登记）
-    writeReplica(publishedAll(), newKey);
+    /*
+     * 重新生成 replica，让 CUSTOM_PAGES / CUSTOM_PAGE_ALIASES 的键名同步
+     * （新键的数据从注册表读，不会丢；别名表已在上一步登记）。
+     *
+     * ⚠️ keepKey 必须传 newKey —— 而且**只在这一页本来就在 replica 里**时才传：
+     *    改名之后，新键在 replica.js 里还不存在（文件里仍是旧键），
+     *    assemble() 的「已经下发的才写」判据会把它当成「从没发布过的页面」跳过，
+     *    结果就是「改个名 = 线上页面凭空消失」。反过来，本来就没发布过的页面改名，
+     *    也不能因为这一笔把它塞进产物（那正是 2026-10-15 修掉的那个漏发）。
+     */
+    const wasLive = !!((readReplica().CUSTOM_PAGES || {})[key]);
+    writeReplica(publishedAll(), newKey, { keepKey: wasLive ? newKey : '' });
   }
 
   return {

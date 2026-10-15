@@ -1336,3 +1336,434 @@ App.views.decorate = {
     });
   }
 };
+
+/* ============================== 视图：店铺笔记 ============================== */
+
+/**
+ * 店铺笔记（左侧导航「营销与内容 → 店铺笔记」）。
+ *
+ * 2026-10-15 从装修台**搬出来**成一个独立栏目。原先它只是装修台页面列表工具栏上的
+ * 一个「+ 新建笔记」按钮，和「+ 新建页面」并排 —— 但那是**内容**（一篇一篇写出来的图文），
+ * 不是「页面长什么样」，混在一起说不清归属，也找不到入口。
+ *
+ * 三件事要分清楚，页面上都写明了：
+ *   ① 这里管的是「有哪些笔记」；
+ *   ② 点「装修」在新窗口打开 /admin 的可视化编辑器（笔记的正文/封面/组件都在那儿填）；
+ *   ③ 「生成代码」只写回 replica.js —— 小程序要**上传发布新版本**才真的更新。
+ *
+ * 数据只取一个接口（`/api/decorate/pages`）：它同时给出笔记行的状态（generated / hasDraft）
+ * 与配额（d.notes）。改用 `/api/decorate/notes` 的话拿不到状态，就得再发一次请求合并 ——
+ * 两份数据源对账是这类页面最容易出错的地方。
+ */
+App.views.shopnotes = {
+  async render(body) {
+    const d = await API.get('/api/decorate/pages');
+    const ns = d.notes || {};
+    /* 新的排前面：key 是 `note-<id>`，比数字部分而不是比字符串
+     * （直接比字符串 `note-9` > `note-10`，列表顺序会莫名其妙） */
+    const idOf = (p) => Number(String(p.key).replace(/^note-/, '')) || 0;
+    const notes = (d.list || []).filter((p) => p.shopnote).sort((a, b) => idOf(b) - idOf(a));
+    const canWrite = AdminSession.atLeast('owner');
+
+    body.innerHTML =
+      '<div class="card stat-line"><div class="card-b">' +
+        '店铺笔记 <b>' + (ns.count || 0) + '</b> / ' + (ns.max || 50) + ' 篇' +
+        '<span class="grow"></span>' +
+        '<span class="hint">笔记 = 图文内容（固定头部 + 正文 + 可自由增删的组件）。' +
+        '改完在装修台点「生成代码」写回 replica.js，<b>还要在微信开发者工具上传并发布新版本</b>，小程序端才会更新。</span>' +
+      '</div></div>' +
+
+      '<div class="card">' +
+        '<div class="card-h"><h2>笔记列表</h2><div class="grow"></div>' +
+          '<span class="hint">共 ' + notes.length + ' 篇</span>' +
+          '<button class="btn primary" data-new' + (canWrite ? '' : ' disabled') +
+            ' title="' + (canWrite ? '新建一篇店铺笔记' : '需要超级管理员') + '">+ 新建笔记</button>' +
+        '</div>' +
+        '<div class="card-b tight">' +
+          (notes.length
+            ? '<div class="table-wrap"><table class="tb"><thead><tr>' +
+                '<th>笔记标题 · 真机地址</th>' +
+                '<th style="width:168px">状态</th>' +
+                '<th style="width:132px">内容量</th>' +
+                '<th style="width:210px">操作</th>' +
+              '</tr></thead><tbody>' + notes.map((p) => noteRow(p, canWrite)).join('') + '</tbody></table></div>'
+            : '<div class="empty-state">还没有店铺笔记。点右上角「+ 新建笔记」写第一篇。</div>') +
+        '</div>' +
+      '</div>';
+
+    const btnNew = body.querySelector('[data-new]');
+    if (btnNew && canWrite) btnNew.addEventListener('click', () => createNoteDialog(ns));
+
+    body.querySelectorAll('[data-note-del]').forEach((b) => b.addEventListener('click', async () => {
+      const key = b.getAttribute('data-note-del');
+      const p = notes.filter((x) => x.key === key)[0] || {};
+      if (!needRole('owner', '删除笔记')) return;
+      if (!await confirmBox('删除笔记「' + esc(p.name || key) + '」？<br><span class="sub">会连带清掉它的草稿与版本记录，' +
+        '并从 replica.js 里移除（下次生成代码后生效）。<b>不可撤销。</b></span>', '删除')) return;
+      try {
+        await API.post('/api/decorate/note/delete', { key });
+        toast('已删除');
+        App.render();
+      } catch (e) { toast(e.message, true); }
+    }));
+  }
+};
+
+/** 笔记表格的一行（属性值统一过 esc —— 它同时转义引号，放属性里是安全的） */
+function noteRow(p, canWrite) {
+  const st = p.generated
+    ? '<span class="tag on">代码已生成</span>'
+    : '<span class="tag warn">未生成代码</span>';
+  const editHref = '/admin?edit=' + encodeURIComponent(p.key);
+  return '<tr>' +
+    '<td>' +
+      '<div><a href="' + editHref + '" target="_blank" rel="noopener" ' +
+        'title="在新窗口打开可视化编辑器"><b>' + esc(p.name) + '</b></a></div>' +
+      '<div class="sub" title="' + esc(p.path) + '">' + esc(p.path) + '</div>' +
+    '</td>' +
+    '<td>' + st +
+      (p.hasDraft ? '<div class="sub">草稿 ' + esc(p.draftAtText || '') + '</div>' : '') +
+    '</td>' +
+    '<td class="sub">' + contentText(p) + '</td>' +
+    '<td class="nowrap"><div class="btn-group">' +
+      '<a class="btn sm" href="' + editHref + '" target="_blank" rel="noopener"' +
+        ' title="在新窗口打开可视化编辑器">装修</a>' +
+      '<button class="btn sm danger" data-note-del="' + esc(p.key) + '"' + (canWrite ? '' : ' disabled') +
+        ' title="' + (canWrite ? '删除这篇笔记（不可撤销）' : '需要超级管理员') + '">删除</button>' +
+    '</div></td>' +
+  '</tr>';
+}
+
+/**
+ * 「内容量」列的文案。
+ *
+ * 三种状态各说各的话，别让一个数字同时背两件事：
+ *   · 有草稿 + 代码没生成过 → 只报草稿（代码那份是 0，状态列「未生成代码」已经说了）
+ *   · 有草稿 + 代码生成过     → 两份都报（改了草稿还没点「生成代码」时，两者会不一样）
+ *   · 没有草稿                → 只报已生成代码里的区块数（那一份就是唯一的内容）
+ *
+ * 字段真源是后端 `store.listPages()` 的 `blockCount` / `draftBlockCount`；
+ * 这里**不做任何取整或兜底换算**，`draftBlockCount` 为 null 就说明确实没有草稿。
+ */
+function contentText(p) {
+  const hasDraftCount = p.hasDraft && typeof p.draftBlockCount === 'number';
+  if (!hasDraftCount) return (p.blockCount || 0) + ' 个组件';
+  if (p.generated) {
+    return '<div>代码 ' + (p.blockCount || 0) + ' 个组件</div>' +
+      '<div>草稿 ' + p.draftBlockCount + ' 个组件</div>';
+  }
+  return '草稿 ' + p.draftBlockCount + ' 个组件';
+}
+
+/**
+ * 新建笔记弹层。
+ *
+ * 口径（标题 5~40 / 标签 8 字 / 摘要选填）**从后端下发**（ns 里那三个字段，
+ * 真源是 server/decorate/shopnotes.js 的常量）—— 前端再抄一份数字，
+ * 改下限时就会跟后端判据分叉，表现是「提示说可以，提交被拒」。
+ */
+function createNoteDialog(ns) {
+  if (!needRole('owner', '新建笔记')) return;
+  const tMin = ns.titleMin || 5;
+  const tMax = ns.titleMax || 40;
+  const m = openModal({
+    title: '新建店铺笔记',
+    width: 'narrow',
+    html:
+      '<div class="sub" style="line-height:1.7;margin-bottom:6px">' +
+        '新建后只是后台多出一篇笔记，装修完点「生成代码」才会写进小程序代码包（replica.js）；' +
+        '已发布的小程序要等下一次上传发布新版本才会出现这篇笔记。</div>' +
+      '<div class="field" style="margin-top:10px"><label>笔记标题</label>' +
+        '<input type="text" data-title placeholder="必填，' + tMin + '~' + tMax + ' 字" style="flex:1"></div>' +
+      '<div class="field" style="margin-top:8px"><label>笔记摘要</label>' +
+        '<input type="text" data-summary placeholder="选填：一句话卖点，仅在笔记封面展示" style="flex:1"></div>' +
+      '<div class="field" style="margin-top:8px"><label>笔记标签</label>' +
+        '<input type="text" data-tags placeholder="选填：逗号分隔，每个标签 8 字以内" style="flex:1"></div>',
+    footer: '<button class="btn" data-close>取消</button>' +
+      '<button class="btn primary" data-ok>创建并开始装修</button>'
+  });
+  const titleEl = m.$('[data-title]');
+  const err = (msg) => toast(msg, true);
+  m.$('[data-ok]').addEventListener('click', async () => {
+    const title = titleEl.value.trim();
+    /* 前端挡一次只是别让人白等一次往返；后端 shopnotes.checkTitle 那道必须保留（接口可以被绕过） */
+    if (!title) return err('请先填写笔记标题');
+    if (title.length > tMax) return err('笔记标题最多 ' + tMax + ' 个字');
+    const btn = m.$('[data-ok]');
+    btn.disabled = true;
+    btn.textContent = '创建中…';
+    try {
+      const r = await API.post('/api/decorate/note/create', {
+        title,
+        summary: m.$('[data-summary]').value.trim(),
+        tags: m.$('[data-tags]').value.trim()
+      });
+      m.close();
+      toast('已创建「' + r.page.name + '」，正在打开编辑器…');
+      /* 建完直接进编辑器：正文 / 封面 / 组件都在那儿填，少一次「回列表再点装修」。
+       * 用 window.open 而不是在本页跳走 —— 本页是列表，跳走就丢了「刚建的在哪一篇」的上下文。
+       * 被浏览器拦掉时（无用户手势 / 弹窗拦截）退回「刷新列表」这条稳妥路径，不假装开过了。 */
+      const w = window.open('/admin?edit=' + encodeURIComponent(r.page.key), '_blank', 'noopener');
+      if (!w) toast('已创建，请在列表里点这一行的「装修」继续编辑');
+      App.render();
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = '创建并开始装修';
+      err(e.message);
+    }
+  });
+  setTimeout(() => titleEl.focus(), 30);
+}
+
+/* ============================== 视图：成员管理 ============================== */
+
+/**
+ * 成员管理（左侧导航「系统 → 成员管理」）—— 后台管理员账号。
+ *
+ * 在此之前后台没有「人」的概念：能登录的只有服务器上一串共享口令，
+ * 谁在用、谁该只读、谁离职了要收回，全在 `.env` 里手工维护。
+ * 这一页把「谁能进后台、各是什么角色」变成可视数据（落 data/admin/members.json）。
+ *
+ * 页面上刻意点明的两件事：
+ *   ① **口令只存哈希**，这一页永远看不到任何人的口令 —— 忘了只能「重置」，不能「查看」；
+ *   ② 环境变量里的长期令牌**不在这一页**（那是服务器救援通道），
+ *      所以页头会标出「另有 N 条环境变量令牌」，免得运营以为把成员删空就没人能进了。
+ */
+App.views.members = {
+  async render(body) {
+    const d = await API.get('/api/admin/members');
+    const canWrite = AdminSession.atLeast('owner');
+    const roles = d.roles || [];
+    const rules = d.rules || {};
+    const me = AdminSession.me() || {};
+
+    body.innerHTML =
+      '<div class="card stat-line"><div class="card-b">' +
+        '成员 <b>' + (d.list || []).length + '</b> / ' + (rules.max || 50) + ' 个' +
+        '　·　启用中的超级管理员 <b>' + (d.activeOwners || 0) + '</b> 个' +
+        '<span class="grow"></span>' +
+        '<span class="hint">' +
+          '环境变量长期令牌 ' + (d.envTokens || 0) + ' 条（不在本页管理）· ' +
+          '共享口令 ' + (d.sharedPassword ? '已启用' : '未启用') +
+          '　—— 这两项是服务器侧的救援通道，成员表全删了也还能进后台。' +
+        '</span>' +
+      '</div></div>' +
+
+      '<div class="card">' +
+        '<div class="card-h"><h2>后台成员</h2><div class="grow"></div>' +
+          '<span class="hint">口令只存哈希，这页看不到任何人的口令；忘了只能重置</span>' +
+          '<button class="btn primary" data-new' + (canWrite ? '' : ' disabled') +
+            ' title="' + (canWrite ? '新建一个后台账号' : '需要超级管理员') + '">+ 新建成员</button>' +
+        '</div>' +
+        '<div class="card-b tight">' +
+          ((d.list || []).length
+            ? '<div class="table-wrap"><table class="tb"><thead><tr>' +
+                '<th>账号 · 姓名</th>' +
+                '<th style="width:132px">角色</th>' +
+                '<th style="width:88px">状态</th>' +
+                '<th style="width:150px">最近登录</th>' +
+                '<th style="width:296px">操作</th>' +
+              '</tr></thead><tbody>' +
+              (d.list || []).map((m) => memberRow(m, canWrite, me, d.activeOwners)).join('') +
+              '</tbody></table></div>'
+            : '<div class="empty-state">还没有成员账号。' +
+              (canWrite ? '点右上角「+ 新建成员」加一个 —— 建成后就能用它登录后台了。'
+                : '请联系超级管理员创建。') + '</div>') +
+        '</div>' +
+      '</div>' +
+
+      '<div class="card"><div class="card-h"><h2>角色能做什么</h2></div><div class="card-b">' +
+        roles.map((r) => '<div class="form-row"><div class="lbl">' + esc(r.label) + '</div>' +
+          '<div class="ctl" style="display:block"><div class="tip" style="width:auto">' +
+          esc(roleHint(r.value)) + '</div></div></div>').join('') +
+      '</div></div>';
+
+    const btnNew = body.querySelector('[data-new]');
+    if (btnNew && canWrite) btnNew.addEventListener('click', () => memberDialog(null, roles, rules));
+
+    body.querySelectorAll('[data-edit]').forEach((b) => b.addEventListener('click', () => {
+      const m = (d.list || []).find((x) => String(x.id) === b.getAttribute('data-edit'));
+      memberDialog(m, roles, rules);
+    }));
+
+    body.querySelectorAll('[data-pw]').forEach((b) => b.addEventListener('click', () => {
+      const m = (d.list || []).find((x) => String(x.id) === b.getAttribute('data-pw'));
+      resetPasswordDialog(m, rules);
+    }));
+
+    body.querySelectorAll('[data-toggle]').forEach((b) => b.addEventListener('click', async () => {
+      if (!needRole('owner', '启用 / 停用成员')) return;
+      const id = b.getAttribute('data-toggle');
+      const on = b.getAttribute('data-on') === '1';
+      if (!on && !await confirmBox('停用这个账号？<br><span class="sub">停用后它<b>立刻无法登录</b>（已登录的会话到期后失效）。</span>', '停用')) return;
+      try {
+        await API.post('/api/admin/members/status', { id, enabled: !on });
+        toast(on ? '已停用' : '已启用');
+        App.render();
+      } catch (e) { toast(e.message, true); }
+    }));
+
+    body.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', async () => {
+      if (!needRole('owner', '删除成员')) return;
+      const id = b.getAttribute('data-del');
+      const m = (d.list || []).find((x) => String(x.id) === id) || {};
+      if (!await confirmBox('删除成员「' + esc(m.username || id) + '」？<br>' +
+        '<span class="sub">该账号将<b>立刻无法登录</b>，不可撤销。' +
+        '（只是不给权限的话，用「停用」更稳妥 —— 历史记录还在。）</span>', '删除')) return;
+      try {
+        await API.post('/api/admin/members/delete', { id });
+        toast('已删除');
+        App.render();
+      } catch (e) { toast(e.message, true); }
+    }));
+  }
+};
+
+/**
+ * 成员表格的一行。
+ *
+ * @param {number} activeOwners 当前「启用中的超级管理员」数量
+ *
+ * 「最后一个启用中的超级管理员」的停用 / 删除按钮**置灰** —— 服务端一定会拦
+ * （members.js 的三条自锁防护），但先置灰能免得点了才被拒，那时的报错像「功能坏了」。
+ * 判据用「服务端给的 activeOwners 数量」，不再前端自己数一遍：数一遍就有分叉的机会。
+ */
+function memberRow(m, canWrite, me, activeOwners) {
+  const roleTag = { owner: 'red', operator: 'blue', viewer: 'id' }[m.role] || 'id';
+  const isSelf = !!(me && m.username && m.username === me.username);
+  const lastOwner = m.role === 'owner' && m.enabled && (activeOwners || 0) <= 1;
+  const lock = canWrite ? '' : ' disabled';
+  const lockOwner = lastOwner ? ' disabled' : '';
+  const ownerTip = lastOwner ? '最后一个启用中的超级管理员，不能停用 / 删除（否则没人能再登录后台）' : '';
+  return '<tr' + (m.enabled ? '' : ' style="opacity:.55"') + '>' +
+    '<td>' +
+      '<div><b>' + esc(m.username) + '</b>' +
+        (isSelf ? ' <span class="tag id">这是你</span>' : '') +
+      '</div>' +
+      '<div class="sub">' + esc(m.name || '') + '　创建 ' + esc(fmtTime(m.createdAt, false)) + '</div>' +
+    '</td>' +
+    '<td><span class="tag ' + roleTag + '">' + esc(m.roleLabel) + '</span></td>' +
+    '<td>' + (m.enabled ? '<span class="tag on">启用</span>' : '<span class="tag off">已停用</span>') + '</td>' +
+    '<td class="sub">' + esc(m.lastLoginAt ? fmtTime(m.lastLoginAt) : '从未登录') + '</td>' +
+    '<td class="nowrap"><div class="btn-group">' +
+      '<button class="btn sm" data-edit="' + esc(m.id) + '"' + lock + ' title="改姓名 / 角色 / 启用状态">编辑</button>' +
+      '<button class="btn sm" data-pw="' + esc(m.id) + '"' + lock + ' title="给它设一个新口令（原口令查不到，只能重置）">重置口令</button>' +
+      '<button class="btn sm" data-toggle="' + esc(m.id) + '" data-on="' + (m.enabled ? '1' : '0') + '"' +
+        lock + lockOwner + ' title="' + (ownerTip || (m.enabled ? '停用后立刻无法登录' : '恢复登录')) + '">' +
+        (m.enabled ? '停用' : '启用') + '</button>' +
+      '<button class="btn sm danger" data-del="' + esc(m.id) + '"' + lock + lockOwner +
+        ' title="' + (ownerTip || '删除该账号（不可撤销）') + '">删除</button>' +
+    '</div></td>' +
+  '</tr>';
+}
+
+/**
+ * 新建 / 编辑成员弹层（`mem` 为空 = 新建）。
+ *
+ * ⚠️ 形参刻意叫 `mem` 而不是 `m`：弹层句柄也叫 `m`/`box`，两者同名过一次
+ *    （把 `box.$('[data-ok]')` 写成了 `m.$('[data-ok]')`），
+ *    报错是「m.$ is not a function」—— 而 `m` 是成员对象，读起来完全说得通，
+ *    这类遮蔽最难在 review 里看出来。
+ */
+function memberDialog(mem, roles, rules) {
+  const isNew = !mem;
+  if (!needRole('owner', isNew ? '新建成员' : '修改成员')) return;
+  const min = (rules && rules.pwdMin) || 8;
+  const max = (rules && rules.pwdMax) || 64;
+  const box = openModal({
+    title: isNew ? '新建成员' : '修改成员',
+    width: 'narrow',
+    html:
+      (isNew ? '' : '<div class="sub" style="margin-bottom:6px">账号：<b>' + esc(mem.username) + '</b></div>') +
+      (isNew
+        ? '<div class="field" style="margin-top:6px"><label>登录账号</label>' +
+            '<input type="text" data-username placeholder="字母 / 数字 / . _ - @，3~32 位" style="flex:1"></div>'
+        : '') +
+      '<div class="field" style="margin-top:8px"><label>姓名</label>' +
+        '<input type="text" data-name placeholder="显示在顶栏的称呼，如「运营小王」" style="flex:1" value="' +
+        esc(mem ? mem.name : '') + '"></div>' +
+      '<div class="field" style="margin-top:8px"><label>角色</label>' +
+        '<select data-role style="flex:1">' +
+          roles.map((r) => '<option value="' + esc(r.value) + '"' +
+            (mem ? (mem.role === r.value ? ' selected' : '')
+                 : (r.value === 'operator' ? ' selected' : '')) +
+            '>' + esc(r.label) + '</option>').join('') +
+        '</select></div>' +
+      '<div class="field" style="margin-top:8px"><label>' + (isNew ? '登录口令' : '新口令') + '</label>' +
+        '<input type="password" data-pw placeholder="' +
+          (isNew ? min + '~' + max + ' 位' : '留空 = 不改口令') + '" style="flex:1"></div>' +
+      '<label class="ck" style="margin-top:10px"><input type="checkbox" data-enabled' +
+        (mem && !mem.enabled ? '' : ' checked') + '> 启用（不勾则无法登录）</label>' +
+      '<div class="sub" style="margin-top:8px;line-height:1.6">' +
+        (isNew ? '建好后它会立刻获得对应角色的权限，可以在「登录」页用这个账号登录。'
+               : '留空口令就是只改资料。忘了口令请用列表里的「重置口令」。') +
+      '</div>',
+    footer: '<button class="btn" data-close>取消</button>' +
+      '<button class="btn primary" data-ok>' + (isNew ? '创建' : '保存') + '</button>'
+  });
+
+  const okBtn = box.$('[data-ok]');
+  okBtn.addEventListener('click', async () => {
+    const body = {
+      id: mem ? mem.id : null,
+      name: box.$('[data-name]').value.trim(),
+      role: box.$('[data-role]').value,
+      enabled: box.$('[data-enabled]').checked
+    };
+    if (isNew) body.username = box.$('[data-username]').value.trim();
+    const pw = box.$('[data-pw]').value;
+    if (pw) body.password = pw;
+    okBtn.disabled = true;
+    okBtn.textContent = '保存中…';
+    try {
+      await API.post('/api/admin/members/save', body);
+      box.close();
+      toast(isNew ? '成员已创建' : '已保存');
+      App.render();
+    } catch (e) {
+      okBtn.disabled = false;
+      okBtn.textContent = isNew ? '创建' : '保存';
+      toast(e.message, true);
+    }
+  });
+  const first = box.$('[data-username]') || box.$('[data-name]');
+  if (first) setTimeout(() => first.focus(), 30);
+}
+
+/** 重置口令弹层 */
+function resetPasswordDialog(mem, rules) {
+  if (!mem) return;
+  if (!needRole('owner', '重置口令')) return;
+  const min = (rules && rules.pwdMin) || 8;
+  const max = (rules && rules.pwdMax) || 64;
+  const box = openModal({
+    title: '重置口令 · ' + mem.username,
+    width: 'narrow',
+    html:
+      '<div class="sub" style="line-height:1.7">给它设一个新口令。<b>原口令无法查看</b>' +
+        '（库里只存哈希），所以「忘口令」只能走这条路。<br>' +
+        '重置后该账号的旧口令立即失效，已登录的会话到期后需要重新登录。</div>' +
+      '<div class="field" style="margin-top:10px"><label>新口令</label>' +
+        '<input type="password" data-pw placeholder="' + min + '~' + max + ' 位" style="flex:1"></div>',
+    footer: '<button class="btn" data-close>取消</button>' +
+      '<button class="btn primary" data-ok>重置口令</button>'
+  });
+  const okBtn = box.$('[data-ok]');
+  okBtn.addEventListener('click', async () => {
+    const pw = box.$('[data-pw]').value;
+    if (!pw) return toast('请填写新口令', true);
+    okBtn.disabled = true;
+    okBtn.textContent = '重置中…';
+    try {
+      await API.post('/api/admin/members/password', { id: mem.id, password: pw });
+      box.close();
+      toast('口令已重置');
+      App.render();
+    } catch (e) {
+      okBtn.disabled = false;
+      okBtn.textContent = '重置口令';
+      toast(e.message, true);
+    }
+  });
+  setTimeout(() => { const p = box.$('[data-pw]'); if (p) p.focus(); }, 30);
+}

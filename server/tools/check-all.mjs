@@ -721,6 +721,24 @@ assert('新建后未发布，replica.js 里还没有这次新建的页面',
   readFileSync(REPLICA_FILE, 'utf8').indexOf(CUSTOM_KEY) < 0,
   `replica.js 中不应出现 ${CUSTOM_KEY}`);
 
+/*
+ * ★ 「注册表里有」≠「已经下发」：**再触发一次整份重建**，没发布过的自定义页仍不许出现在产物里。
+ *
+ * 原 bug：组装 replica 时把 publishedAll() 整份写出去，于是任何一次「写 replica.js」
+ * （删任意页面 / 删任意笔记 / 发布任意页面）都会把没发布过的页面一起塞进产物，
+ * 接口同时把它的状态谎报成「代码已生成」。
+ * 上面那条「新建后还没有它」只验了「建的那一刻没写文件」——那一刻本来就不写文件，
+ * 所以**它原样绿着，bug 却照样存在**（这正是本节点要补的一刀）。
+ *
+ * 触发方式用「建一篇笔记再删掉」：更贴近运营的真实动作，且不碰内置页的数据。
+ */
+const gateTriggerA = await call('POST', '/api/decorate/note/create', { body: { title: '自检笔记-触发重建甲' } });
+await call('POST', '/api/decorate/note/delete', { body: { key: gateTriggerA.ok ? gateTriggerA.data.key : '' } });
+const replicaAfterRebuild = readFileSync(REPLICA_FILE, 'utf8');
+assert('★ 自定义页「发布」门：没点过「发布」的自定义页，不会被别的操作（整份重建 replica）顺带下发',
+  replicaAfterRebuild.indexOf(CUSTOM_KEY) < 0,
+  `replica.js 含 ${CUSTOM_KEY} = ${replicaAfterRebuild.indexOf(CUSTOM_KEY) >= 0}（期望 false）`);
+
 const decoMadeP = (((await call('GET', '/api/decorate/pages', { auth: false })).data.list) || [])
   .filter((x) => x.key === CUSTOM_KEY)[0];
 assert('自定义页在列表里被标记（类型 / 归属 / 数据来源）',
@@ -752,6 +770,14 @@ assert('发布后 replica.js 写入 CUSTOM_PAGES 与页面数据',
   replicaAfterPub.indexOf(CUSTOM_KEY) >= 0 && replicaAfterPub.indexOf('自检标题') >= 0);
 assert('replica.js 的导出清单包含 CUSTOM_PAGES', /^\s*CUSTOM_PAGES,?$/m.test(replicaAfterPub));
 
+/* 反向：已经发布过的自定义页，不能被「写别人」顺手抹掉（修过头会让线上页面凭空消失） */
+const gateTriggerB = await call('POST', '/api/decorate/note/create', { body: { title: '自检笔记-触发重建乙' } });
+await call('POST', '/api/decorate/note/delete', { body: { key: gateTriggerB.ok ? gateTriggerB.data.key : '' } });
+const replicaKept = readFileSync(REPLICA_FILE, 'utf8');
+assert('★ 自定义页「发布」门：已发布的自定义页在整份重建后仍在产物里（防「一律跳过」式修过头）',
+  replicaKept.indexOf(CUSTOM_KEY) >= 0 && replicaKept.indexOf('自检标题') >= 0,
+  `含 ${CUSTOM_KEY} = ${replicaKept.indexOf(CUSTOM_KEY) >= 0}　含页面内容 = ${replicaKept.indexOf('自检标题') >= 0}`);
+
 const decoDiff2 = await call('GET', '/api/decorate/diff', { auth: false, query: { key: CUSTOM_KEY } });
 assert('发布后该页草稿已清空', decoDiff2.ok && decoDiff2.data.hasDraft === false, decoDiff2.data && decoDiff2.data.note);
 
@@ -765,6 +791,22 @@ assert('自定义页改名（页面标识迁移）成功',
 const replicaAfterRename = readFileSync(REPLICA_FILE, 'utf8');
 assert('改名后 replica.js 的键名同步、旧键消失',
   replicaAfterRename.indexOf(CUSTOM_NEW_KEY) >= 0 && replicaAfterRename.indexOf('"' + CUSTOM_KEY + '"') < 0);
+
+/*
+ * 再单独锁一次「新标识真的成了 CUSTOM_PAGES 的**键**」。
+ *
+ * 上面那条用的是整份文件的 indexOf，而**别名表里也会出现新标识**
+ * （CUSTOM_PAGE_ALIASES = { 旧: "新" }）—— 于是「CUSTOM_PAGES 里已经没有这一页了、
+ * 只剩一条指向它的别名」这种情况照样能骗过它（实测：把改名时的 keepKey 去掉，
+ * 那一页会从 CUSTOM_PAGES 里消失，上面那条却仍然绿）。
+ *
+ * 判据写成「键 + 冒号」：emit 只会给**合法标识符**去掉引号（见 emit.js 的 jsExpr），
+ * 而本用例的新标识带连字符，所以它一定是 `"xxx":` 这种带引号的键形态 ——
+ * 别名表里它只是**值**（后面跟逗号或换行，不跟冒号），不会误命中。
+ */
+assert('自定义页改名：新标识真的成了 CUSTOM_PAGES 的键（不是只剩一条指向它的别名）',
+  new RegExp('"' + CUSTOM_NEW_KEY + '"\\s*:').test(replicaAfterRename),
+  `replica.js 里有 "${CUSTOM_NEW_KEY}": = ${new RegExp('"' + CUSTOM_NEW_KEY + '"\\s*:').test(replicaAfterRename)}`);
 
 const decoReopen = await call('GET', '/api/decorate/page', { auth: false, query: { key: CUSTOM_NEW_KEY } });
 assert('改名后已发布内容不丢',
@@ -855,6 +897,27 @@ assert('新建笔记后 replica.js 里还没有这篇（装修完「生成代码
   readFileSync(REPLICA_FILE, 'utf8').indexOf(noteKey) < 0,
   `replica.js 中不应出现 ${noteKey}`);
 
+/*
+ * 「内容量」列的两个口径（2026-10-15 补）。
+ *
+ * 起因：控制台截图里，一篇刚编了 5 个组件、但还没点「生成代码」的笔记显示「0 个组件」——
+ * 数字没错（blockCount 的口径就是「已生成代码里几个区块」），但它回答不了运营的问题：
+ * 运营要看的是「我这版内容有几个组件」。
+ * 于是加了一个 draftBlockCount，由展示层决定报哪一个。
+ *
+ * 为什么「没有草稿」必须是 null 而不是 0：
+ *   0 会被展示层读成「草稿里有 0 个组件」（= 空草稿，即将发布一个空页面），
+ *   而真实含义是「根本没有草稿」。这两种状态要能分开 —— 与 PITFALLS 里
+ *   「判空 if (x) 会把『没传』与『要清空』混成一件事」是同一族坑。
+ */
+const notePagesNoDraft = await call('GET', '/api/decorate/pages');
+const noteRowNoDraft = (notePagesNoDraft.data.list || []).filter((p) => p.key === noteKey)[0] || {};
+assert('笔记列表口径：没有草稿时 draftBlockCount 是 null、blockCount 是 0（缺省值缺的是「没有」而不是「0 个」）',
+  notePagesNoDraft.ok && noteRowNoDraft.hasDraft === false &&
+  noteRowNoDraft.draftBlockCount === null && noteRowNoDraft.blockCount === 0,
+  `hasDraft=${noteRowNoDraft.hasDraft}　blockCount=${noteRowNoDraft.blockCount}　` +
+  `draftBlockCount=${JSON.stringify(noteRowNoDraft.draftBlockCount)}`);
+
 const noteBlankTitle = await call('POST', '/api/decorate/note/create', {
   body: { title: '' }, expectFail: '空标题', expectHttp: 200, expectCode: 1001
 });
@@ -914,6 +977,28 @@ const noteOutOfLibRes = await call('POST', '/api/decorate/draft', {
 assert('笔记里塞首页专属 kind（elevator）仍被拒 1001（不是把校验关掉了）',
   /不支持/.test(noteOutOfLibRes.json.msg || ''), noteOutOfLibRes.json.msg);
 
+/*
+ * 存一份**确定是 3 个区块**的草稿，再读列表 —— 两个口径必须各说各的：
+ *   blockCount 仍是 0（代码包里确实还没有这篇），draftBlockCount 是 3。
+ * 这条同时是「不许把 blockCount 的数据源换成草稿」的守卫：真换了，blockCount 会变 3，
+ * 装修台列表的既有口径被顺手改掉，而装修台没有任何一条断言会因此变红。
+ */
+const noteThree = JSON.parse(JSON.stringify(noteDraftBase));
+noteThree.blocks = [
+  Object.assign({ id: 'c1', type: 'text' }, NOTE_KIND_SAMPLE.text),
+  Object.assign({ id: 'c2', type: 'blank' }, NOTE_KIND_SAMPLE.blank),
+  Object.assign({ id: 'c3', type: 'line' }, NOTE_KIND_SAMPLE.line)
+];
+const noteThreeSave = await call('POST', '/api/decorate/draft', { body: { key: noteKey, data: noteThree } });
+const notePagesDraft = await call('GET', '/api/decorate/pages');
+const noteRowDraft = (notePagesDraft.data.list || []).filter((p) => p.key === noteKey)[0] || {};
+assert('笔记列表口径：草稿的区块数单独上报（blockCount 仍读已生成代码那一份，没被草稿覆盖）',
+  noteThreeSave.ok && noteRowDraft.hasDraft === true &&
+  noteRowDraft.draftBlockCount === 3 && noteRowDraft.blockCount === 0,
+  `存草稿 code=${noteThreeSave.json.code}　hasDraft=${noteRowDraft.hasDraft}　` +
+  `draftBlockCount=${JSON.stringify(noteRowDraft.draftBlockCount)}（期望 3）　` +
+  `blockCount=${noteRowDraft.blockCount}（期望 0）`);
+
 /* 收尾：丢弃这一轮存的草稿，别把「有未保存草稿」留给后面的用例 */
 await call('POST', '/api/decorate/discard', { body: { key: noteKey } });
 
@@ -927,6 +1012,90 @@ const noteDel = await call('POST', '/api/decorate/note/delete', { body: { key: n
 assert('删除店铺笔记成功（按页面标识 note-<id>，不是内部数字 id）',
   noteDel.ok && noteDel.data.id === noteId && noteDel.data.title === NOTE_TITLE,
   noteDel.ok ? `${noteDel.data.key} / ${noteDel.data.title}` : noteDel.json.msg);
+
+/* ---------------------------------------------------------------------------
+ * ★ 笔记的「生成代码」门（2026-10-15 修的真 bug，行为判据）
+ *
+ * 症状（实测取证）：建 A、建 B 两篇笔记 → 只给 **B** 点一次「生成代码」→
+ *   replica.js 里**同时**出现了 A，`/api/decorate/pages` 随即把 A 判成「代码已生成」。
+ *   也就是说：运营在编、还没打算发布的笔记，会被任何一次「写 replica.js」悄悄下发到小程序
+ *   （删除任意页面同样会触发）。控制台新加的「状态」列因此会与事实相反。
+ *
+ * 根因：组装 replica 用的是 publishedAll()，而它对**每一篇已注册笔记**都返回
+ *   「注册表里的已发布内容」——「注册表里有」被当成了「已经下发」。
+ *   修法：assemble() 只写「本次正在发布的那一篇」或「当前已经在 replica.js 里」的笔记。
+ *
+ * 两个方向都要锁（只锁一个会留下更严重的反例）：
+ *   ① 没点过「生成代码」的笔记不许被顺带下发；
+ *   ② 已经下发的笔记不许被顺手抹掉 —— 修法若写成「一律跳过所有笔记」，
+ *      线上正在用的笔记会在发布/删除别的页面时凭空消失，比原 bug 更严重。
+ * ------------------------------------------------------------------------- */
+const gateIdOf = (key) => String(key).replace(/^note-/, '');
+/*
+ * 只在 SHOPNOTES 那一段里找 id，不在整份文件里找：
+ * 整份找的话，某篇笔记的 id 恰好是自定义页 key 或别处的数字（如 "95"）就会假阳性。
+ * SHOPNOTES 是 emit 里最后一段，从它的位置切到文件末尾即可。
+ */
+const noteInReplica = (key) => {
+  if (!key) return false;
+  const src = readFileSync(REPLICA_FILE, 'utf8');
+  const i = src.indexOf('const SHOPNOTES');
+  if (i < 0) return false;
+  return src.slice(i).indexOf('"' + gateIdOf(key) + '":') >= 0;
+};
+
+const GATE_A = '自检笔记-门A';
+const GATE_B = '自检笔记-门B';
+const gateA = await call('POST', '/api/decorate/note/create', { body: { title: GATE_A } });
+const gateB = await call('POST', '/api/decorate/note/create', { body: { title: GATE_B } });
+const gateAKey = gateA.ok ? gateA.data.key : '';
+const gateBKey = gateB.ok ? gateB.data.key : '';
+
+assert('笔记「生成代码」门：两篇新笔记都还没进 replica.js（建条目 ≠ 下发；两篇都建成功才有意义）',
+  !!gateAKey && !!gateBKey && !noteInReplica(gateAKey) && !noteInReplica(gateBKey),
+  `A=${gateAKey || '(建失败)'} 在产物里=${noteInReplica(gateAKey)}　B=${gateBKey || '(建失败)'} 在产物里=${noteInReplica(gateBKey)}`);
+
+if (gateAKey && gateBKey) {
+  await call('POST', '/api/decorate/draft', {
+    body: {
+      key: gateBKey,
+      data: {
+        header: { title: GATE_B, summary: '', tags: '' },
+        body: { html: '<p>门的正例</p>', bg: '#ffffff', full: '1' },
+        blocks: [Object.assign({ id: 'g1', type: 'text' }, NOTE_KIND_SAMPLE.text)]
+      }
+    }
+  });
+  const gatePub = await call('POST', '/api/decorate/publish', { body: { key: gateBKey, note: '自检：生成代码' } });
+  assert('笔记「生成代码」门：点过「生成代码」的那一篇确实进了 replica.js（门不是把所有人都挡在外面）',
+    gatePub.ok && noteInReplica(gateBKey),
+    `发布 code=${gatePub.json.code}　B 在产物里=${noteInReplica(gateBKey)}`);
+
+  assert('★ 笔记「生成代码」门：给 B 生成代码，不会把没点过「生成代码」的 A 一起下发（运营在编的内容不许被顺带上线）',
+    !noteInReplica(gateAKey),
+    `A 在产物里=${noteInReplica(gateAKey)}（期望 false）　B 在产物里=${noteInReplica(gateBKey)}`);
+
+  /* 删 A（会整份重建 replica）—— 这是「② 已下发的 B 不能被顺手抹掉」的关键一步 */
+  const gateDelA = await call('POST', '/api/decorate/note/delete', { body: { key: gateAKey } });
+  assert('★ 笔记「生成代码」门：删除另一篇笔记时，已下发的 B 不许被顺手抹掉（防「一律跳过所有笔记」这种修过头）',
+    gateDelA.ok && noteInReplica(gateBKey) && !noteInReplica(gateAKey),
+    `删 A code=${gateDelA.json.code}　B 仍在产物里=${noteInReplica(gateBKey)}（期望 true）　` +
+    `A 在产物里=${noteInReplica(gateAKey)}（期望 false）`);
+
+  const gatePages = await call('GET', '/api/decorate/pages');
+  const gateRowB = (gatePages.data.list || []).filter((p) => p.key === gateBKey)[0] || {};
+  assert('笔记「生成代码」门：状态列与产物一致（B 判「代码已生成」，不是只改了文件没改状态）',
+    gateRowB.generated === true && gateRowB.status === '代码已生成',
+    `B: generated=${gateRowB.generated} status=${gateRowB.status}`);
+
+  const gateDelB = await call('POST', '/api/decorate/note/delete', { body: { key: gateBKey } });
+  assert('笔记「生成代码」门：删掉已下发的 B 后产物里不留幽灵笔记（真机能按旧 id 打开的那种）',
+    gateDelB.ok && !noteInReplica(gateBKey),
+    `删 B code=${gateDelB.json.code}　B 在产物里=${noteInReplica(gateBKey)}（期望 false）`);
+} else {
+  assert('笔记「生成代码」门：A / B 都建成功（建不出来就没法验门，宁可红也别静默跳过）', false,
+    'note/create 失败：' + (gateA.json && gateA.json.msg) + ' / ' + (gateB.json && gateB.json.msg));
+}
 
 const notesAfter = await call('GET', '/api/decorate/notes', { auth: false });
 assert('自检未改变笔记数量（可重复运行），且 replica.js 里没有测试笔记残留',
@@ -4829,6 +4998,323 @@ const notUsedByFe = registered.filter((r) => !fePaths.has(r.path));
 assert('前端 services 引用的点位后端均已实现（无断链）',
   brokenLinks.length === 0,
   brokenLinks.length ? '断链：' + brokenLinks.join(', ') : `前端引用 ${fePaths.size} 个点位，全部命中`);
+
+/* ---------------------------------------------------------------------------
+ * 17.5 后台左侧导航三栏 + 成员管理（2026-10-15）
+ *
+ * 本批把三样东西放进 `/console` 的左侧导航：**店铺笔记**（从装修台列表工具栏里搬出来）、
+ * **成员管理**（新增：后台账号，谁能登录、各是什么角色）、**登录**（新增独立登录页，
+ * 未登录时整个后台强制落在这里）。
+ *
+ * 为什么「接口全绿」还不够，必须再对一遍源码结构：
+ *   控制台的左侧导航是**三处同步**的结构 —— `NAV` 表（栏目文案）/ `ICONS` 表（图标）/
+ *   `App.views` 注册表（视图实现）。改一处漏两处，得到的都是半截状态：
+ *     · 只加 NAV 不加 App.views → 「点得进去、页面空白」（还带一个难看的运行时报错）；
+ *     · 只加 App.views 不加 NAV → 「页面已经做好了，但没人找得到入口」；
+ *     · 只加 NAV 不加 ICONS   → 图标位置空一块。**这一条不报错**，最容易被放过。
+ *   三条都不会让任何接口断言变红，只有结构对账才抓得住。
+ *   浏览器侧的真渲染 / 真跳转实测在 `.tooling/check-shopnotes-ui.mjs`（CDP 驱动的 58 条验收）。
+ *
+ * ⚠️ 断言前**先剥注释**：本批在源码里留了大量说明注释，其中正写着「btnCreateNote」
+ *    「店铺笔记」这些词。不剥就是恒红（本项目踩过这个坑，见 PITFALLS 假红族）。
+ * ------------------------------------------------------------------------- */
+const CONSOLE_DIR = join(__dirname, '..', 'public', 'console');
+const coreSrc = readFileSync(join(CONSOLE_DIR, 'console.core.js'), 'utf8');
+const modSrc = readFileSync(join(CONSOLE_DIR, 'console.modules.js'), 'utf8');
+/** 剥掉块注释 + 整行行注释（只用于「某标识符是否还存在」这类断言） */
+const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^[ \t]*\/\/.*$/gm, '');
+const consoleSrcNoC = stripJsComments(coreSrc + '\n' + modSrc);
+
+/** NAV 表：把 `const NAV = [...]` 那段里的 { key, text, ico } 全抓出来 */
+const navBlock = (/const NAV = \[([\s\S]*?)\n\];/.exec(coreSrc) || ['', ''])[1];
+const navItems = [...navBlock.matchAll(
+  /\{\s*key:\s*'([A-Za-z0-9_]+)'\s*,\s*text:\s*'([^']+)'\s*,\s*ico:\s*'([A-Za-z0-9_]+)'\s*\}/g
+)].map((m) => ({ key: m[1], text: m[2], ico: m[3] }));
+const navKeys = navItems.map((n) => n.key);
+
+/** ICONS 表：只取「行首两空格 + 名字 + 冒号」那种键（值是跨行拼接的字符串，不能整段当键读） */
+const iconsBlock = (/const ICONS = \{([\s\S]*?)\n\};/.exec(coreSrc) || ['', ''])[1];
+const iconKeys = [...iconsBlock.matchAll(/^ {2}([A-Za-z0-9_]+):\s*'/gm)].map((m) => m[1]);
+
+/** App.views 注册表：core 与 modules 两个文件加起来（视图可以注册在任一处） */
+const consoleViewKeys = [...new Set(
+  [...consoleSrcNoC.matchAll(/App\.views\.([A-Za-z0-9_]+)\s*=\s*\{/g)].map((m) => m[1])
+)];
+
+const navMissing = ['shopnotes', 'members', 'login'].filter((k) => navKeys.indexOf(k) < 0);
+assert('后台左侧导航：店铺笔记 / 成员管理 / 登录三栏都在 NAV 表里（改坏：从 NAV 删掉任一栏）',
+  navMissing.length === 0 && navItems.length > 0,
+  navMissing.length ? '缺栏目：' + navMissing.join('、')
+    : `${navItems.length} 栏：${navItems.map((n) => n.text).join(' / ')}`);
+
+const icoMissing = navItems.filter((n) => iconKeys.indexOf(n.ico) < 0).map((n) => `${n.key}→${n.ico}`);
+assert('后台左侧导航：每一栏的图标都在 ICONS 表里（漏一处该栏图标位空一块，而且不报错）',
+  icoMissing.length === 0,
+  icoMissing.length ? '缺图标：' + icoMissing.join('、')
+    : `${iconKeys.length} 个图标覆盖 ${navItems.length} 栏`);
+
+const viewMissing = navKeys.filter((k) => consoleViewKeys.indexOf(k) < 0);
+assert('后台左侧导航：每一栏都有对应视图（漏一处 = 「点得进去、页面空白」）',
+  viewMissing.length === 0,
+  viewMissing.length ? '缺视图：' + viewMissing.join('、')
+    : `${navItems.length} 栏全部有视图：${consoleViewKeys.join('/')}`);
+
+const orphanViews = consoleViewKeys.filter((k) => navKeys.indexOf(k) < 0);
+assert('后台左侧导航：不存在「视图已注册但没有入口」的孤儿页（功能做好了却没人找得到）',
+  orphanViews.length === 0,
+  orphanViews.length ? '无入口：' + orphanViews.join('、')
+    : `${consoleViewKeys.length} 个视图与栏目一一对应（无孤儿）`);
+
+assert('后台未登录强制落在登录页：GATE_VIEW=login，且 gate() 未登录一律返回它、三处入口都过 gate()',
+  /const GATE_VIEW = 'login'/.test(consoleSrcNoC) &&
+  /if \(!AdminSession\.me\(\)\) return GATE_VIEW;/.test(consoleSrcNoC) &&
+  (consoleSrcNoC.match(/App\.gate\(/g) || []).length >= 2,
+  `GATE_VIEW=login：${/const GATE_VIEW = 'login'/.test(consoleSrcNoC)}　` +
+  `gate 单点判定：${/if \(!AdminSession\.me\(\)\) return GATE_VIEW;/.test(consoleSrcNoC)}　` +
+  `App.gate( 调用点：${(consoleSrcNoC.match(/App\.gate\(/g) || []).length} 处`);
+
+assert('后台未登录时除「登录」外一律置灰不可点（只是提示，真正拦截在服务端各管理接口）',
+  /const off = locked && n\.key !== GATE_VIEW;/.test(consoleSrcNoC),
+  'renderNav 里按 locked 与 GATE_VIEW 算 .locked');
+
+/* ---- 装修台那一半：入口撤掉，但「装修笔记」这条路必须留着 ---- */
+const adminHtmlRaw = readFileSync(join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8');
+const adminJsRaw = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+const adminHtmlNoC = stripJsComments(adminHtmlRaw.replace(/<!--[\s\S]*?-->/g, ''));
+const adminJsNoC = stripJsComments(adminJsRaw);
+
+assert('装修台已撤掉「新建笔记」入口：HTML 里既无按钮也无统计卡（改坏：把 btnCreateNote 加回去）',
+  !/btnCreateNote/.test(adminHtmlNoC) && !/statNote/.test(adminHtmlNoC),
+  `btnCreateNote=${/btnCreateNote/.test(adminHtmlNoC)}　statNote=${/statNote/.test(adminHtmlNoC)}`);
+
+assert('装修台已撤掉「新建 / 删除笔记」实现：JS 里既无 createNoteDialog 也无笔记删除分支',
+  !/createNoteDialog/.test(adminJsNoC) && !/btnCreateNote/.test(adminJsNoC) && !/data-note-del/.test(adminJsNoC),
+  `createNoteDialog=${/createNoteDialog/.test(adminJsNoC)}　btnCreateNote=${/btnCreateNote/.test(adminJsNoC)}　` +
+  `data-note-del=${/data-note-del/.test(adminJsNoC)}`);
+
+/*
+ * 笔记**只从列表渲染里滤掉**，S.pages 里那份必须留着 ——
+ * 控制台点「装修」走的是 /admin?edit=note-<id>，openPage 还要按 key 找到它。
+ * 真把数据一起删掉，得到的是「按钮在、点了打不开编辑器」。
+ */
+assert('装修台仍认 shopnote：列表渲染里滤掉笔记行，但编辑那一半（顶栏标记 / 按 key 打开）必须留着',
+  /if \(p\.shopnote\) return false;/.test(adminJsNoC) &&
+  /meta\.shopnote/.test(adminJsNoC) &&
+  !/S\.pages\s*=[^;]*\.filter\([^;]*shopnote/.test(adminJsNoC),
+  `列表渲染滤掉=${/if \(p\.shopnote\) return false;/.test(adminJsNoC)}　` +
+  `顶栏仍认 shopnote=${/meta\.shopnote/.test(adminJsNoC)}　` +
+  `没有把数据一起删掉=${!/S\.pages\s*=[^;]*\.filter\([^;]*shopnote/.test(adminJsNoC)}`);
+
+/* ---- 笔记列表「内容量」列：数据源与展示三分支（2026-10-15） ---- */
+const storeSrc = readFileSync(join(__dirname, '..', 'decorate', 'store.js'), 'utf8');
+const storeNoC = stripJsComments(storeSrc);
+const modNoC = stripJsComments(modSrc);
+
+/*
+ * 两条都要锁：
+ *   ① 新增 draftBlockCount（有草稿才给数字，否则 null）
+ *   ② blockCount 的数据源**仍是 pub**（已生成代码那一份）
+ * 只锁 ① 不锁 ②，等于允许「把 blockCount 换成读草稿」这种顺手改动溜过去 ——
+ * 它不会让任何装修台断言变红，却悄悄改掉了装修台列表的既有口径。
+ */
+assert('笔记「内容量」：草稿区块数是独立字段（有草稿才给数，无草稿为 null），blockCount 仍读已生成代码那份',
+  /draftBlockCount:\s*\(draft && draft\.data\)\s*\?\s*countBlocks\(meta\.key, draft\.data\)\s*:\s*null/.test(storeNoC) &&
+  /blockCount:\s*countBlocks\(meta\.key, pub\)/.test(storeNoC),
+  `draftBlockCount 由草稿算出=${/draftBlockCount:\s*\(draft && draft\.data\)\s*\?\s*countBlocks\(meta\.key, draft\.data\)\s*:\s*null/.test(storeNoC)}　` +
+  `blockCount 仍读 pub=${/blockCount:\s*countBlocks\(meta\.key, pub\)/.test(storeNoC)}`);
+
+assert('笔记「内容量」：展示层三分支齐全（无草稿 / 有草稿且已生成 / 有草稿未生成），且 noteRow 走的是它',
+  /function contentText\(p\) \{/.test(modNoC) &&
+  /if \(!hasDraftCount\) return \(p\.blockCount \|\| 0\) \+ ' 个组件';/.test(modNoC) &&
+  /if \(p\.generated\) \{/.test(modNoC) &&
+  /return '草稿 ' \+ p\.draftBlockCount \+ ' 个组件';/.test(modNoC) &&
+  /'<td class="sub">' \+ contentText\(p\) \+ '<\/td>'/.test(modNoC),
+  `contentText 存在=${/function contentText\(p\) \{/.test(modNoC)}　` +
+  `无草稿分支=${/if \(!hasDraftCount\) return \(p\.blockCount \|\| 0\) \+ ' 个组件';/.test(modNoC)}　` +
+  `已生成两行=${/if \(p\.generated\) \{/.test(modNoC)}　` +
+  `未生成只报草稿=${/return '草稿 ' \+ p\.draftBlockCount \+ ' 个组件';/.test(modNoC)}　` +
+  `noteRow 调用=${/'<td class="sub">' \+ contentText\(p\) \+ '<\/td>'/.test(modNoC)}`);
+
+/* ---- 笔记「生成代码」门（2026-10-15 修）：实现锁 ---- */
+/*
+ * 行为判据在第 10 节（建 A/B → 发布 B → 看 A 有没有被顺带下发）。
+ * 这里再锁一次**实现**，好处是改坏时能一眼看出是哪一处松了口，
+ * 并且顺带锁住「id 要归一成字符串」这个易错点（拿 Number 去 has() 会一条都命不中，
+ * 表现成「已下发的笔记被悄悄删掉」）。
+ */
+assert('笔记 / 自定义页「生成代码」门：assemble() 只写「本次发布的」或「已经在 replica.js 里的」，id 归一到字符串',
+  /if \(p\.key !== keepKey && !generatedNoteIds\.has\(String\(shopnotes\.idOfKey\(p\.key\)\)\)\) return;/.test(storeNoC) &&
+  /if \(p\.key !== keepKey && !liveCustomKeys\.has\(p\.key\)\) return;/.test(storeNoC) &&
+  /const generatedNoteIds = new Set\(Object\.keys\(R0\.SHOPNOTES \|\| \{\}\)\.map\(String\)\);/.test(storeNoC) &&
+  /const liveCustomKeys = new Set\(Object\.keys\(R0\.CUSTOM_PAGES \|\| \{\}\)\);/.test(storeNoC) &&
+  /writeReplica\(pageData, key, \{ keepKey: key \}\)/.test(storeNoC) &&
+  /writeReplica\(publishedAll\(\), newKey, \{ keepKey: wasLive \? newKey : '' \}\)/.test(storeNoC),
+  `笔记过滤=${/if \(p\.key !== keepKey && !generatedNoteIds\.has\(String\(shopnotes\.idOfKey\(p\.key\)\)\)\) return;/.test(storeNoC)}　` +
+  `自定义页过滤=${/if \(p\.key !== keepKey && !liveCustomKeys\.has\(p\.key\)\) return;/.test(storeNoC)}　` +
+  `笔记 id 归一=${/const generatedNoteIds = new Set\(Object\.keys\(R0\.SHOPNOTES \|\| \{\}\)\.map\(String\)\);/.test(storeNoC)}　` +
+  `已下发自定义页集合=${/const liveCustomKeys = new Set\(Object\.keys\(R0\.CUSTOM_PAGES \|\| \{\}\)\);/.test(storeNoC)}　` +
+  `publish 传 keepKey=${/writeReplica\(pageData, key, \{ keepKey: key \}\)/.test(storeNoC)}　` +
+  `改名传 keepKey（只看旧键是否已下发）=${/writeReplica\(publishedAll\(\), newKey, \{ keepKey: wasLive \? newKey : '' \}\)/.test(storeNoC)}`);
+
+/* ---- 成员管理的角色门（直接问 lib/adminAuth 的 minRoleFor，不看注释） ---- */
+const adminAuthLib = localRequire(join(__dirname, '..', 'lib', 'adminAuth.js'));
+const memberOwnerPaths = ['save', 'delete', 'status', 'password']
+  .map((p) => `/api/admin/members/${p}`);
+const memberLoose = memberOwnerPaths.filter((p) => adminAuthLib.minRoleFor('POST', p) !== 'owner');
+assert('成员管理是最高危点位：增 / 删 / 停用 / 重置口令一律要求 owner（能改谁能进后台）',
+  memberLoose.length === 0,
+  memberLoose.length ? '角色门过松：' + memberLoose.join('、')
+    : `${memberOwnerPaths.length} 个写点位全部 owner：${memberOwnerPaths.join(' / ')}`);
+
+assert('成员列表是只读点位：GET 只要求 viewer（只读成员也能看清自己是谁）',
+  adminAuthLib.minRoleFor('GET', '/api/admin/members') === 'viewer',
+  `minRoleFor(GET,/api/admin/members)=${adminAuthLib.minRoleFor('GET', '/api/admin/members')}`);
+
+/*
+ * 「改自己的口令」是 POST，但他**只需要 viewer**：否则只读成员连自己的口令都换不了，
+ * 只能让 owner 代改 —— 等于人人共用一个口令，成员分级白做。
+ * ⚠️ 这条判定在 minRoleFor 里必须排在 `method === 'GET'` 之前才生效（后面就永远走不到）。
+ */
+const selfPwPath = adminAuthLib.ADMIN_SELF_PASSWORD_PATH;
+/* 单独读一份源码 —— 第 18 节里那个 adminAuthSrc 声明在本节之后，直接用会踩 TDZ */
+const adminAuthSrcHere = readFileSync(join(__dirname, '..', 'lib', 'adminAuth.js'), 'utf8');
+const selfPwFirst = (() => {
+  const body = (/function minRoleFor\(method, path\) \{([\s\S]*?)\n\}/.exec(adminAuthSrcHere) || ['', ''])[1];
+  const iSelf = body.indexOf('ADMIN_SELF_PASSWORD_PATH');
+  const iGet = body.indexOf("=== 'GET'");
+  return iSelf >= 0 && iGet >= 0 && iSelf < iGet;
+})();
+assert('「改自己的口令」只要求已登录（viewer 起），且在 minRoleFor 里排在 GET 判断之前',
+  adminAuthLib.minRoleFor('POST', selfPwPath) === 'viewer' && selfPwFirst,
+  `minRoleFor(POST,${selfPwPath})=${adminAuthLib.minRoleFor('POST', selfPwPath)}　排在 GET 之前=${selfPwFirst}`);
+
+/* ---- 成员管理接口的运行时边界（真实 HTTP） ---- */
+const memAnon = await call('GET', '/api/admin/members', {
+  auth: false, admin: false, expectFail: '匿名读成员列表', expectHttp: 401, expectCode: 401
+});
+assertBlocked('成员列表：匿名访问被拒（401 / code 401，不是先回一个空列表）', memAnon,
+  `HTTP ${memAnon.httpStatus} / code ${memAnon.json && memAnon.json.code}`);
+
+const memUser = await call('GET', '/api/admin/members', {
+  admin: false, bearer: token, expectFail: '小程序用户令牌读成员列表', expectHttp: 401, expectCode: 401
+});
+assertBlocked('成员列表：小程序用户令牌被拒（401 / code 401，用户身份进不了后台）', memUser,
+  `HTTP ${memUser.httpStatus} / code ${memUser.json && memUser.json.code}`);
+
+const memList = await call('GET', '/api/admin/members');
+const memData = (memList.data) || {};
+const memRows = memData.list || [];
+assert('成员列表返回：成员 + 角色说明 + 账号规则 + 现有 owner 数 + 凭证来源',
+  memList.ok && Array.isArray(memData.list) && Array.isArray(memData.roles) &&
+  !!memData.rules && typeof memData.activeOwners === 'number' &&
+  typeof memData.envTokens === 'number' && typeof memData.sharedPassword === 'boolean',
+  memList.ok ? `成员 ${memRows.length} 个 · 角色 ${(memData.roles || []).length} 种 · ` +
+    `启用中 owner ${memData.activeOwners} · 长期令牌 ${memData.envTokens} 条` : (memList.json || {}).msg);
+
+/*
+ * 「不能吐哈希」——出接口只走 members.pub()。
+ * 手拼字段迟早会漏一次，而漏掉的那次就是把 scrypt 哈希与盐发到浏览器。
+ *
+ * ⚠️ 这里**不写**「拿着响应体找 pwd/hash/salt」那种运行时判据：
+ *    本机与线上成员表通常是空的，`[].every(...)` 恒真 —— 那就是一条永远绿的假断言
+ *    （实测过：把 pub() 改成 `return m` 直接吐哈希，空表下这条照样绿）。
+ *    运行时判据放在 `.tooling/test-admin-auth.mjs` 的 7.5 节（那里真有成员，
+ *    改坏后能打印出泄漏的 salt/hash）；本节点锁**实现**：出参字段表单点维护、
+ *    路由不许绕过它去碰 raw()。
+ */
+const membersSrc = readFileSync(join(__dirname, '..', 'lib', 'members.js'), 'utf8');
+const pubBody = stripJsComments((/function pub\(m\) \{([\s\S]*?)\n\}/.exec(membersSrc) || ['', ''])[1]);
+const pubKeys = [...pubBody.matchAll(/^\s{4}([A-Za-z0-9_]+):/gm)].map((x) => x[1]);
+const pubUnsafe = pubKeys.filter((k) => ['pwd', 'hash', 'salt', 'password'].indexOf(k) >= 0);
+/* 只允许**一条** return：`return m;` 那种「直接把原始记录吐出去」也要拦（实测过它会绕过字段表检查） */
+const pubReturns = (pubBody.match(/\breturn\b/g) || []).length;
+assert('成员出参由 members.pub() 单点产出：白名单字段、不含 pwd/hash/salt、且只有一条 return（不许直接返回原始记录）',
+  pubKeys.length >= 8 && pubUnsafe.length === 0 && /pwdSet:/.test(pubBody) &&
+  pubReturns === 1 && /^\s{2}return \{/m.test(pubBody),
+  `字段 ${pubKeys.length} 个${pubUnsafe.length ? '（危险：' + pubUnsafe.join('、') + '）' : ''}　` +
+  `return 条数=${pubReturns}　首句是 return {=${/^\s{2}return \{/m.test(pubBody)}`);
+
+const adminRoutesNoC = stripJsComments(readFileSync(join(__dirname, '..', 'routes', 'admin.js'), 'utf8'));
+assert('成员接口只经 members 模块出参：路由用 list() / create() / update() / remove()，不碰内部 raw()',
+  /members\.list\(\)/.test(adminRoutesNoC) && !/members\.raw\(/.test(adminRoutesNoC),
+  `用 list()=${/members\.list\(\)/.test(adminRoutesNoC)}　没碰 raw()=${!/members\.raw\(/.test(adminRoutesNoC)}`);
+
+/* 运行时的「成员表非空」那一半在 check-all 里做不了（真实数据通常没成员），
+ * 所以这一条**不依赖成员数**：接口下发的角色清单必须与 lib/members.js 的 ROLES 同源。 */
+const membersLib = localRequire(join(__dirname, '..', 'lib', 'members.js'));
+const rolesFromApi = (memData.roles || []).map((r) => r.value).join(',');
+assert('成员角色清单与 lib/members.js 的 ROLES 同源（加角色只改一处，下拉与校验不会各说各话）',
+  rolesFromApi === membersLib.ROLES.join(','),
+  `接口=${rolesFromApi || '（空）'}　模块=${membersLib.ROLES.join(',')}`);
+
+/*
+ * 「共享口令是否可用」的口径必须与登录同源。
+ * 写 `!!process.env.ADMIN_PASSWORD` 就是错的：**开发环境用的是内置默认口令、环境变量为空**，
+ * 那样会显示成「没有共享口令」，而实际能登 —— 两处判据分家，页面就开始骗人。
+ * 这里拿 health 自述的 password 字段做等价对账（'unset' ⟺ 共享口令不可用）。
+ */
+const pwUsableByHealth = health.data.adminAuth.password !== 'unset';
+assert('成员列表的「共享口令可用」与 health 自述同口径（拿环境变量判会与内置默认口令打架）',
+  memData.sharedPassword === pwUsableByHealth,
+  `health.password=${health.data.adminAuth.password} → 期望 ${pwUsableByHealth}，实际 ${memData.sharedPassword}`);
+
+/*
+ * 这里**故意不写**「health 自述的成员数 == 成员列表长度」那类等价对账 ——
+ * 本机与线上成员表大概率是空的，`0 === 0` 恒真，写在这儿等于没写。
+ * 那两条对账（成员数一致 / activeOwners 与逐条统计一致）放在
+ * `.tooling/test-admin-auth.mjs` 的 7.5 节 —— 那个脚本会临时建出成员，
+ * 判据才真的有边界，改坏得出来。
+ */
+
+/*
+ * 成员写点位：走**预期失败**分支触达，一个字节都不落盘。
+ *
+ * 为什么不像自定义页那样「建一个再删掉」：check-all 跑在**真实数据目录**上，
+ * 而 members.json 里是运营/同事的真实后台账号 —— 自检往里塞人再删，
+ * 即使最后清干净，中途也有「自检的临时账号正拿得到后台权限」的时间窗；
+ * 万一半路异常退出，还会在真数据里留下一个没人认领的账号。
+ * 所以这里只用「不存在 / 缺参数」这类入口把点位打一遍（也顺带锁住错误分支），
+ * 真正会改数据的增删改停在成员表上的端到端验证放在 `.tooling/test-admin-auth.mjs`
+ * （那个脚本起独立端口 + 临时数据目录，随便写）。
+ */
+const memBadSave = await call('POST', '/api/admin/members/save', {
+  body: {}, expectFail: '新建成员缺账号', expectHttp: 200, expectCode: 1001
+});
+assert('成员保存：缺账号被参数校验拦下（不会静默建出一个空账号）',
+  memBadSave.json.code === 1001 && /请填写登录账号/.test((memBadSave.json || {}).msg || ''),
+  `code ${memBadSave.json.code} ${memBadSave.json.msg}`);
+
+const memBadStatus = await call('POST', '/api/admin/members/status', {
+  body: { id: 999999, enabled: false }, expectFail: '停用不存在的成员', expectHttp: 404, expectCode: 404
+});
+assert('成员停用：不存在的成员 → 404（不会把「找不到」当成「已停用」回报成功）',
+  memBadStatus.json.code === 404, `code ${memBadStatus.json.code} ${memBadStatus.json.msg}`);
+
+const memBadPwd = await call('POST', '/api/admin/members/password', {
+  body: { id: 999999, password: 'whatever-1234' }, expectFail: '重置不存在的成员口令', expectHttp: 404, expectCode: 404
+});
+assert('成员重置口令：不存在的成员 → 404', memBadPwd.json.code === 404,
+  `code ${memBadPwd.json.code} ${memBadPwd.json.msg}`);
+
+const memBadDel = await call('POST', '/api/admin/members/delete', {
+  body: { id: 999999 }, expectFail: '删除不存在的成员', expectHttp: 404, expectCode: 404
+});
+assert('成员删除：不存在的成员 → 404（顺手确认「最后一位 owner」那类防护没被走到）',
+  memBadDel.json.code === 404, `code ${memBadDel.json.code} ${memBadDel.json.msg}`);
+
+/* 本次自检用的若不是成员账号，自助改口令就该被拒 —— 顺带把这条点位也打一遍 */
+const selfPwProbe = await call('POST', '/api/admin/me/password', {
+  body: { oldPassword: 'x', newPassword: 'self-pw-probe-1' },
+  expectFail: '非成员身份改个人口令', expectHttp: 403, expectCode: 403
+});
+assert('「改自己的口令」对非成员身份（共享口令 / 长期令牌）→ 403（它们没有「个人口令」这回事）',
+  selfPwProbe.json.code === 403, `code ${selfPwProbe.json.code} ${selfPwProbe.json.msg}`);
+
+/* 后果断言：上面 5 个失败分支跑完，成员表必须一个字节都没变 */
+const memAfterProbe = await call('GET', '/api/admin/members', { silent: true });
+assert('成员写点位的失败分支不留痕：成员数量与逐条内容都与刚才一致',
+  JSON.stringify((memAfterProbe.data || {}).list) === JSON.stringify(memRows),
+  `前 ${memRows.length} 条 → 后 ${(((memAfterProbe.data || {}).list) || []).length} 条`);
 
 /* ---------------------------------------------------------------------------
  * 18. 安全开关回归（纯函数单测，不起进程）

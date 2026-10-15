@@ -530,6 +530,8 @@ const server = http.createServer(async (req, res) => {
       adminAuth: {
         credentials: adminAuth.configured() ? 'on' : 'off',
         tokens: adminAuth.tokenCount(),
+        /* 成员账号数（后台「成员管理」里的那批人）。只报数量，成员明细走 /api/admin/members */
+        members: adminAuth.memberCount(),
         writable: adminAuth.hasWritableCredential() ? 'yes' : 'no',
         password: adminAuth.usingDevPassword() ? 'dev-default' : (adminAuth.configured() ? 'custom' : 'unset')
       }
@@ -646,8 +648,10 @@ if (process.env.NODE_ENV === 'production' && authLib.IS_DEFAULT_SECRET) {
 if (process.env.NODE_ENV === 'production' && ADMIN_PAGE && !adminAuth.configured()) {
   console.error('[fatal] NODE_ENV=production 且 ADMIN_PAGE 开启，但未配置任何管理员凭证，拒绝启动。');
   console.error('        请至少设置其中一项：');
-  console.error('        ADMIN_PASSWORD=\'你的强口令\'                     # 口令登录（换取超级管理员会话）');
+  console.error('        ADMIN_PASSWORD=\'你的强口令\'                     # 共享口令登录（换取超级管理员会话）');
   console.error('        ADMIN_TOKENS=\'{"tok_long_enough":{"role":"operator","name":"运营A"}}\'  # 分角色长期令牌');
+  console.error('        # 或者：先在本地跑起来，用 /console 的「成员管理」建一个超级管理员成员账号');
+  console.error('        #       （成员数据落在 data/admin/members.json，随环境各自维护、不入库）');
   console.error('        或直接设置 ADMIN_PAGE=off 关闭运营后台。');
   process.exit(1);
 }
@@ -671,10 +675,10 @@ server.listen(PORT, HOST, () => {
     ? '（全部要求管理员令牌；只读=viewer、日常运营=operator、删素材/发布/删除商品=owner）'
     : '（已随页面一同关闭，返回 403）'}`);
   log(`管理员凭证 ${!adminAuth.configured()
-    ? '⚠️  未配置，登录不可用（ADMIN_PASSWORD 或 ADMIN_TOKENS 至少设置一项）'
+    ? '⚠️  未配置，登录不可用（ADMIN_PASSWORD / ADMIN_TOKENS / 成员账号 至少一项）'
     : (adminAuth.usingDevPassword()
       ? `⚠️  正在使用开发默认口令（${ADMIN_PAGE ? '请立刻设置' : ''} ADMIN_PASSWORD），仅限本机联调`
-      : `已配置（长期令牌 ${adminAuth.tokenCount()} 条）`)}`);
+      : `已配置（长期令牌 ${adminAuth.tokenCount()} 条 · 成员账号 ${adminAuth.memberCount()} 个）`)}`);
   log(`点位总数   ${routes.length + 2} 个（业务 ${routes.length} + 运维 2，需登录 ${authed} 个）`);
   log(`数据文件   ${store.DB_FILE}`);
   media.ensureDir(media.ROOT);

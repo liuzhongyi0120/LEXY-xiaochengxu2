@@ -166,12 +166,36 @@ module.exports = {
    * ⚠️ 除 /api/admin/login 外，本组点位**都要求管理员令牌**（见 lib/adminAuth.js）。
    *    调试台里请先调用 login 拿到 token，再把它填到「请求头 → Authorization: Bearer <token>」。 */
   'POST /api/admin/login': {
-    note: '管理员登录：口令换会话令牌。生产环境需先设置 ADMIN_PASSWORD；连续 5 次错误会退避 60 秒。返回 { token, role, roleLabel, ttl }',
-    body: { password: 'admin' }
+    note: '管理员登录，两种方式共用一个点位：① 传 username → 走「成员管理」里的账号（角色按成员配置，可能是只读/运营/超级管理员）；② username 留空 → 走共享口令 ADMIN_PASSWORD（登录即超级管理员）。连续 5 次错误退避 60 秒。返回 { token, role, roleLabel, name, username, ttl }',
+    body: { username: '', password: 'admin' }
   },
   'GET /api/admin/session': {
-    note: '当前管理员会话（我是谁）：返回 { role, roleLabel, name, source }；未带管理员令牌返回 401',
+    note: '当前管理员会话（我是谁）：返回 { role, roleLabel, name, source, username, canChangePassword }（source=member 表示是成员账号登录）；未带管理员令牌返回 401',
     query: {}
+  },
+  'POST /api/admin/me/password': {
+    note: '修改自己的登录口令（**只对成员账号有效**，共享口令 / 长期令牌登录会返回 403）。必须验旧口令，所以这是个安全的自我服务点位 —— 任何已登录角色都能调',
+    body: { oldPassword: '旧口令', newPassword: '新口令至少8位' }
+  },
+  'GET /api/admin/members': {
+    note: '成员列表（后台管理员账号）+ 角色说明 + 账号规则 + activeOwners（当前启用中的超级管理员数，前端据此禁用「删除/停用」）。**绝不含口令与哈希**',
+    query: {}
+  },
+  'POST /api/admin/members/save': {
+    note: '新建 / 修改成员：id 留空=新建（必须给 username + password），传 id=修改（不改口令就别传 password）。账号不区分大小写且不可重复；口令 8~64 位。需超级管理员',
+    body: { id: null, username: 'yy_a', name: '运营A', role: 'operator', password: 'changeme123', enabled: true }
+  },
+  'POST /api/admin/members/status': {
+    note: '启用 / 停用成员。⚠️ 最后一个启用中的超级管理员不可停用（会把自己锁在门外）。需超级管理员',
+    body: { id: '{{memberId}}', enabled: false }
+  },
+  'POST /api/admin/members/password': {
+    note: '重置成员口令（不验旧口令，供超管给忘记口令的成员重置）。需超级管理员',
+    body: { id: '{{memberId}}', password: 'reset12345' }
+  },
+  'POST /api/admin/members/delete': {
+    note: '删除成员。⚠️ 最后一个启用中的超级管理员不可删除。需超级管理员',
+    body: { id: '{{memberId}}' }
   },
   'GET /api/admin/dashboard': {
     note: '数据概览。days 控制趋势天数（默认 7）。返回今日/昨日/近7日/近30日/累计 GMV 与订单数、待办（待发货 / 待付款 / 库存预警）、各状态计数、Top 商品、库存预警榜、最近订单',

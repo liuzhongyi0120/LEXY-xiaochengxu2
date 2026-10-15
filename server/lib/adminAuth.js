@@ -12,10 +12,13 @@
  *        viewer   只读（看板、列表、详情）
  *        operator 运营（改商品/分类/库存/订单/券、上传素材、存草稿）
  *        owner    高危（删素材与素材夹、发布/回滚、删商品/分类/券、改店铺设置）
- *   2. 令牌有两个来源，互不干扰：
+ *   2. 身份有三个来源，互不干扰：
  *        - `ADMIN_TOKENS`（环境变量，JSON：{ "<token>": { "role": "operator", "name": "运营A" } }）
  *          用于给不同的人/系统发不同角色的长期令牌；
- *        - `POST /api/admin/login` 用口令换取的会话令牌（JWT，带 admin 标记）。
+ *        - `POST /api/admin/login` 用**共享口令**换取的会话令牌（JWT，带 admin 标记，登录即 owner）；
+ *        - `POST /api/admin/login` 用**成员账号 + 口令**登录（2026-10-15 起，见 lib/members.js）——
+ *          成员数据落在 `server/data/admin/members.json`，后台「成员管理」里能增删改。
+ *      后两者共用同一个登录点位：带 `username` 走成员表，不带则沿用共享口令。
  *   3. 管理员令牌与**小程序用户令牌**必须互不通用：
  *        - 管理员令牌 payload 里只有 `admin:true`，没有 `userId` → 用户链路拿不到身份；
  *        - 用户令牌没有 `admin` 标记 → 管理链路一律拒绝，**不能因为「有 token」就放行**。
@@ -25,6 +28,7 @@
  */
 
 const authLib = require('./auth');
+const members = require('./members');
 const { BizError, ERR } = require('./http');
 
 /** 角色等级：数值越大权限越高 */
@@ -90,28 +94,40 @@ function effectivePassword() {
 const PASSWORD = effectivePassword();
 const USING_DEV_PASSWORD = !process.env.ADMIN_PASSWORD && !IS_PROD;
 
-/** 是否配置了可用的管理员凭证 */
+/**
+ * 是否配置了可用的管理员凭证。
+ *
+ * 成员表也算「已配置」—— 但**不替代**环境变量那两个来源：
+ * 环境变量是服务器侧的救援通道（成员表被改坏 / 全员口令忘了还能进去修），
+ * 所以这里只是把第三个来源并进来，任何一处可用就不算「没人能登录」。
+ */
 function configured() {
-  return Object.keys(ADMIN_TOKENS).length > 0 || !!PASSWORD;
+  return Object.keys(ADMIN_TOKENS).length > 0 || !!PASSWORD || members.count() > 0;
 }
 
 /** 是否至少有一条「能写」的凭证（只有只读凭证时运营会寸步难行，启动日志要提示） */
 function hasWritableCredential() {
   if (PASSWORD) return true;
-  return Object.keys(ADMIN_TOKENS).some((t) => ROLE_RANK[ADMIN_TOKENS[t].role] >= ROLE_RANK.operator);
+  if (Object.keys(ADMIN_TOKENS).some((t) => ROLE_RANK[ADMIN_TOKENS[t].role] >= ROLE_RANK.operator)) return true;
+  return members.hasWritable();
 }
 
 /* ------------------------------ 会话 ------------------------------ */
 
-/** 签发管理员会话令牌（复用 lib/auth 的 HS256 实现，payload 里打 admin 标记） */
-function issue(role, name) {
+/**
+ * 签发管理员会话令牌（复用 lib/auth 的 HS256 实现，payload 里打 admin 标记）。
+ * @param {string} [username] 成员账号名（共享口令登录时为空；「改自己的口令」要靠它认人）
+ */
+function issue(role, name, username) {
   const r = isRole(role) ? role : 'owner';
-  return authLib.sign({ admin: true, role: r, name: String(name || ROLE_LABEL[r]) }, ADMIN_TTL);
+  const payload = { admin: true, role: r, name: String(name || ROLE_LABEL[r]) };
+  if (username) payload.username = String(username);
+  return authLib.sign(payload, ADMIN_TTL);
 }
 
 /**
  * 读取请求里的管理员身份。
- * @returns {{role:string, name:string, source:string}|null}
+ * @returns {{role:string, name:string, source:string, username?:string}|null}
  */
 function read(req) {
   const raw = String((req.headers && (req.headers.authorization || req.headers.Authorization)) || '')
@@ -126,7 +142,35 @@ function read(req) {
 
   const payload = authLib.verify(raw);
   if (payload && payload.admin === true && isRole(payload.role)) {
-    return { role: payload.role, name: String(payload.name || ROLE_LABEL[payload.role]), source: 'session' };
+    /*
+     * 成员账号：**每次都回查成员表**，不直接信令牌里的角色。
+     *
+     * 为什么必须回查：会话 TTL 是 12 小时。只在签发时校验一次的话，
+     * 「停用某人」要等他的令牌自然过期才生效 —— 那 12 小时里他能照常改价、发货、删素材，
+     * 也就是说**「停用」按钮是假的**。同理，改角色也当场生效，不必等人重新登录。
+     * 代价是内存里一次数组查找（成员上限 50），可以忽略。
+     *
+     * 回查带来的语义（写在这里，免得以后被当成 bug 改回去）：
+     *   · 成员被**停用或删除** → 他手里所有未过期的令牌**立即**失效（下一个请求就 401）；
+     *   · 成员被**降级** → 下一个请求就按新角色判权；
+     *   · 长期令牌（env）与共享口令会话**不受影响** —— 它们的身份不来自成员表。
+     */
+    if (payload.username) {
+      const m = members.findByName(payload.username);
+      if (!m || m.enabled === false) return null;
+      return {
+        role: m.role,
+        name: m.name || m.username,
+        source: 'member',
+        username: m.username
+      };
+    }
+    return {
+      role: payload.role,
+      name: String(payload.name || ROLE_LABEL[payload.role]),
+      source: 'session',
+      username: ''
+    };
   }
   return null;
 }
@@ -142,6 +186,14 @@ function read(req) {
 const ADMIN_API_PREFIXES = ['/api/admin/', '/api/decorate/', '/api/media/'];
 /** 管理员登录点位（受页面开关约束，但不要求令牌） */
 const ADMIN_LOGIN_PATH = '/api/admin/login';
+/**
+ * 「改自己的口令」点位。
+ *
+ * 单独开一个例外：它**只要求已登录**（viewer 起），不要求 operator —— 否则只读成员
+ * 连自己的口令都换不了，只能让 owner 代改，等于人人共用一个口令，成员分级白做。
+ * 处理器内部再验一次旧口令（见 members.changeOwnPassword），所以放宽这里不会开口子。
+ */
+const ADMIN_SELF_PASSWORD_PATH = '/api/admin/me/password';
 /** 该路径是否属于管理接口 */
 function isAdminApiPath(p) {
   return ADMIN_API_PREFIXES.some((x) => String(p).indexOf(x) === 0);
@@ -164,11 +216,20 @@ const OWNER_RULES = [
   /^\/api\/admin\/goods\/delete$/,
   /^\/api\/admin\/category\/delete$/,
   /^\/api\/admin\/coupon\/(save|status|delete)$/,
-  /^\/api\/admin\/settings\/save$/
+  /^\/api\/admin\/settings\/save$/,
+  /*
+   * 成员管理 = 最高危：能改谁能进后台、能把自己提成 owner。
+   * 只让 owner 动，并且**禁用 / 降级 / 删除三条路**都在 members.js 里做了
+   * 「不能消灭最后一个启用中的 owner」的防护 —— 权限给错一次就再也进不来了。
+   * （GET /api/admin/members 是只读列表，仍走 viewer，方便只读成员看清自己是谁。）
+   */
+  /^\/api\/admin\/members\/(save|delete|status|password)$/
 ];
 
 /** 该点位要求的最低角色 */
 function minRoleFor(method, path) {
+  /* 「改自己的口令」只要求已登录 —— 必须排在 GET 判断之前，它是 POST 点位 */
+  if (String(path) === ADMIN_SELF_PASSWORD_PATH) return 'viewer';
   if (String(method).toUpperCase() === 'GET') return 'viewer';
   if (OWNER_RULES.some((re) => re.test(path))) return 'owner';
   return 'operator';
@@ -206,23 +267,53 @@ const attempts = { count: 0, lockedUntil: 0 };
 const MAX_ATTEMPTS = 5;
 const LOCK_MS = 60 * 1000;
 
-function login(password) {
+function countFailure() {
+  attempts.count += 1;
+  if (attempts.count >= MAX_ATTEMPTS) {
+    attempts.count = 0;
+    attempts.lockedUntil = Date.now() + LOCK_MS;
+    throw new BizError('尝试次数过多，请 1 分钟后重试', ERR.FORBIDDEN, 429);
+  }
+}
+
+/**
+ * 登录。两种方式共用同一套失败退避（否则攻击者可以拿成员账号把退避刷满、
+ * 把共享口令那条路一起锁死，或者反过来）。
+ *
+ * @param {string} password 口令
+ * @param {string} [username] 成员账号；留空 = 走共享口令（登录即 owner）
+ * @returns {string} 会话令牌
+ */
+function login(password, username) {
   const now = Date.now();
   if (attempts.lockedUntil > now) {
     const left = Math.ceil((attempts.lockedUntil - now) / 1000);
     throw new BizError(`尝试次数过多，请 ${left} 秒后再试`, ERR.FORBIDDEN, 429);
   }
+
+  const uname = String(username == null ? '' : username).trim();
+
+  /* ---- 成员账号登录 ---- */
+  if (uname) {
+    const m = members.authenticate(uname, password);
+    if (!m) {
+      /* 刻意不区分「账号不存在 / 口令不对 / 账号已停用」三种情况：
+       * 区分开就等于给出一个「这个账号存不存在」的探测接口。 */
+      countFailure();
+      throw new BizError('账号或口令不正确', ERR.FORBIDDEN, 403);
+    }
+    attempts.count = 0;
+    attempts.lockedUntil = 0;
+    return issue(m.role, m.name || m.username, m.username);
+  }
+
+  /* ---- 共享口令登录（旧路径，保留） ---- */
   if (!PASSWORD) {
-    // 生产未配置口令：登录不可用，只能靠 ADMIN_TOKENS
-    throw new BizError('未配置管理员口令（服务端设置 ADMIN_PASSWORD 后可用）', ERR.FORBIDDEN, 403);
+    // 生产未配置共享口令：这条路不可用，只能靠成员账号或 ADMIN_TOKENS
+    throw new BizError('未配置管理员共享口令（服务端设置 ADMIN_PASSWORD 后可用）', ERR.FORBIDDEN, 403);
   }
   if (String(password || '') !== PASSWORD) {
-    attempts.count += 1;
-    if (attempts.count >= MAX_ATTEMPTS) {
-      attempts.count = 0;
-      attempts.lockedUntil = now + LOCK_MS;
-      throw new BizError('尝试次数过多，请 1 分钟后重试', ERR.FORBIDDEN, 429);
-    }
+    countFailure();
     throw new BizError('管理员口令不正确', ERR.FORBIDDEN, 403);
   }
   attempts.count = 0;
@@ -242,6 +333,7 @@ module.exports = {
   ADMIN_TTL,
   ADMIN_API_PREFIXES,
   ADMIN_LOGIN_PATH,
+  ADMIN_SELF_PASSWORD_PATH,
   isAdminApiPath,
   minRoleFor,
   guard,
@@ -252,5 +344,11 @@ module.exports = {
   hasWritableCredential,
   usingDevPassword: () => USING_DEV_PASSWORD,
   tokenCount: () => Object.keys(ADMIN_TOKENS).length,
+  /** 共享口令是否可用（开发环境的默认口令也算可用 —— 与 login() 的判据同源） */
+  sharedPasswordUsable: () => !!PASSWORD,
+  /** 成员账号数（health 与启动日志用；具体成员列表走 /api/admin/members） */
+  memberCount: () => members.count(),
+  /** 是否有至少一个可写的启用成员 */
+  hasMemberWritable: () => members.hasWritable(),
   resetAttempts
 };

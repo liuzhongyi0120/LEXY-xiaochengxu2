@@ -3,7 +3,8 @@
  *
  * 与 check-shopnotes-ui.mjs 的分工：
  *   那个脚本负责「断言」；这个只负责**截图**，产出 deliverables/ 下三张实图：
- *     1. 装修台列表页（店铺笔记行 + 统计 + 新建入口）
+ *     1. 控制台「店铺笔记」栏目（笔记列表 + 配额 + 新建入口 + 行内「装修 / 删除」）
+ *        —— 2026-10-15 起入口与列表在这里，装修台列表里已经没有笔记了
  *     2. 装修台编辑器（组件库 / 区块树 / 手机预览 / 笔记头部属性面板）
  *     3. /preview 编译真机源码后的**小程序端笔记详情页**
  *
@@ -187,31 +188,36 @@ let createdKey = '';
     if (dr.code !== 0) throw new Error('存草稿失败：' + JSON.stringify(dr).slice(0, 240));
     console.log('    ' + createdKey + '（id=' + noteId + '）草稿已存，' + DRAFT.blocks.length + ' 个组件');
 
-    /* ---------- 2. 装修台列表页 ---------- */
-    console.log('\n【2】截装修台列表页');
-    const tabA = await open(SITE + '/admin', 2600);
-    tabs.push(tabA);
-    if (!await ensureLoggedIn(tabA)) throw new Error('装修台登录失败');
-    /*
-     * 列表是个**内部滚动容器**，而 `captureBeyondViewport` 只能把整页拉长、
-     * 拉不动容器内部的滚动 —— 直接截会得到「列表被切掉、笔记那条在框外」。
-     * 所以先把「归属」筛成「店铺笔记」，让这篇笔记排到最上面（截图也更有针对性）。
+    /* ---------- 2. 控制台「店铺笔记」栏目 ----------
+     *
+     * 2026-10-15 起笔记的入口与列表搬到后台控制台的「店铺笔记」栏目，
+     * 装修台列表里已经没有它了（那里只剩「装修」那一半，见第 3 张图）。
+     * 截图要跟着搬到 /console#shopnotes，别再对着装修台列表找笔记行。
      */
-    const filtered = await run(tabA, `(() => {
-      const sel = document.getElementById('fBelongs');
-      if (!sel) return 'no-belongs-select';
-      const opt = [...sel.options].find((o) => o.textContent.indexOf('店铺笔记') >= 0);
-      if (!opt) return 'no-note-option';
-      sel.value = opt.value;
-      sel.dispatchEvent(new Event('change', { bubbles: true }));
-      document.getElementById('btnFilter').click();
-      return 'filtered:' + opt.value;
+    console.log('\n【2】截控制台「店铺笔记」栏目');
+    const tabA = await open(SITE + '/console#shopnotes', 2800);
+    tabs.push(tabA);
+    const cl = await run(tabA, `(() => {
+      const p = document.getElementById('body') ? document.querySelector('#body [data-p]') : null;
+      if (!p) return 'already-logged-in';
+      p.value = ${JSON.stringify(ADMIN_PW)};
+      document.querySelector('#body [data-login]').click();
+      return 'logged-in';
     })()`);
-    await sleep(900);
-    const rowSeen = await run(tabA, `String([...document.querySelectorAll('#pageRows a.pname')]
-      .filter((a) => (a.getAttribute('href') || '').indexOf(encodeURIComponent(${JSON.stringify(createdKey)})) >= 0).length)`);
-    console.log('    归属筛选 → ' + filtered + '；命中的笔记行 = ' + rowSeen);
-    await shot(tabA, '店铺笔记-装修台列表.png');
+    await sleep(1900);
+    /* 登录后 hash 会被带回 #dashboard，再点一次侧栏「店铺笔记」 */
+    await run(tabA, `(() => {
+      const b = [...document.querySelectorAll('#nav .nav-item')].find((x) => x.textContent.trim() === '店铺笔记');
+      if (!b) return 'no-nav';
+      b.click();
+      return 'ok';
+    })()`);
+    await sleep(1500);
+    const rowSeen = await run(tabA, `String([...document.querySelectorAll('#body table.tb tbody tr')]
+      .filter((r) => r.innerText.indexOf(${JSON.stringify(NOTE_TITLE)}) >= 0).length)`);
+    console.log('    控制台登录 → ' + cl + '；命中的笔记行 = ' + rowSeen);
+    if (rowSeen !== '1') console.log('    ⚠️ 期望命中 1 行（这次建的这篇），实际 ' + rowSeen + ' 行');
+    await shot(tabA, '店铺笔记-控制台列表.png');
 
     /* ---------- 3. 装修台编辑器（?edit=note-N 直达） ---------- */
     console.log('\n【3】截装修台编辑器');

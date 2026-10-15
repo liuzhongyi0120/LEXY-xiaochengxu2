@@ -126,7 +126,10 @@
     pages: [],
     stats: null,
     custom: null,       // 自定义页配额 { count, max }
-    notes: null,        // 店铺笔记配额 { count, max, belongs }
+    /* 店铺笔记**不在这里管**（2026-10-15 搬到后台控制台的「店铺笔记」栏目）。
+     * 本装修台只负责「装修」那一半：控制台点「装修」会带 ?edit=note-N 进来，
+     * 编辑器照旧能用（顶栏标记、店长区、存草稿都还认 shopnote）。
+     * 所以这里不再缓存笔记配额 —— 页面列表里也不出现笔记行（见 filtered()）。 */
     templates: [],      // 新建页面可选模板
     filters: { name: '', status: '', belongs: '' },
     cur: null,        // { key, meta, schema, data, published, titles, hasDraft, versions }
@@ -437,7 +440,6 @@
       S.pages = d.list || [];
       S.stats = d.stats || {};
       S.custom = d.custom || null;
-      S.notes = d.notes || null;
       if (d.templates && d.templates.length) S.templates = d.templates;
       if (d.lib) {
         S.globalLib = d.lib;          // 全局组件库（首页 / 自定义页用）
@@ -466,12 +468,10 @@
     $('statCustom').textContent = S.custom
       ? '自定义页 ' + S.custom.count + ' / ' + S.custom.max
       : '自定义页 —';
-    // 店铺笔记与自定义页是两套独立配额（50 / 20），统计行各占一格
-    $('statNote').textContent = S.notes
-      ? '店铺笔记 ' + S.notes.count + ' / ' + S.notes.max
-      : '店铺笔记 —';
-    // 计数不含「店铺导航」—— 它是全局配置，不是页面（否则这里永远多一个）
-    $('pageCount').textContent = S.pages.filter(function (p) { return !p.nav; }).length;
+    /* 计数不含两类东西，否则表头数字会跟表里的行数对不上：
+     *   · 「店铺导航」—— 它是全局配置，不是页面；
+     *   · 「店铺笔记」—— 2026-10-15 搬到控制台的「店铺笔记」栏目了，本页不再列出。 */
+    $('pageCount').textContent = S.pages.filter(function (p) { return !p.nav && !p.shopnote; }).length;
   }
 
   function renderBelongs() {
@@ -479,7 +479,7 @@
     var cur = sel.value;
     var list = [];
     S.pages.forEach(function (p) {
-      if (p.nav) return; // 店铺导航不是页面，不进「归属」筛选
+      if (p.nav || p.shopnote) return; // 导航与笔记都不进「归属」筛选（本页不列它们）
       if (list.indexOf(p.belongs) === -1) list.push(p.belongs);
     });
     sel.innerHTML = '<option value="">全部</option>' + list.map(function (b) {
@@ -492,6 +492,11 @@
     var f = S.filters;
     return S.pages.filter(function (p) {
       if (p.nav) return false; // 店铺导航走列表上方的独立卡片，不混进页面表格
+      /* 店铺笔记也不混进来（2026-10-15）：它有自己的一栏（控制台「店铺笔记」）。
+       * ⚠️ 只在这里滤**渲染**，S.pages 里那份**必须留着** ——
+       *    openPage(key) 与「装修」链接（/admin?edit=note-N）都还要按 key 打开它，
+       *    真从 S.pages 里删掉就会出现「点装修打不开编辑器」。 */
+      if (p.shopnote) return false;
       if (f.name && (p.name + p.key + p.note).toLowerCase().indexOf(f.name.toLowerCase()) === -1) return false;
       if (f.belongs && p.belongs !== f.belongs) return false;
       if (f.status === 'draft' && !p.hasDraft) return false;
@@ -569,19 +574,16 @@
     rows.innerHTML = '';
     if (!list.length) {
       rows.innerHTML = '<tr><td colspan="5" class="td-empty">没有匹配的页面' +
-        (S.pages.length ? '，试试「重置」筛选条件' : '，点右上角「+ 新建页面」创建自定义页，或「+ 新建笔记」写第一篇店铺笔记') + '</td></tr>';
+        (S.pages.length ? '，试试「重置」筛选条件' : '，点右上角「+ 新建页面」创建一个自定义页') + '</td></tr>';
     }
     list.forEach(function (p) {
       var tr = el('tr');
-      /* 三种类型标记：
-         · 笔记（shopnote）：内容型页面，跟自定义页共用装修链路但归属完全不同，用青色角标区分；
+      /* 两种类型标记（笔记已不在本页列出，故不再有第三种）：
          · 自定义页（custom）：蓝色角标；
          · 内置页：灰色角标（对应小程序里编译期固定的页面，不可删）。 */
-      var typeHtml = p.shopnote
-        ? '<span class="type-tag note">店铺笔记</span>'
-        : p.custom
-          ? '<span class="type-tag custom">自定义页</span>'
-          : '<span class="type-tag builtin">内置页</span>';
+      var typeHtml = p.custom
+        ? '<span class="type-tag custom">自定义页</span>'
+        : '<span class="type-tag builtin">内置页</span>';
       // 9 列压成 5 列：类型 / 归属 / 内容量并进名称单元格，
       // 草稿时间并进状态单元格 —— 否则 1440 宽度下「操作」的 6 个按钮会换行（实测需求 354px / 实际 302px）
       var subParts = [p.path, p.belongs, p.blockCount + ' 项', p.fields + ' 字段'];
@@ -630,33 +632,31 @@
             ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修</a>' +
           '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +
             ' title="' + (p.hasDraft ? '恢复到已发布内容' : '当前没有草稿') + '">丢弃草稿</button>' +
-          (p.shopnote
-            /* 笔记不提供「改名」：它的名字就是笔记标题，在编辑器顶部「笔记头部 → 标题」里改，
-               另开一个改名入口会出现「两处都能改标题」的分叉（列表页改完还得再点生成代码才生效，
-               运营会以为没保存成功）。删除走笔记专属端点（连带清 SHOPNOTES 里的那一条）。 */
-            ? '<button class="btn sm danger" data-note-del="' + attr(p.key) + '" ' +
-                'title="删除这篇笔记（不可撤销）">删除</button>'
-            : p.custom
-              ? '<button class="btn sm" data-rename="' + attr(p.key) + '" title="改名称 / 标识 / 备注">改名</button>' +
-                '<button class="btn sm danger" data-del="' + attr(p.key) + '" title="删除该自定义页（不可撤销）">删除</button>'
-              : '') +
+          /* 内置页没有「改名 / 删除」：它们对应小程序里编译期固定的页面，删不掉。
+           * （笔记此前在这里有一支专属的「删除」按钮，2026-10-15 随入口一起搬到了
+           *   控制台的「店铺笔记」栏目 —— 删除仍走同一个端点 /api/decorate/note/delete。） */
+          (p.custom
+            ? '<button class="btn sm" data-rename="' + attr(p.key) + '" title="改名称 / 标识 / 备注">改名</button>' +
+              '<button class="btn sm danger" data-del="' + attr(p.key) + '" title="删除该自定义页（不可撤销）">删除</button>'
+            : '') +
         '</div></td>';
       rows.appendChild(tr);
     });
 
-    var pagesOnly = S.pages.filter(function (p) { return !p.nav; });
+    /* 口径与 filtered() 一致：导航与笔记都不算本页的「页面」。
+     * 三处（表格 / pageCount / 这里）必须同口径，否则表头数字、表行、脚注各说各的。 */
+    var pagesOnly = S.pages.filter(function (p) { return !p.nav && !p.shopnote; });
     var draftCount = pagesOnly.filter(function (p) { return p.hasDraft; }).length;
-    var customCount = pagesOnly.filter(function (p) { return p.custom && !p.shopnote; }).length;
-    var noteCount = pagesOnly.filter(function (p) { return p.shopnote; }).length;
+    var customCount = pagesOnly.filter(function (p) { return p.custom; }).length;
     $('listFoot').innerHTML = '共 <b>' + pagesOnly.length + '</b> 个页面（内置 5 个' +
-      (customCount ? ' + 自定义 <b>' + customCount + '</b> 个' : '') +
-      (noteCount ? ' + 店铺笔记 <b>' + noteCount + '</b> 篇' : '') + '）' +
+      (customCount ? ' + 自定义 <b>' + customCount + '</b> 个' : '') + '）' +
       (draftCount ? '，其中 <b>' + draftCount + '</b> 个有未发布草稿' : '') +
       '。<br><b>内置页</b>对应小程序的固定页面，不能删除；<b>自定义页</b>用右上角「+ 新建页面」创建，' +
-      '发布后写入 <code>replica.CUSTOM_PAGES</code>，小程序端通过 <code>pages/custom/index?key=标识</code> 打开；' +
-      '<b>店铺笔记</b>用「+ 新建笔记」创建，发布后写入 <code>replica.SHOPNOTES</code>，' +
-      '小程序端通过 <code>packageNews/note/note?id=编号</code> 打开（内容型：固定头部 + 固定正文 + 可自由增删的组件）。' +
-      '三者共用同一套装修链路（属性面板 / 页面布局 / 预览 / 草稿 / 发布 / 回滚）。' +
+      '发布后写入 <code>replica.CUSTOM_PAGES</code>，小程序端通过 <code>pages/custom/index?key=标识</code> 打开。' +
+      '两者共用同一套装修链路（属性面板 / 页面布局 / 预览 / 草稿 / 发布 / 回滚）。' +
+      '<br><b>店铺笔记不在这里了</b>：它在后台控制台的「店铺笔记」栏目（<a href="/console#shopnotes" ' +
+      'target="_blank" rel="noopener">打开</a>）—— 那里新建 / 看列表 / 删，' +
+      '点「装修」仍会回到本装修台编辑（地址是 <code>/admin?edit=note-编号</code>）。' +
       '编辑只改草稿；点「生成代码」才写回 <code>miniprogram/config/replica.js</code>（生成小程序代码包里的配置文件），' +
       '生成前自动备份到 <code>server/data/decorate/backup/</code>，可随时回滚（保留最近 20 个版本）。' +
       '<br><b>注意：</b>生成代码 ≠ 线上生效 —— 还需要在微信开发者工具「上传」并在公众平台发布新版本，' +
@@ -769,9 +769,10 @@
   function applyPageChrome(meta) {
     var isCustom = !!(meta && meta.custom);
     var isNav = !!(meta && meta.nav);
-    // 笔记也带 custom: true，所以要**先**判 shopnote 再判 custom，
-    // 否则笔记的顶栏会显示「自定义页」——和列表里的青色「店铺笔记」角标自相矛盾。
-    // 配色与 admin.css 的 .type-tag.note / .type-tag.nav 一致（这里沿用本文件既有的内联写法）。
+    // 笔记也带 custom: true，所以要**先**判 shopnote 再判 custom，否则笔记的顶栏会显示「自定义页」。
+    // ⚠️ 笔记行已不在本装修台的列表里（搬到控制台「店铺笔记」栏目了），但这个标记**必须留着**：
+    //    控制台点「装修」走的是 /admin?edit=note-<id>，进来第一眼就该看见「店铺笔记」。
+    //    配色沿用本文件既有的内联写法（青绿 = 笔记，橙 = 全局配置）。
     var isNote = !!(meta && meta.shopnote);
     $('edPageTag').textContent = isNav ? '全局配置' : (isNote ? '店铺笔记' : (isCustom ? '自定义页' : '内置页'));
     $('edPageTag').style.color = isNav ? '#b76e00' : (isNote ? '#0f7a5a' : (isCustom ? '#155bd4' : ''));
@@ -3255,109 +3256,22 @@
     nameInput.focus();
   }
 
-  /* ----------------------------- 新建 / 删除店铺笔记 ----------------------------- */
-
-  /**
-   * 新建店铺笔记（对标有赞「内容管理 → 店铺笔记 → 新建笔记」）。
+  /*
+   * 「新建 / 删除店铺笔记」整段已搬到**后台控制台**的「店铺笔记」栏目（2026-10-15）。
    *
-   * 有赞那一步只要「标题 / 摘要 / 标签」三样，填写完直接进装修页 ——
-   * 这里同构：标题是唯一必填项（也是列表里显示的名字），摘要与标签都可留空后再补。
-   * 创建成功后**直接进编辑器**（openPage），少一次「点列表里的装修」的来回。
-   */
-  function createNoteDialog() {
-    if (!needRole('owner', '新建笔记')) return;
-
-    // 长度口径从后端下发（S.notes，真源是 shopnotes.js 的常量）——
-    // 前端再抄一份「5 / 40 / 8」就会在改下限时和后端判据分叉
-    var ns = S.notes || {};
-    var tMin = ns.titleMin || 5;
-    var tMax = ns.titleMax || 40;
-    var tagMax = ns.tagMax || 8;
-
-    var box = el('div');
-    box.appendChild(el('div', 'hint',
-      '新建后只是后台多出一篇笔记，装修完点「生成代码」才会写进小程序代码包（replica.js）；' +
-      '已发布的小程序要等下一次上传发布新版本才会出现这篇笔记。'));
-
-    var titleInput = textInput('例如：秋冬除尘季，这几件小家电真香（' + tMin + '~' + tMax + ' 字）', '', tMax);
-    var summaryInput = textInput('选填：一句话卖点，仅在笔记封面展示', '', 60);
-    var tagsInput = textInput('选填：逗号分隔，标签 ' + tagMax + ' 字以内，最多 8 个', '', 80);
-
-    box.appendChild(formRow('笔记标题', titleInput,
-      '必填，建议 ' + tMin + '~' + tMax + ' 字。它同时是页面列表里显示的名字。'));
-    box.appendChild(formRow('笔记摘要', summaryInput));
-    box.appendChild(formRow('笔记标签', tagsInput));
-
-    var save = el('button', 'btn primary', '创建并开始装修');
-    save.onclick = function () {
-      var title = titleInput.value.trim();
-      // 与后端 shopnotes.checkTitle 同一口径：必填 + 上限 tMax
-      // （前端挡一次是为了不让运营白等一次往返，后端那道必须保留 —— 接口可以被绕过）
-      if (!title) { toast('请先填写笔记标题', 'err'); titleInput.focus(); return; }
-      if (title.length > tMax) { toast('笔记标题最多 ' + tMax + ' 个字', 'err'); titleInput.focus(); return; }
-      save.disabled = true;
-      api('POST', '/api/decorate/note/create', {
-        body: {
-          title: title,
-          summary: summaryInput.value.trim(),
-          tags: tagsInput.value.trim()
-        }
-      }).then(function (d) {
-        closeModal();
-        toast('已创建笔记「' + d.page.name + '」');
-        // 建完就进编辑器：笔记的正文/封面/组件都在那儿填，不留「再点一次装修」的多余一步
-        return loadPages().then(function () { openPage(d.page.key); });
-      }).catch(function (e) {
-        save.disabled = false;
-        toast('创建失败：' + e.message, 'err');
-      });
-    };
-    modal('新建店铺笔记', box, [save, btnClose()]);
-    titleInput.focus();
-  }
-
-  /**
-   * 删除店铺笔记（连带清草稿与版本，并重新生成 replica.js）。
+   * 搬走的理由：笔记是**内容**（一篇一篇写出来的图文），不是「页面长什么样」。
+   * 它原先只是本页工具栏上的一个「+ 新建笔记」按钮，与「+ 新建页面」并排，
+   * 结果同一篇笔记在两个地方各有半边入口（列表 + 编辑），说不清归属。
    *
-   * 走的是笔记专属端点（`/api/decorate/note/delete`），但**入参与自定义页保持一致：
-   * 传页面标识（note-<id>）而不是数字 id** —— 列表每一行本来就按 key 索引，
-   * 后端 removeNote 会自己把 key 翻成注册表里的 id 并把 replica 里那一条去掉。
+   * ⚠️ 本文件**仍然认 `shopnote`**，别顺手清掉 —— 装修那一半没搬：
+   *    · 顶栏标记（renderPageTag）、店长区取店铺信息（ensureShop）、
+   *    · 编辑器里 store 草稿时带的 shopnote 标记、预览的分段渲染，
+   * 都要在 `/admin?edit=note-<id>` 这条路上继续工作。
+   * 搬走的只有「列表里出现笔记行」与「在这里新建 / 删除笔记」两件事。
+   *
+   * 控制台那边对应的实现：server/public/console/console.modules.js 的
+   *   `App.views.shopnotes`（列表 + 新建）与 `createNoteDialog()`。
    */
-  function deleteNote(key) {
-    if (!needRole('owner', '删除笔记')) return;
-    var p = S.pages.filter(function (x) { return x.key === key; })[0];
-    if (!p) return;
-
-    var box = el('div');
-    box.innerHTML =
-      '<div style="line-height:1.9">确定删除笔记 <b>' + esc(p.name) + '</b>？</div>' +
-      '<div class="hint" style="margin-top:8px">' +
-      '· 该笔记的草稿与历史版本会一并清除<br>' +
-      '· 会立即重新生成 replica.js，小程序端将无法再打开这篇笔记<br>' +
-      '· 删除前的 replica.js 已自动备份到 server/data/decorate/backup/，需要时可以找回' +
-      '</div>';
-
-    var del = el('button', 'btn danger', '删除');
-    var cancel = el('button', 'btn', '取消');
-    cancel.onclick = closeModal;
-    del.onclick = function () {
-      del.disabled = true;
-      del.textContent = '删除中…';
-      api('POST', '/api/decorate/note/delete', { body: { key: key } })
-        .then(function (r) {
-          closeModal();
-          toast('已删除笔记「' + r.title + '」' +
-            (r.removedVersions ? '（清理 ' + r.removedVersions + ' 条版本记录）' : ''));
-          if (S.cur && S.cur.key === key) showList(); else loadPages();
-        })
-        .catch(function (e) {
-          del.disabled = false;
-          del.textContent = '删除';
-          toast('删除失败：' + e.message, 'err');
-        });
-    };
-    modal('删除笔记', box, [cancel, del]);
-  }
 
   /**
    * 改名称 / 备注 / 页面标识。
@@ -3569,8 +3483,8 @@
     renderList();
   };
 
+  /* 只剩「+ 新建页面」一个按钮了：笔记的创建入口已搬到控制台「店铺笔记」栏目（见上面那段指路注释）。 */
   $('btnCreatePage').onclick = createPageDialog;
-  $('btnCreateNote').onclick = createNoteDialog;
 
   /*
    * 列表页的点击委托挂在 document 上。
@@ -3586,14 +3500,15 @@
    */
   document.addEventListener('click', function (e) {
     if ($('viewList').hidden) return;
+    /* `data-note-del` 已随笔记列表一起搬走（现在只有控制台会发这个事件）——
+     * 这里不再挂它，免得留一条「谁都发不出来」的死分支。 */
     var t = e.target && e.target.closest
-      ? e.target.closest('[data-discard],[data-rename],[data-del],[data-note-del]')
+      ? e.target.closest('[data-discard],[data-rename],[data-del]')
       : null;
     if (!t) return;
     var key = t.getAttribute('data-discard'); if (key) { discardDraft(key); return; }
     key = t.getAttribute('data-rename'); if (key) { renamePageDialog(key); return; }
     key = t.getAttribute('data-del'); if (key) { deletePage(key); return; }
-    key = t.getAttribute('data-note-del'); if (key) { deleteNote(key); return; }
   });
 
   $('btnBack').onclick = function () {

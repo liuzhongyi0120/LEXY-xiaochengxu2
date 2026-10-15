@@ -305,6 +305,258 @@ try {
   r = await req(PORT, 'GET', '/api/admin/goods/list', { token: 'Bearer ' + TOKENS.viewer });
   ok('Authorization 里多带 "Bearer " 前缀 → 401（前端只该带一次）', code(r) === 401, `code ${code(r)}`);
 
+  /* ============================ 7.5 成员管理（后台账号） ============================
+   *
+   * 这一节补的是「后台里**有人**」这件事：把「谁能进后台、各是什么角色」
+   * 从 `.env` 变成后台里能看能改的数据（控制台「成员管理」栏目）。
+   *
+   * ⚠️ 必须排在第 8 节（爆破退避）之前：那一节会故意把登录打成限流状态，
+   *    60 秒内任何登录都进不来，成员登录的用例会全部假红。
+   */
+  section('7.5 成员管理：后台账号体系（建 / 改 / 停用 / 重置口令 / 删）');
+
+  const ownerTok = sessionToken; // 共享口令会话 = owner
+
+  /** 当前成员列表（每次都现查，用来做「被拒之后数据没变」的后果断言） */
+  const membersNow = async () => {
+    const x = await req(PORT, 'GET', '/api/admin/members', { token: ownerTok });
+    return (x.json && x.json.data) || {};
+  };
+  const memberList = async () => (await membersNow()).list || [];
+  const activeOwners = async () => (await memberList()).filter((m) => m.role === 'owner' && m.enabled).length;
+
+  /* —— ① 建成员 —— */
+  let m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok,
+    body: { username: 'OperA', name: '运营甲', role: 'operator', password: 'member-pw-one' }
+  });
+  ok('owner（共享口令会话）新建运营成员 → 成功', code(m) === 0, `code ${code(m)} ${msg(m)}`);
+  const memAId = ((m.json || {}).data || {}).id;
+  const memAPub = (m.json || {}).data || {};
+  ok('新建返回体是**安全形状**：有 id / roleLabel / pwdSet，没有 pwd / hash / salt',
+    !!memAId && memAPub.pwdSet === true && memAPub.roleLabel === '运营' &&
+    !('pwd' in memAPub) && !('hash' in memAPub) && !('salt' in memAPub),
+    JSON.stringify(memAPub));
+
+  /* —— ② 账号唯一性按小写归一 —— */
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'opera', name: '重名', role: 'viewer', password: 'member-pw-two' }
+  });
+  ok('账号唯一性按**小写归一**：`opera` 与 `OperA` 视为同一个（否则各建一个号，运营输哪个全凭记忆）',
+    code(m) !== 0 && /占用/.test(msg(m)), `code ${code(m)} ${msg(m)}`);
+  ok('被拒的重名账号没有落库（成员仍只有 1 个）',
+    (await memberList()).length === 1, `实际 ${(await memberList()).length} 个`);
+
+  /* —— ③ 账号 / 口令边界 —— */
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'ab', role: 'viewer', password: 'member-pw-three' }
+  });
+  ok('账号太短（2 位，下限 3）→ 1001', code(m) === 1001, `code ${code(m)} ${msg(m)}`);
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'has space', role: 'viewer', password: 'member-pw-three' }
+  });
+  ok('账号含空格 → 1001（白名单口径，登录框里少一类输错）', code(m) === 1001, `code ${code(m)} ${msg(m)}`);
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'shortpw', role: 'viewer', password: '123' }
+  });
+  ok('口令太短（3 位，下限 8）→ 1001', code(m) === 1001, `code ${code(m)} ${msg(m)}`);
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'rolebad', role: 'god', password: 'member-pw-three' }
+  });
+  ok('未知角色 → 1001（不能靠拼一个角色名提权）', code(m) === 1001, `code ${code(m)} ${msg(m)}`);
+
+  /* —— ④ 列表形状 + 绝不吐哈希 + 口令口径 —— */
+  const mm = await membersNow();
+  ok('成员列表返回：成员 + 角色说明 + 账号规则 + 启用中 owner 数 + 凭证来源',
+    Array.isArray(mm.list) && Array.isArray(mm.roles) && !!mm.rules &&
+    typeof mm.activeOwners === 'number' && typeof mm.envTokens === 'number' &&
+    typeof mm.sharedPassword === 'boolean',
+    JSON.stringify({ n: (mm.list || []).length, roles: (mm.roles || []).length, activeOwners: mm.activeOwners }));
+  ok('账号规则与 lib/members.js 同源（口令 8~64 位 · 姓名 20 字 · 上限 50 人）',
+    mm.rules.pwdMin === 8 && mm.rules.pwdMax === 64 && mm.rules.nameMax === 20 && mm.rules.max === 50,
+    JSON.stringify(mm.rules));
+  ok('如实报告凭证来源：长期令牌 3 条 / 共享口令可用 / 成员表里还没有 owner',
+    mm.envTokens === 3 && mm.sharedPassword === true && mm.activeOwners === 0,
+    JSON.stringify({ envTokens: mm.envTokens, sharedPassword: mm.sharedPassword, activeOwners: mm.activeOwners }));
+  /*
+   * 两条**等价对账**：同一件事算了两遍（服务端 stats 与逐条列表）就必须一起动。
+   * ⚠️ 这两条在成员表为空时是 `0 === 0` 恒真 —— 所以它们**不能**写在 check-all 里
+   *    （那里跑在真实数据上，通常没有成员），只能放在本节。本节第一句就建了一个成员，
+   *    判据从这里开始有边界：把 health 的 memberCount 写死、或让 activeOwners 另算，都会红。
+   */
+  /* ⚠️ 必须**现查** health：顶部那份是本进程刚起来时的快照（那时成员表还是空的），
+   *    拿快照跟当前列表比，红的是「快照过期」而不是「口径不一致」—— 假红。 */
+  const healthNow = await waitHealth(PORT);
+  ok('health 自述的成员数 == 成员列表长度（两处各算一次迟早会漂）',
+    !!healthNow && healthNow.adminAuth.members === (mm.list || []).length,
+    `health.members=${healthNow && healthNow.adminAuth.members}　列表=${(mm.list || []).length}`);
+  ok('列表的 activeOwners == 逐条统计的「启用中 owner」数（不是另算的一个数）',
+    mm.activeOwners === (mm.list || []).filter((x) => x.role === 'owner' && x.enabled).length,
+    `activeOwners=${mm.activeOwners}　逐条统计=${(mm.list || []).filter((x) => x.role === 'owner' && x.enabled).length}`);
+  /*
+   * 「不能吐哈希」不能拿「响应里有没有 pwd」当判据 —— `rules.pwdMin` / `pwdMax` 本来就该有。
+   * 判据落在：每行没有 pwd/hash/salt 字段 + 整包不出现 scrypt 字样。
+   */
+  const memDump = JSON.stringify(mm);
+  ok('成员列表绝不吐出**口令哈希 / 盐 / scrypt 参数**（出接口只走 members.pub()，手拼字段迟早漏一次）',
+    !/scrypt/i.test(memDump) &&
+    (mm.list || []).every((x) => !('pwd' in x) && !('hash' in x) && !('salt' in x)),
+    `scrypt 字样=${/scrypt/i.test(memDump)}`);
+
+  /* —— ⑤ 成员登录与会话 —— */
+  let ml = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'opera', password: 'member-pw-one' } });
+  ok('成员账号登录 → 成功，且角色**按成员配置回显**（operator，不是写死的 owner）',
+    code(ml) === 0 && (ml.json.data || {}).role === 'operator' && (ml.json.data || {}).roleLabel === '运营',
+    JSON.stringify(ml.json && ml.json.data));
+  let memTok = (ml.json.data || {}).token || '';
+
+  r = await req(PORT, 'GET', '/api/admin/session', { token: memTok });
+  /*
+   * 回显的 username 是**建号时填的原样**（这里是 "OperA"），不是登录时输入的小写 ——
+   * 「存原样、比小写」是有意的：运营回头在成员管理里看到的还是自己当初写的那个写法，
+   * 但登录时 `operA` / `OPERA` / `opera` 都进得来。所以这里按小写比。
+   */
+  ok('成员会话：source=member / 带 username（原样大小写）/ canChangePassword=true',
+    code(r) === 0 && (r.json.data || {}).source === 'member' &&
+    String((r.json.data || {}).username || '').toLowerCase() === 'opera' &&
+    (r.json.data || {}).canChangePassword === true,
+    JSON.stringify(r.json && r.json.data));
+
+  r = await req(PORT, 'GET', '/api/admin/goods/list', { token: memTok });
+  ok('operator 成员读商品列表 → 放行', code(r) === 0, `code ${code(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/goods/save', { token: memTok, body: {} });
+  ok('operator 成员保存商品 → 通过角色门（业务码非 401/403）',
+    code(r) !== 401 && code(r) !== 403, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/decorate/publish', { token: memTok, body: { key: 'home' } });
+  ok('operator 成员发布装修 → 403（成员角色照常受同一套角色门约束）', code(r) === 403, `code ${code(r)}`);
+  r = await req(PORT, 'POST', '/api/media/delete', { token: memTok, body: { name: 'x.png', force: 1 } });
+  ok('operator 成员删素材 → 403（需 owner）', code(r) === 403, `code ${code(r)}`);
+
+  /* —— ⑥ 登录失败不区分「账号不存在 / 口令不对 / 已停用」 —— */
+  const wrongPw = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'opera', password: 'nope-nope-nope' } });
+  ok('成员口令错 → 403', code(wrongPw) === 403, `code ${code(wrongPw)}`);
+  const noSuch = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'no_such_user', password: 'whatever-123' } });
+  ok('账号不存在 → 403，且文案与「口令错」**逐字相同**（差一个字就等于送出「这账号存不存在」的探测器）',
+    code(noSuch) === 403 && msg(noSuch) === msg(wrongPw),
+    `不存在="${msg(noSuch)}" 口令错="${msg(wrongPw)}"`);
+
+  /* —— ⑦ 用户令牌 / 匿名一律进不来 —— */
+  r = await req(PORT, 'GET', '/api/admin/members', { token: userToken });
+  ok('小程序用户令牌读成员列表 → 401（有 token ≠ 有管理员身份）', code(r) === 401, `code ${code(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: userToken, body: { username: 'hacker', password: 'hacker-pw-1' }
+  });
+  ok('用户令牌新建成员 → 401', code(r) === 401, `code ${code(r)}`);
+  r = await req(PORT, 'GET', '/api/admin/members', {});
+  ok('匿名读成员列表 → 401', code(r) === 401, `code ${code(r)}`);
+
+  /* —— ⑧ 只读 / 运营：能看列表，不能动成员 —— */
+  r = await req(PORT, 'GET', '/api/admin/members', { token: TOKENS.viewer });
+  ok('viewer 读成员列表 → 放行（只读成员也要能看清自己是谁）', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: TOKENS.viewer, body: { username: 'x1', password: 'x1-password' }
+  });
+  ok('viewer 新建成员 → 403', code(r) === 403, `code ${code(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: TOKENS.operator, body: { username: 'x2', password: 'x2-password' }
+  });
+  ok('operator 新建成员 → 403（能改「谁能进后台」= 最高危，只给 owner）', code(r) === 403, `code ${code(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/delete', { token: TOKENS.operator, body: { id: memAId } });
+  const afterOpDel = await memberList();
+  ok('operator 删成员 → 403，**且成员仍在**（只锁「403」挡不住「403 但已经删掉了」）',
+    code(r) === 403 && afterOpDel.length === 1,
+    `code ${code(r)}　剩余成员 ${afterOpDel.length}`);
+
+  /* —— ⑨ 改自己的口令（成员专用） —— */
+  r = await req(PORT, 'POST', '/api/admin/me/password', {
+    token: memTok, body: { oldPassword: 'member-pw-one', newPassword: 'member-pw-ONE-2' }
+  });
+  ok('成员自助改口令 → 成功', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  const oldLogin = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'opera', password: 'member-pw-one' } });
+  ok('改完口令：旧口令登录 → 403', code(oldLogin) === 403, `code ${code(oldLogin)}`);
+  const newLogin = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'opera', password: 'member-pw-ONE-2' } });
+  ok('改完口令：新口令登录 → 成功', code(newLogin) === 0, `code ${code(newLogin)} ${msg(newLogin)}`);
+  memTok = (newLogin.json.data || {}).token || '';
+
+  r = await req(PORT, 'POST', '/api/admin/me/password', {
+    token: memTok, body: { oldPassword: 'wrong-old-pw', newPassword: 'whatever-12345' }
+  });
+  ok('自助改口令时旧口令错 → 403（放宽到 viewer ≠ 不验旧口令）', code(r) === 403, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/me/password', {
+    token: ownerTok, body: { oldPassword: PASSWORD, newPassword: 'whatever-12345' }
+  });
+  ok('共享口令会话改「个人口令」→ 403（共享口令没有「个人口令」这回事）', code(r) === 403, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/me/password', {
+    token: TOKENS.viewer, body: { oldPassword: 'x', newPassword: 'whatever-12345' }
+  });
+  ok('长期令牌身份改「个人口令」→ 403', code(r) === 403, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/me/password', { body: { oldPassword: 'x', newPassword: 'whatever-12345' } });
+  ok('匿名改「个人口令」→ 401', code(r) === 401, `code ${code(r)}`);
+
+  /* —— ⑩ 三条自锁防护：不能消灭最后一个启用中的 owner ——
+   *
+   * 三条路（停用 / 降级 / 删除）都要拦，而且**每条被拒之后都要回头看一眼数据**：
+   * 「被拒」只说明接口报了错，不说明那个 owner 还在。
+   */
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'OwnerB', name: '超管乙', role: 'owner', password: 'owner-b-pw-1' }
+  });
+  ok('再建一个 owner 成员 → 成功', code(m) === 0, `code ${code(m)} ${msg(m)}`);
+  const memBId = ((m.json || {}).data || {}).id;
+
+  r = await req(PORT, 'POST', '/api/admin/members/status', { token: ownerTok, body: { id: memBId, enabled: false } });
+  ok('停用唯一一个启用中的 owner 成员 → 被拒（否则没人能再登录后台）',
+    code(r) !== 0 && /最后一个/.test(msg(r)), `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/save', { token: ownerTok, body: { id: memBId, role: 'operator' } });
+  ok('把唯一一个启用中的 owner 降级 → 被拒', code(r) !== 0 && /最后一个/.test(msg(r)), `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: memBId } });
+  ok('删除唯一一个启用中的 owner → 被拒', code(r) !== 0 && /最后一个/.test(msg(r)), `code ${code(r)} ${msg(r)}`);
+  ok('三次被拒之后：那个 owner 仍在 / 仍是 owner / 仍启用（后果断言，不只锁「被拒」）',
+    (await activeOwners()) === 1 && (await memberList()).length === 2,
+    `启用中的 owner=${await activeOwners()}　成员总数=${(await memberList()).length}`);
+
+  m = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'OwnerC', name: '超管丙', role: 'owner', password: 'owner-c-pw-1' }
+  });
+  ok('再补一个 owner → 成功（防护只拦「归零」，不是禁止管理 owner）', code(m) === 0, `code ${code(m)} ${msg(m)}`);
+  const memCId = ((m.json || {}).data || {}).id;
+  r = await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: memBId } });
+  ok('有第二个 owner 之后，删掉原来的 owner → 放行', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+
+  /* —— ⑪ 停用 / 启用 / 降级**立刻**生效（token 每次回查成员表） —— */
+  r = await req(PORT, 'POST', '/api/admin/members/status', { token: ownerTok, body: { id: memAId, enabled: false } });
+  ok('停用成员 A → 成功', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  const offLogin = await req(PORT, 'POST', '/api/admin/login', { body: { username: 'opera', password: 'member-pw-ONE-2' } });
+  ok('已停用成员登录 → 403，且文案与「口令错 / 账号不存在」逐字相同（不暴露「号还在、只是停了」）',
+    code(offLogin) === 403 && msg(offLogin) === msg(wrongPw), `code ${code(offLogin)} msg=${msg(offLogin)}`);
+  r = await req(PORT, 'GET', '/api/admin/goods/list', { token: memTok });
+  ok('已停用成员的**旧会话令牌立刻失效**（下一个请求就 401 —— 否则「停用」要等 12 小时 TTL 才真停）',
+    code(r) === 401, `code ${code(r)} ${msg(r)}`);
+
+  r = await req(PORT, 'POST', '/api/admin/members/status', { token: ownerTok, body: { id: memAId, enabled: true } });
+  ok('重新启用成员 A → 成功', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/members/save', { token: ownerTok, body: { id: memAId, role: 'viewer' } });
+  ok('把成员 A 降级为只读 → 成功', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  r = await req(PORT, 'POST', '/api/admin/goods/save', { token: memTok, body: {} });
+  ok('降级**立刻生效**：同一条令牌改商品 → 403（不必等人重新登录）', code(r) === 403, `code ${code(r)} ${msg(r)}`);
+
+  /* —— ⑫ 收尾 ——
+   *
+   * 注意：成员表**不可能被清空到 0 owner** —— 上一条防护的必然结果。
+   * 这不是「收尾没做干净」，而是「后台永远不会处于『有一堆成员、但没有一个 owner』」。
+   * 运营真要只剩一个人，走的是环境变量那条救援通道（ADMIN_PASSWORD / ADMIN_TOKENS），
+   * 那两条不经过成员表。本节的数据全在临时目录里，进程一退就连目录一起删掉。
+   */
+  r = await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: memAId } });
+  ok('删除成员 A（只读）→ 成功', code(r) === 0, `code ${code(r)} ${msg(r)}`);
+  const leftMembers = await memberList();
+  ok('非 owner 成员可以删干净，成员表只剩那个 owner 成员',
+    leftMembers.length === 1 && leftMembers[0].role === 'owner',
+    leftMembers.map((x) => `${x.username}(${x.role})`).join('、') || '空');
+  r = await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: memCId } });
+  ok('成员表里**最后一个 owner** 删不掉（设计如此：不留「后台在跑但没人能登录」的状态）',
+    code(r) !== 0 && /最后一个/.test(msg(r)), `code ${code(r)} ${msg(r)}`);
+
   /* ============================ 8. 爆破退避 ============================ */
   section('8. 口令爆破退避（5 次 / 60 秒）');
 

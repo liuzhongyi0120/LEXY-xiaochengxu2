@@ -441,6 +441,20 @@ section('11 · 自定义页改标识与站内引用清单');
   ok('新建自定义页成功', created.page.key === 'activity');
   ok('新建时还没有任何别名', Object.keys(customPages.aliases()).length === 0);
 
+  /*
+   * ★ 先把这一页**发布**出去，再验改名。
+   *
+   * 这不是为了凑测试，而是这条链路的前提：「改标识要迁移 replica.js 里的 CUSTOM_PAGES 键名」
+   * 只对**已经发布过**（replica 里真的有这个键）的页面才成立。
+   * 2026-10-15 之前，改名会把注册表里**所有**自定义页整份写进 replica，
+   * 所以「从没发布过的页改个名 = 顺手把它发布上线」也能让下面的断言变绿 ——
+   * 那正是本轮修掉的漏发（见 store.js assemble() 的门），这条以漏发为前提的断言必须补上前置。
+   */
+  decorate.saveDraft('activity', { blocks: [{ type: 'title', text: '春季活动' }], meta: { bg: '#FFFFFF' } });
+  const actPub = decorate.publish('activity', '自检：改名前置发布');
+  ok('（前置）活动页先发布，改标识时 replica 里才有键名可迁',
+    !!actPub && !!(decorate.readReplica().CUSTOM_PAGES || {}).activity);
+
   // 造一处站内引用：首页加一个标题区块，跳转到这个活动页
   const homeData = decorate.getPage('home');
   const draft = JSON.parse(JSON.stringify(homeData.published));
@@ -525,6 +539,24 @@ section('11 · 自定义页改标识与站内引用清单');
   const R3 = decorate.readReplica();
   ok('删除后 replica 里不再有该页与相关别名',
     !(R3.CUSTOM_PAGES || {})['activity-final'] && !(R3.CUSTOM_PAGE_ALIASES || {}).activity);
+
+  /*
+   * ★ 反向用例：**从没发布过**的自定义页，改标识不许把它顺带发布出去。
+   *
+   * 与上面「已发布页改名要迁移键名」是同一条规则的两面：
+   *   写进 replica 的条件 = 「本次正在发布」或「当前已经在 replica.js 里」。
+   * 2026-10-15 之前 assemble() 整份写 publishedAll()，于是「建了但没发布」的页面会被
+   * 任何一次写 replica 的操作（发布别的页、删任意页/笔记、改名）带进产物，
+   * 接口同时把它的状态谎报成「代码已生成」。
+   */
+  const draftPage = decorate.createCustomPage({ name: '草稿页（不发布）', key: 'activity-draft' });
+  ok('（反向用例）新建一个不发布的页', draftPage.page.key === 'activity-draft');
+  decorate.updateCustomPage('activity-draft', { key: 'activity-draft-2' });
+  const R4 = decorate.readReplica();
+  ok('★ 没发布过的页改标识，不会因此被写进 replica（建条目 ≠ 下发）',
+    !(R4.CUSTOM_PAGES || {})['activity-draft'] && !(R4.CUSTOM_PAGES || {})['activity-draft-2'],
+    'CUSTOM_PAGES 键=' + JSON.stringify(Object.keys(R4.CUSTOM_PAGES || {})));
+  decorate.removeCustomPage('activity-draft-2', { force: 1 });
 }
 
 /* ------------------------------------------------------------------ *

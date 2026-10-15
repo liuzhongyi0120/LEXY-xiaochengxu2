@@ -1,17 +1,30 @@
 /**
- * 店铺笔记 · 装修台浏览器验收脚本
+ * 店铺笔记 · 浏览器验收脚本（装修台 + 控制台两侧）
  *
- * 前面三个自检（_test-shopnotes / _test-notes-e2e / _test-notes-http）覆盖的是
- * 「数据层 → store 编排 → 接口」。但「运营点下去到底会不会变」只能在真浏览器里验，
- * 这个脚本补那一段：
- *   1. 列表页顶部统计：「店铺笔记 N / 50」
- *   2. 工具条出现「+ 新建笔记」，点它弹的是「新建店铺笔记」而不是新建页面
- *   3. 笔记行：类型角标文案 = 店铺笔记、配色 = 青色（实测 computed style）
- *   4. 笔记行操作列：装修 / 丢弃草稿 / 删除；**没有「改名」**（改了会与「标题在编辑器里改」两处打架）
- *   5. 「归属」筛选里有「店铺笔记」
- *   6. 「装修」是 <a target=_blank href="/admin?edit=note-N">，且编辑器打开后顶栏标记 = 店铺笔记、
- *      左栏组件库**不收起**（笔记是可拼组件的）
- *   7. 收尾：删掉测试笔记，并核对注册表已清空、replica.js 逐字节没变
+ * 前面几个自检（_test-shopnotes / _test-notes-e2e / _test-notes-http / check-all 15.81）
+ * 覆盖的是「数据层 → store 编排 → 接口」。但「运营点下去到底会不会变」只能在真浏览器里验，
+ * 这个脚本补那一段。
+ *
+ * 2026-10-15 起「店铺笔记」的**入口与列表**从装修台搬到了后台控制台的「店铺笔记」栏目，
+ * 装修台只保留「装修」那一半。所以本脚本分两半：
+ *
+ *  A. 装修台（不该再有笔记入口）：
+ *    1. 没有 #statNote 统计卡、没有 #btnCreateNote 按钮，工具条只剩 筛选 / 重置 / + 新建页面
+ *    2. 页面表格里 0 条笔记行，「归属」筛选里没有「店铺笔记」
+ *    3. 底部说明指向控制台（链接到 /console#shopnotes）
+ *    4. `/admin?edit=note-N` 仍能打开编辑器：顶栏标记 = 店铺笔记、青绿配色、组件库不收起、
+ *       区块树两段固定区（笔记头部 / 笔记正文）
+ *    5. 属性面板**读得出**运营填的标题 / 摘要 / 标签（曾经平铺在 data.title 上，面板全空）
+ *    6. 面板改标题 → 存至草稿 → 接口回读确实是新标题；丢弃草稿 → 回到原标题
+ *    7. 点组件卡片能加进区块树，且**存得下去**（面板放行的 kind 必须过草稿校验）
+ *
+ *  B. 控制台「店铺笔记」栏目（接管了入口与列表）：
+ *    8. 未登录访问 /console 被强制落到 #login；侧栏其它栏目全部 .locked
+ *    9. 共享口令登录 → 进 dashboard；点「店铺笔记」能看到同一篇（与装修台同一份数据）
+ *   10. 行内「装修」= <a target=_blank href="/admin?edit=note-N">；「删除」走确认层
+ *   11. 点「新建」→ 弹层 → 提交 → 列表 +1 → 再从行内「删除」删掉（走 UI 确认层）
+ *
+ * 收尾：清掉测试笔记、核对注册表已清空、replica.js 内容未变（只回退时间戳噪音）。
  *
  * 用法（前置：① 后端 3000 ② 无头 CDP 代理 3456）：
  *   node server/index.js
@@ -109,8 +122,23 @@ const NOTE_TITLE = '秋冬除尘季，这几件小家电真香';
 const NOTE_SUMMARY = '一句话卖点';
 const NOTE_TAGS = '洗地机,吸尘器';
 let createdKey = '';
+/* 第 2.5 节从控制台 UI 新建的那一篇（正常会当场删掉；中途异常时由 finally 按标题扫掉） */
+let consoleNoteTitle = '';
 
 (async function main() {
+  /*
+   * 章节标头带一个「距开跑多少秒」的时间戳。
+   *
+   * 这不是装饰：这个脚本会**真发布一次笔记**，而 replica.js 里出现 SHOPNOTES 也是别的
+   * 环节（删笔记、发布页面）的副作用。排查「到底哪一步把它写出来的」时，
+   * 把本脚本的时间戳与 `.tooling/_watch-shopnotes.mjs` 的观察时刻一对就定位了
+   * （2026-10-15 那个「没点生成代码的笔记被顺带下发」的 bug 就是这么抓到的）。
+   */
+  const T0 = Date.now();
+  const TLOG = (m) => {
+    const t = '  [t=' + ((Date.now() - T0) / 1000).toFixed(1) + 's]';
+    console.log(String(m).replace(/\n$/, '') + t);
+  };
   const before = readFileSync(REPLICA);
   const tabs = [];
 
@@ -131,99 +159,265 @@ let createdKey = '';
     }
 
     /* ---------- 1. 造一条测试笔记 ---------- */
-    console.log('\n【1】造测试数据');
+    TLOG('\n【1】造测试数据');
     const cr = await api('POST', '/api/decorate/note/create', { title: NOTE_TITLE, summary: NOTE_SUMMARY, tags: NOTE_TAGS });
     createdKey = cr.data && cr.data.page && cr.data.page.key;
     ok('笔记已创建', !!createdKey, JSON.stringify(cr).slice(0, 200));
 
-    /* ---------- 2. 列表页 ---------- */
-    console.log('\n【2】列表页（真实浏览器）');
+    /* ---------- 2. 装修台列表页：笔记入口与列表已撤（真浏览器） ---------- */
+    TLOG('\n【2】装修台列表页：笔记入口与列表已撤');
     const tab = await open(SITE + '/admin');
     tabs.push(tab);
     const state = await ensureLoggedIn(tab);
     ok('列表已渲染', Number(await run(tab, `String(document.querySelectorAll('#pageRows tr').length)`)) > 0, state);
 
-    // 2.1 顶部统计
-    const stat = await run(tab, `document.getElementById('statNote').textContent`);
-    ok('统计行显示「店铺笔记 N / 50」', /^店铺笔记 \d+ \/ 50$/.test(stat), stat);
-
-    // 2.2 「+ 新建笔记」按钮
-    const btn = await run(tab, `(() => {
-      const b = document.getElementById('btnCreateNote');
-      return b ? b.textContent.trim() : '';
-    })()`);
-    ok('工具条有「+ 新建笔记」', btn === '+ 新建笔记', btn);
-
-    // 2.3 笔记行的角标与配色（实测 computed style，不看截图）
-    const rowInfo = await run(tab, `(() => {
-      const key = ${JSON.stringify(createdKey)};
-      const a = [...document.querySelectorAll('#pageRows a.pname')].find((x) => (x.getAttribute('href') || '').indexOf(encodeURIComponent(key)) >= 0);
-      if (!a) return JSON.stringify({ err: 'row-not-found' });
-      const tr = a.closest('tr');
-      const tag = tr.querySelector('.type-tag');
-      const cs = tag ? getComputedStyle(tag) : null;
-      const ops = [...tr.querySelectorAll('.ops-row > *')].map((n) => n.textContent.trim());
-      const delBtn = tr.querySelector('[data-note-del]');
-      const renameBtn = tr.querySelector('[data-rename]');
+    const gone = await run(tab, `(() => {
+      const trs = [...document.querySelectorAll('#pageRows tr')];
       return JSON.stringify({
-        tagText: tag ? tag.textContent.trim() : '',
-        tagColor: cs ? cs.color : '',
-        tagBg: cs ? cs.backgroundColor : '',
-        ops: ops,
-        hasNoteDel: !!delBtn,
-        noteDelKey: delBtn ? delBtn.getAttribute('data-note-del') : '',
-        hasRename: !!renameBtn,
-        href: a.getAttribute('href'),
-        target: a.getAttribute('target')
+        hasStatNote: !!document.getElementById('statNote'),
+        hasCreateNoteBtn: !!document.getElementById('btnCreateNote'),
+        toolbar: [...document.querySelectorAll('.toolbar button')].map((b) => b.textContent.trim()),
+        toolbarAll: [...document.querySelectorAll('.toolbar [id^=btn]')].map((b) => b.id),
+        noteRows: trs.filter((r) => r.innerText.indexOf('店铺笔记') >= 0).length,
+        belongs: [...document.querySelectorAll('#fBelongs option')].map((o) => o.textContent).join(','),
+        foot: document.getElementById('listFoot').innerHTML,
+        noteLink: !!document.querySelector('#listFoot a[href="/console#shopnotes"]')
       });
     })()`);
-    console.log('    行实测：' + rowInfo);
-    let ri = {};
-    try { ri = JSON.parse(rowInfo); } catch (e) { /* ignore */ }
-    ok('笔记行角标文案 = 店铺笔记', ri.tagText === '店铺笔记', rowInfo);
-    ok('角标是青色（区别于自定义页的蓝）', ri.tagBg === 'rgb(234, 247, 242)' && ri.tagColor === 'rgb(15, 122, 90)',
-      'bg=' + ri.tagBg + ' color=' + ri.tagColor);
-    ok('操作列 = 装修 / 丢弃草稿 / 删除', (ri.ops || []).join('|') === '装修|丢弃草稿|删除', (ri.ops || []).join('|'));
-    ok('删除走笔记专属端点（data-note-del）', ri.hasNoteDel === true && ri.noteDelKey === createdKey, rowInfo);
-    ok('笔记行**没有**「改名」按钮', ri.hasRename === false, rowInfo);
-    ok('「装修」是新窗口打开（href 带 ?edit=，target=_blank）',
-      String(ri.href).indexOf('?edit=' + encodeURIComponent(createdKey)) > 0 && ri.target === '_blank', rowInfo);
+    let g = {};
+    try { g = JSON.parse(gone); } catch (e) { /* ignore */ }
+    ok('顶部「店铺笔记 N / 50」统计卡已撤掉（#statNote 不存在）', g.hasStatNote === false, gone);
+    ok('工具条里的「+ 新建笔记」已撤掉（#btnCreateNote 不存在）', g.hasCreateNoteBtn === false, gone);
+    ok('工具条只剩 筛选 / 重置 / + 新建页面',
+      (g.toolbar || []).join('|') === '筛选|重置|+ 新建页面', (g.toolbar || []).join('|'));
+    ok('页面表格里 0 条笔记行（笔记不再混在页面列表里）', g.noteRows === 0, String(g.noteRows));
+    ok('「归属」筛选里没有「店铺笔记」（它已不是本页的页面类型）',
+      (g.belongs || '').indexOf('店铺笔记') < 0, g.belongs);
+    ok('底部说明指向控制台「店铺笔记」栏目（真链接 /console#shopnotes）', g.noteLink === true,
+      String(g.foot).replace(/\s+/g, ' ').slice(0, 120));
 
-    // 2.4 归属筛选
-    const belongs = await run(tab, `[...document.querySelectorAll('#fBelongs option')].map(o=>o.textContent).join(',')`);
-    ok('「归属」筛选含店铺笔记', belongs.indexOf('店铺笔记') >= 0, belongs);
+    /* ---------- 2.5 控制台「店铺笔记」栏目接管（真浏览器） ---------- */
+    TLOG('\n【2.5】控制台「店铺笔记」栏目接管（真浏览器）');
+    const ctab = await open(SITE + '/console');
+    tabs.push(ctab);
+    /* 先清掉登录态再看 —— 否则上一轮跑完留在 localStorage 里的令牌会让「未登录强制跳转」假绿。
+     *
+     * ⚠️ 只清 localStorage **不够**：AdminSession 会把令牌与身份在内存里缓存一份
+     *    （`_token` / `_me` 为 null 时才回读 localStorage），所以必须整页重载。
+     *    重载放在 setTimeout 里：让这次 eval 先把结果返回，别跟导航抢时序。
+     *    也不直接调 boot()/AdminSession.clear() —— 那是内部函数，改名就断
+     *    （断言要锁意图，不锁实现字面）。 */
+    await run(ctab, `(() => {
+      localStorage.removeItem('lexy_admin_token');
+      localStorage.removeItem('lexy_admin_me');
+      location.hash = '';
+      setTimeout(function () { location.reload(); }, 30);
+      return 'reload-scheduled';
+    })()`);
+    await sleep(2500);
 
-    // 2.5 底部口径说明提到笔记
-    const foot = await run(tab, `document.getElementById('listFoot').textContent`);
-    ok('底部说明提到店铺笔记与 replica.SHOPNOTES', foot.indexOf('店铺笔记') >= 0 && foot.indexOf('SHOPNOTES') >= 0);
-
-    // 2.6 点「+ 新建笔记」→ 弹的是笔记弹层
-    const dlg = await run(tab, `(() => {
-      document.getElementById('btnCreateNote').click();
-      const t = document.getElementById('modalTitle').textContent;
-      const body = document.getElementById('modalBody');
-      const inputs = [...body.querySelectorAll('input')];
+    const cnav = await run(ctab, `(() => {
+      const items = [...document.querySelectorAll('#nav .nav-item')];
       return JSON.stringify({
-        title: t,
-        hidden: document.getElementById('modal').hidden,
-        labels: [...body.querySelectorAll('label')].map((l) => l.textContent),
-        titleMax: inputs[0] ? inputs[0].maxLength : -1,
-        hint: (body.querySelector('.hint') || {}).textContent || ''
+        texts: items.map((b) => b.textContent.trim()),
+        locked: items.filter((b) => b.classList.contains('locked')).map((b) => b.textContent.trim()),
+        hash: location.hash,
+        title: document.getElementById('pgTitle').textContent,
+        hasPwForm: !!document.querySelector('#body [data-p]'),
+        pwType: (document.querySelector('#body [data-p]') || {}).type || ''
       });
     })()`);
-    console.log('    弹层实测：' + dlg);
-    let d = {};
-    try { d = JSON.parse(dlg); } catch (e) { /* ignore */ }
-    ok('弹层标题 = 新建店铺笔记', d.title === '新建店铺笔记', dlg);
-    ok('弹层可见', d.hidden === false, dlg);
-    ok('表单含 笔记标题 / 笔记摘要 / 笔记标签', (d.labels || []).join('|') === '笔记标题|笔记摘要|笔记标签', (d.labels || []).join('|'));
-    ok('标题输入框长度上限 = 40（取自后端下发口径）', d.titleMax === 40, String(d.titleMax));
-    ok('弹层说明「新建后只是后台多出一篇笔记」', String(d.hint).indexOf('生成代码') >= 0, String(d.hint).slice(0, 80));
-    await run(tab, `document.getElementById('modalClose').click();`);
-    await sleep(300);
+    let cn = {};
+    try { cn = JSON.parse(cnav); } catch (e) { /* ignore */ }
+    console.log('    侧栏实测：' + cnav);
+    ok('★ 未登录访问 /console 被强制落到登录页（hash=#login、标题=登录）',
+      cn.hash === '#login' && cn.title === '登录', cnav);
+    ok('登录页渲染出账号 + 口令表单（口令框 type=password）',
+      cn.hasPwForm === true && cn.pwType === 'password', cnav);
+    ok('侧栏含 店铺笔记 / 成员管理 / 登录 三栏',
+      ['店铺笔记', '成员管理', '登录'].every((t) => (cn.texts || []).indexOf(t) >= 0),
+      (cn.texts || []).join('/'));
+    ok('未登录时除「登录」外全部置灰不可点（13 栏里 12 栏 locked）',
+      (cn.locked || []).length === (cn.texts || []).length - 1 && (cn.locked || []).indexOf('登录') < 0,
+      'locked=' + (cn.locked || []).length + '/' + (cn.texts || []).length);
+
+    /* 用共享口令登录（控制台自己的表单，与装修台的登录层不是一回事） */
+    await run(ctab, `(() => {
+      document.querySelector('#body [data-p]').value = ${JSON.stringify(ADMIN_PW)};
+      document.querySelector('#body [data-login]').click();
+      return 'clicked';
+    })()`);
+    await sleep(1800);
+    const afterLogin = await run(ctab, `JSON.stringify({ hash: location.hash, title: document.getElementById('pgTitle').textContent })`);
+    let al = {};
+    try { al = JSON.parse(afterLogin); } catch (e) { /* ignore */ }
+    ok('共享口令登录后进入数据概览（hash=#dashboard）', al.hash === '#dashboard', afterLogin);
+
+    /* 进「店铺笔记」栏目 —— 与装修台读的是同一份数据，所以应该看得见刚造的那篇 */
+    await run(ctab, `(() => {
+      const b = [...document.querySelectorAll('#nav .nav-item')].find((x) => x.textContent.trim() === '店铺笔记');
+      b.click();
+      return 'clicked';
+    })()`);
+    await sleep(1500);
+    const listInfo = await run(ctab, `(() => {
+      const trs = [...document.querySelectorAll('#body table.tb tbody tr')];
+      const hit = trs.find((r) => r.innerText.indexOf(${JSON.stringify(NOTE_TITLE)}) >= 0);
+      return JSON.stringify({
+        rows: trs.length,
+        headers: [...document.querySelectorAll('#body table.tb thead th')].map((t) => t.textContent.trim()),
+        hitFound: !!hit,
+        hitButtons: hit ? [...hit.querySelectorAll('a, button')].map((b) => ({
+          text: b.textContent.trim(), tag: b.tagName.toLowerCase(),
+          href: b.getAttribute('href') || '', target: b.getAttribute('target') || ''
+        })) : [],
+        hasNewBtn: !!document.querySelector('#body [data-new]'),
+        hitCells: hit ? [...hit.querySelectorAll('td')].map((t) => t.innerText.replace(/\\s+/g, ' ').trim()) : [],
+        statLine: (document.querySelector('#body .card.stat-line') || {}).innerText || ''
+      });
+    })()`);
+    console.log('    列表实测：' + listInfo);
+    let li = {};
+    try { li = JSON.parse(listInfo); } catch (e) { /* ignore */ }
+    ok('控制台「店铺笔记」栏目里能看到装修台造的那一篇（两侧同一份数据）', li.hitFound === true, listInfo);
+    ok('列头 = 笔记标题 · 真机地址 / 状态 / 内容量 / 操作',
+      (li.headers || []).join('|') === '笔记标题 · 真机地址|状态|内容量|操作', (li.headers || []).join('|'));
+    const draw = (li.hitButtons || []).find((b) => b.text === '装修');
+    ok('★ 行内「装修」是新窗口打开的真链接 /admin?edit=note-N（装修那一半仍留在装修台）',
+      !!draw && draw.tag === 'a' && draw.target === '_blank' &&
+      draw.href.indexOf('?edit=' + encodeURIComponent(createdKey)) > 0,
+      JSON.stringify(draw));
+    const delBtnInfo = (li.hitButtons || []).find((b) => b.text === '删除');
+    ok('行内有「删除」按钮（笔记行**没有**「改名」—— 改名会与「标题在编辑器里改」两处打架）',
+      !!delBtnInfo && (li.hitButtons || []).every((b) => b.text !== '改名'), JSON.stringify(li.hitButtons));
+    ok('本页带「新建」入口（#body [data-new]）', li.hasNewBtn === true, listInfo);
+    /*
+     * 「内容量」列：这篇刚建好、**还没有草稿**，所以报的是已生成代码那份（0 个组件）。
+     * 期望值直接写文案而不是只判「非空」——只判非空的话，把这一列改回写死的 0 也会绿。
+     * 有草稿时该列换成「草稿 N 个组件」，那一条在第 4 节存完草稿后复查（见下）。
+     */
+    ok('「内容量」列：无草稿时报已生成代码的区块数（未生成代码 → 0 个组件）',
+      String((li.hitCells || [])[2] || '') === '0 个组件', JSON.stringify(li.hitCells));
+    /* ⚠️ innerText 里「/ 50 篇」前后是换行，先把连续空白折成一个空格再比 ——
+     *    直接对着带换行的原文写正则，红的是「排版换行」而不是「配额没了」（假红）。 */
+    const statFlat = String(li.statLine).replace(/\s+/g, ' ');
+    ok('页面顶部有笔记配额与口径说明（店铺笔记 N / 50 篇）',
+      /店铺笔记 \d+ \/ 50 篇/.test(statFlat), statFlat.slice(0, 100));
+
+    /* 点「新建」→ 弹层 */
+    const UI_NOTE_TITLE = '控制台验收临时笔记（会自动删）';
+    const ROWS_EXPR = `[...document.querySelectorAll('#body table.tb tbody tr')]`;
+    await run(ctab, `document.querySelector('#body [data-new]').click(); 'ok'`);
+    await sleep(600);
+    const dlgInfo = await run(ctab, `(() => {
+      const mask = document.querySelector('#layer .mask');
+      if (!mask) return JSON.stringify({ err: 'no-modal' });
+      return JSON.stringify({
+        title: (document.querySelector('#layer .mask + *') || {}).textContent || '',
+        hasTitle: !!mask.querySelector('[data-title]'),
+        hasSummary: !!mask.querySelector('[data-summary]'),
+        hasTags: !!mask.querySelector('[data-tags]'),
+        titlePh: (mask.querySelector('[data-title]') || {}).placeholder || '',
+        okText: (mask.querySelector('[data-ok]') || {}).textContent || '',
+        text: mask.innerText.replace(/\\s+/g, ' ').slice(0, 200)
+      });
+    })()`);
+    let di = {};
+    try { di = JSON.parse(dlgInfo); } catch (e) { /* ignore */ }
+    ok('新建弹层含 标题 / 摘要 / 标签 三格，且标题占位写明「必填，5~40 字」口径（口径由后端下发，前端不写死）',
+      di.hasTitle === true && di.hasSummary === true && di.hasTags === true &&
+      /必填，5~40 字/.test(String(di.titlePh)), dlgInfo);
+    ok('弹层说明「新建后只是后台多出一篇笔记，生成代码才写进 replica.js」',
+      /replica\.js/.test(String(di.text)) && /生成代码/.test(String(di.text)), String(di.text).slice(0, 100));
+
+    /* 超长标题（41 字）→ 前端先拦一次，列表条数必须不变（后果断言） */
+    const TOO_LONG = '超'.repeat(41);
+    await run(ctab, `(() => {
+      const mask = document.querySelector('#layer .mask');
+      mask.querySelector('[data-title]').value = ${JSON.stringify(TOO_LONG)};
+      mask.querySelector('[data-ok]').click();
+      return 'ok';
+    })()`);
+    await sleep(1000);
+    const overLong = await run(ctab, `JSON.stringify({ rows: ${ROWS_EXPR}.length, modalOpen: !!document.querySelector('#layer .mask') })`);
+    let ol = {};
+    try { ol = JSON.parse(overLong); } catch (e) { /* ignore */ }
+    ok('超长标题（41 字）被拦下：列表条数不变、弹层还开着（不假装建成功）',
+      ol.rows === li.rows && ol.modalOpen === true, overLong);
+
+    /* 填合法标题 → 提交 → 列表 +1，并且「建完直接开编辑器」真的调了 window.open(…?edit=note-N) */
+    await run(ctab, `(() => {
+      /* 把 window.open 换掉：只记录参数、不真开标签页 ——
+       * 既验了「建完会直接带去编辑器」，又不给本脚本留下收尾用的多余标签页。 */
+      window.__opened = '';
+      window.open = function (u) { window.__opened = String(u); return {}; };
+      const mask = document.querySelector('#layer .mask');
+      mask.querySelector('[data-title]').value = ${JSON.stringify(UI_NOTE_TITLE)};
+      mask.querySelector('[data-summary]').value = '一句话卖点';
+      mask.querySelector('[data-tags]').value = '验收';
+      mask.querySelector('[data-ok]').click();
+      return 'ok';
+    })()`);
+    await sleep(1900);
+    const afterNew = await run(ctab, `(() => {
+      const trs = ${ROWS_EXPR};
+      return JSON.stringify({
+        rows: trs.length,
+        hit: trs.filter((r) => r.innerText.indexOf(${JSON.stringify(UI_NOTE_TITLE)}) >= 0).length,
+        opened: window.__opened || ''
+      });
+    })()`);
+    let an = {};
+    try { an = JSON.parse(afterNew); } catch (e) { /* ignore */ }
+    ok('★ 从控制台新建 → 列表多出一行（走的是同一个 /api/decorate/note/create）',
+      an.hit === 1 && an.rows === (li.rows || 0) + 1, afterNew);
+    ok('建完直接带进编辑器：window.open 的地址是 /admin?edit=note-N',
+      /^\/admin\?edit=note-\d+$/.test(String(an.opened)), String(an.opened));
+
+    /* 再从行内「删除」删掉它（走 UI 确认层） */
+    const delFlow = await run(ctab, `(() => {
+      const tr = [...document.querySelectorAll('#body table.tb tbody tr')]
+        .find((r) => r.innerText.indexOf(${JSON.stringify(UI_NOTE_TITLE)}) >= 0);
+      if (!tr) return JSON.stringify({ err: 'row-gone' });
+      tr.querySelector('[data-note-del]').click();
+      return JSON.stringify({ clicked: true });
+    })()`);
+    await sleep(700);
+    const confirmInfo = await run(ctab, `(() => {
+      const mask = document.querySelector('#layer .mask');
+      return JSON.stringify({
+        text: mask ? mask.innerText.replace(/\\s+/g, ' ').slice(0, 220) : '(无确认层)',
+        hasDelBtn: !!mask && [...mask.querySelectorAll('button')].some((b) => b.textContent.trim() === '删除')
+      });
+    })()`);
+    let ci = {};
+    try { ci = JSON.parse(confirmInfo); } catch (e) { /* ignore */ }
+    ok('点「删除」先弹确认层，文案讲清连带影响与不可撤销',
+      ci.hasDelBtn === true && /删除笔记/.test(String(ci.text)) && /不可撤销/.test(String(ci.text)),
+      String(ci.text).slice(0, 160));
+    await run(ctab, `(() => {
+      const mask = document.querySelector('#layer .mask');
+      const b = [...mask.querySelectorAll('button')].find((x) => x.textContent.trim() === '删除');
+      b.click();
+      return 'ok';
+    })()`);
+    await sleep(1900);
+    const afterDel = await run(ctab, `(() => {
+      const trs = [...document.querySelectorAll('#body table.tb tbody tr')];
+      return JSON.stringify({
+        rows: trs.length,
+        gone: trs.filter((r) => r.innerText.indexOf(${JSON.stringify(UI_NOTE_TITLE)}) >= 0).length
+      });
+    })()`);
+    let ad = {};
+    try { ad = JSON.parse(afterDel); } catch (e) { /* ignore */ }
+    ok('★ 确认后那一行消失、列表回到新建前的条数（UI 删除路径真的通）',
+      ad.gone === 0 && ad.rows === (li.rows || 0), afterDel);
+    /* 兜底：万一 UI 删除没成，这一步的残留交给 finally 按标题扫一遍清掉 */
+    consoleNoteTitle = UI_NOTE_TITLE;
 
     /* ---------- 3. 编辑器（?edit=note-N 直达） ---------- */
-    console.log('\n【3】编辑器直达（?edit=' + createdKey + '）');
+    TLOG('\n【3】编辑器直达（?edit=' + createdKey + '）');
     const tab2 = await open(SITE + '/admin?edit=' + encodeURIComponent(createdKey), 2600);
     tabs.push(tab2);
     const st2 = await ensureLoggedIn(tab2);
@@ -288,7 +482,7 @@ let createdKey = '';
      * 所以这里必须断言「面板上真的显示出了运营在弹层里填的那几个值」——
      * 只看 DOM 里有没有 input（上面那条 inspFields）是拦不住这个 bug 的。
      */
-    console.log('\n【3.5】面板显示「笔记头部」的值');
+    TLOG('\n【3.5】面板显示「笔记头部」的值');
     const fields = await run(tab2, `(() => {
       const head = [...document.querySelectorAll('#tree .tnode')]
         .find((n) => ((n.querySelector(':scope > .txt') || {}).textContent || '') === '笔记头部');
@@ -343,7 +537,7 @@ let createdKey = '';
     /* ---------- 3.6 在面板里改标题 → 存至草稿 → 读回来确实是新标题 ----------
      * 3.5 证的是「读得出来」，这里证的是「写得下去」——两段合起来才是完整的对账。
      */
-    console.log('\n【3.6】面板改标题 → 存至草稿 → 读回');
+    TLOG('\n【3.6】面板改标题 → 存至草稿 → 读回');
     const NEW_TITLE = '面板改过的标题（验收）';
     await run(tab2, `(() => {
       const fld = [...document.querySelectorAll('#inspector .fld')]
@@ -379,7 +573,7 @@ let createdKey = '';
       JSON.stringify(afterDiscard.data && afterDiscard.data.data && afterDiscard.data.data.header && afterDiscard.data.data.header.title));
 
     /* ---------- 4. 真加一个组件：证明笔记真的可拼组件（不只是结构上接了） ---------- */
-    console.log('\n【4】加一个组件（辅助线）');
+    TLOG('\n【4】加一个组件（辅助线）');
     const added = await run(tab2, `(() => {
       const card = [...document.querySelectorAll('#libGrid .lib-item:not(.off)')]
         // 笔记组件面板用**有赞的名字**（辅助线 / 辅助空白），不是内部名「辅助分割」
@@ -419,7 +613,7 @@ let createdKey = '';
      * 「加了组件就标记未保存」这条断言当时是绿的，因为**它压根没碰保存**。
      * 所以这里必须真点一次「存至草稿」，再回读接口确认那一项落盘了。
      */
-    console.log('\n【4.5】★「加得进去」还得「存得下去」');
+    TLOG('\n【4.5】★「加得进去」还得「存得下去」');
     await run(tab2, `document.getElementById('btnSave').click();`);
     await sleep(1500);
     const afterAdd = await api('GET', '/api/decorate/page?key=' + encodeURIComponent(createdKey));
@@ -430,6 +624,39 @@ let createdKey = '';
     ok('存完状态回到「无未保存改动」',
       /无未保存改动/.test(await run(tab2, `document.getElementById('edDirty').textContent`)),
       await run(tab2, `document.getElementById('edDirty').textContent`));
+
+    /*
+     * ★ 「内容量」列在有草稿时改报**草稿**的区块数（2026-10-15 补）。
+     *
+     * 起因：控制台截图里一篇编了 5 个组件、还没点「生成代码」的笔记显示「0 个组件」。
+     * 数字按原口径没错（blockCount = 已生成代码里几个区块），但它回答不了运营的问题。
+     *
+     * ⚠️ 期望值**不写死数字**，而是拿接口现查的 draftBlockCount 对齐 ——
+     *    断言锁的是「界面与接口同源」；写死「草稿 1 个组件」的话，改坏成「草稿 2 个」照样绿，
+     *    而且以后调整初始区块数就要来改断言（假红）。
+     */
+    const pagesNow = await api('GET', '/api/decorate/pages');
+    const rowNow = ((pagesNow.data && pagesNow.data.list) || []).filter((p) => p.key === createdKey)[0] || {};
+    /* 回控制台：先把 hash 切走再切回来 —— 同 hash 直接重设不会触发重渲染（go() 同页直接返回） */
+    await run(ctab, `location.hash = '#dashboard'; 'ok'`);
+    await sleep(500);
+    await run(ctab, `(() => {
+      const b = [...document.querySelectorAll('#nav .nav-item')].find((x) => x.textContent.trim() === '店铺笔记');
+      b.click(); return 'ok';
+    })()`);
+    await sleep(1300);
+    const cellNow = await run(ctab, `(() => {
+      const hit = [...document.querySelectorAll('#body table.tb tbody tr')]
+        .find((r) => r.innerText.indexOf(${JSON.stringify(NOTE_TITLE)}) >= 0);
+      return hit ? [...hit.querySelectorAll('td')].map((t) => t.innerText.replace(/\\s+/g, ' ').trim()).join(' | ') : 'ROW-NOT-FOUND';
+    })()`);
+    ok('★「内容量」列：有草稿时报草稿的区块数（与接口 draftBlockCount 同源），没被已生成代码那份盖住',
+      typeof rowNow.draftBlockCount === 'number' &&
+      cellNow.indexOf('草稿 ' + rowNow.draftBlockCount + ' 个组件') >= 0,
+      '接口 generated=' + JSON.stringify(rowNow.generated) + ' status=' + JSON.stringify(rowNow.status) +
+      ' blockCount=' + JSON.stringify(rowNow.blockCount) + ' draftBlockCount=' + JSON.stringify(rowNow.draftBlockCount) +
+      '　界面=' + cellNow);
+
     /* 把这份带组件的草稿丢弃，免得影响后续步骤与收尾的「replica.js 未变」 */
     await run(tab2, `window.confirm = function () { return true; }; 'ok'`);
     await run(tab2, `document.getElementById('btnDiscard').click();`);
@@ -445,13 +672,28 @@ let createdKey = '';
   } finally {
     /* 收尾 1：关掉所有标签页（不点「返回」，避免原生「离开？」框卡死标签页） */
     for (const t of tabs) { try { await close(t); } catch (_) { /* ignore */ } }
-    /* 收尾 2：清掉测试笔记 */
-    if (createdKey && TOKEN) {
-      const rm = await api('POST', '/api/decorate/note/delete', { key: createdKey });
-      console.log('\n收尾：清理测试笔记 ' + createdKey + ' → ' + (rm.code === 0 ? '已删除' : 'code=' + rm.code));
+    /* 收尾 2：清掉测试笔记。
+     *
+     * 两处都要清：① 第 1 节用接口造的那篇（createdKey）；② 第 2.5 节从控制台 UI 新建的那篇
+     * （正常已在 UI 里删掉，这里按标题兜一遍 —— 万一中途异常退出，别把垃圾留在注册表里）。 */
+    if (TOKEN) {
+      if (consoleNoteTitle) {
+        const all = await api('GET', '/api/decorate/notes');
+        for (const n of ((all.data && all.data.list) || [])) {
+          if (n.title === consoleNoteTitle) {
+            const r2 = await api('POST', '/api/decorate/note/delete', { key: n.key });
+            console.log('\n收尾：清掉控制台 UI 残留笔记 ' + n.key + ' → ' + (r2.code === 0 ? '已删除' : 'code=' + r2.code));
+          }
+        }
+      }
+      if (createdKey) {
+        const rm = await api('POST', '/api/decorate/note/delete', { key: createdKey });
+        console.log('收尾：清理测试笔记 ' + createdKey + ' → ' + (rm.code === 0 ? '已删除' : 'code=' + rm.code));
+      }
       const left = await api('GET', '/api/decorate/notes');
       const n = left.data && left.data.stats ? left.data.stats.count : -1;
       console.log('收尾：注册表剩余笔记数 = ' + n + (n === 0 ? ' ✓' : ' ✗（有残留）'));
+      if (n !== 0) { fail++; fails.push('收尾后仍有 ' + n + ' 篇笔记残留'); }
     }
     /* 收尾 3：replica.js 必须没变。
      *

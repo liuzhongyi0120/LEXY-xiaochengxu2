@@ -348,80 +348,36 @@ function renderWho() {
 }
 
 /**
- * 拉起管理员登录弹层。
+ * 引导去登录页。
  *
- * 触发时机：① 顶栏点「登录」；② 任意请求返回 401（未登录 / 会话过期）。
- * 口令换会话令牌（owner），或直接粘贴 `ADMIN_TOKENS` 里的长期令牌（按配置的角色）。
+ * ⚠️ 2026-10-15 起这里**不再弹框**，改成跳「登录」栏目（App.views.login，左侧导航栏里那一栏）。
+ *    原因：登录界面原来只存在于一个弹层里，「登录」就没有自己的位置 ——
+ *    未登录时能看到整套导航、点进去只有一屏 401，而真正能做事的地方藏着。
+ *    现在登录是一个正常页面，未登录时整个后台强制落在它上面。
+ *
+ * 保留这个函数名与签名，是因为调用点有四处（顶栏、401、needRole、退出），
+ * 全部改成「跳页面」比在四处各写一遍 `App.go('login')` 更不容易漏。
+ * @param {{reason?:string}} [info] 为什么被叫来登录（显示在表单上方）
  */
 function openLogin(info) {
-  if (AdminSession.me()) return;         // 已有身份（别的标签页刚登录）就不再打扰
-  if ($('#layer .login-mask')) return;   // 已经弹着，避免并发 401 弹出一摞
-  const m = openModal({
-    title: '管理员登录',
-    width: 'narrow',
-    html:
-      '<div style="line-height:1.7;color:#5b6472;font-size:13px">' +
-        esc((info && info.reason) || '运营后台需要管理员身份') + '</div>' +
-      '<div class="field" style="margin-top:12px"><label>管理员口令</label>' +
-        '<input type="password" data-pw placeholder="登录后获得超级管理员会话" style="flex:1"></div>' +
-      '<div style="color:#8a919e;font-size:12px;margin-top:12px;line-height:1.6">' +
-        '也可以粘贴「长期令牌」（服务端 <code>ADMIN_TOKENS</code> 里的那一串），按它配置的角色获得权限：' +
-        '只读 / 运营 / 超级管理员。</div>' +
-      '<div class="field" style="margin-top:8px"><label>长期令牌</label>' +
-        '<input type="text" data-tk placeholder="粘贴令牌（与口令二选一）" style="flex:1"></div>',
-    footer: '<button class="btn" data-close>稍后</button><button class="btn primary" data-login>登录</button>'
-  });
-  m.root.classList.add('login-mask');
-
-  const pwEl = m.$('[data-pw]');
-  const tkEl = m.$('[data-tk]');
-  const btn = m.$('[data-login]');
-
-  const reset = () => { btn.disabled = false; btn.textContent = '登录'; };
-
-  const submit = async () => {
-    const pw = pwEl.value;
-    const tk = tkEl.value.trim();
-    if (!pw && !tk) { toast('请填写管理员口令，或粘贴长期令牌', true); return; }
-    btn.disabled = true;
-    btn.textContent = '验证中…';
-    try {
-      if (tk) {
-        // 长期令牌没有单独的回显接口：先用它请求一次会话，验证「令牌确实有效、角色被识别」
-        AdminSession.save(tk, null);
-        const me = await API.get('/api/admin/session');
-        AdminSession.save(tk, me);
-      } else {
-        const d = await API.post('/api/admin/login', { password: pw });
-        // name 留空：口令登录的身份就是 owner，服务端给的 roleLabel 已经是「超级管理员」，
-        // 前端再硬塞一个「超级管理员」名字只会让顶栏显示两遍（详见 whoText）
-        AdminSession.save(d.token, {
-          role: d.role, roleLabel: d.roleLabel, name: '', source: 'session'
-        });
-      }
-      toast('已登录：' + whoText(AdminSession.me()).text);
-      m.close();
-      boot(); // 带着身份重跑一次，把刚才 401 的页面补上
-    } catch (e) {
-      // 用长期令牌失败时要把刚写进去的坏令牌清掉，否则后续每个请求都 401
-      if (tk) AdminSession.clear();
-      toast(e.message, true);
-      reset();
-    }
-  };
-
-  btn.addEventListener('click', submit);
-  [pwEl, tkEl].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
-  setTimeout(() => pwEl.focus(), 30);
-  reset();
+  if (AdminSession.me()) return;              // 已有身份（别的标签页刚登录）就不再打扰
+  if (App.view === GATE_VIEW) return;         // 已经在登录页：避免 401 → 跳登录 → 再 401 的死循环
+  if (info && info.reason) loginReason = String(info.reason);
+  App.go(GATE_VIEW);
 }
 
-/** 顶栏身份按钮：未登录 → 弹登录；已登录 → 确认后退出 */
+/** 登录页表单上方的一句话（「会话已过期」这类上下文，比干巴巴一个登录框有用） */
+let loginReason = '';
+
+/** 顶栏身份按钮：未登录 → 去登录页；已登录 → 确认后退出 */
 async function onTapWho() {
   if (!AdminSession.me()) return openLogin({});
-  if (await confirmBox('退出管理后台登录？退出后需重新输入口令或令牌。')) {
+  if (await confirmBox('退出管理后台登录？退出后需重新登录（成员账号或共享口令）。')) {
     AdminSession.clear();
     toast('已退出管理员登录');
+    /* 重跑 boot：它会重新认身份、按 gate 落回登录页，并刷新顶栏与导航锁态。
+     * 不在这里逐件手动刷新，是为了「退出」与「刷新页面」走同一条路 ——
+     * 两处各写一套，迟早有一处忘了更新导航锁态。 */
     boot();
   }
 }
@@ -436,6 +392,25 @@ function needRole(role, action) {
   else toast('当前身份「' + (ROLE_TEXT[(AdminSession.me() || {}).role] || '未知') +
     '」无权' + (action || '执行该操作') + '（需要「' + (ROLE_TEXT[role] || role) + '」及以上）', true);
   return false;
+}
+
+/** 角色能做什么 —— 直接对着服务端的规则说人话，别让人试出来 */
+function roleHint(role) {
+  if (role === 'owner') return '全部权限：改商品/订单/客户/营销与设置，还能删素材、发布装修、管成员。';
+  if (role === 'operator') return '日常运营：改商品价格库存、上下架、发货、回评、上传素材、存装修草稿；删素材与发布装修要超级管理员。';
+  if (role === 'viewer') return '只读：能看所有列表与详情，不能做任何修改。';
+  return '未知角色，请联系超级管理员确认。';
+}
+
+/** 登录成功后的收尾：带着新身份回到数据概览（并补一次角标） */
+function afterLogin() {
+  loginReason = '';
+  renderWho();
+  App.view = 'dashboard';
+  location.hash = '#dashboard';
+  App.renderNav();
+  App.render();
+  App.refreshBadges();
 }
 
 /* ============================== 大图预览 ============================== */
@@ -886,6 +861,14 @@ const ICONS = {
   media: '<rect x="2.4" y="3" width="11.2" height="10" rx="1.5"/><circle cx="5.9" cy="6.4" r="1.1"/>' +
     '<path d="M2.7 11.1 6.1 8.2l2.3 2 1.9-1.6 2.9 2.5"/>',
   decorate: '<path d="M11.3 2.4 13.6 4.7 6.2 12.1l-2.9.7.7-2.9z"/><path d="M9.7 4 12 6.3"/>',
+  /* 店铺笔记：一页带折角的纸 + 两条正文线（与「素材库」的方框、「店铺装修」的笔区分开） */
+  notes: '<path d="M3.4 2.4h6.2l3 3v8.2H3.4z"/><path d="M9.4 2.5v3h3"/>' +
+    '<path d="M5.6 8.4h4.8M5.6 10.8h3.2"/>',
+  /* 成员管理：两个人（后一个留半身轮廓，读起来就是「多个人」而不是「客户」） */
+  members: '<circle cx="6.2" cy="5.9" r="2.2"/><path d="M2.4 13.4c0-2.1 1.7-3.4 3.8-3.4s3.8 1.3 3.8 3.4"/>' +
+    '<path d="M10.4 4.2a2 2 0 0 1 0 3.5M11.3 10.4c1.4.4 2.3 1.5 2.3 3"/>',
+  /* 登录：门 + 向右的箭头（钥匙孔的另一种画法，避免与「店铺设置」的齿轮混淆） */
+  login: '<path d="M6.4 2.6H3.2v10.8h3.2"/><path d="M9.2 5.2 12 8l-2.8 2.8"/><path d="M12 8H6.6"/>',
   settings: '<circle cx="8" cy="8" r="2.1"/>' +
     '<path d="M8 2.1v1.5M8 12.4v1.5M13.9 8h-1.5M3.6 8H2.1M12.2 3.8l-1.1 1.1M4.9 11.1l-1.1 1.1M12.2 12.2l-1.1-1.1M4.9 4.9 3.8 3.8"/>'
 };
@@ -898,6 +881,18 @@ function navIcon(name) {
     'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>';
 }
 
+/*
+ * 侧栏栏目表。改这里就等于改左侧导航 —— 但**三处要一起改**，否则会出现「点得进去、
+ * 页面空白」或「页面存在、没有入口」这种半截状态（细节见 check-all 的导航断言）：
+ *   ① 本表；② 图标表 ICONS 里的 ico 键；③ App.views 里的同名视图。
+ *
+ * 分组顺序与有赞后台一致（经营 / 商品 / 营销与内容 / 系统），
+ * 2026-10-15 起「店铺笔记」「成员管理」「登录」各自**独立成栏**：
+ *   · 店铺笔记 —— 原先长在装修台的页面列表工具栏里（「+ 新建笔记」），
+ *     但它是**内容**，不是「页面长什么样」，跟店铺装修混在一起说不清归属；
+ *   · 成员管理 —— 后台账号（谁能登录、各是什么角色）；
+ *   · 登录     —— 独立登录页；未登录时整个后台强制落在这里。
+ */
 const NAV = [
   { group: '经营' },
   { key: 'dashboard', text: '数据概览', ico: 'dashboard' },
@@ -910,10 +905,16 @@ const NAV = [
   { group: '营销与内容' },
   { key: 'marketing', text: '优惠券', ico: 'marketing' },
   { key: 'media', text: '素材库', ico: 'media' },
+  { key: 'shopnotes', text: '店铺笔记', ico: 'notes' },
   { key: 'decorate', text: '店铺装修', ico: 'decorate' },
   { group: '系统' },
-  { key: 'settings', text: '店铺设置', ico: 'settings' }
+  { key: 'settings', text: '店铺设置', ico: 'settings' },
+  { key: 'members', text: '成员管理', ico: 'members' },
+  { key: 'login', text: '登录', ico: 'login' }
 ];
+
+/** 未登录时唯一可进的栏目 —— 其余一律不可点（真正的拦截在服务端，这里只是别让人白点） */
+const GATE_VIEW = 'login';
 
 const App = {
   view: 'dashboard',
@@ -922,10 +923,25 @@ const App = {
   views: {},
   badges: {},
 
+  /**
+   * 路由守卫：**未登录只能落在登录页**。
+   *
+   * 单点判定 —— `go()`、boot()、hashchange 三处入口都过它，不再各写一遍 `if (token)`。
+   * 各写一遍的后果是「某个入口漏判 → 未登录也能停在数据概览页，页面里全是 401」，
+   * 而那看起来像「接口坏了」，不像「没登录」。
+   */
+  gate(view) {
+    const v = this.views[view] ? view : 'dashboard';
+    if (!AdminSession.me()) return GATE_VIEW;
+    return v;
+  },
+
   go(view) {
-    if (!this.views[view]) view = 'dashboard';
-    this.view = view;
-    location.hash = '#' + view;
+    const v = this.gate(view);
+    /* 已经在同一页就不重渲染：登录页里调 go('login')（如 401 回退）会无限自渲染 */
+    if (v === this.view && this.view !== GATE_VIEW) return;
+    this.view = v;
+    location.hash = '#' + v;
     this.renderNav();
     this.render();
   },
@@ -937,16 +953,23 @@ const App = {
   },
 
   renderNav() {
+    /* 未登录：除「登录」外一律置灰不可点。
+     * 只是**提示**，不是权限 —— 真正的拦截在服务端（每个管理接口都要管理员令牌）。 */
+    const locked = !AdminSession.me();
     $('#nav').innerHTML = NAV.map((n) => {
       if (n.group) return '<div class="nav-group">' + esc(n.group) + '</div>';
       const b = this.badges[n.key];
-      return '<button class="nav-item' + (n.key === this.view ? ' on' : '') + '" data-view="' + n.key + '">' +
+      const off = locked && n.key !== GATE_VIEW;
+      return '<button class="nav-item' + (n.key === this.view ? ' on' : '') + (off ? ' locked' : '') +
+        '" data-view="' + n.key + '"' + (off ? ' title="需要先登录管理员账号"' : '') + '>' +
         '<span class="ico">' + navIcon(n.ico) + '</span><span>' + esc(n.text) + '</span>' +
         (b ? '<span class="badge">' + b + '</span>' : '') + '</button>';
     }).join('');
     $('#nav').querySelectorAll('[data-view]').forEach((el) => {
       el.addEventListener('click', () => this.go(el.getAttribute('data-view')));
     });
+    /* 顶部标题跟着走：未登录时标题必须显示「登录」，
+     * 否则停在数据概览的标题上、内容却是登录框，看着像页面坏了 */
     const cur = NAV.find((n) => n.key === this.view) || {};
     $('#pgTitle').textContent = cur.text || '数据概览';
     document.title = '莱克商城后台 · ' + (cur.text || '');
@@ -976,6 +999,214 @@ const App = {
       };
       this.renderNav();
     } catch (e) { /* 静默 */ }
+  }
+};
+
+/* ============================== 登录（独立页面） ============================== */
+
+/**
+ * 登录栏目（左侧导航「系统 → 登录」）。
+ *
+ * 这是整个后台**唯一**的登录界面 —— 原来那个弹层已经删掉（openLogin 改成跳这里）。
+ * 一份界面而不是两份，是因为两份必然走样：弹层里改了文案、页面里没改，
+ * 或者一边支持长期令牌、另一边忘了。
+ *
+ * 未登录 → 表单；已登录 → 当前身份 + 改口令 + 退出。
+ */
+App.views.login = {
+  async render(body) {
+    const me = AdminSession.me();
+    if (me) return this.renderAccount(body, me);
+    return this.renderForm(body);
+  },
+
+  /* ---------------------------- 未登录：登录表单 ---------------------------- */
+  renderForm(body) {
+    body.innerHTML =
+      '<div class="card" style="max-width:520px">' +
+        '<div class="card-h"><h2>登录后台</h2><div class="grow"></div>' +
+          '<span class="hint">登录后才能进入其它栏目</span></div>' +
+        '<div class="card-b">' +
+          (loginReason
+            ? '<div class="login-note">' + esc(loginReason) + '</div>'
+            : '') +
+          '<div class="form-row"><div class="lbl">账号</div><div class="ctl">' +
+            '<input type="text" data-u placeholder="成员账号（如 yy_a）" autocomplete="username" style="flex:1">' +
+            '<div class="tip">在「成员管理」里创建的账号。留空则使用服务器共享口令登录（超级管理员）。</div>' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl">口令</div><div class="ctl">' +
+            '<input type="password" data-p placeholder="登录口令" autocomplete="current-password" style="flex:1">' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
+            '<button class="btn primary" data-login>登录</button>' +
+            '<span class="tip" data-err hidden></span>' +
+          '</div></div>' +
+
+          '<div class="login-sep">或者：用长期令牌直接进入</div>' +
+          '<div class="form-row"><div class="lbl">长期令牌</div><div class="ctl">' +
+            '<input type="text" data-tk placeholder="粘贴 ADMIN_TOKENS 里的令牌" style="flex:1">' +
+            '<div class="tip">令牌的角色由服务端配置决定（只读 / 运营 / 超级管理员）。' +
+            '这是给系统对接用的通道，日常请用账号登录。</div>' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
+            '<button class="btn" data-login-tk>用令牌登录</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>';
+
+    const uEl = body.querySelector('[data-u]');
+    const pEl = body.querySelector('[data-p]');
+    const tkEl = body.querySelector('[data-tk]');
+    const errEl = body.querySelector('[data-err]');
+    const btn = body.querySelector('[data-login]');
+    const btnTk = body.querySelector('[data-login-tk]');
+
+    const showErr = (msg) => {
+      errEl.hidden = !msg;
+      errEl.textContent = msg || '';
+    };
+
+    const submit = async () => {
+      const username = uEl.value.trim();
+      const password = pEl.value;
+      if (!password) return showErr('请填写登录口令');
+      btn.disabled = true;
+      btn.textContent = '验证中…';
+      try {
+        const d = await API.post('/api/admin/login', { username, password });
+        AdminSession.save(d.token, {
+          role: d.role, roleLabel: d.roleLabel, name: d.name || '',
+          username: d.username || '', source: d.username ? 'member' : 'session'
+        });
+        loginReason = '';
+        toast('已登录：' + whoText(AdminSession.me()).text);
+        return afterLogin();
+      } catch (e) {
+        showErr(e.message);
+      }
+      btn.disabled = false;
+      btn.textContent = '登录';
+    };
+
+    const submitToken = async () => {
+      const tk = tkEl.value.trim();
+      if (!tk) return showErr('请粘贴长期令牌');
+      btnTk.disabled = true;
+      btnTk.textContent = '验证中…';
+      try {
+        /* 长期令牌没有单独的回显接口：先用它请求一次会话，确认「令牌有效、角色被识别」。
+         * 不确认就写进 localStorage 的话，坏令牌会留在本地、让之后每个请求都 401。 */
+        AdminSession.save(tk, null);
+        const me = await API.get('/api/admin/session');
+        AdminSession.save(tk, me);
+        loginReason = '';
+        toast('已登录：' + whoText(AdminSession.me()).text);
+        return afterLogin();
+      } catch (e) {
+        AdminSession.clear();
+        showErr(e.message);
+      }
+      btnTk.disabled = false;
+      btnTk.textContent = '用令牌登录';
+    };
+
+    btn.addEventListener('click', submit);
+    btnTk.addEventListener('click', submitToken);
+    [uEl, pEl].forEach((el) => el.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
+    tkEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') submitToken(); });
+    setTimeout(() => { (uEl.value ? pEl : uEl).focus(); }, 30);
+  },
+
+  /* ---------------------------- 已登录：身份与口令 ---------------------------- */
+  renderAccount(body, me) {
+    const srcText = { member: '成员账号', env: '长期令牌', session: '共享口令' }[me.source] || me.source || '—';
+    const roleText = me.roleLabel || ROLE_TEXT[me.role] || me.role || '—';
+    /* 身份那行**只显示「人」**，角色交给右边那枚 tag。
+     * 直接用 whoText() 会撞上它内部的去重规则：共享口令登录的 name 是空、
+     * 会被回落成角色名，于是屏幕上是「身份 超级管理员 超级管理员」两遍。 */
+    const displayName = me.name || me.username ||
+      ({ session: '共享口令管理员', env: '长期令牌用户' }[me.source] || '管理员');
+    /*
+     * 能不能改自己的口令：**只看 source 是不是 member**。
+     *
+     * ⚠️ 不能只信 `me.canChangePassword` —— 那个字段只有 `/api/admin/session` 会返回，
+     *    而刚登录完（还没刷新页面）时 me 来自本地缓存，字段是 undefined，
+     *    于是成员账号登录后看到的是「你没有个人口令可改」这句错话。
+     *    `source === 'member'` 与服务端 `changeOwnPassword` 前的判定**是同一条规则**
+     *    （服务端只在 payload 带 username 时才置 member），所以这里推导出来的结论必然一致。
+     */
+    const canChangePw = me.source === 'member';
+    body.innerHTML =
+      '<div class="card" style="max-width:520px">' +
+        '<div class="card-h"><h2>当前身份</h2><div class="grow"></div>' +
+          '<span class="hint">后台整站需要登录才能进入</span></div>' +
+        '<div class="card-b">' +
+          '<div class="form-row"><div class="lbl">身份</div><div class="ctl">' +
+            '<b>' + esc(displayName) + '</b>' +
+            '<span class="tag ' + (me.role === 'owner' ? 'red' : 'id') + '">' + esc(roleText) + '</span>' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl">账号</div><div class="ctl">' +
+            (me.username ? esc(me.username) : '<span class="sub">（不是成员账号）</span>') +
+            '<div class="tip">登录方式：' + esc(srcText) + '</div>' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl">权限</div><div class="ctl" style="display:block">' +
+            '<div class="tip" style="width:auto">' + esc(roleHint(me.role)) + '</div>' +
+          '</div></div>' +
+          '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
+            '<button class="btn" data-go-dashboard>回到数据概览</button>' +
+            '<button class="btn danger" data-logout>退出登录</button>' +
+          '</div></div>' +
+        '</div>' +
+      '</div>' +
+
+      (canChangePw
+        ? '<div class="card" style="max-width:520px;margin-top:14px">' +
+            '<div class="card-h"><h2>修改我的口令</h2></div>' +
+            '<div class="card-b">' +
+              '<div class="form-row"><div class="lbl">原口令</div><div class="ctl">' +
+                '<input type="password" data-old autocomplete="current-password" style="flex:1"></div></div>' +
+              '<div class="form-row"><div class="lbl">新口令</div><div class="ctl">' +
+                '<input type="password" data-new autocomplete="new-password" style="flex:1">' +
+                '<div class="tip">至少 8 位、最多 64 位。改完立即生效，当前登录不受影响。</div></div></div>' +
+              '<div class="form-row"><div class="lbl">确认新口令</div><div class="ctl">' +
+                '<input type="password" data-new2 autocomplete="new-password" style="flex:1"></div></div>' +
+              '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
+                '<button class="btn primary" data-save-pw>保存新口令</button>' +
+                '<span class="tip" data-pw-err hidden></span></div></div>' +
+            '</div>' +
+          '</div>'
+        : '<div class="card" style="max-width:520px;margin-top:14px">' +
+            '<div class="card-b"><div class="hint">当前用' + esc(srcText) +
+            '登录，没有「个人口令」可改。要用账号登录，请在「成员管理」里建一个成员账号。</div></div>' +
+          '</div>');
+
+    body.querySelector('[data-go-dashboard]').addEventListener('click', () => App.go('dashboard'));
+    body.querySelector('[data-logout]').addEventListener('click', () => onTapWho());
+
+    const btn = body.querySelector('[data-save-pw]');
+    if (!btn) return;
+    const oldEl = body.querySelector('[data-old]');
+    const newEl = body.querySelector('[data-new]');
+    const new2El = body.querySelector('[data-new2]');
+    const errEl = body.querySelector('[data-pw-err]');
+    btn.addEventListener('click', async () => {
+      const showErr = (m) => { errEl.hidden = !m; errEl.textContent = m || ''; };
+      if (!oldEl.value) return showErr('请填写原口令');
+      if (newEl.value.length < 8) return showErr('新口令至少 8 位');
+      if (newEl.value !== new2El.value) return showErr('两次输入的新口令不一致');
+      btn.disabled = true;
+      btn.textContent = '保存中…';
+      try {
+        await API.post('/api/admin/me/password', { oldPassword: oldEl.value, newPassword: newEl.value });
+        toast('口令已更新');
+        App.render();
+        return;
+      } catch (e) {
+        showErr(e.message);
+      }
+      btn.disabled = false;
+      btn.textContent = '保存新口令';
+    });
   }
 };
 
@@ -1258,15 +1489,25 @@ async function boot() {
     if (who) who.addEventListener('click', onTapWho);
     window.addEventListener('hashchange', () => {
       const v = (location.hash || '').replace('#', '');
-      if (App.views[v] && v !== App.view) { App.view = v; App.renderNav(); App.render(); }
+      /* 过 gate：手改地址栏敲 #goods 时，未登录也只能停在登录页 */
+      const g = App.gate(v);
+      if (g !== App.view) { App.view = g; App.renderNav(); App.render(); }
     });
   }
   // 先把身份缓存补齐（只有令牌没有身份时，按钮会全被当成「未登录」）
   await AdminSession.hydrate();
   renderWho();
   const hash = (location.hash || '').replace('#', '');
-  App.view = App.views[hash] ? hash : 'dashboard';
+  /* ⚠️ gate 只能在这里统一过：boot 是「刷新页面」这条入口，
+   *    和 go()（点导航）、hashchange（改地址）是三条不同的路，
+   *    任何一条漏判都会出现「未登录也能停在业务页、满屏 401」。 */
+  App.view = App.gate(hash);
+  /* 被 gate 拦下来时把地址栏也改掉（#goods → #login）：否则地址写着 #goods、
+   * 页面是登录页，刷新一次的现象会对不上，排查时非常费解 */
+  if (App.view !== hash) location.hash = '#' + App.view;
   App.renderNav();
   App.render();
-  App.refreshBadges();
+  /* 未登录时不要去拉角标：那两个请求必然 401，
+   * 会让控制台一进来就弹「需要管理员身份」，而用户只是想登录 */
+  if (AdminSession.me()) App.refreshBadges();
 }
