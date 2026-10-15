@@ -22,7 +22,7 @@
 
 const replica = require('../config/replica');
 const { resolveAssets } = require('../utils/asset');
-const { BASE_URL } = require('../utils/constants');
+const { baseUrlNow } = require('../utils/constants');
 const { iconSrc } = require('../utils/navcolor');
 
 /**
@@ -149,8 +149,9 @@ function readConfig() {
      * 而浏览器里同样的 filter 逐像素正确 →「装修台预览好看、真机是色块」。
      * 详见 utils/navcolor.js 顶部注释。
      */
-    const srcOff = iconSrc(icon, color, BASE_URL);
-    const srcOn = iconSrc(activeIcon, selectedColor, BASE_URL);
+    /* baseUrlNow() 而非加载期的 BASE_URL —— 见 utils/constants.js「惰性复查」 */
+    const srcOff = iconSrc(icon, color, baseUrlNow());
+    const srcOn = iconSrc(activeIcon, selectedColor, baseUrlNow());
 
     items.push({
       path: it.path,

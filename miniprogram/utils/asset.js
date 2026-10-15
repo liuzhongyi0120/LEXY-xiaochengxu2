@@ -16,18 +16,22 @@
  *   Page({ data: { series: resolveAssets(replica.LEXY_SERIES) } })
  */
 
-const { BASE_URL } = require('./constants');
+const { baseUrlNow } = require('./constants');
 
 /**
  * 单个地址归一
  *   http(s)://… 或 //…  → 原样（外链）
  *   /uploads/…           → 拼接后端域名（本地上传的素材）
  *   其它（含站内路径）    → 原样
+ *
+ * ⚠️ 用 baseUrlNow() 而**不是** `const { BASE_URL }`：本模块在**加载期**被 require，
+ *   那一刻若 wx 还没就绪，档位会停在 server（连内网访问不了的域名）→ 图片全挂、
+ *   整页空白且不报错。这里在「真的要拼地址」时取，那时 wx 必已就绪。
  */
 function assetUrl(p) {
   if (!p || typeof p !== 'string') return p || '';
   if (/^(https?:)?\/\//.test(p)) return p;
-  if (p.indexOf('/uploads/') === 0) return BASE_URL + p;
+  if (p.indexOf('/uploads/') === 0) return baseUrlNow() + p;
   return p;
 }
 

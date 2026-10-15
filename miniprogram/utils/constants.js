@@ -99,6 +99,43 @@ const BASE_URL_MAP = {
 const BASE_URL = BASE_URL_MAP[ENV];
 const IS_MOCK = ENV === 'mock';
 
+/*
+ * ── 惰性复查（2026-10-15 补）─────────────────────────────────────────────
+ * ENV / BASE_URL 上面这两行是在**模块加载期**算出来的。加载期若 wx 还没就绪
+ * （或 platform 一时取不到），detectEnv() 会兜底成 'server' ——
+ * 那在真机上是对的，但在**模拟器**上就是去连一个本机访问不了的域名（出口按 SNI 拦）
+ * → 素材全挂 → 首页整页空白，**而且完全没有报错**（本次故障就是这个形态）。
+ *
+ * 而「拼地址」这件事（resolveAssets / wx.request / 导航图标）全都发生在
+ * **页面渲染期**，那时 wx 一定已就绪 —— 所以在真正要用地址时再确认一次。
+ *
+ * ⚠️ 只做**单向纠正**：仅当「加载期判成 server」且「当下明确是 devtools」时才改判 local。
+ *   真机（ios / android / windows / mac …）永远不可能返回 devtools，
+ *   所以这条纠正**不可能把真机改坏**；反向纠正（local → server）不存在对应场景，故不做。
+ * ⚠️ ENV_OVERRIDE 手动钉死时，**无条件尊重**，一律不纠正。
+ */
+function isDevtoolsNow() {
+  if (typeof wx === 'undefined') return false;
+  return platformOf(() => wx.getDeviceInfo()) === 'devtools'
+      || platformOf(() => wx.getSystemInfoSync()) === 'devtools';
+}
+
+/** 当下这一刻该用哪个档 */
+function envNow() {
+  /* 先判 ENV === 'server'，是为了让「加载期已判对」的常见路径**短路**掉
+     isDevtoolsNow()（真机上就不必白调两次同步接口）。 */
+  if (ENV_OVERRIDE) return ENV_OVERRIDE;
+  return ENV === 'server' && isDevtoolsNow() ? 'local' : ENV;
+}
+
+let baseUrlNowCache = null;
+
+/** 当下应使用的 BASE_URL（首次调用定下来，之后缓存；避免 resolveAssets 里逐条重算） */
+function baseUrlNow() {
+  if (baseUrlNowCache === null) baseUrlNowCache = BASE_URL_MAP[envNow()];
+  return baseUrlNowCache;
+}
+
 /** 业务响应码，与服务端约定保持一致（见 server/lib/http.js 的 ERR） */
 const CODE = {
   OK: 0,
@@ -173,6 +210,10 @@ const ROUTES = {
 module.exports = {
   ENV,
   BASE_URL,
+  /* ⚠️ 拼地址一律用 baseUrlNow()，**不要**用上面的 BASE_URL ——
+     它是加载期的快照，加载期拿不到 platform 时会停在 'server'。见上方「惰性复查」。 */
+  baseUrlNow,
+  envNow,
   IS_MOCK,
   CODE,
   ORDER_STATUS,

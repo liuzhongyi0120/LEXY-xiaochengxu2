@@ -1,4 +1,4 @@
-const { BASE_URL, IS_MOCK, CODE, STORAGE } = require('./constants');
+const { baseUrlNow, IS_MOCK, CODE, STORAGE } = require('./constants');
 const mock = require('../mock/index');
 
 const TIMEOUT = 15000;
@@ -50,7 +50,8 @@ function request(url, method = 'GET', data = {}, options = {}) {
 
   return new Promise((resolve, reject) => {
     wx.request({
-      url: BASE_URL + url,
+      /* baseUrlNow() 而非加载期的 BASE_URL —— 见 utils/constants.js「惰性复查」 */
+      url: baseUrlNow() + url,
       method: method.toUpperCase(),
       data,
       header: buildHeader(auth),

@@ -2390,6 +2390,71 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
     envWrong.length === 0,
     envWrong.length ? `选错：${envWrong.join('；')}` : `${ENV_CASES.length} 个环境全部选对`);
 
+  /* (0b) 「拼地址」必须走惰性复查（baseUrlNow），**不能**直接用加载期的 BASE_URL。
+   *
+   *     上面那条只验了「加载期那一判」。但 ENV 是**加载期**算的，而真正拼地址
+   *     （resolveAssets / wx.request / 导航图标）全在**渲染期** —— 两个不同时刻。
+   *     加载期若 wx 还没就绪，ENV 会停在 'server'，模拟器就会去连内网访问不了的域名
+   *     → 素材全挂 → 整页空白、零报错（正是 2026-10-15 那次故障的形态）。
+   *     所以这里专门验那条兜底路径：**加载期 server + 渲染期 devtools → 必须改判 local**。
+   *     ⚠️ 真机那几条仍必须**保持 server** —— 纠正只能是单向的，不可能把真机改坏。 */
+  const envPin = (/const\s+ENV_OVERRIDE\s*=\s*'([^']*)'/.exec(readFileSync(ENV_CONST_FILE, 'utf8')) || [])[1] || '';
+  const LOCAL_URL = 'http://127.0.0.1:3000';
+  const urlWith = (loadStub, callStub) => {
+    const key = requireFromHere.resolve(ENV_CONST_FILE);
+    delete requireFromHere.cache[key];
+    const hadWx = Object.prototype.hasOwnProperty.call(globalThis, 'wx');
+    const prevWx = globalThis.wx;
+    const setWx = (s) => { if (s === undefined) delete globalThis.wx; else globalThis.wx = s; };
+    setWx(loadStub);
+    try {
+      const mod = requireFromHere(ENV_CONST_FILE);
+      const loadedEnv = mod.ENV;
+      const loadedBase = mod.BASE_URL;
+      setWx(callStub);   /* 加载完成后换桩 = 模拟「渲染期 wx 已就绪」 */
+      return { loadedEnv, loadedBase, tier: mod.envNow(), url: mod.baseUrlNow() };
+    } finally {
+      if (hadWx) globalThis.wx = prevWx; else delete globalThis.wx;
+      delete requireFromHere.cache[key];
+    }
+  };
+  const DT = { getSystemInfoSync: () => ({ platform: 'devtools' }) };
+  const AND = { getSystemInfoSync: () => ({ platform: 'android' }) };
+  /* [说明, 加载期桩, 渲染期桩, 期望档（未钉死时）] */
+  const LAZY_CASES = [
+    ['加载期没有 wx（兜底 server）→ 渲染期发现是模拟器', undefined, DT, 'local'],
+    ['加载期没有 wx → 渲染期仍是真机', undefined, AND, 'server'],
+    ['加载期就是真机 → 渲染期真机', AND, AND, 'server'],
+    ['加载期就是模拟器（旧接口）→ 渲染期模拟器', DT, DT, 'local'],
+    ['加载期就是模拟器（新接口 getDeviceInfo）→ 渲染期模拟器',
+      { getDeviceInfo: () => ({ platform: 'devtools' }) },
+      { getDeviceInfo: () => ({ platform: 'devtools' }) }, 'local'],
+    ['加载期真机 → 渲染期变成模拟器（中途才就绪）', AND, DT, 'local'],
+    ['渲染期：新接口不返回 platform，旧接口兜住',
+      undefined, { getDeviceInfo: () => ({}), getSystemInfoSync: () => ({ platform: 'devtools' }) }, 'local'],
+    ['渲染期：新接口抛错，旧接口兜住',
+      undefined, { getDeviceInfo: () => { throw new Error('boom'); }, getSystemInfoSync: () => ({ platform: 'devtools' }) }, 'local']
+  ];
+  const lazyWrong = [];
+  LAZY_CASES.forEach(([name, loadStub, callStub, wantAuto]) => {
+    const r = urlWith(loadStub, callStub);
+    /* 手动钉死时惰性纠正按设计关闭 —— 期望值就是那一档，不算错 */
+    const want = envPin || wantAuto;
+    const wantUrl = want === 'local' ? LOCAL_URL : r.loadedBase;
+    if (r.tier !== want || r.url !== wantUrl) {
+      lazyWrong.push(`${name}（档 ${r.tier}／地址 ${r.url}，期望 ${want}／${wantUrl}）`);
+    }
+  });
+  /* 关键区分性检查：真要出现「加载期 server、渲染期 devtools」时，
+     地址必须**真的换掉**，不能与加载期快照相同（否则等于没兜住）。 */
+  const lazyKey = urlWith(undefined, DT);
+  const lazyKeyOk = envPin ? lazyKey.url === lazyKey.loadedBase : lazyKey.url === LOCAL_URL && lazyKey.loadedBase !== LOCAL_URL;
+  assert('拼地址走 baseUrlNow() 惰性复查：**加载期拿不到 platform 时，模拟器仍能落到本机**'
+    + (envPin ? `（当前被手动钉死为 '${envPin}'，纠正按设计关闭）` : ''),
+    lazyWrong.length === 0 && lazyKeyOk,
+    (lazyWrong.length ? `选错：${lazyWrong.join('；')}` : `${LAZY_CASES.length} 个时刻组合全部选对`)
+      + `｜加载期快照 ${lazyKey.loadedBase} → 渲染期 ${lazyKey.url}`);
+
   /* app.json 里所有注册过的页面路径（主包 + 分包） */
   const allPages = [];
   (appJson.pages || []).forEach((p) => allPages.push('/' + p));
