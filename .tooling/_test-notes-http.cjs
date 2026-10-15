@@ -295,7 +295,13 @@ async function http(method, p, body, token) {
 
     /* ---------------- 12. 限流/配额字段 ---------------- */
     console.log('\n【12】配额上限口径');
-    ok('上限 50', nl.body.stats.max === 50, String(nl.body.stats.max));
+    /*
+     * ⚠️ 不写死 50：上限是护栏常量（2026-10-15 由 50 提到 100，因为两页 61 张卡片
+     * 要各配一篇笔记）。写死数字 → 每次调上限都假红。这里锁「接口返回的 max 与常量同源」。
+     */
+    const SN_MAX = require(path.join(ROOT, 'server/decorate/shopnotes.js')).MAX_NOTES;
+    ok('配额上限与 shopnotes.MAX_NOTES 同源', nl.body.stats.max === SN_MAX,
+      'stats.max=' + JSON.stringify(nl.body.stats.max) + ' MAX_NOTES=' + SN_MAX);
     eq('stats.belongs = 店铺笔记', nl.body.stats.belongs, '店铺笔记');
   } catch (e) {
     fail++;

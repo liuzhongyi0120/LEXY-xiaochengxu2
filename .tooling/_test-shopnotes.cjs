@@ -114,8 +114,15 @@ const errDel = throws(() => sn.remove(1));
 ok('删不存在的笔记 → 404 BizError', !!errDel && errDel.httpStatus === 404, errDel && (errDel.httpStatus + ' ' + errDel.message));
 
 // 13. 上限与统计
-ok('MAX_NOTES = 50', sn.MAX_NOTES === 50);
-ok('stats 形态正确', typeof sn.stats().count === 'number' && sn.stats().max === 50);
+/*
+ * ⚠️ 不写死 50：上限是**护栏常量**（2026-10-15 因「新闻大事 24 + 用户分享 37 = 61 张卡片」
+ * 要各配一篇笔记而由 50 提到 100）。断言写死数字的话，每次调上限都是假红 ——
+ * 假红比不检查更糟。这里锁的是「stats.max 与常量同源」这个**意图**。
+ */
+ok('MAX_NOTES 是正整数', Number.isInteger(sn.MAX_NOTES) && sn.MAX_NOTES > 0, String(sn.MAX_NOTES));
+ok('stats 形态正确且 max 与 MAX_NOTES 同源',
+  typeof sn.stats().count === 'number' && sn.stats().max === sn.MAX_NOTES,
+  'stats.max=' + JSON.stringify(sn.stats().max) + ' MAX_NOTES=' + sn.MAX_NOTES);
 
 /* 14. 「笔记头部」的形状与搬运（这一组是本轮修 bug 后补的，钉住三层行为）
  *

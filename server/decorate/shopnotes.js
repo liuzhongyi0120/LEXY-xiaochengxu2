@@ -43,8 +43,14 @@ const { BizError, ERR } = require('../lib/http');
 const DATA_DIR = nodePath.join(require('../lib/dataDir').ROOT, 'decorate');
 const FILE = nodePath.join(DATA_DIR, 'shopnotes.json');
 
-/** 笔记数量上限（内容是持续产出的，给得比自定义页宽） */
-const MAX_NOTES = 50;
+/**
+ * 笔记数量上限（内容是持续产出的，给得比自定义页宽）
+ *
+ * 2026-10-15 由 50 提到 100：有赞「新闻大事」24 张 +「用户分享」37 张卡片，
+ * 每张都要链到自己的一篇笔记详情页（**光这两页就要 61 篇**），50 装不下。
+ * 上限只是防失控的护栏，不是业务约束；100 仍远低于小程序包体与渲染的承受量。
+ */
+const MAX_NOTES = 100;
 /** 笔记在装修台里的归属分组 */
 const BELONGS = '店铺笔记';
 /** 页面 key 前缀：note-3 对应 id=3 的笔记 */

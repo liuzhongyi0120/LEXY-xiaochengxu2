@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-13 15:28:27（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-15 23:48:58（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -2093,91 +2093,91 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-p6a88s.jpg",
                 video: "",
                 title: "绿色赋能 实力出圈｜莱克电气成功发行江苏省首单上市民企绿色超短期融资券",
-                link: ""
+                link: "packageNews/note/note?id=212"
               },
               {
                 image: "/uploads/202610/20261012-9bwde3.jpg",
                 video: "",
                 title: "莱克电气“四高十法”质量数字化赋能实践入选工信部典型案例",
-                link: ""
+                link: "packageNews/note/note?id=213"
               },
               {
                 image: "/uploads/202610/20261012-86g5a2.jpg",
                 video: "",
                 title: "2026“新三件·新品质”AWE发布会精彩回顾",
-                link: ""
+                link: "packageNews/note/note?id=214"
               },
               {
                 image: "/uploads/202610/20261012-dqfdxs.jpg",
                 video: "",
                 title: "莱克电气旗下三大品牌产品荣膺AWE2026艾普兰创新奖",
-                link: ""
+                link: "packageNews/note/note?id=215"
               },
               {
                 image: "/uploads/202610/20261012-yf92l4.jpg",
                 video: "",
                 title: "权威认证加冕！莱克电气荣获“三合一洗地吸尘器开创者”认证，新品类定义清洁新标准",
-                link: ""
+                link: "packageNews/note/note?id=216"
               },
               {
                 image: "/uploads/202610/20261012-7cyqfk.jpg",
                 video: "",
                 title: "莱克、碧云泉荣获2025中国家电行业\"好产品\"大奖",
-                link: ""
+                link: "packageNews/note/note?id=217"
               },
               {
                 image: "/uploads/202610/20261012-0o9v8h.jpg",
                 video: "",
                 title: "苏宁易购深入莱克电气技术探讨共启11-1月战略攻势合作新篇章",
-                link: ""
+                link: "packageNews/note/note?id=218"
               },
               {
                 image: "/uploads/202610/20261012-p6a88s.jpg",
                 video: "",
                 title: "莱克天狼星S10 Pro、碧云泉小积木G5领跑IFA家电创新赛道",
-                link: ""
+                link: "packageNews/note/note?id=219"
               },
               {
                 image: "/uploads/202610/20261012-lh2cuk.jpg",
                 video: "",
                 title: "书香沁润职场，文化赋能未来“莱克新教育书房“正式授牌",
-                link: ""
+                link: "packageNews/note/note?id=220"
               },
               {
                 image: "/uploads/202610/20261012-0zsu5z.jpg",
                 video: "",
                 title: "2025 莱克 | 碧云泉 | 咖博士新品体验发布会现场回顾",
-                link: ""
+                link: "packageNews/note/note?id=221"
               },
               {
                 image: "/uploads/202610/20261012-68l2pi.jpg",
                 video: "",
                 title: "莱克电气AWE2025大放异彩，多项大奖彰显创新实力",
-                link: ""
+                link: "packageNews/note/note?id=222"
               },
               {
                 image: "/uploads/202610/20261012-68l2pi.jpg",
                 video: "",
                 title: "喜讯 | 莱克入选首批中国消费名品，荣获“时代优品”认证",
-                link: ""
+                link: "packageNews/note/note?id=223"
               },
               {
                 image: "/uploads/202610/20261012-aik88m.jpg",
                 video: "",
                 title: "喜讯 | 莱克荣获两项2024年中国家电行业年度“好产品”奖项",
-                link: ""
+                link: "packageNews/note/note?id=224"
               },
               {
                 image: "/uploads/202610/20261012-rawzvv.jpg",
                 video: "",
                 title: "喜讯 | 莱克电气再获殊荣，荣登2024年度绿色制造名单",
-                link: ""
+                link: "packageNews/note/note?id=225"
               },
               {
                 image: "/uploads/202610/20261012-ylcgut.jpg",
                 video: "",
                 title: "回望2024 见证非凡之旅",
-                link: ""
+                link: "packageNews/note/note?id=226"
               }
             ]
           },
@@ -2188,19 +2188,19 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-pf7vpc.jpg",
                 video: "",
                 title: "莱克集团:以公益心筑教育梦，携千年府学共赴未来",
-                link: ""
+                link: "packageNews/note/note?id=227"
               },
               {
                 image: "/uploads/202610/20261012-pqt0qb.jpg",
                 video: "",
                 title: "行直道正，谊在千秋 | 莱克集团向苏州中学捐赠2000万",
-                link: ""
+                link: "packageNews/note/note?id=228"
               },
               {
                 image: "/uploads/202610/20261012-47k5k9.jpg",
                 video: "",
                 title: "莱克电气助力上海疫情防控，捐赠410万元健康家电驰援上海方舱",
-                link: ""
+                link: "packageNews/note/note?id=229"
               }
             ]
           },
@@ -2211,37 +2211,37 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-90fkoo.jpg",
                 video: "",
                 title: "一图读懂莱克电气2025年半年报",
-                link: ""
+                link: "packageNews/note/note?id=230"
               },
               {
                 image: "/uploads/202610/20261012-w3xww5.jpg",
                 video: "",
                 title: "一图读懂莱克电气2024年年报",
-                link: ""
+                link: "packageNews/note/note?id=231"
               },
               {
                 image: "/uploads/202610/20261012-90fkoo.jpg",
                 video: "",
                 title: "一图读懂莱克电气2024年半年报",
-                link: ""
+                link: "packageNews/note/note?id=232"
               },
               {
                 image: "/uploads/202610/20261012-mpdhzf.jpg",
                 video: "",
                 title: "一图读懂莱克电气2023年年报和2024年一季报",
-                link: ""
+                link: "packageNews/note/note?id=233"
               },
               {
                 image: "/uploads/202610/20261012-y3jac7.jpg",
                 video: "",
                 title: "一图读懂莱克电气2023半年报",
-                link: ""
+                link: "packageNews/note/note?id=234"
               },
               {
                 image: "/uploads/202610/20261012-k603zo.jpg",
                 video: "",
                 title: "一图读懂莱克电气2022年年报和2023年一季报",
-                link: ""
+                link: "packageNews/note/note?id=235"
               }
             ]
           }
@@ -2626,55 +2626,55 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-908jee.jpg",
                 video: "",
                 title: "冲京东Mall挖到莱克 ，吸尘洗地除螨一步到位",
-                link: ""
+                link: "packageNews/note/note?id=236"
               },
               {
                 image: "/uploads/202610/20261012-rgu5bk.jpg",
                 video: "",
                 title: "上海 AWE 焦点！莱克天狼星，一站式解决家务",
-                link: ""
+                link: "packageNews/note/note?id=237"
               },
               {
                 image: "/uploads/202610/20261012-l7d0n6.jpg",
                 video: "",
                 title: "从清洁黑科技到生活美学，这里藏着多少惊喜？",
-                link: ""
+                link: "packageNews/note/note?id=238"
               },
               {
                 image: "/uploads/202610/20261012-4a2820.jpg",
                 video: "",
                 title: "莱克品质生活，邂逅山城魅力！",
-                link: ""
+                link: "packageNews/note/note?id=239"
               },
               {
                 image: "/uploads/202610/20261012-3jb1eg.jpg",
                 video: "",
                 title: "主持人刘帅亲探潍坊三联家电！沉浸式体验莱克天狼星~",
-                link: ""
+                link: "packageNews/note/note?id=240"
               },
               {
                 image: "/uploads/202610/20261012-q9tcvg.jpg",
                 video: "",
                 title: "逛利群家里不白来！青岛人专属莱克天狼星实测",
-                link: ""
+                link: "packageNews/note/note?id=241"
               },
               {
                 image: "/uploads/202610/20261012-xrfspg.jpg",
                 video: "",
                 title: "天狼星550W大吸力 “卷” 进济宁九龙家电",
-                link: ""
+                link: "packageNews/note/note?id=242"
               },
               {
                 image: "/uploads/202610/20261012-dybs3k.jpg",
                 video: "",
                 title: "跟着主持人张杰逛北国电器：石家庄的隐藏福利",
-                link: ""
+                link: "packageNews/note/note?id=243"
               },
               {
                 image: "/uploads/202610/20261012-kz253h.jpg",
                 video: "",
                 title: "探同利家电天狼星：包头 “包” 藏清洁礼",
-                link: ""
+                link: "packageNews/note/note?id=244"
               }
             ]
           },
@@ -2685,61 +2685,61 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-f0emne.jpg",
                 video: "",
                 title: "演员费启鸣晒新家，好夏日配好水",
-                link: ""
+                link: "packageNews/note/note?id=245"
               },
               {
                 image: "/uploads/202610/20261012-7sttg9.jpg",
                 video: "",
                 title: "杨子姗亲测！模块随心搭解锁冰饮自由",
-                link: ""
+                link: "packageNews/note/note?id=246"
               },
               {
                 image: "/uploads/202610/20261012-f9lu0i.jpg",
                 video: "",
                 title: "李思思的24小时喝水养生秘诀",
-                link: ""
+                link: "packageNews/note/note?id=247"
               },
               {
                 image: "/uploads/202610/20261012-coga7l.jpg",
                 video: "",
                 title: "跟着“顿顿”一起解锁夏日饮水黑科技",
-                link: ""
+                link: "packageNews/note/note?id=248"
               },
               {
                 image: "/uploads/202610/20261012-p0yr2l.jpg",
                 video: "",
                 title: "带三个娃还能精致生活？全靠这台天狼星「一键善后」",
-                link: ""
+                link: "packageNews/note/note?id=249"
               },
               {
                 image: "/uploads/202610/20261012-jd47o7.jpg",
                 video: "",
                 title: "科技让爱更纯净，让生活更轻松",
-                link: ""
+                link: "packageNews/note/note?id=250"
               },
               {
                 image: "/uploads/202610/20261012-eimeem.jpg",
                 video: "",
                 title: "于AWE人潮中，邂逅“智能”惊喜",
-                link: ""
+                link: "packageNews/note/note?id=251"
               },
               {
                 image: "/uploads/202610/20261012-pq7e4o.jpg",
                 video: "",
                 title: "莱克30周年！感受来自苏州的洁净吧！",
-                link: ""
+                link: "packageNews/note/note?id=252"
               },
               {
                 image: "/uploads/202610/20261012-du8bf2.jpg",
                 video: "",
                 title: "回归生活本真秩序，找寻「净」的新境界",
-                link: ""
+                link: "packageNews/note/note?id=253"
               },
               {
                 image: "/uploads/202610/20261012-yz9q58.jpg",
                 video: "",
                 title: "在百年故居花园体验“江南之净 ”的一天",
-                link: ""
+                link: "packageNews/note/note?id=254"
               }
             ]
           },
@@ -2750,43 +2750,43 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-lr2m1f.jpg",
                 video: "",
                 title: "净家致心安",
-                link: ""
+                link: "packageNews/note/note?id=255"
               },
               {
                 image: "/uploads/202610/20261012-omoq97.jpg",
                 video: "",
                 title: "梦想居所，莱克天王星U7成就洁净之美",
-                link: ""
+                link: "packageNews/note/note?id=256"
               },
               {
                 image: "/uploads/202610/20261012-0txyt1.jpg",
                 video: "",
                 title: "向不凡而生的家",
-                link: ""
+                link: "packageNews/note/note?id=257"
               },
               {
                 image: "/uploads/202610/20261012-hn6etr.jpg",
                 video: "",
                 title: "情绪流动收容所",
-                link: ""
+                link: "packageNews/note/note?id=258"
               },
               {
                 image: "/uploads/202610/20261012-lxddto.jpg",
                 video: "",
                 title: "本真归真 洁来洁往",
-                link: ""
+                link: "packageNews/note/note?id=259"
               },
               {
                 image: "/uploads/202610/20261012-fstns7.jpg",
                 video: "",
                 title: "挖掘记忆深处的故事",
-                link: ""
+                link: "packageNews/note/note?id=260"
               },
               {
                 image: "/uploads/202610/20261012-2pqaul.jpg",
                 video: "",
                 title: "“绅士”养成计划",
-                link: ""
+                link: "packageNews/note/note?id=261"
               }
             ]
           },
@@ -2797,31 +2797,31 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-yzdqe8.jpg",
                 video: "",
                 title: "智净未来，健康生活",
-                link: ""
+                link: "packageNews/note/note?id=221"
               },
               {
                 image: "/uploads/202610/20261012-yieb2k.jpg",
                 video: "",
                 title: "器之净美 归于心安",
-                link: ""
+                link: "packageNews/note/note?id=262"
               },
               {
                 image: "/uploads/202610/20261012-liqf60.jpg",
                 video: "",
                 title: "生活有净气 灵魂有香气",
-                link: ""
+                link: "packageNews/note/note?id=263"
               },
               {
                 image: "/uploads/202610/20261012-zkwsgg.jpg",
                 video: "",
                 title: "诗意之宅 造景入室",
-                link: ""
+                link: "packageNews/note/note?id=264"
               },
               {
                 image: "/uploads/202610/20261012-rr1w2i.jpg",
                 video: "",
                 title: "寻得隐秘“天堂” 享足自然之乐",
-                link: ""
+                link: "packageNews/note/note?id=265"
               }
             ]
           },
@@ -2832,37 +2832,37 @@ const CUSTOM_PAGES = {
                 image: "/uploads/202610/20261012-fbdpu2.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=266"
               },
               {
                 image: "/uploads/202610/20261012-rhi52h.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=267"
               },
               {
                 image: "/uploads/202610/20261012-n3nxod.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=268"
               },
               {
                 image: "/uploads/202610/20261012-eitl82.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=269"
               },
               {
                 image: "/uploads/202610/20261012-lgznz2.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=270"
               },
               {
                 image: "/uploads/202610/20261012-hwco61.jpg",
                 video: "",
                 title: "",
-                link: ""
+                link: "packageNews/note/note?id=271"
               }
             ]
           }
@@ -3349,6 +3349,1750 @@ const CUSTOM_PAGES = {
   }
 };
 
+/** ---------------- 店铺笔记（id → { header, body, blocks }，由装修台「店铺笔记」创建） ---------------- */
+const SHOPNOTES = {
+  "212": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "绿色赋能 实力出圈｜莱克电气成功发行江苏省首单上市民企绿色超短期融资券",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-p6a88s.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792074982936,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "213": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克电气“四高十法”质量数字化赋能实践入选工信部典型案例",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-9bwde3.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792074987032,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "214": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "2026“新三件·新品质”AWE发布会精彩回顾",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-86g5a2.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792074991743,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "215": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克电气旗下三大品牌产品荣膺AWE2026艾普兰创新奖",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-dqfdxs.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792074996231,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "216": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "权威认证加冕！莱克电气荣获“三合一洗地吸尘器开创者”认证，新品类定义清洁新标准",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-yf92l4.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075000916,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "217": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克、碧云泉荣获2025中国家电行业\"好产品\"大奖",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-7cyqfk.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075006119,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "218": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "苏宁易购深入莱克电气技术探讨共启11-1月战略攻势合作新篇章",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-0o9v8h.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075011366,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "219": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克天狼星S10 Pro、碧云泉小积木G5领跑IFA家电创新赛道",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-p6a88s.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075016979,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "220": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "书香沁润职场，文化赋能未来“莱克新教育书房“正式授牌",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-lh2cuk.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075022832,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "221": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "2025 莱克 | 碧云泉 | 咖博士新品体验发布会现场回顾",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-0zsu5z.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075028961,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "222": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克电气AWE2025大放异彩，多项大奖彰显创新实力",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-68l2pi.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075035349,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "223": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "喜讯 | 莱克入选首批中国消费名品，荣获“时代优品”认证",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-68l2pi.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075042470,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "224": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "喜讯 | 莱克荣获两项2024年中国家电行业年度“好产品”奖项",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-aik88m.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075050209,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "225": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "喜讯 | 莱克电气再获殊荣，荣登2024年度绿色制造名单",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-rawzvv.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075058063,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "226": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "回望2024 见证非凡之旅",
+      summary: "",
+      tags: "新闻资讯",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-ylcgut.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075065699,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "227": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克集团:以公益心筑教育梦，携千年府学共赴未来",
+      summary: "",
+      tags: "社会责任",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-pf7vpc.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075073786,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "228": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "行直道正，谊在千秋 | 莱克集团向苏州中学捐赠2000万",
+      summary: "",
+      tags: "社会责任",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-pqt0qb.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075081903,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "229": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克电气助力上海疫情防控，捐赠410万元健康家电驰援上海方舱",
+      summary: "",
+      tags: "社会责任",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-47k5k9.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075090287,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "230": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2025年半年报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-90fkoo.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075099051,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "231": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2024年年报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-w3xww5.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075108629,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "232": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2024年半年报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-90fkoo.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075117959,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "233": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2023年年报和2024年一季报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-mpdhzf.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075127975,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "234": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2023半年报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-y3jac7.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075138675,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "235": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "一图读懂莱克电气2022年年报和2023年一季报",
+      summary: "",
+      tags: "财务报告",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-k603zo.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075149047,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "236": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "冲京东Mall挖到莱克 ，吸尘洗地除螨一步到位",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-908jee.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075160984,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "237": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "上海 AWE 焦点！莱克天狼星，一站式解决家务",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-rgu5bk.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075173574,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "238": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "从清洁黑科技到生活美学，这里藏着多少惊喜？",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-l7d0n6.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075184493,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "239": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克品质生活，邂逅山城魅力！",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-4a2820.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075195375,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "240": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "主持人刘帅亲探潍坊三联家电！沉浸式体验莱克天狼星~",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-3jb1eg.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075206567,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "241": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "逛利群家里不白来！青岛人专属莱克天狼星实测",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-q9tcvg.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075218599,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "242": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "天狼星550W大吸力 “卷” 进济宁九龙家电",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-xrfspg.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075230574,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "243": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "跟着主持人张杰逛北国电器：石家庄的隐藏福利",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-dybs3k.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075242540,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "244": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "探同利家电天狼星：包头 “包” 藏清洁礼",
+      summary: "",
+      tags: "城市探店",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-kz253h.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075254629,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "245": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "演员费启鸣晒新家，好夏日配好水",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-f0emne.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075267405,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "246": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "杨子姗亲测！模块随心搭解锁冰饮自由",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-7sttg9.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075280258,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "247": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "李思思的24小时喝水养生秘诀",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-f9lu0i.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075293667,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "248": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "跟着“顿顿”一起解锁夏日饮水黑科技",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-coga7l.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075308244,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "249": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "带三个娃还能精致生活？全靠这台天狼星「一键善后」",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-p0yr2l.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075323258,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "250": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "科技让爱更纯净，让生活更轻松",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-jd47o7.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075338713,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "251": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "于AWE人潮中，邂逅“智能”惊喜",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-eimeem.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075354349,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "252": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "莱克30周年！感受来自苏州的洁净吧！",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-pq7e4o.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075370443,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "253": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "回归生活本真秩序，找寻「净」的新境界",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-du8bf2.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075387117,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "254": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "在百年故居花园体验“江南之净 ”的一天",
+      summary: "",
+      tags: "精选内容",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-yz9q58.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075403491,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "255": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "净家致心安",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-lr2m1f.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075420474,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "256": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "梦想居所，莱克天王星U7成就洁净之美",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-omoq97.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075437503,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "257": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "向不凡而生的家",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-0txyt1.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075455388,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "258": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "情绪流动收容所",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-hn6etr.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075472581,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "259": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "本真归真 洁来洁往",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-lxddto.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075488851,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "260": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "挖掘记忆深处的故事",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-fstns7.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075505267,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "261": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "“绅士”养成计划",
+      summary: "",
+      tags: "用户故事",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-2pqaul.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075521881,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "262": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "器之净美 归于心安",
+      summary: "",
+      tags: "品牌挚友",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-yieb2k.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075538772,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "263": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "生活有净气 灵魂有香气",
+      summary: "",
+      tags: "品牌挚友",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-liqf60.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075555836,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "264": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "诗意之宅 造景入室",
+      summary: "",
+      tags: "品牌挚友",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-zkwsgg.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075573206,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "265": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "寻得隐秘“天堂” 享足自然之乐",
+      summary: "",
+      tags: "品牌挚友",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-rr1w2i.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075591066,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "266": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.27 · 新年特刊（2025.01）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-fbdpu2.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075609178,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "267": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.26 · 秋冬合刊（2024.11）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-rhi52h.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075627466,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "268": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.25 · 九月期刊（2024.09）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-n3nxod.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075646123,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "269": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.24 · 八月期刊（2024.08）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-eitl82.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075664916,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "270": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.23 · 七月期刊（2024.07）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-lgznz2.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075684036,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  },
+  "271": {
+    header: {
+      templateId: 2,
+      showTitle: true,
+      showPublishTime: true,
+      showBrowseCount: true,
+      showThumbsUpCount: true,
+      showEnterShop: true,
+      showRecommendItems: true,
+      title: "品牌期刊 NO.22 · 六月期刊（2024.06）",
+      summary: "",
+      tags: "品牌期刊",
+      coverMode: "single",
+      covers: [
+        {
+          image: "/uploads/202610/20261012-hwco61.jpg"
+        }
+      ],
+      showGoodsCard: false,
+      showNoteOnGoods: false
+    },
+    publishedAt: 1792075703300,
+    body: {
+      html: "",
+      bg: "#ffffff",
+      full: "0"
+    },
+    blocks: []
+  }
+};
+
 /** ---------------- 页面级设置（装修后台「页面设置」面板，key = 页面 key） ---------------- */
 const PAGE_META = {
   home: {
@@ -3471,6 +5215,7 @@ module.exports = {
   PRODUCT_NAV_LOGO,
   PRODUCT_BRANDS,
   CUSTOM_PAGES,
+  SHOPNOTES,
   PAGE_META,
   TABBAR
 };

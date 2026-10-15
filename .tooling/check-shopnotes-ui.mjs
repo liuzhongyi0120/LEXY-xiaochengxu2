@@ -37,6 +37,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createRequire } from 'node:module';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -64,6 +65,26 @@ async function j(url, opt) {
   try { return JSON.parse(t); } catch (e) { return t; }
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * 轮询等待一个条件成立（超时返回 false）。
+ *
+ * 为什么不能只用固定 `sleep`：笔记从 0 涨到 60 篇之后（2026-10-15 复刻有赞两页），
+ * 每一次「新建 / 删除 / 生成代码」都要重写一遍 140KB 的 `replica.js` + 跑 `vm.Script`
+ * 校验 + 打一份备份，控制台列表也要渲染 60+ 行 —— 原来按空库调的 1.9s / 2.6s
+ * 就不够了，表现成「编辑器没打开」「删掉的行还在」这类**假红**
+ * （定点取证过：同一时刻手工打开 /admin?edit=note-N 与调删除接口都是好的）。
+ * 判据本身没变，变的只是「等到什么时候再判」。
+ */
+async function waitFor(fn, timeout = 15000, step = 400) {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    const v = await fn();
+    if (v) return true;
+    if (Date.now() > deadline) return false;
+    await sleep(step);
+  }
+}
 
 async function open(url, wait = 2300) {
   const r = await j('/new', { method: 'POST', body: url });
@@ -122,6 +143,14 @@ const NOTE_TITLE = '秋冬除尘季，这几件小家电真香';
 const NOTE_SUMMARY = '一句话卖点';
 const NOTE_TAGS = '洗地机,吸尘器';
 let createdKey = '';
+/*
+ * ⚠️ 必须声明在**外层**（不能写在第 1 节里）。
+ *    `finally` 里的收尾断言要用它，而写在第 1 节里就是 `try { const … }` 的块作用域，
+ *    `finally` 根本看不到 —— 会抛 `ReferenceError: notesBefore is not defined`，
+ *    而且是在收尾阶段抛，表现成「前面全绿、最后整脚本崩掉」。
+ *    同族坑（断言引了别的块里的局部变量）在 MEMORY.md 铁律 51 记过。
+ */
+let notesBefore = 0;
 /* 第 2.5 节从控制台 UI 新建的那一篇（正常会当场删掉；中途异常时由 finally 按标题扫掉） */
 let consoleNoteTitle = '';
 
@@ -157,6 +186,16 @@ let consoleNoteTitle = '';
     for (const n of ((pre.data && pre.data.list) || [])) {
       if (n.title === NOTE_TITLE) await api('POST', '/api/decorate/note/delete', { key: n.key });
     }
+    /*
+     * 开跑时的笔记底数。
+     *
+     * ⚠️ 收尾那条「不许有残留」原来是写死 `n === 0` 的 —— 那时候库是空的。
+     *    2026-10-15 库里有 60 篇真笔记（复刻有赞「新闻大事 / 用户分享」两页），
+     *    这条就变成**永久假红**（典型「探针前提过期」，不是代码坏了）。
+     *    判据改成「跟开跑时比，不多不少」：既能抓残留，也不要求库必须是空的。
+     */
+    notesBefore = (pre.data && pre.data.stats && pre.data.stats.count) || 0;
+    console.log('    开跑前笔记底数 = ' + notesBefore);
 
     /* ---------- 1. 造一条测试笔记 ---------- */
     TLOG('\n【1】造测试数据');
@@ -259,7 +298,7 @@ let consoleNoteTitle = '';
       b.click();
       return 'clicked';
     })()`);
-    await sleep(1500);
+    await waitFor(async () => (await run(ctab, `String(!!document.querySelector('#body table.tb'))`)) === 'true', 15000);
     const listInfo = await run(ctab, `(() => {
       const trs = [...document.querySelectorAll('#body table.tb tbody tr')];
       const hit = trs.find((r) => r.innerText.indexOf(${JSON.stringify(NOTE_TITLE)}) >= 0);
@@ -298,11 +337,15 @@ let consoleNoteTitle = '';
      */
     ok('「内容量」列：无草稿时报已生成代码的区块数（未生成代码 → 0 个组件）',
       String((li.hitCells || [])[2] || '') === '0 个组件', JSON.stringify(li.hitCells));
-    /* ⚠️ innerText 里「/ 50 篇」前后是换行，先把连续空白折成一个空格再比 ——
-     *    直接对着带换行的原文写正则，红的是「排版换行」而不是「配额没了」（假红）。 */
+    /* ⚠️ innerText 里「/ N 篇」前后是换行，先把连续空白折成一个空格再比 ——
+     *    直接对着带换行的原文写正则，红的是「排版换行」而不是「配额没了」（假红）。
+     * ⚠️ 配额上限**从后端常量读**，不写死数字：原来写的是 `/ 50 篇`，
+     *    2026-10-15 把 MAX_NOTES 从 50 调到 100 之后，这条就红在「文案变了」，
+     *    而不是红在「配额不见了」—— 典型「锁了当时值而不是锁意图」。 */
     const statFlat = String(li.statLine).replace(/\s+/g, ' ');
-    ok('页面顶部有笔记配额与口径说明（店铺笔记 N / 50 篇）',
-      /店铺笔记 \d+ \/ 50 篇/.test(statFlat), statFlat.slice(0, 100));
+    const quotaMax = createRequire(import.meta.url)(join(ROOT, 'server', 'decorate', 'shopnotes.js')).MAX_NOTES;
+    ok(`页面顶部有笔记配额与口径说明（店铺笔记 N / ${quotaMax} 篇）`,
+      new RegExp('店铺笔记 \\d+ \\/ ' + quotaMax + ' 篇').test(statFlat), statFlat.slice(0, 100));
 
     /* 点「新建」→ 弹层 */
     const UI_NOTE_TITLE = '控制台验收临时笔记（会自动删）';
@@ -358,7 +401,8 @@ let consoleNoteTitle = '';
       mask.querySelector('[data-ok]').click();
       return 'ok';
     })()`);
-    await sleep(1900);
+    /* 新建要重写一遍 replica.js（60 篇时 ~140KB），等列表真的多出一行再判 */
+    await waitFor(async () => (await run(ctab, `String(${ROWS_EXPR}.length)`) ) !== String(li.rows || 0), 20000);
     const afterNew = await run(ctab, `(() => {
       const trs = ${ROWS_EXPR};
       return JSON.stringify({
@@ -401,7 +445,11 @@ let consoleNoteTitle = '';
       b.click();
       return 'ok';
     })()`);
-    await sleep(1900);
+    /* 删除同样要重写 replica.js —— 等那一行真的消失再判（固定 sleep 在 60 篇数据下会假红）。
+     * 超时给到 35s：删除那一下服务端要同步重写 140KB 产物，实测偶发 30s 级别的卡顿
+     * （CDP 自己的 eval 超时就是 30s，卡住时会返回空串，所以这里必须轮询而不是一次判死）。 */
+    await waitFor(async () => (await run(ctab, `String([...document.querySelectorAll('#body table.tb tbody tr')]
+      .filter((r) => r.innerText.indexOf(${JSON.stringify(UI_NOTE_TITLE)}) >= 0).length === 0)`)) === 'true', 35000);
     const afterDel = await run(ctab, `(() => {
       const trs = [...document.querySelectorAll('#body table.tb tbody tr')];
       return JSON.stringify({
@@ -421,6 +469,12 @@ let consoleNoteTitle = '';
     const tab2 = await open(SITE + '/admin?edit=' + encodeURIComponent(createdKey), 2600);
     tabs.push(tab2);
     const st2 = await ensureLoggedIn(tab2);
+    /* ⚠️ 必须等到**标题正好是这篇**，不能只等 `#edName` 出现：
+     *    `/admin` 在页面列表还没回来时会先按「内置页」渲染一次（`#edName` 此时已经有值），
+     *    深链 `?edit=note-N` 是列表到位之后才生效的。只判「非空」就会抓住那个中间态，
+     *    表现成「顶栏显示内置页 / path 是 — / 区块树 0 项」的一整串假红。
+     *    60 篇笔记（共 137 个页面）时列表回来得慢，这个竞态才暴露出来。 */
+    await waitFor(async () => (await run(tab2, `String((document.getElementById('edName') || {}).textContent || '')`)) === NOTE_TITLE, 30000);
     ok('编辑器已打开（顶栏出现页面名）',
       (await run(tab2, `document.getElementById('edName').textContent`)) === NOTE_TITLE, st2);
 
@@ -692,8 +746,9 @@ let consoleNoteTitle = '';
       }
       const left = await api('GET', '/api/decorate/notes');
       const n = left.data && left.data.stats ? left.data.stats.count : -1;
-      console.log('收尾：注册表剩余笔记数 = ' + n + (n === 0 ? ' ✓' : ' ✗（有残留）'));
-      if (n !== 0) { fail++; fails.push('收尾后仍有 ' + n + ' 篇笔记残留'); }
+      console.log('收尾：注册表剩余笔记数 = ' + n + '（开跑前 ' + notesBefore + '）'
+        + (n === notesBefore ? ' ✓ 不留残留' : ' ✗ 有残留'));
+      if (n !== notesBefore) { fail++; fails.push('收尾后笔记数 = ' + n + '，开跑前 ' + notesBefore + '（有残留）'); }
     }
     /* 收尾 3：replica.js 必须没变。
      *

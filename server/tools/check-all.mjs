@@ -5156,6 +5156,74 @@ assert('笔记 / 自定义页「生成代码」门：assemble() 只写「本次�
   `publish 传 keepKey=${/writeReplica\(pageData, key, \{ keepKey: key \}\)/.test(storeNoC)}　` +
   `改名传 keepKey（只看旧键是否已下发）=${/writeReplica\(publishedAll\(\), newKey, \{ keepKey: wasLive \? newKey : '' \}\)/.test(storeNoC)}`);
 
+/* ---- 装修卡片「点了有地方去」：链接完整性（2026-10-15 补） ---- */
+/*
+ * 起因（真事）：新闻大事 / 用户分享两页复刻完，61 张卡片**标题与封面全齐**、
+ * 页面渲染完全正常、接口零报错 —— 唯独每张卡片的 `link` 是空字符串，点了没反应。
+ * 这类「看起来是好的」的哑故障，只能靠对账抓。
+ *
+ * 判据落在**真机真正读的那份数据**上（`miniprogram/config/replica.js`），
+ * 而不是后台草稿：草稿改了没生成代码，真机上依然是旧的。
+ *
+ * ⚠️ 两条必须成对：
+ *   ① 「断链 0」—— 只锁它一条，遍历逻辑写错时「一条都没扫到」会显示成全绿（空表恒真）；
+ *   ② 「确实扫到了 link（>0）」—— 补上它，① 才是真判据。
+ * 空 link **不算断链**：有些图片位本来就不跳转。空链接的兜底在
+ * `.tooling/check-cards-link.mjs`（那里按页面逐个点名，且允许「某个页面本来就没卡片」）。
+ */
+{
+  const replicaNow = localRequire(REPLICA_FILE);
+  const appJsonNow = JSON.parse(readFileSync(join(MP_ROOT, 'app.json'), 'utf8'));
+  const builtin = new Set((appJsonNow.pages || []).map((p) => '/' + p));
+  ((appJsonNow.subPackages || appJsonNow.subpackages || []).forEach((sp) => {
+    (sp.pages || []).forEach((p) => builtin.add('/' + sp.root + '/' + p));
+  }));
+
+  const linksFound = [];
+  const walkLinks = (v, where) => {
+    if (Array.isArray(v)) { v.forEach((x, i) => walkLinks(x, where + '[' + i + ']')); return; }
+    if (v && typeof v === 'object') {
+      Object.keys(v).forEach((k) => {
+        if (k === 'link' && typeof v[k] === 'string') linksFound.push({ where: where + '.' + k, link: v[k] });
+        else walkLinks(v[k], where + '.' + k);
+      });
+    }
+  };
+  walkLinks(replicaNow.CUSTOM_PAGES || {}, 'CUSTOM_PAGES');
+  walkLinks(replicaNow.HOME_BLOCKS || [], 'HOME_BLOCKS');
+  walkLinks(replicaNow.MINE_BLOCKS || [], 'MINE_BLOCKS');
+
+  const broken = [];
+  let checkedLinks = 0;
+  linksFound.forEach((x) => {
+    const s = String(x.link).trim();
+    if (!s) return;                       // 空 = 这一项不跳转，不是断链
+    checkedLinks++;
+    const p = s.split('?')[0].replace(/^\//, '');
+    let okNow = false;
+    if (/^packageNews\/note\/note$/.test(p)) {
+      const id = (/[?&]id=(\d+)/.exec(s) || [])[1];
+      okNow = !!id && !!((replicaNow.SHOPNOTES || {})[id]);
+    } else if (/^pages\/custom\/index$/.test(p)) {
+      const key = (/[?&]key=([^&]+)/.exec(s) || [])[1];
+      okNow = !!key && !!((replicaNow.CUSTOM_PAGES || {})[key]);
+    } else if (/^https?:/i.test(s) || /^tel:/i.test(s)) {
+      okNow = true;                        // 网页 / 电话由 utils/link.js 另行处理，不归这条管
+    } else {
+      okNow = builtin.has('/' + p);
+    }
+    if (!okNow) broken.push(x.where + ' → ' + s);
+  });
+
+  assert('装修链接完整性：已生成代码里每条非空 link 都指向真实存在的笔记 / 页面（点了没反应是零报错的哑故障）',
+    broken.length === 0,
+    broken.length ? `断链 ${broken.length} 条：` + broken.slice(0, 6).join('；')
+      : `扫到 ${checkedLinks} 条 link（另有 ${linksFound.length - checkedLinks} 条空 link 属「不跳转」，不计）`);
+
+  assert('装修链接完整性：确实扫到了 link（防「遍历写错 → 一条都没查还显示绿」的空表恒真）',
+    checkedLinks > 0, `扫到非空 link ${checkedLinks} 条`);
+}
+
 /* ---- 成员管理的角色门（直接问 lib/adminAuth 的 minRoleFor，不看注释） ---- */
 const adminAuthLib = localRequire(join(__dirname, '..', 'lib', 'adminAuth.js'));
 const memberOwnerPaths = ['save', 'delete', 'status', 'password']
