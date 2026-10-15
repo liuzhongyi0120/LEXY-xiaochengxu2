@@ -410,6 +410,34 @@ let createdKey = '';
        所以判据取类型角标（客户端按 union 的 kinds 现算）而不是 .txt。 */
     ok('新增项的组件类型 = 辅助线（面板用有赞名，不是内部名「辅助分割」）', a.lastKind === '辅助线', added);
     ok('加到页面后标记为「有未保存的改动」（只改内存草稿）', /未保存/.test(String(a.dirty)), String(a.dirty));
+
+    /* ---------- 4.5 ★「加得进去」还得「存得下去」 ----------
+     *
+     * 上面那三条只证明了装修台把组件塞进了**内存草稿**。2026-10-15 的真 bug 恰好长在这一段：
+     * 笔记组件面板放行的 7 个 kind 里，「文本」「辅助空白」住在 UC_KINDS，
+     * 而当时的草稿校验写死了 HOME_BLOCK_KINDS → 面板加得进去、一点「存至草稿」就 1001。
+     * 「加了组件就标记未保存」这条断言当时是绿的，因为**它压根没碰保存**。
+     * 所以这里必须真点一次「存至草稿」，再回读接口确认那一项落盘了。
+     */
+    console.log('\n【4.5】★「加得进去」还得「存得下去」');
+    await run(tab2, `document.getElementById('btnSave').click();`);
+    await sleep(1500);
+    const afterAdd = await api('GET', '/api/decorate/page?key=' + encodeURIComponent(createdKey));
+    const savedBlocks = (afterAdd.data && afterAdd.data.data && afterAdd.data.data.blocks) || [];
+    ok('★ 面板加的那一项真的存进了草稿（blocks 里多出一条 line）',
+      savedBlocks.length >= 1 && savedBlocks.some((b) => b.type === 'line'),
+      'blocks=' + JSON.stringify(savedBlocks.map((b) => b.type)));
+    ok('存完状态回到「无未保存改动」',
+      /无未保存改动/.test(await run(tab2, `document.getElementById('edDirty').textContent`)),
+      await run(tab2, `document.getElementById('edDirty').textContent`));
+    /* 把这份带组件的草稿丢弃，免得影响后续步骤与收尾的「replica.js 未变」 */
+    await run(tab2, `window.confirm = function () { return true; }; 'ok'`);
+    await run(tab2, `document.getElementById('btnDiscard').click();`);
+    await sleep(900);
+    const afterDiscard2 = await api('GET', '/api/decorate/page?key=' + encodeURIComponent(createdKey));
+    ok('丢弃草稿后 blocks 回到空（这一轮没留下组件）',
+      ((afterDiscard2.data && afterDiscard2.data.data && afterDiscard2.data.data.blocks) || []).length === 0,
+      JSON.stringify(((afterDiscard2.data && afterDiscard2.data.data && afterDiscard2.data.data.blocks) || []).map((b) => b.type)));
   } catch (err) {
     fail++;
     fails.push('脚本异常：' + (err && err.stack ? err.stack : err));

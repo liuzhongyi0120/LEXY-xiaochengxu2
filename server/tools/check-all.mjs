@@ -867,6 +867,56 @@ const noteLongTitle = await call('POST', '/api/decorate/note/create', {
 assert('笔记标题超过 40 字被拒（有赞那个「5-40 字」里 40 是硬上限）',
   /40/.test(noteLongTitle.json.msg || ''), noteLongTitle.json.msg);
 
+/*
+ * ★ 笔记组件面板放行的 kind 必须**真的存得进去**（2026-10-15 真 bug 的行为判据）。
+ *
+ * 起因：面板里摆着「文本」「辅助空白」（住在 UC_KINDS，不在 HOME_BLOCK_KINDS），
+ * 而草稿校验当时写死了 HOME_BLOCK_KINDS → 一点「存至草稿」就 1001。
+ * 装修台只改内存草稿，所以「加得进去」验不出它；**只有真发一次存草稿请求才算数**。
+ * 这里取一条已建的笔记，把面板那 7 个 kind 各存一遍；反例是首页专属的 elevator（必须仍被拒）。
+ */
+const notePage0 = await call('GET', '/api/decorate/page', { query: { key: noteKey } });
+const noteDraftBase = notePage0.ok ? notePage0.data.data : null;
+const NOTE_KIND_SAMPLE = {
+  text: { text: '一段文本' },
+  swiper: { images: [{ image: '/uploads/202610/20261009-eqst4d.jpg', link: '' }], mode: 'single', height: 750 },
+  rich_text: { html: '<p>富文本</p>' },
+  line: { style: 'solid', height: 2 },
+  blank: { height: 30 },
+  audio: { src: '/uploads/202610/demo.mp3' },
+  video: { src: '/uploads/202610/demo.mp4', poster: '/uploads/202610/20261009-eqst4d.jpg' }
+};
+const noteKindReject = [];
+/*
+ * ⚠️ 这里必须**就地 require 一份**，不能用别处声明的 `schemaMod` / `requireFromHere`：
+ *    它们都是 `const` 且声明在 1600 行之后（TDZ）—— 在本节引用会抛
+ *    「Cannot access 'xxx' before initialization」，被最外层的「自检中断」兜住，
+ *    于是后面所有断言静默消失（铁律 51：自检也会说谎）。
+ *    这个写法与文件里 fragSchema / pvRequire 一路（就地 createRequire）。
+ */
+const noteSchema = (await import('node:module')).createRequire(import.meta.url)(
+  join(__dirname, '..', 'decorate', 'schema.js'));
+for (const k of (notePage0.ok ? noteSchema.SHOPNOTE_LIB_KINDS : [])) {
+  const one = JSON.parse(JSON.stringify(noteDraftBase));
+  one.blocks = [Object.assign({ id: 'k' + k, type: k }, NOTE_KIND_SAMPLE[k] || {})];
+  const rr = await call('POST', '/api/decorate/draft', { body: { key: noteKey, data: one } });
+  if (!rr.ok) noteKindReject.push(k + '→' + rr.json.code + ' ' + rr.json.msg);
+}
+assert('★ 笔记组件面板放行的 7 个 kind 都能存进草稿（「能加」与「收得下」同一份清单）',
+  notePage0.ok && noteKindReject.length === 0,
+  noteKindReject.length ? '收不下去的：' + noteKindReject.join(' | ') : '7 个 kind 全部通过');
+
+const noteOutOfLib = JSON.parse(JSON.stringify(noteDraftBase || {}));
+noteOutOfLib.blocks = [{ id: 'x1', type: 'elevator', title: '电梯导航' }];
+const noteOutOfLibRes = await call('POST', '/api/decorate/draft', {
+  body: { key: noteKey, data: noteOutOfLib }, expectFail: '越界区块类型', expectHttp: 200, expectCode: 1001
+});
+assert('笔记里塞首页专属 kind（elevator）仍被拒 1001（不是把校验关掉了）',
+  /不支持/.test(noteOutOfLibRes.json.msg || ''), noteOutOfLibRes.json.msg);
+
+/* 收尾：丢弃这一轮存的草稿，别把「有未保存草稿」留给后面的用例 */
+await call('POST', '/api/decorate/discard', { body: { key: noteKey } });
+
 const noteDelMiss = await call('POST', '/api/decorate/note/delete', {
   body: { key: 'note-999999' }, expectFail: '笔记不存在', expectHttp: 404, expectCode: 404
 });
@@ -2223,11 +2273,51 @@ assert('装修 schema 里所有跳转字段都是 link 类型（回退成 text �
 
   /* (10) 组件库按页面下发：装修台必须能按页面切库（否则「我的」页显示的仍是首页那 57 种） */
   const decorateRoute = readFileSync(join(__dirname, '..', 'routes', 'decorate.js'), 'utf8');
+  /*
+   * ⚠️ 这里原来判的是 `Object.keys(pageLibs()).join(',') === 'mine'`。
+   *    笔记（2026-10-15）也带页面级组件库之后，这个「只等于 mine」就不再成立了
+   *    （有笔记时 pageLibs() 还会带上 note-<id>）。判据改成判**它该有的性质**：
+   *    每个声明了 lib 的页面都得在表里出现，且「我的」页必须在。
+   */
+  const libKeys = Object.keys(schemaMod.pageLibs());
   assert('装修台组件库按页面下发（pageLibs）并支持分组渲染开关（tabs[].grouped）',
     /pageLibs/.test(decorateRoute) && /schema\.pageLibs\(\)/.test(decorateRoute) &&
     /usePageLib/.test(adminJs) && /meta\.grouped/.test(adminJs) &&
-    Object.keys(schemaMod.pageLibs()).join(',') === 'mine',
-    'pageLibs 下发 + usePageLib 切库 + grouped 分组渲染均已就位');
+    libKeys.indexOf('mine') >= 0,
+    'pageLibs 下发 + usePageLib 切库 + grouped 分组渲染均已就位；当前带独立库的页面：' + libKeys.join(','));
+
+  /* (11) ★「面板能加什么」与「后端收不收」必须是同一份清单
+   *
+   * 2026-10-15 的真 bug：笔记组件面板里摆着「文本」「辅助空白」（它们在 UC_KINDS），
+   * 而草稿校验 checkBlocks() 写死了 HOME_BLOCK_KINDS → 运营加一个「文本」，
+   * 一点「存至草稿」就报 1001「第 1 个区块类型不支持：text」。
+   * 装修台只改内存草稿（标记「有未保存改动」），所以只验到「加得进去」的脚本永远抓不到它。
+   *
+   * 这一组对**每个页面**对账：面板放行的 kind 必须全部在 schema.pageBlockKinds(该页) 里。
+   * 新增一个页面级组件库（或往库里加一项）时，只要没同步放行清单，这里立刻红。 */
+  const libMismatch = [];
+  schemaMod.allPages().forEach((pg) => {
+    if (!pg || !pg.lib || !Array.isArray(pg.lib.kinds)) return;
+    const allowed = schemaMod.pageBlockKinds(pg);
+    pg.lib.kinds.forEach((k) => {
+      const kind = (k && k.kind) || k;
+      if (!allowed[kind]) libMismatch.push(pg.key + ':' + kind);
+    });
+  });
+  assert('每个页面「组件面板放行的区块类型」都能通过该页的数据校验（不留「能加但存不下去」的组件）',
+    libMismatch.length === 0,
+    libMismatch.length ? '收不下去的：' + libMismatch.join(', ') : '面板放行清单与校验放行清单逐页一致');
+
+  /* 放行清单必须**按页面**取，不能顺手放宽到「一张全量表」：
+   *   无组件库的页面（自定义页 / 内置页）= 首页那 59 种（**同一份对象**，不是等长的另一份）；
+   *   笔记 = 面板那 7 个，一个不多一个不少。 */
+  const noteAllowed = schemaMod.pageBlockKinds(schemaMod.shopnoteDef({ id: 999999, published: {} }));
+  assert('放行清单按页面取：无库页面 = 首页那 59 种（同一份）；笔记 = 面板那 7 个（一个不多一个不少）',
+    schemaMod.pageBlockKinds(schemaMod.get('home')) === schemaMod.HOME_BLOCK_KINDS &&
+    schemaMod.pageBlockKinds(schemaMod.get('lexy')) === schemaMod.HOME_BLOCK_KINDS &&
+    String(Object.keys(noteAllowed).sort()) === String(schemaMod.SHOPNOTE_LIB_KINDS.slice().sort()),
+    'home=' + Object.keys(schemaMod.pageBlockKinds(schemaMod.get('home'))).length +
+    ' note=' + Object.keys(noteAllowed).sort().join(','));
 }
 
 /* ---------------------------------------------------------------------------

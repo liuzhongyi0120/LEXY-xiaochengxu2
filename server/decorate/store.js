@@ -300,17 +300,22 @@ function decorateRef(page, hit, titles, stateText) {
 /* ----------------------------- 结构校验 ----------------------------- */
 
 /**
- * 区块数组结构校验（首页与自定义页面共用一份规则）。
+ * 区块数组结构校验（首页 / 自定义页 / 店铺笔记共用一份规则）。
  * 校验的是「能不能渲染」：区块类型必须已接入，且各类区块的必填字段不能为空。
+ *
+ * ⚠️ `kinds` 由调用方按**页面**给出（见 schema.pageBlockKinds），默认才是首页那 59 种。
+ *    原来这里写死 `schema.HOME_BLOCK_KINDS`，于是笔记组件面板里摆着的
+ *    「文本」「辅助空白」（它们住在 UC_KINDS）一存草稿就被判「类型不支持」——
+ *    装修台给得出来、后端收不下去。**「能加什么」与「收不收」必须是同一份清单。**
  */
-function checkBlocks(d) {
+function checkBlocks(d, kinds) {
   if (!d || typeof d !== 'object') return '页面数据必须是对象';
   if (!Array.isArray(d.blocks)) return '缺少 blocks 数组';
-  const kinds = schema.HOME_BLOCK_KINDS;
+  const table = kinds || schema.HOME_BLOCK_KINDS;
   for (let i = 0; i < d.blocks.length; i++) {
     const b = d.blocks[i];
     if (!b || !b.type) return `第 ${i + 1} 个区块缺少 type`;
-    if (!kinds[b.type]) return `第 ${i + 1} 个区块类型不支持：${b.type}`;
+    if (!table[b.type]) return `第 ${i + 1} 个区块类型不支持：${b.type}`;
     if (b.type === 'swiper' && (!Array.isArray(b.images) || !b.images.length)) return `第 ${i + 1} 个图片广告没有图片`;
     if (b.type === 'image' && !b.src) return `第 ${i + 1} 张图片缺少地址`;
     if (b.type === 'video' && !b.src) return `第 ${i + 1} 个视频缺少地址`;
@@ -381,6 +386,11 @@ function validate(key, data) {
   const page = schema.get(key);
   if (!page) return '未知页面：' + key;
   /*
+   * 放行清单按**页面**取（笔记 7 个 / 自定义页与内置页 = 首页那 59 种），
+   * 与装修台左栏能拖进来的那份严格同源 —— 见 schema.pageBlockKinds 的注释。
+   */
+  const kinds = schema.pageBlockKinds(page);
+  /*
    * 店铺笔记：先校验「标题」，再走区块流校验。
    *
    * ⚠️ 这一条必须落在 validate() 里，**不能只在 setPublished() 里拦**：
@@ -396,10 +406,10 @@ function validate(key, data) {
     const raw = h.title !== undefined ? h.title : (data && data.title);
     const t = shopnotes.checkTitle(String(raw === undefined || raw === null ? '' : raw).trim());
     if (t) return t;
-    return checkBlocks(data);
+    return checkBlocks(data, kinds);
   }
   // 自定义页面统一是「区块流」结构，与首页共用同一套校验规则
-  if (page.custom) return checkBlocks(data);
+  if (page.custom) return checkBlocks(data, kinds);
   const fn = REQUIRED[key];
   if (!fn) return '未知页面：' + key;
   return fn(data) || '';

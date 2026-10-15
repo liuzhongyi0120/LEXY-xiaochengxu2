@@ -1513,6 +1513,37 @@ function pageLibs() {
 }
 
 /**
+ * 这个页面**允许出现**的区块类型表（kind → 字段定义）。
+ *
+ * 为什么要单独有一个出口：装修台「能加什么」与后端「收不收」曾经是两份口径 ——
+ *   · 装修台左栏 / 区块树的 kind 表来自 `page.lib.kinds`（笔记 = 那 7 个组件）；
+ *   · 而 store.js 的草稿校验 `checkBlocks()` 写死了 `HOME_BLOCK_KINDS`（首页那 59 种）。
+ * 两者在「笔记」上就岔开了：`text`（文本）与 `blank`（辅助空白）不在首页那 59 种里
+ * （它们原本只被「我的」页用到，住在 UC_KINDS），于是运营在笔记里加一个「文本」，
+ * **一点「存至草稿」就报 1001「第 1 个区块类型不支持：text」** ——
+ * 面板里摆着的组件却存不下去，正是最不该有的那种「假装可用」。
+ *
+ * 取法：**页面声明了组件库就用它自己那份**（笔记 7 个 / 「我的」25 个），
+ * 否则回落到首页那 59 种（自定义页、内置页）。字段定义一律从 MINE_BLOCK_KINDS 取
+ * （它是 HOME_BLOCK_KINDS ∪ UC_KINDS 的合成表，两类都在里面）。
+ *
+ * ⚠️ `lib.kinds` 里的元素是元信息对象（`{ kind, label, … }`，见 shopnoteLibKinds），
+ *    不是裸字符串 —— 这里两种写法都收，免得以后有人换了形状就静默回落到「全放行」。
+ */
+function pageBlockKinds(page) {
+  const lib = page && page.lib;
+  if (!lib || !Array.isArray(lib.kinds)) return HOME_BLOCK_KINDS;
+  const out = {};
+  lib.kinds.forEach((k) => {
+    const kind = (k && k.kind) || k;
+    const def = MINE_BLOCK_KINDS[kind];
+    if (kind && def) out[kind] = def;
+  });
+  // 一份都取不到时宁可回落到首页表，也不要返回空表（空表 = 什么都存不下去）
+  return Object.keys(out).length ? out : HOME_BLOCK_KINDS;
+}
+
+/**
  * 「我的」页「页面区块」列表只认识这 25 种 —— 与组件库严格一致。
  * （区块树里的「+ 新增」会弹这个清单；若放开成 66 种，就会出现「能加但组件库里找不到」的错乱。）
  */
@@ -2723,4 +2754,4 @@ function clone(v) {
 module.exports = { PAGES, allPages, findPage, customPageDef, shopnoteDef, SHOPNOTE_HEADER_NODE, SHOPNOTE_BODY_NODE, SHOPNOTE_BLOCKS_NODE, SHOPNOTE_LIB_GROUPS, SHOPNOTE_LIB_KINDS, shopnoteComponentLib, CUSTOM_META_DEFAULT, list, metaOf, get, serialize, itemTitle, clone, HOME_BLOCK_KINDS, componentLib, ICONS, PAGE_META_FIELDS, PAGE_META_DEFS, pageMetaDefault, upgradeBlock, upgradePageData, linkOptions, LINK_KINDS, LINK_ROUTES, TAB_PAGES, BUILTIN_LINKS, normalizeTabbar, tabbarDefault, tabbarPageName, TABBAR_PAGES, TABBAR_PAGE_OPTIONS, TABBAR_DEFAULTS, TABBAR_DEFAULT_ITEMS, TABBAR_MIN, TABBAR_MAX, TABBAR_TEXT_MAX, TABBAR_ICON_DIR, TABBAR_ICON_FILES, TABBAR_PRESET_OFF, TABBAR_PRESET_ON, tabbarIconName, CUSTOM_PAGE_PREFIX, customKeyOf, isTabbarPath,
   /* 个人中心（「我的」页）：区块类型表 / 组件库 / 默认区块 / 字段节点 / 页面级组件库 */
   MINE_BLOCK_KINDS, MINE_BLOCKS_NODE, MINE_UNION_KINDS, MINE_LIB_KINDS, mineComponentLib, cloneDefaultMineBlocks,
-  pageLibs, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };
+  pageLibs, pageBlockKinds, UC_KINDS, UC_LIB_GROUPS, UC_MAX, UC_TOOL_ITEMS, UC_DEFAULT_BLOCKS };

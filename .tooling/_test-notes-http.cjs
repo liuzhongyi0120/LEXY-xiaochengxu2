@@ -200,6 +200,67 @@ async function http(method, p, body, token) {
     eq('列表名跟随标题', row2 && row2.name, '秋冬除尘季，这几件小家电真香（平铺改）');
     eq('无未发布草稿', row2 && row2.hasDraft, false);
 
+    /* ---------------- 8.5 组件面板放行清单 ⇄ 后端校验（2026-10-15 真 bug 回归） ----------------
+     *
+     * 起因：笔记组件面板里摆着「文本」「辅助空白」—— 这两个 kind 住在 UC_KINDS
+     * （原本只被「我的」页用到），不在 HOME_BLOCK_KINDS 里。
+     * 而草稿校验 checkBlocks() 当时写死了 HOME_BLOCK_KINDS，
+     * 于是运营在笔记里加一个「文本」，一点「存至草稿」就报
+     * 「数据校验未通过：第 1 个区块类型不支持：text」——
+     * **面板给得出来、后端收不下去**。装修台那一步只改了内存草稿（标记「有未保存改动」），
+     * 所以不看「存下去」的验收脚本根本抓不到它，是出图脚本顺手发现的。
+     *
+     * 这一组把「面板放行的 7 个 kind」逐个存一遍草稿，再验两个反例：
+     *   ① 7 个都必须存得下去（面板说了能用就得真能用）；
+     *   ② 不在那 7 个里的（电梯导航）必须仍被拒 —— 否则就是「把校验关掉」而不是「修对了」。
+     */
+    console.log('\n【8.5】笔记组件放行清单 ⇄ 后端校验');
+    const NOTE_KINDS = ['text', 'swiper', 'rich_text', 'line', 'blank', 'audio', 'video'];
+    /* 每个 kind 给一份**能过结构校验**的最小数据（swiper 必须有图、video 必须有地址） */
+    const KIND_SAMPLE = {
+      text: { text: '一段文本' },
+      swiper: { images: [{ image: '/uploads/202610/20261009-eqst4d.jpg', link: '' }], mode: 'single', height: 750 },
+      rich_text: { html: '<p>富文本</p>' },
+      line: { style: 'solid', height: 2 },
+      blank: { height: 30 },
+      audio: { src: '/uploads/202610/demo.mp3' },
+      video: { src: '/uploads/202610/demo.mp4', poster: '/uploads/202610/20261009-eqst4d.jpg' }
+    };
+    const reject = [];
+    for (const k of NOTE_KINDS) {
+      const one = JSON.parse(JSON.stringify(edited));
+      one.blocks = [Object.assign({ id: 'k' + k, type: k }, KIND_SAMPLE[k] || {})];
+      const rr = await http('POST', '/api/decorate/draft', { key: key, data: one }, token);
+      if (rr.code !== 0) reject.push(k + '→' + rr.code + ' ' + rr.msg);
+    }
+    ok('★ 笔记组件面板放行的 7 个 kind 都能存进草稿（不留「能加但存不下去」的组件）',
+      reject.length === 0, reject.join(' | '));
+
+    /* 反例①：不在笔记 7 个里的 kind（首页专属的电梯导航）必须仍被拒 */
+    const outOfLib = JSON.parse(JSON.stringify(edited));
+    outOfLib.blocks = [{ id: 'x1', type: 'elevator', title: '电梯导航' }];
+    const badKind = await http('POST', '/api/decorate/draft', { key: key, data: outOfLib }, token);
+    eq('笔记里塞首页专属 kind（elevator）仍被拒 1001', badKind.code, 1001);
+
+    /* 反例②：**自定义页**的放行清单不能被笔记那 7 个污染（自定义页仍按首页那 59 种） */
+    const cpKey = 'pkindchk';
+    // 先清掉上一次跑剩下的同名页（幂等；删不到就忽略）
+    await http('POST', '/api/decorate/page/delete', { key: cpKey }, token);
+    const cp = await http('POST', '/api/decorate/page/create', { name: '放行清单回归页', key: cpKey }, token);
+    if (cp.code === 0) {
+      const cpg = await http('GET', '/api/decorate/page?key=' + cpKey, undefined, token);
+      const cdata = JSON.parse(JSON.stringify(cpg.body.data));
+      cdata.blocks = [{ id: 'ct1', type: 'text', text: '自定义页里放文本' }];
+      const cbad = await http('POST', '/api/decorate/draft', { key: cpKey, data: cdata }, token);
+      eq('自定义页里的 text 仍被拒 1001（没被顺手放宽）', cbad.code, 1001);
+      await http('POST', '/api/decorate/page/delete', { key: cpKey }, token);
+    } else {
+      ok('自定义页里的 text 仍被拒 1001（没被顺手放宽）', false, '建页失败：' + cp.code + ' ' + cp.msg);
+    }
+
+    /* 收尾：把这一节存的草稿丢弃，否则下一节的「无未发布草稿」会假红 */
+    await http('POST', '/api/decorate/discard', { key: key }, token);
+
     /* ---------------- 9. 笔记列表端点 ---------------- */
     console.log('\n【9】GET /notes 清单');
     const nl = await http('GET', '/api/decorate/notes', undefined, token);
