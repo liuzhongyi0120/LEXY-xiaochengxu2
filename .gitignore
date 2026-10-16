@@ -67,6 +67,15 @@ Desktop.ini
 *.tmp
 *.bak
 *.swp
+# 原子写的残留：名字形如 `replica.js.tmp.<pid>.<时间戳>.<第几次>` / `replica.js.replacing`
+# —— 它们**不以 .tmp 结尾**，上面那条 `*.tmp` 兜不住，`git add -A` 会把 310KB 一份的垃圾提交进去
+# （见 server/lib/atomicFile.js 的 sweepStale）
+*.tmp.[0-9]*
+*.replacing
+*.newtest
+*.owtest
+*.awaytest
+*.diagmove
 .vscode/
 .idea/
 __pycache__/

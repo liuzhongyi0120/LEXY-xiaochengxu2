@@ -1,0 +1,12 @@
+import fs from 'node:fs';
+const TOK=fs.readFileSync('.tooling/_tok.txt','utf8').trim();
+const B='http://127.0.0.1:3000'; const H={Authorization:'Bearer '+TOK};
+const d=await (await fetch(B+'/api/decorate/page?key=note-216',{headers:H})).json();
+const data=d.data.data||{};
+console.log('顶层键:', Object.keys(data));
+console.log('header:', JSON.stringify(data.header).slice(0,300));
+console.log('body 键:', Object.keys(data.body||{}), 'html 含 null-src:', /src\s*=\s*["']?null/i.test(String(data.body?.html||'')));
+console.log('blocks:', JSON.stringify(data.blocks||[]).slice(0,300));
+const s=JSON.stringify(data);
+const idx=s.indexOf('null');
+console.log('全文第一次出现 null 的上下文:', s.slice(Math.max(0,idx-120), idx+80));

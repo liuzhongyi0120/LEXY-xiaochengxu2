@@ -85,6 +85,12 @@ function stampOf(ts) {
 
 /** 读取 replica.js（清 require 缓存，保证拿到最新发布结果） */
 function readReplica() {
+  /*
+   * ⚠ 先自愈再读：`writeFileAtomic` 的退路是「先把目标挪走、再挪进来」（见 atomicFile.js
+   *   的 replaceByMovingAway）。万一进程恰好卡在两次 rename 之间崩掉，磁盘上会留下
+   *   `replica.js.replacing` 而没有 `replica.js` —— 这里把它还原，避免整个装修台起不来。
+   */
+  atomic.healAfterCrash(REPLICA_FILE);
   delete require.cache[require.resolve(REPLICA_FILE)];
   return require(REPLICA_FILE);
 }
