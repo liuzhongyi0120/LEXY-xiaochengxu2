@@ -12,6 +12,7 @@
  */
 
 const { resolveAssets, assetUrl } = require('./asset');
+const { baseUrlNow } = require('./constants');
 const { px2rpx, heightRpx } = require('./units');
 const { strikePrice } = require('./format');
 const goodsSvc = require('../services/goods');
@@ -248,16 +249,80 @@ function richResetMarginTop(html) {
 }
 
 /**
+ * 富文本正文里的图片处理：① 地址补全 ② 尺寸约束。两件事都必须做，缺一样真机就是废的。
+ *
+ * ── ① 为什么要补地址 ────────────────────────────────────────────────────
+ *   本函数跑在小程序里，而 `<rich-text>` 的 nodes 中 **`/` 开头的路径会被当成「小程序包内路径」**
+ *   （不是网络地址）→ 图片**根本不发请求**，直接是破图。
+ *   而 `pvRich`（server/public/shared/pv-render.js）与 `richSafe`（…/mp-wxml.js）都跑在**网页**里，
+ *   `/uploads/x` 会基于网页 origin 自然解析 → 天然可显示。
+ *   ⇒ 这就是「装修台/预览里一切正常、真机点进去全是破图」的成因
+ *     （实测 2026-10-16：34 篇笔记 / **421 张图** 100% 是裸 `/uploads/…`，真机全军覆没）。
+ *   换言之：预览链路**不可能**发现这个 bug，因为它的 URL 语义与真机不同 —— 「验证的层不对」。
+ *
+ * ── ② 为什么要补尺寸 ────────────────────────────────────────────────────
+ *   有赞导出的正文里，`<img>` 只有 `data-origin-width/height`（如 1080×2583），
+ *   **既没有 `style` 也没有 `width`/`height` 属性**（实测 19/19 张皆如此）。
+ *   装修台靠 CSS 兜住了：`admin.css` 的 `.pv-rich img { max-width:100%; display:block }`；
+ *   但小程序 `<rich-text>` **不接受外部样式选择器**（wxss 的 `.cr-body img` 打不进 nodes 内部）
+ *   → 真机侧没有任何约束：1080px 宽的图**溢出**，且默认 inline 使多张图**挤成一行**
+ *   （这就是 2026-10-16 用户看到的「正文一排小方块」）。
+ *   ⇒ 与 `richResetMarginTop` 同一个道理：**预览能靠 CSS 兜的，真机必须写进 HTML**。
+ *   口径与 `.pv-rich img` 对齐（`max-width:100%; display:block`），保证三端观感一致。
+ *
+ * ── 通用注意 ────────────────────────────────────────────────────────────
+ *   - 一律走 `baseUrlNow()`：前缀随环境变（模拟器 local = `http://127.0.0.1:3000`、
+ *     真机 server = `https://mall.lexy.cn/mall-api`），写进数据就破坏了
+ *     「换服务器/换域名只改 constants.js 一处」这条设计（见 utils/asset.js 抬头注释）。
+ *   - 与 `resolveAssets()` 的分工：后者是**对象递归**，只认字段值、进不去 HTML 字符串
+ *     （笔记的 `covers`、区块的 `src/images` 都由它处理，所以它们一直是好的）；
+ *     富文本正文是字符串，必须在这里单独处理 —— 这正是本 bug 的由来。
+ *   - 节点**自己写了** `max-width` / `display` 的一律尊重（inline 优先，与有赞同语义）。
+ */
+function resolveRichAssets(html) {
+  const base = baseUrlNow();
+  return String(html || '')
+    .replace(
+      /(<img\b[^>]*?\ssrc\s*=\s*)(["']?)(\/uploads\/[^"'\s>]*)\2/gi,
+      function (whole, pre, q, path) { return pre + q + (base || '') + path + q; }
+    )
+    .replace(/<img\b[^>]*>/gi, imgFit);
+}
+
+/**
+ * 给单个 `<img>` 标签补上宽度约束（与 `.pv-rich img` 同口径）。
+ * 已有的 `max-width` / `display` 不覆盖 —— 尊重节点自己的写法。
+ */
+function imgFit(tag) {
+  const m = /\sstyle\s*=\s*("([^"]*)"|'([^']*)')/i.exec(tag);
+  const val = m ? (m[2] !== undefined ? m[2] : m[3]) : null;
+  const add = [];
+  if (val === null || !/max-width\s*:/i.test(val)) add.push('max-width:100%');
+  if (val === null || !/display\s*:/i.test(val)) add.push('display:block');
+  if (!add.length) return tag;
+  if (m) {
+    const kept = String(val).replace(/;\s*$/, '');
+    return tag.replace(m[0], ' style="' + (kept ? kept + ';' : '') + add.join(';') + '"');
+  }
+  return tag.replace(/<img\b/i, '<img style="' + add.join(';') + '"');
+}
+
+/**
  * 富文本净化：小程序 rich-text 本身不执行脚本，但历史脏数据里可能带 <script>/on* 属性，
  * 这里统一剥掉，避免「编辑器里粘了网页源码」把脏东西带上线。
+ *
+ * ⚠️ 「净化规则 + margin-top 重置」这两段必须与装修台 `pvRich`、预览链路 `richSafe` **逐字一致**，
+ *    所以地址/尺寸处理**套在最外层**、不插进这段内部 —— 它是真机独有的那两步（原因见 resolveRichAssets）。
  */
 function sanitizeRich(html) {
-  return richResetMarginTop(
-    String(html || '')
-      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
-      .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
-      .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
-      .replace(/javascript:/gi, '')
+  return resolveRichAssets(
+    richResetMarginTop(
+      String(html || '')
+        .replace(/<\s*(script|style|iframe|object|embed|link|meta)[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+        .replace(/<\s*(script|style|iframe|object|embed|link|meta)[^>]*>/gi, '')
+        .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+        .replace(/javascript:/gi, '')
+    )
   );
 }
 

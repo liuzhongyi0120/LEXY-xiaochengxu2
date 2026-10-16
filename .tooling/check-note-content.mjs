@@ -6,6 +6,15 @@
  *   2. **有内容**：每篇要么有正文 HTML，要么有视频区块（两者都没有 = 点进去一片空白的哑故障）
  *   3. **引用的本地素材真的存在**：/uploads/… 逐个 HEAD/GET 确认能取到（防止引用了没入库的文件）
  *
+ * ⚠️ 本检查器验的是**数据层**（数据里有没有、文件在不在）。
+ *    「数据里存的是 /uploads/ 相对路径 —— 真机渲染时到底能不能显示」属于**渲染层**，
+ *    本脚本**验不到**，必须另跑：
+ *      · `node .tooling/check-rich-assets.mjs`（专门守这条：真跑一遍 sanitizeRich 看产物）
+ *      · 已并入 `server/tools/check-all.mjs` 第 697 条断言，随全量门禁一起跑
+ *    2026-10-16 的教训：本脚本 6/6 全绿，而真机上 34 篇 / 421 张图**全是破图** ——
+ *    因为富文本正文是 HTML 字符串，`resolveAssets()`（对象递归）进不去，
+ *    而预览链路跑在网页里、`/uploads/x` 基于 origin 自然解析 → **预览永远看不出这个 bug**。
+ *
  * 用法：node .tooling/check-note-content.mjs
  */
 import fs from 'node:fs';

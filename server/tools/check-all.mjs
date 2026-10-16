@@ -6262,6 +6262,27 @@ function emitReport() {
       rxResetOk,
       `真机=${/richResetMarginTop\(/.test(rxJs)} 装修台=${/pvRichMarginTop\(/.test(rxPv)} 预览=${/richMarginTop\(/.test(rxWxml)}`);
 
+    /* 真机富文本里的图片：必须补 BASE_URL + 尺寸约束。
+     *
+     * ⚠️ 这条**真的执行一遍 sanitizeRich**，而不是拿正则查源码 —— 因为这个 bug 有两个
+     *   「源码正则永远查不出来」的特征：
+     *     ① 病灶在**字符串内容**里（`<img src="/uploads/…">` 少了前缀），字符层面完全正常；
+     *     ② 它**在预览链路里永远显示正常** —— 网页里 `/uploads/x` 会基于 origin 自然解析，
+     *        只有真机 `<rich-text>` 把 `/` 开头的路径当**包内路径**（不发请求、直接破图）。
+     *   2026-10-16 用户报「新闻大事/用户分享的笔记点进去图片全挂」：
+     *   实测 34 篇 / **421 张图 100% 是裸相对路径**，而后台预览与装修台里一切正常
+     *   —— 又一个「验证的层不对」，判据只能落在**渲染产物**上。
+     *   尺寸那半条同理：`<img>` 只有 data-origin-width/height、没有 style，
+     *   装修台靠 `.pv-rich img{max-width:100%;display:block}` 兜住，而 rich-text 不吃外部样式 → 真机溢出。 */
+    const richFixed = requireFromHere(join(MP_ROOT, 'utils', 'blocks.js'))
+      .sanitizeRich('<img src="/uploads/_probe_.png">');
+    assert('富文本：真机渲染产物里图片须补 BASE_URL 且带尺寸约束（预览链路查不出，须真跑一遍）',
+      !/<img[^>]*\ssrc\s*=\s*["']?\/uploads\//.test(richFixed) &&
+        /src="[^"]*\/uploads\/_probe_\.png"/.test(richFixed) &&
+        /max-width\s*:\s*100%/i.test(richFixed) &&
+        /display\s*:\s*block/i.test(richFixed),
+      `产物=${String(richFixed).slice(0, 150)}`);
+
     /* 字体栈：line-height:normal 按字体本身的行高算，桌面 Chrome 上 Arial 与 Segoe UI 差 0.17em（24px 下 4px） */
     assert('字体：页面字体栈含 Helvetica/Arial 档（对齐有赞 H5，消除桌面预览 4px 假差异）',
       /'Helvetica Neue', Helvetica/.test(rxReset) && /Arial/.test(rxReset),
