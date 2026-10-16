@@ -6334,6 +6334,185 @@ function emitReport() {
       `.tb-icon{}=${JSON.stringify(navIconBody.replace(/\s+/g, ' ').trim())}`);
   }
 
+  /* -------------------------------------------------------------------
+   * 页面「风格选择：标准 / 沉浸式」（2026-10-16 复刻有赞首页时新增）
+   *
+   * 需求原话：「首页添加功能可以选择沉浸式全屏显示，没有顶部的标题栏」。
+   * 微信没有「按数据决定这一页要不要标题栏」的接口 —— 只能页面 .json 写死
+   * `navigationStyle: custom`，再自绘一条标题栏回来。于是这条链路天然**跨五处**，
+   * 任何一处漏掉都会变成「运营能选、真机不生效」（比没有这个选项更糟）：
+   *
+   *   ① 后端字段表 schema.js         —— 有没有这个可选项、默认值是什么
+   *   ② 页面设置默认值四处           —— PAGE_META_DEFS / CUSTOM_META_DEFAULT / customPages 的 BLANK_META
+   *   ③ 真机 .json + nav-bar 组件    —— navigationStyle 与自绘标题栏
+   *   ④ 真机页面 JS                  —— 上划浮现（navState + onPageScroll）
+   *   ⑤ 预览两处（/preview 与装修台）—— 手机壳必须跟着变形态，否则运营选了没反馈
+   *
+   * 另外锁两条**踩过的坑**：
+   *   · 页面 .json **不能带注释**：mp-runtime 用 JSON.parse 读它，带注释会静默退化成 {}，
+   *     结果是「预览里标题栏没了、组件也没了」，而 devtools 照样能跑（两边行为不一致）。
+   *   · 页面 WXML **不能给 .page 补 padding-top**：标题栏自己占位（标准模式 sticky 参与文档流），
+   *     再补一次就把标题栏高度算了两遍 —— 实测 pageBox.top 198 而首个区块在 262。
+   * ------------------------------------------------------------------- */
+  {
+    const styleSchema = readFileSync(join(__dirname, '..', 'decorate', 'schema.js'), 'utf8');
+    const styleCps = readFileSync(join(__dirname, '..', 'decorate', 'customPages.js'), 'utf8');
+
+    /* ① 字段：键名 / 默认值 / 两个选项 / 只挂首页与自定义页 */
+    const stField = /const PAGE_META_STYLE_FIELD = \{[\s\S]*?\n\};/.exec(styleSchema);
+    const stFieldSrc = stField ? stField[0] : '';
+    const stOk = /\bk:\s*'style'/.test(stFieldSrc) &&
+      /def:\s*'standard'/.test(stFieldSrc) &&
+      /value:\s*'standard'/.test(stFieldSrc) && /value:\s*'immersive'/.test(stFieldSrc);
+    const stFullOk = /PAGE_META_FIELDS_FULL = PAGE_META_FIELDS\.concat\(\[PAGE_META_STYLE_FIELD\]\)/.test(styleSchema);
+    /* 首页与自定义页用 FULL；莱克 / 资讯 / 产品 / 我的四页只能挂基础两项 ——
+       它们的小程序端没实现沉浸式，挂了就是「能选、点了不生效」。 */
+    const stFullUses = (styleSchema.match(/fields:\s*PAGE_META_FIELDS_FULL/g) || []).length;
+    const stBaseUses = (styleSchema.match(/fields:\s*PAGE_META_FIELDS\b(?!_)/g) || []).length;
+    assert('风格选择：schema 字段齐备（style / 默认 standard / 标准+沉浸式两选项），且只挂首页与自定义页',
+      stOk && stFullOk && stFullUses === 2 && stBaseUses === 4,
+      `字段=${stOk} FULL=${stFullOk} FULL 用了 ${stFullUses} 处（应 2：首页 + CUSTOM_META_NODE）` +
+      ` 基础用了 ${stBaseUses} 处（应 4：莱克/资讯/产品/我的）`);
+
+    /* ② 默认值口径：四处必须逐字一致，否则「装修台显示标准、真机按沉浸式渲染」 */
+    const defsBlock = /const PAGE_META_DEFS = \{[\s\S]*?\n\};/.exec(styleSchema);
+    const defsSrc = defsBlock ? defsBlock[0] : '';
+    const defsCount = (defsSrc.match(/style:\s*'standard'/g) || []).length;
+    const customDefOk = /CUSTOM_META_DEFAULT = \{ desc: '', bg: '#F5F6F8', style: 'standard' \}/.test(styleSchema);
+    const blankOk = /BLANK_META = \{ desc: '', bg: '#F5F6F8', style: 'standard' \}/.test(styleCps);
+    assert('风格选择：默认值四处逐字一致（PAGE_META_DEFS 五页 / CUSTOM_META_DEFAULT / BLANK_META）',
+      defsCount === 5 && customDefOk && blankOk,
+      `PAGE_META_DEFS 命中 ${defsCount}/5 · CUSTOM_META_DEFAULT=${customDefOk} · BLANK_META=${blankOk}`);
+
+    /* ③ 真机 .json：两页都要 navigationStyle: custom + 注册 nav-bar，且必须是**纯 JSON** */
+    const stJsonOf = (rel) => {
+      const raw = readFileSync(join(MP_ROOT, rel), 'utf8');
+      try { return { ok: true, j: JSON.parse(raw) }; } catch (e) { return { ok: false, err: e.message }; }
+    };
+    const jIndex = stJsonOf('pages/index/index.json');
+    const jCustom = stJsonOf('pages/custom/index.json');
+    const navRegOk = (r) => r.ok && r.j.navigationStyle === 'custom' &&
+      !!(r.j.usingComponents && r.j.usingComponents['nav-bar']);
+    assert('风格选择：首页与自定义页 .json 都写了 navigationStyle: custom 且注册了 nav-bar（且是纯 JSON，无注释）',
+      navRegOk(jIndex) && navRegOk(jCustom),
+      `首页=${jIndex.ok ? JSON.stringify(jIndex.j.navigationStyle) + '/' + !!(jIndex.j.usingComponents || {})['nav-bar'] : 'JSON 解析失败：' + jIndex.err}` +
+      ` 自定义页=${jCustom.ok ? JSON.stringify(jCustom.j.navigationStyle) + '/' + !!(jCustom.j.usingComponents || {})['nav-bar'] : 'JSON 解析失败：' + jCustom.err}`);
+
+    /* ④ 真机自绘标题栏：组件四件套齐备 + sticky/fixed 两种形态 + 尺寸实测（不许写死 64px） */
+    const navFiles = ['js', 'json', 'wxml', 'wxss'].map((e) => join(MP_ROOT, 'components', 'nav-bar', 'nav-bar.' + e));
+    const navAllExist = navFiles.every((f) => existsSync(f));
+    const navWxss = navAllExist ? readFileSync(navFiles[3], 'utf8') : '';
+    const navJs = navAllExist ? readFileSync(navFiles[0], 'utf8') : '';
+    const navWxmlSrc = navAllExist ? readFileSync(navFiles[2], 'utf8') : '';
+    const navbarUtil = readFileSync(join(MP_ROOT, 'utils', 'navbar.js'), 'utf8');
+    const stSticky = /\.nb\s*\{[\s\S]*?position:\s*sticky;/.test(navWxss);
+    const stFixed = /\.nb-immersive\s*\{[\s\S]*?position:\s*fixed;/.test(navWxss);
+    const stMeasure = /getMenuButtonBoundingClientRect/.test(navbarUtil) && /statusBarHeight/.test(navbarUtil);
+    /* class 属性里只许出现**类名字面量**：静态核对区分不出「类名」与「拿来比较的字面量」，
+       写成 {{mode === 'immersive' ? …}} 会把 'immersive' 也当类名报未定义（见 nav-bar.wxml 注释）。 */
+    const stNoCompareInClass = !/class="[^"]*\{\{[^}]*['"]immersive['"][^}]*\}\}[^"]*"/.test(navWxmlSrc) ||
+      !/class="[^"]*'immersive'/.test(navWxmlSrc);
+    assert('风格选择：nav-bar 组件四件套齐备，标准=sticky 占位 / 沉浸式=fixed 脱离文档流，尺寸按胶囊实测',
+      navAllExist && stSticky && stFixed && stMeasure && stNoCompareInClass,
+      `四件套=${navAllExist} sticky=${stSticky} fixed=${stFixed} 实测胶囊=${stMeasure} class 不含比较字面量=${stNoCompareInClass}`);
+
+    /* ⑤ 真机页面：两页都要渲染 nav-bar、都要接上划浮现，且**都不许再补 padding-top** */
+    const stPage = (rel) => {
+      const w = readFileSync(join(MP_ROOT, rel.replace(/\.js$/, '.wxml')), 'utf8');
+      const j = readFileSync(join(MP_ROOT, rel), 'utf8');
+      return {
+        renders: /<nav-bar[\s\S]*?\/>/.test(w),
+        pads: /padding-top:\s*\{\{\s*nav/.test(w),
+        scroll: /onPageScroll\s*\(/.test(j) && /isImmersive\(/.test(j) && /navState\(/.test(j)
+      };
+    };
+    const pIndex = stPage('pages/index/index.js');
+    const pCustom = stPage('pages/custom/index.js');
+    assert('风格选择：首页与自定义页都渲染 nav-bar + 接上划浮现，且都没有给 .page 补 padding-top（标题栏自己占位，补了就重复算一条）',
+      pIndex.renders && pCustom.renders && pIndex.scroll && pCustom.scroll && !pIndex.pads && !pCustom.pads,
+      `首页 渲染=${pIndex.renders} 上划=${pIndex.scroll} 补padding=${pIndex.pads} · ` +
+      `自定义页 渲染=${pCustom.renders} 上划=${pCustom.scroll} 补padding=${pCustom.pads}`);
+
+    /* ⑥ 预览两处必须跟着变形态：/preview 的 chrome 层与装修台手机壳 ——
+       否则运营在装修台选了沉浸式，预览里标题栏照旧压着内容，等于没反馈。 */
+    const stRt = readFileSync(join(__dirname, '..', 'public', 'shared', 'mp-runtime.js'), 'utf8');
+    const stPvJs = readFileSync(join(__dirname, '..', 'public', 'preview', 'preview.js'), 'utf8');
+    const stPvCss = readFileSync(join(__dirname, '..', 'public', 'preview', 'preview.css'), 'utf8');
+    const stAdJs = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.js'), 'utf8');
+    const stAdCss = readFileSync(join(__dirname, '..', 'public', 'admin', 'admin.css'), 'utf8');
+    const stChrome = /CHROME_RENDERED = \{[^}]*'nav-bar':\s*true/.test(stRt);
+    /*
+     * 两个壳体都要呈现「没有标题栏、内容整屏铺满」，但**能表达的东西不同**：
+     *
+     *   · /preview：滚动容器就是 `.phone-screen` 自己（屏幕不动、内容在屏内滚）
+     *               → 顶栏 `absolute` 钉在 `.phone` 顶部即可，屏幕不会跑；
+     *                 再按 `scrollTop > nav.total` 切 `.nav-reveal`，**能**如实演出「上划浮现」。
+     *   · 装修台  ：`.phone { overflow: hidden }`（裁圆角用）⇒ `sticky` 失效
+     *               （实测滚 400px 后顶栏 top = -272，跟着手机滚出可视区），
+     *               所以要钉住只能牺牲圆角 —— 不值得。装修台只呈现**初始态**。
+     *
+     * 这条断言因此锁的是「两处都做到无标题栏 + 整屏铺满」，并且
+     * 装修台里**不许**留下 `nav-reveal` / `sticky` 那套做了一半的实现
+     * （半成品比不做更糟：看着像生效了，其实那个状态在屏幕上看不到）。
+     */
+    const stPv = /function applyNavChrome/.test(stPvJs) && /ph-immersive/.test(stPvJs) &&
+      /\.ph-immersive\s+\.phone-bar\s*\{[\s\S]*?position:\s*absolute/.test(stPvCss) &&
+      /function syncNavReveal/.test(stPvJs);
+    const stAd = /function applyNavStyle/.test(stAdJs) && /ph-immersive/.test(stAdJs) &&
+      /\.ph-immersive\s+\.phone-bar\s*\{[\s\S]*?position:\s*absolute/.test(stAdCss) &&
+      !/nav-reveal/.test(stAdCss) && !/nav-reveal/.test(stAdJs) &&
+      !/addEventListener\('wheel'/.test(stAdJs) && !/bindNavReveal/.test(stAdJs);
+    assert('风格选择：预览端两处同口径（都做到无标题栏+整屏铺满；nav-bar 交给 chrome 层不重复展开；「上划浮现」只在 /preview 如实演出，装修台不留在效的死代码）',
+      stChrome && stPv && stAd,
+      `/preview 内核=${stChrome} 预览页=${stPv} 装修台=${stAd}`);
+
+    /*
+     * ⑦ /preview 的手机屏**竖向必须可滚**。
+     *
+     * 起因：复刻有赞首页时这一页有 14 个区块、实测 7396px，而 .phone-screen 写的是
+     * `overflow: hidden` + 固定高 718px —— 运营在 /preview 里只能看到第一屏，
+     * 后面九成区块**根本看不到**（「复刻得对不对」也就无从核对，而我当时正需要核对尾部 4 个区块）。
+     *
+     * 一并把「上划浮现」接到**真实滚动**上：原先用滚轮事件模拟，而屏幕既然滚不动，
+     * 那个模拟就只是把状态切了一下、屏幕上什么也不会动。
+     * 现在按 `screen.scrollTop > nav.total` 判定，与真机 onPageScroll 同一口径。
+     */
+    const stScrollCss = /\.phone-screen\s*\{[\s\S]*?overflow-y:\s*auto/.test(stPvCss);
+    const stScrollJs = /function syncNavReveal/.test(stPvJs) &&
+      /\$\('preview'\)[\s\S]{0,200}?addEventListener\('scroll'/.test(stPvJs) &&
+      !/addEventListener\('wheel'/.test(stPvJs);
+    assert('风格选择：/preview 手机屏竖向可滚（overflow-y:auto），上划浮现接的是真实滚动而非滚轮模拟',
+      stScrollCss && stScrollJs,
+      `.phone-screen overflow-y:auto=${stScrollCss} 滚动接线=${stScrollJs}（含「不该再有 wheel 监听」）`);
+  }
+
+  /* -------------------------------------------------------------------
+   * 轮播「一行一个」必须把**所有图**渲染出来（2026-10-16 一并修掉的真缺陷）
+   *
+   * 起因：复刻有赞首页时，尾部那个组件是「image_ad + 一行一个 + 3 张长图」。
+   * 对照真机源码才发现我们的 single 分支只画了 `images[0]` ——
+   * 运营在一个组件里放 3 张图，真机只显示第一张，另外两张**静默消失**
+   * （不报错、装修台预览同样只画一张，看起来「一切正常」）。
+   * 所以这条断言锁的是「真机与预览两处都遍历全部图」，不是某一处的写法。
+   * ------------------------------------------------------------------- */
+  {
+    const lbTpl = readFileSync(join(MP_ROOT, 'templates', 'blocks.wxml'), 'utf8');
+    const lbSeg = (() => {
+      const m = /<block wx:elif="\{\{block\.type === 'swiper' && block\.mode === 'single'\}\}">([\s\S]*?)<\/block>/.exec(lbTpl);
+      return m ? m[1] : '';
+    })();
+    const lbPv = readFileSync(join(__dirname, '..', 'public', 'shared', 'pv-render.js'), 'utf8');
+    const lbPvSeg = (() => {
+      const m = /if \(mode === 'single'\) \{([\s\S]*?)\} else if \(mode === 'scroll'\)/.exec(lbPv);
+      return m ? m[1] : '';
+    })();
+    assert('轮播「一行一个」：真机与预览都遍历全部图（老实现只画 images[0]，放 3 张会静默丢 2 张）',
+      /wx:for="\{\{block\.images\}\}"/.test(lbSeg) && /item\.image/.test(lbSeg) && /item\.link/.test(lbSeg) &&
+      /imgs\.map\(/.test(lbPvSeg) && !/curImg/.test(lbPvSeg),
+      `真机遍历=${/wx:for="\{\{block\.images\}\}"/.test(lbSeg)} 预览遍历=${/imgs\.map\(/.test(lbPvSeg)} ` +
+      `预览残留只画当前张=${/curImg/.test(lbPvSeg)}`);
+  }
+
   /*
    * 统计取**终值**：上面最后一条断言已注册完毕，这里才算「跑了多少点位 / 红了几条」。
    * 挪到前面任意一处都会漏报之后的断言 —— 第 21 节那条结构性断言就是锁这件事的

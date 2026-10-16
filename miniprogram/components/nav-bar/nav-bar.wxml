@@ -1,0 +1,31 @@
+<!--
+  自绘导航栏。两种形态由页面的 meta.style 决定（见 utils/navbar.js 的 navState）：
+
+    标准   —— 常驻白底标题栏；页面内容从下方开始（页面给 .page 加 padding-top）
+    沉浸式 —— 透明且不可见，内容从屏幕最顶端铺满；上划过阈值后 solid=true 才浮现
+
+  `m` 是实测到的尺寸（状态栏高 / 标题栏高 / 胶囊占位），attached 里才测得出来，
+  所以取值一律走三元兜底 —— 否则首帧会渲染成一条 0 高度的透明条（视觉上无感，
+  但真机上会闪一下，且开发者工具里能看到布局塌陷）。
+-->
+<!--
+  形态类名走 data.immersive（组件 JS 里算好的布尔），**不要**在 class 里直接比字符串：
+    · 写 `nb-{{mode}}`      → 自检把 `nb-{{` 静态部分解析成字面量 `nb-`，报「未定义」；
+    · 写 `{{mode === 'immersive' ? …}}` → 自检把比较用的 `'immersive'` 也当成一个类名，照样报「未定义」。
+  自检（check-all 的 class 作用域核对）只认「{{}} 之外的静态类名」与「{{}} 之内的字符串字面量」，
+  它在 class 属性里没法区分「类名字面量」和「拿来比较的字面量」——
+  所以把判断挪进 JS，模板里只留真正的类名字面量（nb-immersive / nb-solid 仍可被静态核对）。
+-->
+<view class="nb{{immersive ? ' nb-immersive' : ''}}{{solid ? ' nb-solid' : ''}}"
+      style="height:{{m ? m.total : 0}}px;background:{{(immersive && !solid) ? 'transparent' : bg}};">
+  <!-- 状态栏占位：真机 custom 导航下这块区域属于页面，必须自己垫出来 -->
+  <view class="nb-status" style="height:{{m ? m.status : 0}}px;"></view>
+
+  <view class="nb-bar"
+        style="height:{{m ? m.bar : 0}}px;padding-right:{{m ? (m.capsule.width + m.capsule.right) : 0}}px;">
+    <view wx:if="{{showBack}}" class="nb-back" bindtap="onBack">
+      <view class="nb-arrow" style="border-color:{{color}};"></view>
+    </view>
+    <text class="nb-title" style="color:{{color}};">{{title}}</text>
+  </view>
+</view>

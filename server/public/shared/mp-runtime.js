@@ -371,19 +371,25 @@
   /**
    * 由预览的 chrome 层负责渲染的组件 —— **不展开它的模板和样式**。
    *
-   * 目前只有底部导航（页面 json 里注册为 tab-bar，真源是 /custom-tab-bar/index）：
-   * /preview 与装修台手机壳都由 PvTabbar 在手机壳底部渲染一份
-   * （见 preview.js 的 applyChrome、admin.js 的 renderTabbar）。
+   * ① 底部导航（页面 json 里注册为 tab-bar，真源是 /custom-tab-bar/index）：
+   *    /preview 与装修台手机壳都由 PvTabbar 在手机壳底部渲染一份
+   *    （见 preview.js 的 applyChrome、admin.js 的 renderTabbar）。
+   *
+   * ② 自绘导航栏（nav-bar，真源 /components/nav-bar/nav-bar）：
+   *    手机壳本来就有一条 .phone-bar（状态栏 + 标题 + 胶囊）。真机因为
+   *    navigationStyle: custom 才有 nav-bar 这个组件，预览里再展开一次就是两条标题栏。
+   *    沉浸式的呈现（内容铺满整屏、上划标题栏才浮现）由 phone 壳加 class 完成 ——
+   *    见 preview.js 的 applyNavChrome。
    *
    * 这里若再展开一次组件模板，会同时出两个问题：
-   *   ① **两条底部导航**叠在一起；
+   *   ① **两条底部导航 / 两条标题栏**叠在一起；
    *   ② 组件那份渲染不出东西 —— 本模块只提取 properties，而导航的 items 在
    *      组件的 data 里，展开后是一条「有背景、有顶边框、却是空的」固定定位白条，
    *      正好压在 PvTabbar 上面，看起来就是底部被糊住。
    * 页面里 wx:if="{{showTabbar}}" 的**占位（.tabbar-hold）仍然照常生效**，
    * 所以预览里内容底部留白的高度与真机一致。
    */
-  var CHROME_RENDERED = { 'tab-bar': true };
+  var CHROME_RENDERED = { 'tab-bar': true, 'nav-bar': true };
 
   /**
    * usingComponents 的值 → 组件基础路径（不带扩展名）。

@@ -1,4 +1,20 @@
+<!--
+  ⚠️ 这里**不要**给 .page 补 padding-top —— 自绘标题栏自己占位（标准模式是 sticky，参与文档流），
+     再补一次就把标题栏高度算了两遍。沉浸式下那条栏脱离文档流，内容自然铺满整屏。
+     详见 components/nav-bar/nav-bar.wxss 顶部注释。
+-->
 <view class="page" style="background: {{meta.bg || '#F5F6F8'}};">
+  <!-- 标题栏：标准常驻 / 沉浸式透明、上划才浮现（参数由 utils/navbar.js 的 navState 装配） -->
+  <nav-bar
+    wx:if="{{nav}}"
+    title="{{nav.title}}"
+    mode="{{nav.mode}}"
+    bg="{{nav.bg}}"
+    color="{{nav.color}}"
+    showBack="{{nav.showBack}}"
+    solid="{{nav.solid}}"
+  />
+
   <!-- 11 种装修区块的渲染见 templates/blocks.wxml（首页与自定义页共用一份，避免两边走样） -->
   <include src="../../templates/blocks.wxml" />
 

@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-16 10:35:46（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-16 17:58:18（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -1080,7 +1080,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "",
-      bg: "#F5F6F8"
+      bg: "#F5F6F8",
+      style: "standard"
     }
   },
   p159: {
@@ -1088,7 +1089,8 @@ const CUSTOM_PAGES = {
     blocks: [],
     meta: {
       desc: "",
-      bg: "#F5F6F8"
+      bg: "#F5F6F8",
+      style: "standard"
     }
   },
   p236: {
@@ -1822,7 +1824,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "",
-      bg: "#F5F6F8"
+      bg: "#F5F6F8",
+      style: "standard"
     }
   },
   p288: {
@@ -1906,7 +1909,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "了解莱克 · 栏目入口",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p295: {
@@ -2039,7 +2043,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "关于莱克 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p296: {
@@ -2276,7 +2281,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "新闻大事 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p297: {
@@ -2426,7 +2432,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "创业故事 · 莱克资讯栏目",
-      bg: "#FFFFFF"
+      bg: "#FFFFFF",
+      style: "standard"
     }
   },
   p298: {
@@ -2572,7 +2579,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "我们品牌 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p299: {
@@ -2897,7 +2905,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "用户分享 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p300: {
@@ -3008,7 +3017,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "业务模式 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
     }
   },
   p301: {
@@ -3192,7 +3202,8 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "售后服务 · 莱克资讯栏目",
-      bg: "#F9F9F9"
+      bg: "#F9F9F9",
+      style: "standard"
     }
   },
   p302: {
@@ -3344,7 +3355,175 @@ const CUSTOM_PAGES = {
     ],
     meta: {
       desc: "加入我们 · 莱克资讯栏目",
-      bg: "#F7F8FA"
+      bg: "#F7F8FA",
+      style: "standard"
+    }
+  },
+  p481: {
+    name: "有赞首页复刻",
+    blocks: [
+      {
+        type: "swiper",
+        mode: "poster",
+        height: 1322,
+        radius: "square",
+        interval: 4500,
+        indicator: "dots",
+        pageMargin: 0,
+        imageGap: 0,
+        images: [
+          {
+            image: "/uploads/202610/20261009-86caac-Fo69HIsVHfOzMC08PSX7N7uFY8s1.webp",
+            link: "/packageGoods/detail/detail?id=g1003972"
+          },
+          {
+            image: "/uploads/202610/20261009-44f4b4-Fl6yiLDP_qD77xcIPwrKfpbdgn3l.webp",
+            link: "/packageGoods/detail/detail?id=g1003972"
+          }
+        ]
+      },
+      {
+        type: "video",
+        height: 420,
+        src: "/uploads/202610/20261009-huuw56.mp4",
+        poster: "/uploads/202610/20261009-7c88cd-FmWuKKYDvg5Wt4aDDF0BzrOtFjJ6.webp",
+        autoplay: false,
+        muted: true,
+        controls: false,
+        loop: false,
+        radius: "square",
+        pageMargin: 0
+      },
+      {
+        type: "image",
+        height: 1342,
+        src: "/uploads/202610/20261009-e2a92a-FpEmv38JlZ6Gs7uqOc3Oc45c8ZyO.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "line",
+        style: "blank",
+        height: 48,
+        gapY: 0,
+        color: "#EEEEEE",
+        bg: "",
+        pageMargin: 0
+      },
+      {
+        type: "image",
+        height: 1642,
+        src: "/uploads/202610/20261009-f8b64b-Fs2JC2Rd_zFcdWuYOzLkNR_PKFP8.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "video",
+        height: 420,
+        src: "/uploads/202610/20261009-f632ky.mp4",
+        poster: "/uploads/202610/20261009-7a46e4-FuFIgF8CRwJ0Ea6su5y3izD9gGKe.webp",
+        autoplay: false,
+        muted: true,
+        controls: false,
+        loop: false,
+        radius: "square",
+        pageMargin: 0
+      },
+      {
+        type: "image",
+        height: 756,
+        src: "/uploads/202610/20261009-0a2785-Fr_tsF2gAxM2M35MG16j34djUjZs.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "image",
+        height: 1326,
+        src: "/uploads/202610/20261009-a25845-FhZ_bsHU5p4qvtJlg5a7rprmsHhB.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "video",
+        height: 420,
+        src: "/uploads/202610/20261009-pj6lis.mp4",
+        poster: "/uploads/202610/20261009-6a796a-XvLEB33Z0lZ-QiYQ2eRMzI899fRo2arKyE_6qg_c.jpg",
+        autoplay: false,
+        muted: true,
+        controls: false,
+        loop: false,
+        radius: "square",
+        pageMargin: 0
+      },
+      {
+        type: "image",
+        height: 652,
+        src: "/uploads/202610/20261009-fe18b3-FhkZ06W7Z8D16Cd0ULEu700z0_kr.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "image",
+        height: 882,
+        src: "/uploads/202610/20261009-b8a41a-Fs-nj3UEvr_44TFpny7zs8_0TZB2.webp",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "video",
+        height: 420,
+        src: "/uploads/202610/20261009-wvq94t.mp4",
+        poster: "/uploads/202610/20261009-db6432-J2S8RqWN_Lla-3X3b99IvkTEmX4tvEsMaSCWog_c.jpg",
+        autoplay: false,
+        muted: true,
+        controls: false,
+        loop: false,
+        radius: "square",
+        pageMargin: 0
+      },
+      {
+        type: "image",
+        height: 598,
+        src: "/uploads/首页/FtvYjCwh63g2WYeVU7Pm9nY5wmpc.png",
+        radius: "square",
+        pageMargin: 0,
+        link: ""
+      },
+      {
+        type: "swiper",
+        mode: "single",
+        height: 2052,
+        radius: "square",
+        interval: 4500,
+        indicator: "dots",
+        pageMargin: 0,
+        imageGap: 0,
+        images: [
+          {
+            image: "/uploads/首页/FqUkbtDssN5a_bkdNKxqI6XM12dL.png",
+            link: ""
+          },
+          {
+            image: "/uploads/首页/Fr1uBwoTH6nnNiPQgRhte1Pa84N0.png",
+            link: ""
+          },
+          {
+            image: "/uploads/首页/FgEGHs0O89DzGGM7yML3Lmg318PO.png",
+            link: ""
+          }
+        ]
+      }
+    ],
+    meta: {
+      desc: "有赞首页复刻",
+      bg: "#F2EDE7",
+      style: "immersive"
     }
   }
 };
@@ -5293,71 +5472,93 @@ const SHOPNOTES = {
 const PAGE_META = {
   home: {
     desc: "新版首页！！",
-    bg: "#F5F6F8"
+    bg: "#F5F6F8",
+    style: "standard"
   },
   lexy: {
     desc: "7 大系列",
-    bg: "#FFFFFF"
+    bg: "#FFFFFF",
+    style: "standard"
   },
   news: {
     desc: "了解莱克",
-    bg: "#F0F0F0"
+    bg: "#F0F0F0",
+    style: "standard"
   },
   product: {
     desc: "全品牌产品库",
-    bg: "#FFFFFF"
+    bg: "#FFFFFF",
+    style: "standard"
   },
   mine: {
     desc: "个人中心",
-    bg: "#FFFFFF"
+    bg: "#FFFFFF",
+    style: "standard"
   },
   p149: {
     desc: "",
-    bg: "#F5F6F8"
+    bg: "#F5F6F8",
+    style: "standard"
   },
   p159: {
     desc: "",
-    bg: "#F5F6F8"
+    bg: "#F5F6F8",
+    style: "standard"
   },
   p236: {
     desc: "",
-    bg: "#F5F6F8"
+    bg: "#F5F6F8",
+    style: "standard"
   },
   p288: {
     desc: "了解莱克 · 栏目入口",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p295: {
     desc: "关于莱克 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p296: {
     desc: "新闻大事 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p297: {
     desc: "创业故事 · 莱克资讯栏目",
-    bg: "#FFFFFF"
+    bg: "#FFFFFF",
+    style: "standard"
   },
   p298: {
     desc: "我们品牌 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p299: {
     desc: "用户分享 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p300: {
     desc: "业务模式 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
   },
   p301: {
     desc: "售后服务 · 莱克资讯栏目",
-    bg: "#F9F9F9"
+    bg: "#F9F9F9",
+    style: "standard"
   },
   p302: {
     desc: "加入我们 · 莱克资讯栏目",
-    bg: "#F7F8FA"
+    bg: "#F7F8FA",
+    style: "standard"
+  },
+  p481: {
+    desc: "有赞首页复刻",
+    bg: "#F2EDE7",
+    style: "immersive"
   }
 };
 

@@ -50,8 +50,8 @@ const RESERVED = new Set([
   'packagegoods', 'packagenews', 'tabbar', 'setting', 'settings', 'root', 'system', 'null'
 ]);
 
-/** 新建页面的默认页面级设置 */
-const BLANK_META = { desc: '', bg: '#F5F6F8' };
+/** 新建页面的默认页面级设置（style 缺省 `standard`，与 schema.js 的 PAGE_META_FIELDS 逐字一致） */
+const BLANK_META = { desc: '', bg: '#F5F6F8', style: 'standard' };
 
 /** 自定义页在装修台里的归属分组 */
 const BELONGS = '自定义页面';

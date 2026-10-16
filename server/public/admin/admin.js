@@ -2039,6 +2039,19 @@
     var host = $('inspector');
     var tip = el('div', 'tip', '💡 页面设置作用于整页（写回 replica.PAGE_META）：背景颜色会作为小程序页面底色，页面描述仅用于后台备注。');
     host.insertBefore(tip, host.children[1] || null);
+    /*
+     * 「风格设置」的补充说明 —— 对标有赞首页装修面板里的两句原文：
+     *   「建议将图片/轮播图作为页面中第一个组件」
+     *   「沉浸模式下，标题设置和样式设置的配置项仅在页面上划时展示样式预览」
+     *
+     * 常驻而不是随 style 值切换：面板每次点单选都会重渲染（radiobutton 的 onclick 里
+     * renderInspector()），跟着值走的提示会在切换那一刻消失，运营看到的是「提示一闪而过」。
+     */
+    /* 文案与后端 PAGE_META_STYLE_FIELD.hint 同口径（后两句直接取自有赞面板原文）：
+       两处写法不一致时，运营在面板里看到的和接口文档里写的会互相打架。 */
+    var styleTip = el('div', 'tip', '🎨 <b>标准</b> = 保留顶部标题栏；<b>沉浸式</b> = 不显示顶部标题栏、内容整屏铺满，' +
+      '标题栏仅在页面上划时浮现。<br>建议将图片/轮播图作为页面中第一个组件。');
+    host.insertBefore(styleTip, host.children[2] || null);
   }
 
   /* ----------------------------- 列表操作 ----------------------------- */
@@ -2218,6 +2231,34 @@
     });
   }
 
+  /**
+   * 手机壳顶栏：**沉浸式**（页面 meta.style）下让内容整屏铺满、不显示标题栏。
+   *
+   * 真机上这件事由页面 .json 的 `navigationStyle: custom` + components/nav-bar 自绘完成；
+   * 装修台里画不出真机那套，但**顶栏必须跟着消失** —— 否则运营选了沉浸式，
+   * 预览里还是一条标题栏压在内容上面，等于没反馈（也看不出「上划才浮现」）。
+   *
+   * 做法：给 .phone 加 ph-immersive → `.phone-bar` 脱离文档流（不占高度，内容自然顶到最上面）、
+   * 底色透明、标题隐藏（时间与胶囊保留 —— 真机上也一直在，见 admin.css 同段注释）。
+   *
+   * ⚠️ 装修台**不模拟「上划后浮现」**，这也是刻意的：`.phone` 的 `overflow: hidden`
+   *    （裁圆角用）会让 `position: sticky` 失效（实测滚 400px 后顶栏 top = -272，
+   *    跟着手机滚出可视区），想钉住就得牺牲圆角 —— 不值得。
+   *    装修台只呈现**初始态**；「上划浮现」请在 `/preview` 里看（那边滚动容器就是手机屏本身，
+   *    与真机同构，见 preview.js 的 `syncNavReveal`）。
+   *
+   * ⚠️ 只对**真的实现了沉浸式**的两种页面生效（首页 home 与自定义页）：
+   *    后端字段表里也只有这两页有「风格选择」（见 schema.js 的 PAGE_META_FIELDS_FULL）。
+   */
+  function applyNavStyle() {
+    var phone = $('phone');
+    if (!phone) return;
+    var meta = (S.cur && S.cur.data && S.cur.data.meta) || null;
+    var supported = !!S.cur && (S.cur.key === 'home' || !!(S.cur.meta && S.cur.meta.custom));
+    var immersive = supported && !!meta && String(meta.style) === 'immersive';
+    phone.classList.toggle('ph-immersive', immersive);
+  }
+
   function renderPreview() {
     // 笔记的店长区要店铺信息，按需取一次（见 ensureShop）
     if (S.cur.meta && S.cur.meta.shopnote) ensureShop();
@@ -2270,6 +2311,13 @@
       console.error('[预览渲染失败]', e);
       host.innerHTML = '<div class="insp-empty">预览渲染失败：' + esc(e && e.message) + '</div>';
     }
+
+    /*
+     * 顶栏形态（标准 / 沉浸式）跟着当页 meta.style 走。
+     * 放在 renderPreview 里而不是属性面板的写值处 —— 与底部导航同一个约定：
+     * 「数据变了就 renderPreview()」，挂在这里就不会漏掉任何一条改数据的路径。
+     */
+    applyNavStyle();
     if (!host.__bound) {
       host.addEventListener('click', function (e) {
         // 轮播指示点 / 缩略图：只翻预览的页码，不改数据

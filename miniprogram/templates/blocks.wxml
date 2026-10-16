@@ -51,16 +51,24 @@
   </block>
 
   <!-- ============ 图片广告：一行一个（只展示第一张） ============ -->
+  <!--
+    「一行一个」：每张图各占一行、纵向依次排开（有赞 image_ad 的「一行一个」就是这个形态）。
+    ⚠️ 必须 wx:for 把**所有**图都画出来。早先只画 images[0] ——
+       运营在一个组件里放 3 张图，真机只显示第一张，另外两张静默消失（不报错、装修台也不提示）。
+       2026-10-16 复刻有赞首页时实测到的正是这个形态：页面尾部的 image_ad.9 用「一行一个」装了 3 张长图。
+  -->
   <block wx:elif="{{block.type === 'swiper' && block.mode === 'single'}}">
     <view
+      wx:for="{{block.images}}"
+      wx:key="image"
       class="block-wrap"
       style="padding: 0 {{block.marginRpx}}rpx;"
-      data-link="{{block.images[0].link}}"
+      data-link="{{item.link}}"
       bindtap="onTapBlock"
-      hover-class="{{block.images[0].link ? 'hover-lite' : 'none'}}"
+      hover-class="{{item.link ? 'hover-lite' : 'none'}}"
       hover-stay-time="80"
     >
-      <image class="biw {{block.round ? 'round' : ''}}" src="{{block.images[0].image}}" mode="widthFix" lazy-load />
+      <image class="biw {{block.round ? 'round' : ''}}" src="{{item.image}}" mode="widthFix" lazy-load />
     </view>
   </block>
 

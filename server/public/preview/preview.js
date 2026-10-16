@@ -222,6 +222,7 @@
       // 注入真机样式 → 再放 DOM
       $('mpStyle').textContent = out.css;
       screen.innerHTML = out.html;
+      applyNavChrome(out.data && out.data.nav, title);
       applySwiper(key);
       reportStats();
       renderStatus();
@@ -283,6 +284,53 @@
     }
 
     window.PvTabbar.apply($('phTabbar'), CUR.tabbar, active, hidden);
+  }
+
+  /**
+   * 顶栏形态：标准 / 沉浸式（页面 .json 是 navigationStyle: custom，标题栏由真机自绘）。
+   *
+   * 真机的 components/nav-bar 在本页**不展开**（见 mp-runtime 的 CHROME_RENDERED）——
+   * 手机壳本来就有一条 .phone-bar，再展开一次就是两条标题栏。
+   * 所以这里读页面 data 里的 nav（utils/navbar.js 的 navState 装配）来切壳体形态：
+   *   · 标准   —— 标题栏留在文档流里（内容从它下方开始，与真机的 padding-top 同效果）
+   *   · 沉浸式 —— 标题栏变浮层、底色透明、标题隐藏，内容整屏铺满；
+   *              上划过阈值才加 .nav-reveal（与真机 onPageScroll 同一口径）
+   *
+   * 浮现阈值取整条标题栏高度（页面 data 里的 nav.total，与真机 utils/navbar.js 同源），
+   * 由 bindNavReveal 绑在手机屏的滚动事件上按滚动位置换算 —— 不另写一套数字。
+   */
+  function applyNavChrome(nav, title) {
+    var phone = $('phone');
+    if (!phone) return;
+    var immersive = !!(nav && nav.mode === 'immersive');
+    phone.classList.toggle('ph-immersive', immersive);
+    if (!immersive) phone.classList.remove('nav-reveal');
+    if (nav && nav.title) $('phTitle').textContent = nav.title;
+    else $('phTitle').textContent = title || '—';
+    /* 记住阈值：滚动时按它判断该不该浮现（真机是在 onPageScroll 里比 nav.total） */
+    phone.__navTotal = (nav && Number(nav.total)) || 64;
+    syncNavReveal();
+  }
+
+  /** 按当前滚动位置决定标题栏浮现与否（只对沉浸式有意义） */
+  function syncNavReveal() {
+    var phone = $('phone');
+    var screen = $('preview');
+    if (!phone || !screen) return;
+    if (!phone.classList.contains('ph-immersive')) { phone.classList.remove('nav-reveal'); return; }
+    phone.classList.toggle('nav-reveal', (screen.scrollTop || 0) > (phone.__navTotal || 64));
+  }
+
+  /*
+   * 手机屏的滚动事件 —— 整页十几个区块（实测 7396px）要能滚着看，
+   * 所以 .phone-screen 是 overflow-y: auto（见 preview.css 同段注释）。
+   * 沉浸式下顺便按滚动位置切「标题栏浮现」，与真机 onPageScroll 同口径。
+   */
+  function bindNavReveal() {
+    var screen = $('preview');
+    if (!screen || screen.__navBound) return;
+    screen.__navBound = 1;
+    screen.addEventListener('scroll', syncNavReveal, { passive: true });
   }
 
   function renderStatus() {
@@ -425,6 +473,7 @@
   }
 
   bind();
+  bindNavReveal();   // 沉浸式手机壳：滚轮模拟「上划后标题栏浮现」
   paintDot();
   startAuto();
   refresh(false);

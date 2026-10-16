@@ -290,7 +290,13 @@ for (const f of srcFiles) {
 }
 /* 「已申报」脚本查不到（微信后台不给接口）→ 靠登记表。不登记就一直报红 = 假红；
  * 反过来**不许因为登记了就不看源码** —— 源码扫描永远执行，登记表只决定「红还是绿」。 */
-const PRIVACY_DECLARED = !!(EXT && EXT.items && EXT.items.privacyGuide && EXT.items.privacyGuide.status === 'done');
+const PRIVACY_ITEM = (EXT && EXT.items && EXT.items.privacyGuide) || null;
+const PRIVACY_STATUS = PRIVACY_ITEM ? PRIVACY_ITEM.status : 'pending';
+const PRIVACY_DECLARED = PRIVACY_STATUS === 'done';
+/** 第三态：**已提交、审核中**。写 done 是假绿（审核可能被驳、协议尚未生效），
+ *  写 pending 是假红（明明已经交上去了、页面已锁死不可改）→ 只能单列一态。
+ *  判据来自实登：隐私设置页刷新后仍渲染「当前协议审核中，不可修改」。 */
+const PRIVACY_SUBMITTED = PRIVACY_STATUS === 'submitted';
 if (!found.size) {
   ok('未扫到任何隐私接口', '提审时可勾选「未采集用户隐私」（仍建议人工复核一遍）');
 } else if (PRIVACY_DECLARED) {
@@ -299,18 +305,32 @@ if (!found.size) {
     ok('已申报：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； ')
       + '　← 登记于 deploy/wechat-external.json（' + [it.doneAt, it.note].filter(Boolean).join('　·　') + '）');
   }
+} else if (PRIVACY_SUBMITTED) {
+  const it = EXT.items.privacyGuide;
+  for (const [info, apis] of found) {
+    warn('已提交待审核：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； ')
+      + '　← 提交于 ' + (it.submittedAt || '日期未记') + '（deploy/wechat-external.json）'
+      + '　⚠️ **交上去 ≠ 已生效**：审核通过前真机仍可能因「未获用户同意」被拦。'
+      + '审核结束后（通过或驳回）请回来把 items.privacyGuide.status 改成 **done**（并补 doneAt）——'
+      + '否则这里会**一直停在「需人工跟进」**：脚本查不到微信后台的审核结果，只能靠这张登记表。');
+  }
 } else {
   for (const [info, apis] of found) {
     block('必须申报：' + info, [...apis.entries()].map(([a, fs2]) => a + '（' + fs2.join('、') + '）').join('； ')
-      + '　→ 微信后台「设置 → 服务内容声明 → 用户隐私保护指引」逐项勾选并写清用途；'
+      + '　→ 微信后台 **账号设置 → 基础设置 → 页面下滚到「服务内容声明」区块 → 用户隐私保护指引 → 去完善**'
+      + '（⚠️ 后台**没有**「设置 → 服务内容声明」这个菜单，早前本行写错，2026-10-16 已实登修正；'
+      + '逐条填法见 **deploy/隐私保护指引-填报单.md**）；'
       + '**办完请把 deploy/wechat-external.json 的 items.privacyGuide 改成 status="done"**（补 doneAt + note），'
       + '否则这里会**一直报红** —— 脚本查不到微信后台的申报状态，只能靠这张登记表。');
   }
 }
-// 官方对照表未逐字列出的一个：wx.scanCode 会拉起相机取景
+// wx.scanCode：已核实**不在**需申报的隐私接口之列
+// （官方《小程序用户隐私保护指引内容介绍》的「处理的信息 ↔ 接口或组件」对照表里没有它，
+//   它也不索取 scope.camera）。2026-10-16 修正：此前这里报「需人工确认／按摄像头口径申报」
+//   是错的 —— 多勾一项即构成超范围声明。改为通过项，仅为让读者不再反复疑问。
 const scanHit = srcFiles.filter((f) => stripComments(read(f)).includes('wx.scanCode'));
 if (scanHit.length) {
-  warn('wx.scanCode 需人工确认', '官方对照表未逐字列出 scanCode，但扫码会拉起相机取景（scope.camera）→ 到微信后台按「访问你的摄像头」口径申报最稳；' +
+  ok('wx.scanCode 无需申报', '官方接口↔信息类型对照表未收录 scanCode，且不索取 scope.camera → **不要**勾「访问你的摄像头」（多勾=超范围声明）。涉及：' +
     scanHit.map((f) => path.relative(ROOT, f).split(path.sep).join('/')).join('、'));
 }
 

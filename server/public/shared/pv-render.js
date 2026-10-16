@@ -762,8 +762,17 @@
       var cur = Math.min(Math.max(0, CTX.slide[p] || 0), Math.max(0, imgs.length - 1));
       var curImg = imgs[cur] || {};
       if (mode === 'single') {
-        box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px;position:relative">' +
-          img(curImg.image, 'width:100%;display:block;font-size:0') + linkBadge(curImg.link) + '</div>';
+        /*
+         * 一行一个：每张图各占一行、纵向排开。
+         * ⚠️ 必须把**所有**图画出来 —— 老实现只画 images[cur]，与真机
+         *    miniprogram/templates/blocks.wxml 同一条口径：放 3 张只显示 1 张，
+         *    另外两张静默消失（装修台预览也是「看起来正常」的假绿）。
+         *    2026-10-16 复刻有赞首页时实测到的正是这个形态（尾部 image_ad.9 装 3 张长图）。
+         */
+        box += '<div style="padding:0 ' + (b.pageMargin || 0) + 'px">' + imgs.map(function (x) {
+          return '<div style="position:relative">' +
+            img(x.image, 'width:100%;display:block;font-size:0') + linkBadge(x.link) + '</div>';
+        }).join('') + '</div>';
       } else if (mode === 'scroll') {
         box += '<div style="display:flex;overflow:hidden;height:' + hh + 'px;padding:0 ' + (b.pageMargin || 0) + 'px">' +
           imgs.slice(0, 3).map(function (x) {

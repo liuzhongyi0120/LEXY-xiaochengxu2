@@ -18,6 +18,7 @@ const { resolveAssets } = require('../../utils/asset');
 const { normalizeBlocks, applyShopAvatar } = require('../../utils/blocks');
 const { blockPageBehavior } = require('../../utils/blockPage');
 const { syncTabBar } = require('../../utils/tabbar');
+const { navState, isImmersive } = require('../../utils/navbar');
 
 /** 店铺头像可能是后台上传的 /uploads/… 相对路径，必须过一遍素材地址解析（首页同理） */
 const SHOP = resolveAssets(replica.SHOP || {});
@@ -62,7 +63,13 @@ Page(Object.assign({}, blockPageBehavior, {
     blocks: [],
     missing: false,
     /* 被底部导航选中的自定义页 → 底部再渲染一份导航（见 tabbarShowsFor） */
-    showTabbar: false
+    showTabbar: false,
+    /*
+     * 自绘导航栏参数。本页 .json 写了 navigationStyle: custom ——
+     * 所有自定义页共用这一个页面文件，而「风格选择」是**每页**配的（meta.style），
+     * 所以只能在运行时按当页的 meta 决定画常驻标题栏还是沉浸式。
+     */
+    nav: null
   },
 
   onLoad(query) {
@@ -80,18 +87,25 @@ Page(Object.assign({}, blockPageBehavior, {
 
     // 找不到页面：多半是运营建了页面但还没点「生成代码」，或标识填错了
     if (!page) {
-      this.setData({ key: asked, missing: true, title: '页面不存在' });
+      // 这一支也要给 nav：本页是 custom 导航，没有它连「页面不存在」的标题栏都没有
+      this.setData({
+        key: asked, missing: true, title: '页面不存在',
+        nav: navState(null, '页面不存在')
+      });
       wx.setNavigationBarTitle({ title: '页面不存在' });
       return;
     }
 
+    const meta = page.meta || { bg: '#F5F6F8' };
+    const name = page.name || '活动页';
     const blocks = applyShopAvatar(normalizeBlocks(page.blocks || []), SHOP.avatar || '');
     this.setData({
       key: asked,
-      title: page.name || '活动页',
-      meta: page.meta || { bg: '#F5F6F8' },
+      title: name,
+      meta: meta,
       blocks: blocks,
-      showTabbar: tabbarShowsFor(asked)
+      showTabbar: tabbarShowsFor(asked),
+      nav: navState(meta, name)
     }, () => {
       // 商品区块要实时数据，装修时存的是快照（与首页共用同一份实现）
       this.loadGoodsBlocks();
@@ -99,11 +113,28 @@ Page(Object.assign({}, blockPageBehavior, {
       this.syncActive();
     });
 
+    /*
+     * 本页 .json 已写 navigationStyle: custom —— 原生标题栏不存在了，
+     * 这行 `wx.setNavigationBarTitle` **实际是空操作**，标题由上面 setData 的 nav 交给 nav-bar 自绘。
+     * 保留它只为「万一回退到原生导航栏」时不丢标题；别指望它还能改标题栏文字。
+     */
     wx.setNavigationBarTitle({ title: page.name || '活动页' });
   },
 
   onShow() {
     this.syncActive();
+  },
+
+  /**
+   * 沉浸式：上划过阈值后标题栏才浮现（与首页同一口径，见 utils/navbar.js）。
+   * 标准模式标题栏常驻，直接 return 省掉一次 setData。
+   */
+  onPageScroll(e) {
+    const nav = this.data.nav;
+    if (!nav || !isImmersive(nav.mode)) return;
+    const solid = (e && e.scrollTop || 0) > (nav.total || 64);
+    if (solid === nav.solid) return;
+    this.setData({ 'nav.solid': solid });
   },
 
   /**

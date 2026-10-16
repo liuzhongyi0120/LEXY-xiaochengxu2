@@ -159,6 +159,8 @@ html, body { height: 100%; margin: 0; }
   box-shadow: 0 6px 32px rgba(0, 0, 0, .16);
   overflow: hidden;
   transform-origin: top center;
+  /* 沉浸式要把 .phone-bar 变成浮层（见下方 .ph-immersive），锚点得在这里 */
+  position: relative;
 }
 
 /* 导航栏：真机是系统导航栏，标题居中 */
@@ -199,14 +201,45 @@ html, body { height: 100%; margin: 0; }
   border-radius: 50%; background: #111;
 }
 
-/* 手机屏 = 小程序 page 根节点：真机里 100vh 就是这块区域的高度 */
+/*
+ * 沉浸式（页面设置 → 风格选择）：真机是 navigationStyle: custom + 自绘 nav-bar，
+ * 「内容整屏铺满、不显示顶部标题栏，上划时标题栏才浮现」。
+ *
+ * 这里把 .phone-bar 变成浮层：脱离文档流后 .phone-screen 自然顶到最上面（= 整屏铺满），
+ * 底色透明、标题隐藏；滚轮滚一下加 .nav-reveal，模拟「上划后浮现」。
+ */
+.ph-immersive .phone-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 9;
+  background: transparent;
+  transition: background-color .2s linear;
+}
+.ph-immersive .ph-title { opacity: 0; transition: opacity .2s linear; }
+.ph-immersive.nav-reveal .phone-bar { background: #fff; }
+.ph-immersive.nav-reveal .ph-title { opacity: 1; }
+
+/*
+ * 手机屏 = 小程序 page 根节点：真机里 100vh 就是这块区域的高度。
+ *
+ * ⚠️ 竖向必须**可滚**：首页、有赞首页复刻这类页面有十几个区块（实测 7396px），
+ *    早先这里写的是 `overflow: hidden`，屏高又固定 718px —— 结果运营在 /preview
+ *    里只能看到第一屏，后面九成的区块根本看不到（「复刻得对不对」也就没法核对）。
+ *    真机整页是能滚的，这里跟着能滚才叫复刻。
+ *
+ * 竖向滚动条画细一点：手机屏上本没有这条东西，太粗就不像真机了。
+ */
 .phone-screen {
   position: relative;
   width: var(--mp-screen-w);
   height: var(--mp-screen-h);
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   background: #F5F5F5;
 }
+.phone-screen::-webkit-scrollbar { width: 4px; }
+.phone-screen::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, .18); border-radius: 2px; }
+.phone-screen::-webkit-scrollbar-track { background: transparent; }
 
 /* tabBar：app.json 里没配 iconPath，所以真机上是纯文字（别自作主张加图标） */
 /*

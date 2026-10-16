@@ -160,7 +160,7 @@ const HOME_BLOCK_KINDS = {
     lib: 'image_ad',
     group: 'basic',
     desc: '多张图片轮播 / 横向滑动，建议所有图比例一致',
-    tip: '轮播海报支持调整切换速度与轮播提示样式；横向滑动适合展示多张等宽图。',
+    tip: '轮播海报支持调整切换速度与轮播提示样式；一行一个＝每张图各占一行纵向排开（适合放多张长图）；横向滑动适合展示多张等宽图。',
     fields: [
       {
         k: 'mode', label: '展示形态', type: 'template', def: 'poster',
@@ -1653,10 +1653,40 @@ const SHOP_NODE = {
 
 /* ============================ 页面级设置（写回 replica.PAGE_META） ============================ */
 
+/** 所有页面共有的页面级设置（写回 replica.PAGE_META） */
 const PAGE_META_FIELDS = [
   { k: 'desc', label: '页面描述', type: 'text', hint: '用于列表页展示与备注，不影响前台渲染' },
   { k: 'bg', label: '页面背景颜色', type: 'color', def: '#F5F6F8', hint: '小程序端读取该值作为页面底色' }
 ];
+
+/*
+ * 风格选择 —— 对标有赞装修后台「风格设置」面板（取证：`deploy/有赞首页装修-取证.md` 第一节）。
+ *
+ *   标准   = 保留顶部标题栏（原生导航栏），页面内容从标题栏下方开始 —— 改造前的唯一形态
+ *   沉浸式 = **不显示顶部标题栏**，内容从屏幕最顶端铺满；上划后标题栏才浮现
+ *
+ * 有赞在同一面板里还有一句原文提示「建议将图片/轮播图作为页面中第一个组件」，
+ * 装修台在页面设置面板里原样带出（见 admin.js 的 pageSetting）。
+ *
+ * ⚠️ 只有**首页与自定义页**挂这个字段：小程序端真正实现了沉浸式的就这两个页面文件
+ *    （pages/index、pages/custom）。莱克 / 资讯 / 产品 / 我的 四页的后端字段表里不放它 ——
+ *    放了就会「运营能选、真机不生效」，比没有这个选项更糟。
+ *
+ * ⚠️ 缺省值 `standard` 必须与 BLANK_META / CUSTOM_META_DEFAULT / PAGE_META_DEFS **逐字一致**：
+ *    老数据里没有这个键，四处口径不同就会出现「装修台显示标准、真机按沉浸式渲染」。
+ */
+const PAGE_META_STYLE_FIELD = {
+  k: 'style', label: '风格选择', type: 'radiobutton', def: 'standard',
+  options: [{ value: 'standard', label: '标准' }, { value: 'immersive', label: '沉浸式' }],
+  /* 提示文案取自截图里有赞面板的原文（避免「我们以为的沉浸式」与对家不一致）：
+     ·「建议将图片/轮播图作为页面中第一个组件」
+     ·「沉浸模式下，标题设置和样式设置的配置项仅在页面上划时展示」 */
+  hint: '沉浸模式：不显示顶部标题栏，内容整屏铺满，标题栏仅在页面上划时浮现。'
+    + '建议将图片/轮播图作为页面中第一个组件'
+};
+
+/** 首页 / 自定义页的页面设置字段：基础两项 + 「风格选择」 */
+const PAGE_META_FIELDS_FULL = PAGE_META_FIELDS.concat([PAGE_META_STYLE_FIELD]);
 
 /**
  * 各页面级设置的默认值。
@@ -1667,11 +1697,11 @@ const PAGE_META_FIELDS = [
  * 该页面会整体从 replica.js 的 PAGE_META 中消失，前端读不到页面底色。
  */
 const PAGE_META_DEFS = {
-  home: { desc: '新版首页！！', bg: '#F5F6F8' },
-  lexy: { desc: '7 大系列', bg: '#FFFFFF' },
-  news: { desc: '了解莱克', bg: '#F0F0F0' },
-  product: { desc: '全品牌产品库', bg: '#FFFFFF' },
-  mine: { desc: '个人中心', bg: '#FFFFFF' }
+  home: { desc: '新版首页！！', bg: '#F5F6F8', style: 'standard' },
+  lexy: { desc: '7 大系列', bg: '#FFFFFF', style: 'standard' },
+  news: { desc: '了解莱克', bg: '#F0F0F0', style: 'standard' },
+  product: { desc: '全品牌产品库', bg: '#FFFFFF', style: 'standard' },
+  mine: { desc: '个人中心', bg: '#FFFFFF', style: 'standard' }
 };
 
 /** 取某页面级设置的默认值（深拷贝，调用方可安全改写） */
@@ -1682,12 +1712,23 @@ function pageMetaDefault(key) {
 
 /**
  * 把某页面的 meta 合并进 out.PAGE_META。
- * 缺值时回落到该页默认值，绝不写入 undefined（写入 undefined 等于删键）。
+ *
+ * ⚠️ 是**逐键**回落默认值，不是「整个 meta 缺失才回落」。
+ *    内置页在库里存的是**存量数据**：新加的页面级字段（如 2026-10-16 的 `style`）
+ *    在老数据里根本没有这个键。若只在整体缺失时回落，
+ *    发布后 replica.PAGE_META.home 就是 `{desc, bg}` —— 装修台显示「标准」，
+ *    而小程序端读不到键也只能按标准走，看上去没问题；
+ *    但一旦有页面把这套字段当作「必须存在」来读（例如装修台把它当已选值回填），
+ *    就会出现「四处口径不一致」的老毛病（PAGE_META_DEFS 顶上的注释说的就是这件事）。
+ *    逐键回落保证：发布产物里每条 meta 都带齐当前全部字段。
+ *
+ * 绝不写入 undefined（写入 undefined 等于删键）。
  */
 function setPageMeta(out, key, meta) {
+  const base = pageMetaDefault(key) || {};
   const v = (meta === undefined || meta === null || typeof meta !== 'object')
-    ? pageMetaDefault(key)
-    : meta;
+    ? (pageMetaDefault(key))
+    : Object.assign({}, base, meta);
   if (v === undefined) return;
   out.PAGE_META = Object.assign({}, out.PAGE_META, { [key]: v });
 }
@@ -2250,7 +2291,7 @@ const PAGES = [
         {
           k: 'meta', label: '页面设置', type: 'object',
           hint: '页面级设置（写回 replica.PAGE_META），与页面内的区块无关',
-          fields: PAGE_META_FIELDS
+          fields: PAGE_META_FIELDS_FULL
         }
       ]
     }
@@ -2476,13 +2517,13 @@ const PAGES = [
 /* ============================ 自定义页面（装修台「新建页面」） ============================ */
 
 /** 自定义页面的页面级设置默认值（内置页在 PAGE_META_DEFS 里各自有一份） */
-const CUSTOM_META_DEFAULT = { desc: '', bg: '#F5F6F8' };
+const CUSTOM_META_DEFAULT = { desc: '', bg: '#F5F6F8', style: 'standard' };
 
-/** 自定义页的「页面设置」字段（与内置页共用声明） */
+/** 自定义页的「页面设置」字段（含「风格选择」—— 小程序端 pages/custom 真正支持沉浸式） */
 const CUSTOM_META_NODE = {
   k: 'meta', label: '页面设置', type: 'object',
   hint: '页面级设置（写回 replica.PAGE_META），与页面内的区块无关',
-  fields: PAGE_META_FIELDS
+  fields: PAGE_META_FIELDS_FULL
 };
 
 /**

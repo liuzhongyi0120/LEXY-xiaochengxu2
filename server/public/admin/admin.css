@@ -754,6 +754,33 @@ html.embed-mode .topbar { display: none !important; }
 .ph-dots { color: #bbb; letter-spacing: 1px; }
 /* 手机屏：给整屏最小高度，短页面也像一部手机（长页面按内容继续撑高） */
 .phone-screen { position: relative; background: #fff; min-height: var(--phone-screen-h); }
+
+/*
+ * 沉浸式（页面设置 → 风格选择）：真机是 navigationStyle: custom + 自绘 nav-bar，
+ * 装修台画不出那套，但**顶栏必须跟着消失** —— 否则运营选了沉浸式，
+ * 预览里还是一条标题栏压在内容上，等于没反馈。
+ *
+ * 做法：`.phone-bar` 脱离文档流（`absolute`）→ 不占高度，内容自然顶到手机屏最上面；
+ * 底色透明、标题隐藏。**时间与右上角胶囊保留** —— 真机 `navigationStyle: custom` 只去掉
+ * 标题栏，系统状态栏（时间/电量）与微信胶囊（···⊙）始终都在，全抹掉反而不像真机。
+ *
+ * ⚠️ 装修台**不模拟「上划后浮现」**，这是刻意的：
+ *    真机那条栏是 `fixed`，上划后才浮现；装修台要还原它就得让顶栏钉在可视区顶部，
+ *    而 `.phone` 有 `overflow: hidden`（裁圆角用）——**祖先是滚动容器且自身不滚时，`sticky` 会失效**
+ *    （实测：滚 400px 后顶栏 top = -272，直接跟着手机滚出可视区，屏幕上看不到「浮现」）。
+ *    去掉 `overflow: hidden` 会毁掉手机壳的圆角裁切，不值得。
+ *    装修台这里只呈现**初始态**（没有标题栏、内容整屏铺满）；「上划浮现」在 `/preview` 里看 ——
+ *    那边的滚动容器就是手机屏自己（与真机同构），见 preview.js 的 `syncNavReveal`。
+ */
+.ph-immersive .phone-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 9;
+  background: transparent;
+  border-bottom-color: transparent;
+  transition: background-color .2s linear;
+}
+.ph-immersive .ph-title { opacity: 0; transition: opacity .2s linear; }
 /*
  * 底部导航不再由装修台自己画：结构与样式统一在 /shared/pv-tabbar.js（与 /preview 共用一份，
  * 各写一份必然走样 —— 本项目的首屏海报就因为两处换算口径不同而错成 1.55 屏高）。

@@ -1,4 +1,20 @@
+<!--
+  ⚠️ 这里**不要**给 .page 补 padding-top —— 自绘标题栏自己占位（标准模式是 sticky，参与文档流），
+     再补一次就把标题栏高度算了两遍。沉浸式下那条栏脱离文档流，内容自然铺满整屏
+     （这正是「沉浸式全屏显示、没有顶部标题栏」的要求）。
+-->
 <view class="page" style="background: {{meta.bg || '#F5F6F8'}};">
+
+  <!-- 标题栏：标准常驻 / 沉浸式透明、上划才浮现（按当页 meta.style 决定） -->
+  <nav-bar
+    wx:if="{{nav}}"
+    title="{{nav.title}}"
+    mode="{{nav.mode}}"
+    bg="{{nav.bg}}"
+    color="{{nav.color}}"
+    showBack="{{nav.showBack}}"
+    solid="{{nav.solid}}"
+  />
 
   <!-- 装修数据还没下发：多半是运营建了页面但没点「生成代码」，或 key 填错了 -->
   <empty-state

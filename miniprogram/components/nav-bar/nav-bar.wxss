@@ -1,0 +1,89 @@
+/* =========================================================================
+ * 自绘导航栏（components/nav-bar）
+ *
+ * 标准模式用 `position: sticky`，**刻意不写固定定位**：
+ *
+ *   · 原生导航栏占的是页面最上面那一条位置 —— 内容本来就在它下面。
+ *     页面的 .page 若再补一条 padding-top，就等于把标题栏高度算了两遍
+ *     （真机看不出，但 /preview 的手机壳自己已经画了一条 .phone-bar 占位，
+ *      两条一起生效会让内容额外交出 64px 才开始 —— 实测 pageBox.top 198 而
+ *      首个区块在 262，比壳体多空一整条）。
+ *   · sticky 让这条栏**参与文档流**（自己占掉那条高度，页面不用再垫 padding），
+ *     同时上划时钉在顶部 —— 与原生导航栏不随内容滚走的行为一致。
+ *   · 沉浸式改回 fixed：那条栏不能占位（内容要铺到屏幕最顶端），上划浮现时浮在上面。
+ *
+ * 兜底：万一某个基础库不支持 sticky，退化成「随页面滚动」——标题栏会滑走，
+ * 但布局不会错位（这也比多空 64px 好）。
+ * ========================================================================= */
+.nb {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  width: 100%;
+  box-sizing: border-box;
+  /* 标题栏底色由页面传入（background 写在内联 style 上，沉浸式透明态也走那条） */
+}
+
+.nb-status {
+  width: 100%;
+}
+
+.nb-bar {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 返回箭头：CSS 画的尖角，与原生导航栏同形（不引图片，避免多一个资源请求） */
+.nb-back {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nb-arrow {
+  width: 10px;
+  height: 10px;
+  border-left: 2px solid #000;
+  border-bottom: 2px solid #000;
+  transform: rotate(45deg);
+  margin-left: 3px;
+}
+
+.nb-title {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+/* -------------------------------------------------------------------------
+ * 沉浸式：**脱离文档流**（fixed）+ 整条透明且不可点 ——
+ * 这样下面的内容才能铺到屏幕最顶端，也不会挡住图片/轮播的点击（pointer-events: none）。
+ * 上划过阈值后页面把 solid 置 true，才恢复底色与点击。
+ * ---------------------------------------------------------------------- */
+.nb-immersive {
+  position: fixed;
+  left: 0;
+  right: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s linear;
+}
+
+.nb-immersive.nb-solid {
+  opacity: 1;
+  pointer-events: auto;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.06);
+}
