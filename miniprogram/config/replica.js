@@ -17,7 +17,7 @@
  *    产品页型号卡片已挂站内商品详情链接（products[].link）。
  */
 
-/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-16 17:58:18（来源：/admin） */
+/* 本文件由「店铺装修后台」生成 · 最后发布 2026-10-17 00:24:19（来源：/admin） */
 
 /** 店铺信息（首页与我的页共用） */
 const SHOP = {
@@ -31,7 +31,13 @@ const SHOP = {
 const HOME_BLOCKS = [
   {
     type: "swiper",
+    mode: "poster",
     height: 1322,
+    radius: "square",
+    interval: 4500,
+    indicator: "dots",
+    pageMargin: 0,
+    imageGap: 0,
     images: [
       {
         image: "/uploads/202610/20261009-86caac-Fo69HIsVHfOzMC08PSX7N7uFY8s1.webp",
@@ -46,56 +52,139 @@ const HOME_BLOCKS = [
   {
     type: "video",
     height: 420,
+    src: "/uploads/202610/20261009-huuw56.mp4",
     poster: "/uploads/202610/20261009-7c88cd-FmWuKKYDvg5Wt4aDDF0BzrOtFjJ6.webp",
-    src: "/uploads/202610/20261009-huuw56.mp4"
+    autoplay: false,
+    muted: true,
+    controls: false,
+    loop: false,
+    radius: "square",
+    pageMargin: 0
   },
   {
     type: "image",
     height: 1342,
-    src: "/uploads/202610/20261009-e2a92a-FpEmv38JlZ6Gs7uqOc3Oc45c8ZyO.webp"
+    src: "/uploads/202610/20261009-e2a92a-FpEmv38JlZ6Gs7uqOc3Oc45c8ZyO.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
+  },
+  {
+    type: "line",
+    style: "blank",
+    height: 48,
+    gapY: 0,
+    color: "#EEEEEE",
+    bg: "",
+    pageMargin: 0
   },
   {
     type: "image",
     height: 1642,
-    src: "/uploads/202610/20261009-f8b64b-Fs2JC2Rd_zFcdWuYOzLkNR_PKFP8.webp"
+    src: "/uploads/202610/20261009-f8b64b-Fs2JC2Rd_zFcdWuYOzLkNR_PKFP8.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
   },
   {
     type: "video",
     height: 420,
+    src: "/uploads/202610/20261009-f632ky.mp4",
     poster: "/uploads/202610/20261009-7a46e4-FuFIgF8CRwJ0Ea6su5y3izD9gGKe.webp",
-    src: "/uploads/202610/20261009-f632ky.mp4"
+    autoplay: false,
+    muted: true,
+    controls: false,
+    loop: false,
+    radius: "square",
+    pageMargin: 0
   },
   {
     type: "image",
     height: 756,
-    src: "/uploads/202610/20261009-0a2785-Fr_tsF2gAxM2M35MG16j34djUjZs.webp"
+    src: "/uploads/202610/20261009-0a2785-Fr_tsF2gAxM2M35MG16j34djUjZs.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
   },
   {
     type: "image",
     height: 1326,
-    src: "/uploads/202610/20261009-a25845-FhZ_bsHU5p4qvtJlg5a7rprmsHhB.webp"
+    src: "/uploads/202610/20261009-a25845-FhZ_bsHU5p4qvtJlg5a7rprmsHhB.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
   },
   {
     type: "video",
     height: 420,
+    src: "/uploads/202610/20261009-pj6lis.mp4",
     poster: "/uploads/202610/20261009-6a796a-XvLEB33Z0lZ-QiYQ2eRMzI899fRo2arKyE_6qg_c.jpg",
-    src: "/uploads/202610/20261009-pj6lis.mp4"
+    autoplay: false,
+    muted: true,
+    controls: false,
+    loop: false,
+    radius: "square",
+    pageMargin: 0
   },
   {
     type: "image",
     height: 652,
-    src: "/uploads/202610/20261009-fe18b3-FhkZ06W7Z8D16Cd0ULEu700z0_kr.webp"
+    src: "/uploads/202610/20261009-fe18b3-FhkZ06W7Z8D16Cd0ULEu700z0_kr.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
   },
   {
     type: "image",
     height: 882,
-    src: "/uploads/202610/20261009-b8a41a-Fs-nj3UEvr_44TFpny7zs8_0TZB2.webp"
+    src: "/uploads/202610/20261009-b8a41a-Fs-nj3UEvr_44TFpny7zs8_0TZB2.webp",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
   },
   {
     type: "video",
     height: 420,
+    src: "/uploads/202610/20261009-wvq94t.mp4",
     poster: "/uploads/202610/20261009-db6432-J2S8RqWN_Lla-3X3b99IvkTEmX4tvEsMaSCWog_c.jpg",
-    src: "/uploads/202610/20261009-wvq94t.mp4"
+    autoplay: false,
+    muted: true,
+    controls: false,
+    loop: false,
+    radius: "square",
+    pageMargin: 0
+  },
+  {
+    type: "image",
+    height: 598,
+    src: "/uploads/首页/FtvYjCwh63g2WYeVU7Pm9nY5wmpc.png",
+    radius: "square",
+    pageMargin: 0,
+    link: ""
+  },
+  {
+    type: "swiper",
+    mode: "single",
+    height: 2052,
+    radius: "square",
+    interval: 4500,
+    indicator: "dots",
+    pageMargin: 0,
+    imageGap: 0,
+    images: [
+      {
+        image: "/uploads/首页/FqUkbtDssN5a_bkdNKxqI6XM12dL.png",
+        link: ""
+      },
+      {
+        image: "/uploads/首页/Fr1uBwoTH6nnNiPQgRhte1Pa84N0.png",
+        link: ""
+      },
+      {
+        image: "/uploads/首页/FgEGHs0O89DzGGM7yML3Lmg318PO.png",
+        link: ""
+      }
+    ]
   }
 ];
 
@@ -3525,6 +3614,84 @@ const CUSTOM_PAGES = {
       bg: "#F2EDE7",
       style: "immersive"
     }
+  },
+  homebak: {
+    name: "原首页（换版前备份）",
+    blocks: [
+      {
+        type: "swiper",
+        height: 1322,
+        images: [
+          {
+            image: "/uploads/202610/20261009-86caac-Fo69HIsVHfOzMC08PSX7N7uFY8s1.webp",
+            link: "/packageGoods/detail/detail?id=g1003972"
+          },
+          {
+            image: "/uploads/202610/20261009-44f4b4-Fl6yiLDP_qD77xcIPwrKfpbdgn3l.webp",
+            link: "/packageGoods/detail/detail?id=g1003972"
+          }
+        ]
+      },
+      {
+        type: "video",
+        height: 420,
+        poster: "/uploads/202610/20261009-7c88cd-FmWuKKYDvg5Wt4aDDF0BzrOtFjJ6.webp",
+        src: "/uploads/202610/20261009-huuw56.mp4"
+      },
+      {
+        type: "image",
+        height: 1342,
+        src: "/uploads/202610/20261009-e2a92a-FpEmv38JlZ6Gs7uqOc3Oc45c8ZyO.webp"
+      },
+      {
+        type: "image",
+        height: 1642,
+        src: "/uploads/202610/20261009-f8b64b-Fs2JC2Rd_zFcdWuYOzLkNR_PKFP8.webp"
+      },
+      {
+        type: "video",
+        height: 420,
+        poster: "/uploads/202610/20261009-7a46e4-FuFIgF8CRwJ0Ea6su5y3izD9gGKe.webp",
+        src: "/uploads/202610/20261009-f632ky.mp4"
+      },
+      {
+        type: "image",
+        height: 756,
+        src: "/uploads/202610/20261009-0a2785-Fr_tsF2gAxM2M35MG16j34djUjZs.webp"
+      },
+      {
+        type: "image",
+        height: 1326,
+        src: "/uploads/202610/20261009-a25845-FhZ_bsHU5p4qvtJlg5a7rprmsHhB.webp"
+      },
+      {
+        type: "video",
+        height: 420,
+        poster: "/uploads/202610/20261009-6a796a-XvLEB33Z0lZ-QiYQ2eRMzI899fRo2arKyE_6qg_c.jpg",
+        src: "/uploads/202610/20261009-pj6lis.mp4"
+      },
+      {
+        type: "image",
+        height: 652,
+        src: "/uploads/202610/20261009-fe18b3-FhkZ06W7Z8D16Cd0ULEu700z0_kr.webp"
+      },
+      {
+        type: "image",
+        height: 882,
+        src: "/uploads/202610/20261009-b8a41a-Fs-nj3UEvr_44TFpny7zs8_0TZB2.webp"
+      },
+      {
+        type: "video",
+        height: 420,
+        poster: "/uploads/202610/20261009-db6432-J2S8RqWN_Lla-3X3b99IvkTEmX4tvEsMaSCWog_c.jpg",
+        src: "/uploads/202610/20261009-wvq94t.mp4"
+      }
+    ],
+    meta: {
+      desc: "新版首页！！",
+      bg: "#F5F6F8",
+      style: "standard"
+    }
   }
 };
 
@@ -5471,9 +5638,9 @@ const SHOPNOTES = {
 /** ---------------- 页面级设置（装修后台「页面设置」面板，key = 页面 key） ---------------- */
 const PAGE_META = {
   home: {
-    desc: "新版首页！！",
-    bg: "#F5F6F8",
-    style: "standard"
+    desc: "有赞首页复刻",
+    bg: "#F2EDE7",
+    style: "immersive"
   },
   lexy: {
     desc: "7 大系列",
@@ -5559,6 +5726,11 @@ const PAGE_META = {
     desc: "有赞首页复刻",
     bg: "#F2EDE7",
     style: "immersive"
+  },
+  homebak: {
+    desc: "新版首页！！",
+    bg: "#F5F6F8",
+    style: "standard"
   }
 };
 

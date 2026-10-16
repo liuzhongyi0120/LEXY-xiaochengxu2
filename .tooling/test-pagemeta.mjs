@@ -28,7 +28,17 @@ function ok(cond, name, extra) {
  *    「环境里恰好有几个页面才绿」的假红（本机存着两个测试页，就一直是红的）。
  *    锁「与 schema.allPages() 完全一致」才是这条断言真正要保证的等价关系。
  */
-const expectMetaKeys = () => schema.allPages().filter((p) => !p.nav).map((p) => p.key).sort().join(',');
+/*
+ * 期望键集 = 「内置页 + 自定义页」。
+ *
+ * ⚠️ 必须同时排掉两类**曾被当成普通页面**的特殊页面，否则这个脚本会长期假失败：
+ *   · nav（店铺导航）—— 全局配置，不是页面，本来就被排掉了；
+ *   · shopnote（店铺笔记）—— 2026-10 加的「内容型页面」，走 replica.SHOPNOTES 自己的通道，
+ *     **不进 PAGE_META**（PAGE_META 只管页面底色/风格这类壳信息）。
+ *     漏了这一条，期望值里会凭空多出 60 个 note-*，而实际值里永远不会有 ——
+ *     脚本一直报「键集不一致」，看的人只会以为装修数据坏了。
+ */
+const expectMetaKeys = () => schema.allPages().filter((p) => !p.nav && !p.shopnote).map((p) => p.key).sort().join(',');
 const metaKeysOf = (asm) => Object.keys(asm.PAGE_META || {}).sort().join(',');
 
 console.log('[1] 正常：全部内置页 meta 齐全');
@@ -38,7 +48,14 @@ console.log('[1] 正常：全部内置页 meta 齐全');
   const keys = Object.keys(asm.PAGE_META || {});
   ok(metaKeysOf(asm) === expectMetaKeys(), 'PAGE_META 键集 = 全部页面（内置 5 + 自定义，不含店铺导航）', keys.join(','));
   ok(keys.includes('home'), 'PAGE_META.home 存在');
-  ok(asm.PAGE_META.home && asm.PAGE_META.home.bg === '#F5F6F8', 'PAGE_META.home.bg = #F5F6F8', asm.PAGE_META.home && asm.PAGE_META.home.bg);
+  /*
+   * ⚠️ 这里**不能**断言 `bg === '#F5F6F8'` —— 那是「当前的运营数据」，不是不变式。
+   * 2026-10-16 把有赞首页复刻搬进内置首页后，home.bg 变成 #F2EDE7，这条就挂了，
+   * 但它报的是「代码坏了」，实际只是运营改了底色（底色本来就是可配的）。
+   * 该验的是「有没有值、是不是合法色值」；真要锁默认值，锁 [3] 那条回落值。
+   */
+  const homeBg = (asm.PAGE_META.home || {}).bg || '';
+  ok(/^#[0-9A-Fa-f]{6}$/.test(homeBg), 'PAGE_META.home.bg 是合法色值（不锁具体值：运营可改底色）', homeBg);
 }
 
 console.log('[2] 回归：home 的 meta 为 undefined（模拟旧快照）');
