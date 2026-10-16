@@ -4059,6 +4059,46 @@ assert('app.json 的 tabBar 配色与 schema 默认值一致（custom:true 后�
   (((appJson.tabBar || {}).selectedColor || '').toLowerCase() === NAV_SCHEMA.TABBAR_DEFAULTS.selectedColor.toLowerCase()),
   `app.json ${(appJson.tabBar || {}).color}/${(appJson.tabBar || {}).selectedColor}`);
 
+/* ---- A2. 导航里必须有一项指向内置首页 ----
+ *
+ * 背景（2026-10-17 实测）：运营在装修台把「首页」tab 指向了自定义页
+ * /pages/custom/index?key=p481。这个配置**看起来完全正常** —— 复刻内容此时已经
+ * 搬进了内置首页，指向哪儿画面一模一样（同样 14 区块、同样沉浸式），
+ * 唯一能看出来的后果是：冷启动打开 pages/index/index 时，
+ * 它的 onShow → syncTabBar(this) → setActive('/pages/index/index') 在 items 里
+ * 匹配不到 → selected = -1 → **5 个 tab 整条不高亮**。
+ *
+ * 这类配置错最麻烦的地方是它不是「报错」，而是「界面上少了一点点东西」，
+ * 运营只会觉得「首页怎么感觉不对」，定位不到导航配置上。所以两头都锁：
+ *   ① 装修台要有守卫（缺了就提示，且提示摆在列表页那张卡上）；
+ *   ② 当前这份配置本身也必须是合规的。
+ *
+ * ⚠️ ② 读的是**运营当前的值**，这与「把当前运营数据当不变式」不是一回事：
+ *    底色/文案那种改了也照样能跑的视觉值，不该写进断言；
+ *    而「导航里有没有首页」是**改了就坏**的结构约束，坏了就必须红。
+ *    （门禁对 nav 只写草稿、不发布，最后 discard，所以不会污染这里读到的值。）
+ */
+const NAV_HOME_PATH = NAV_SCHEMA_PATHS[0];
+const navReplicaItems = ((requireFromHere(join(MP_ROOT, 'config', 'replica.js')).TABBAR || {}).items) || [];
+const navHomeHits = navReplicaItems.filter((it) => it && it.path === NAV_HOME_PATH);
+assert('底部导航里有一项指向内置首页（缺了它，启动页的底部导航会整条不高亮）',
+  navHomeHits.length === 1,
+  `${navHomeHits.length} 项指向 ${NAV_HOME_PATH}（应为 1）｜ 当前：${navReplicaItems.map((i) => i && i.path).join(' ') || '（空）'}`);
+
+/*
+ * 守卫锁两头（源码 + 用法），与上面「配色两组默认展开」同一套思路：
+ * 只测守卫函数在不在，测不到它真的被用上；只测用法，又可能在改守卫时漏掉常量口径。
+ */
+const navAdminJs2 = readFileSync(join(PUB, 'admin', 'admin.js'), 'utf8');
+const navGuardConst = /var HOME_TAB_PATH = '\/pages\/index\/index'/.test(navAdminJs2) &&
+  /function homeMissing\(items\)/.test(navAdminJs2);
+const navGuardUsed = /homeMissing\(\(S\.cur\.data && S\.cur\.data\.items\) \|\| \[\]\)/.test(navAdminJs2) &&
+  /homeMissing\(items\) \? '<div class="nv-warn">/.test(navAdminJs2) &&
+  /'tip warn'/.test(navAdminJs2);
+assert('装修台有「导航缺内置首页」守卫（根视图 + 列表页卡片两处都提示，常量与 schema 同口径）',
+  navGuardConst && navGuardUsed && NAV_HOME_PATH === '/pages/index/index',
+  `常量=${navGuardConst} 两处提示=${navGuardUsed} 口径=${NAV_HOME_PATH}`);
+
 /* ---- B. custom-tab-bar 四件套 + 每个 tab 页的 usingComponents ---- */
 const navCtbMissing = ['index.js', 'index.json', 'index.wxml', 'index.wxss'].filter((f) => !existsSync(join(NAV_CTB, f)));
 assert('custom-tab-bar 四件套齐全（目录名与文件名都是微信写死的，不可自定义）',

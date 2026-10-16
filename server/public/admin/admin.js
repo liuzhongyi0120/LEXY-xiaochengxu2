@@ -13,6 +13,36 @@
 
   var API = location.origin;
 
+  /**
+   * 内置首页路径 —— 小程序的启动页（app.json 的 pages[0]），也是底部导航的必留项。
+   *
+   * ⚠️ 为什么导航里必须有一项指向它：
+   *   小程序冷启动打开的就是 pages/index/index，它的 onShow → syncTabBar(this)
+   *   → setActive('/pages/index/index')。items 里没有这一项时匹配不到 → index = -1
+   *   → **5 个 tab 整条不高亮**（custom-tab-bar 里那句「宁可都不高亮，也不要错误地高亮别人」）。
+   *
+   *   运营把「首页」tab 指向自定义页（例如 /pages/custom/index?key=p481）就会踩中：
+   *   复刻内容早已搬进内置首页，指向哪儿**画面完全一样**，
+   *   唯一能看出来的就是启动时底部导航一个都不亮 —— 不提示的话无从定位。
+   *
+   * 与后端同源：schema.js 的 TABBAR_PAGES[0].path（那边是非法路径的回落目标）。
+   */
+  var HOME_TAB_PATH = '/pages/index/index';
+
+  var NAV_HOME_WARN = '⚠️ 当前导航里没有指向内置页「首页」的项。' +
+    '小程序启动时打开的就是这一页，缺了它，启动页的底部导航会<b>整条不高亮</b>。' +
+    '其它 tab 可以指向自定义页，但请保留一项指向内置页「首页」' +
+    '（候选页列表第一组「内置页」里）。';
+
+  /** 导航项里是否缺内置首页。按**路径**判断，不按文案 —— 运营可能把这一项改名 */
+  function homeMissing(items) {
+    var arr = items || [];
+    for (var i = 0; i < arr.length; i++) {
+      if (arr[i] && arr[i].path === HOME_TAB_PATH) return false;
+    }
+    return true;
+  }
+
   /* ----------------------------- 工具 ----------------------------- */
   function $(id) { return document.getElementById(id); }
   function el(tag, cls, html) {
@@ -534,6 +564,12 @@
         '</div>' +
         '<div class="nv-sub">' + esc(nav.desc || '') + '</div>' +
         '<div class="nv-chips">' + (chips || '<span class="dim">—</span>') + '</div>' +
+        /*
+         * 缺内置首页的告警也摆在列表页这张卡上 —— 它是进装修台第一眼看到的，
+         * 运营未必会点进导航编辑器，摆在卡片上才拦得住。
+         * 这里看的是**已发布**配置（S.tabbar），与编辑器里那份草稿各看各的。
+         */
+        (homeMissing(items) ? '<div class="nv-warn">' + NAV_HOME_WARN + '</div>' : '') +
       '</div>' +
       '<div class="nv-ops">' +
         /*
@@ -1348,6 +1384,19 @@
     }
 
     host.appendChild(componentTitle(titleName, titleDesc, tip));
+
+    /*
+     * 店铺导航的「首页」守卫。
+     *
+     * 判据是**路径**而不是文案 —— 运营完全可以把这一项改名成「主页」「商城」，
+     * 按文案找会漏报；而真正决定高亮的是路径（小程序端拿自己的 route 去 items 里比对）。
+     *
+     * 放在根视图（导航整体属性）里：运营每改完一项跳转页面都要回到这里才有全貌，
+     * 在单项面板里提示反而会被当成噪音。
+     */
+    if (S.cur.meta && S.cur.meta.nav && homeMissing((S.cur.data && S.cur.data.items) || [])) {
+      host.insertBefore(el('div', 'tip warn', NAV_HOME_WARN), host.children[1] || null);
+    }
 
     /* 模板选择器（展示形态） */
     var tplField = fields.filter(function (f) { return f.type === 'template'; })[0];
