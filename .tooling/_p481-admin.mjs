@@ -23,10 +23,13 @@ import { dirname, join, resolve } from 'node:path';
 import adminToken from './_admin.mjs';
 
 const argv = process.argv.slice(2);
-const opt = { base: 'http://127.0.0.1:3000', out: '.tooling/_shots/p481-admin' };
+const opt = { base: 'http://127.0.0.1:3000', out: '.tooling/_shots/p481-admin', key: 'p481' };
 for (let i = 0; i < argv.length; i++) {
   if (argv[i] === '--base') opt.base = argv[++i];
   else if (argv[i] === '--out') opt.out = argv[++i];
+  /* 默认测 p481（历史用法）；--key home 就是换首页之后的用法 ——
+     首页现在也是 14 区块 + 沉浸式，同一套判据照样适用。 */
+  else if (argv[i] === '--key') opt.key = argv[++i];
 }
 const BASE = opt.base.replace(/\/$/, '');
 
@@ -139,8 +142,8 @@ async function openEditor(key) {
   await send('Runtime.enable');
 
   /* ---- ①~③ 沉浸式页面 ---- */
-  console.log('\n[沉浸式] p481 有赞首页复刻');
-  await openEditor('p481');
+  console.log('\n[沉浸式] ' + opt.key);
+  await openEditor(opt.key);
   let st = JSON.parse(await evalJs(PROBE) || '{}');
   console.log('  初始态:', JSON.stringify(st));
   check('装修台：沉浸式页面的手机壳带 ph-immersive', /ph-immersive/.test(st.phoneClass || ''), st.phoneClass);
@@ -160,7 +163,14 @@ async function openEditor(key) {
   check('装修台：不做「上划浮现」——滚过阈值后不应出现 nav-reveal（该效果只在 /preview 看）',
     !/nav-reveal/.test(st.phoneClass || ''), st.phoneClass);
 
-  /* ---- ④ 标准页面不受影响 ---- */
+  /* ---- ④ 标准页面不受影响（只在测 p481 时跑：--key home 时首页本身就是沉浸式，没有标准页可对照） ---- */
+  if (opt.key !== 'p481') {
+    const bad0 = results.filter((r) => !r.ok);
+    console.log('\n汇总（--key ' + opt.key + '，跳过 p288 对照组）：' +
+      (results.length - bad0.length) + ' 通过 / ' + bad0.length + ' 失败');
+    ws.close(); child.kill();
+    process.exit(bad0.length ? 1 : 0);
+  }
   console.log('\n[标准] p288 了解莱克（对照组）');
   await openEditor('p288');
   st = JSON.parse(await evalJs(PROBE) || '{}');
