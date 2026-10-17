@@ -476,6 +476,7 @@ function listPages() {
   return schema.list().map((meta) => {
     const draft = state.drafts[meta.key];
     const pub = published[meta.key];
+    const lastVer = state.versions.filter((v) => v.pageKey === meta.key)[0] || null;
     /*
      * 「已发布」对自定义页 / 店铺笔记是个容易被误读的说法：
      * 注册表里的条目刚建好就有 published 字段（那是初始内容），但它**还没写进 replica.js**，
@@ -510,7 +511,17 @@ function listPages() {
        */
       draftBlockCount: (draft && draft.data) ? countBlocks(meta.key, draft.data) : null,
       fields: countFields(pub),
-      lastVersion: (state.versions.filter((v) => v.pageKey === meta.key)[0] || null)
+      /*
+       * 「谁在什么时候生成了现在这份代码」（审查 F21）。
+       * 状态只回答「生成过 / 没生成过」，运营真正要回答的是
+       * 「手机上的内容是什么时候的、谁改的、要不要重新生成」——
+       * 没有时间与操作者，两个人各改一版时只能靠猜。
+       */
+      generatedAt: lastVer ? lastVer.at : null,
+      generatedAtText: lastVer ? stampOf(lastVer.at) : '',
+      generatedBy: lastVer ? (lastVer.by || '') : '',
+      versionId: lastVer ? lastVer.id : '',
+      lastVersion: lastVer
     });
   });
 }
@@ -571,6 +582,8 @@ function getPage(key) {
     hasDraft: !!(draft && draft.data),
     draftAt: draft ? draft.at : null,
     draftAtText: draft ? stampOf(draft.at) : '',
+    /* 草稿版本号：编辑器要把它原样带回 saveDraft，用于「别人改过」的冲突检测（审查 F09） */
+    revision: draft && draft.data ? (Number.isFinite(draft.rev) ? draft.rev : 1) : 0,
     titles,
     versions: state.versions.filter((v) => v.pageKey === key).map((v) => ({
       id: v.id, at: v.at, atText: stampOf(v.at), note: v.note || '', by: v.by || ''
@@ -631,7 +644,7 @@ function collectTitles(key, node, path, data, out) {
 
 /* ----------------------------- 对外：草稿 ----------------------------- */
 
-function saveDraft(key, data) {
+function saveDraft(key, data, opt) {
   const page = schema.get(key);
   if (!page) throw new BizError('未知页面：' + key, ERR.NOT_FOUND, 404);
   const err = validate(key, data);
@@ -639,14 +652,43 @@ function saveDraft(key, data) {
 
   const state = loadState();
   /*
+   * 草稿乐观锁（审查 F09）。
+   *
+   * 旧实现是 `state.drafts[key] = {...}` 直接覆盖：两个运营同时装修同一页时，
+   * 后保存的那份**基于更早内容**的草稿会把先保存的人的改动整个盖掉，
+   * 而且没有任何提示 —— 版本快照只记历史，挡不住这件事。
+   *
+   * 现在编辑器打开时把 `revision` 带下来，保存时带回 `rev`：
+   *   对得上 → 正常保存，revision + 1；
+   *   对不上 → 409，并把「是谁在什么时候改的」回给前端，让他自己决定重新加载还是另存。
+   * 不传 rev 的调用方（脚本、旧客户端）按「不检查」处理，不阻断既有链路。
+   */
+  const cur = state.drafts[key];
+  const curRev = cur && Number.isFinite(cur.rev) ? cur.rev : (cur && cur.data ? 1 : 0);
+  const expect = opt && opt.rev !== undefined && opt.rev !== null && opt.rev !== ''
+    ? Number(opt.rev) : null;
+  if (expect !== null && expect !== curRev) {
+    const e = new BizError(
+      `这份草稿在你打开之后已被别人保存过（${cur ? stampOf(cur.at) : '未知时间'}），` +
+      '为避免覆盖对方的改动，请刷新后重新编辑',
+      ERR.CONFLICT, 409);
+    e.conflict = { revision: curRev, at: cur ? cur.at : null, atText: cur ? stampOf(cur.at) : '' };
+    throw e;
+  }
+  /*
    * 笔记草稿存**规范形状**（内容键在 header 下，与字段树一致）。
    * 不搬的话，用平铺写法存进来的草稿再打开时，面板上标题/摘要/标签那几格是空的
    * （数据还在，只是躺在顶层键上）—— 与 getPage() 的读侧归位配套。
    */
   const stored = page.shopnote ? shopnotes.hoistHeader(data) : schema.clone(data);
-  state.drafts[key] = { data: stored, at: now() };
+  state.drafts[key] = { data: stored, at: now(), rev: curRev + 1 };
   saveState(state);
-  return { key, at: state.drafts[key].at, atText: stampOf(state.drafts[key].at) };
+  return {
+    key,
+    at: state.drafts[key].at,
+    atText: stampOf(state.drafts[key].at),
+    revision: state.drafts[key].rev
+  };
 }
 
 function discardDraft(key) {
@@ -728,15 +770,21 @@ function writeReplica(pageData, validateKey, opt) {
   return { code, bytes: Buffer.byteLength(code, 'utf8'), backup: backupName, ts };
 }
 
-/** 记一个发布版本（只保留最近 MAX_VERSIONS 个） */
-function recordVersion(state, key, ts, note, pageData) {
+/**
+ * 记一个发布版本（只保留最近 MAX_VERSIONS 个）
+ *
+ * `by` 记真实操作者（审查 F21）：以前硬编码成 'admin'，
+ * 于是「谁生成了现在这份代码」永远答不出来 —— 两个人各改一版时无从追责，
+ * 与 F27 的审计要求是同一件事（版本列表也要能回答「谁改的」）。
+ */
+function recordVersion(state, key, ts, note, pageData, by) {
   state.seq = (state.seq || 0) + 1;
   const version = {
     id: 'v' + state.seq,
     pageKey: key,
     at: ts,
     note: note || '发布',
-    by: 'admin',
+    by: String(by || '').slice(0, 40) || '未知',
     snapshot: schema.clone(pageData)
   };
   state.versions.unshift(version);
@@ -748,7 +796,7 @@ function recordVersion(state, key, ts, note, pageData) {
  * 发布：把某个页面的草稿写回 replica.js
  * @returns {{ ok, pageKey, versionId, backup, bytes, publishedAt }}
  */
-function publish(key, note) {
+function publish(key, note, by) {
   const page = schema.get(key);
   if (!page) throw new BizError('未知页面：' + key, ERR.NOT_FOUND, 404);
 
@@ -772,7 +820,7 @@ function publish(key, note) {
 
   /* keepKey：告诉 assemble()「这一篇是本次正在发布的」，别被「生成代码」门挡掉 */
   const res = writeReplica(pageData, key, { keepKey: key });
-  const version = recordVersion(state, key, res.ts, note || '发布', pageData);
+  const version = recordVersion(state, key, res.ts, note || '发布', pageData, by);
   delete state.drafts[key];
   saveState(state);
 
@@ -1056,9 +1104,31 @@ function noteStats() {
  * 同时 replica 必须重建，否则已删笔记的数据会留在 SHOPNOTES 里，
  * 小程序端按旧 id 还能打开一个「幽灵笔记」。
  */
-function removeNote(key) {
+function removeNote(key, opt) {
   const id = shopnotes.idOfKey(key);
   if (!id || !shopnotes.has(id)) throw new BizError('笔记不存在：' + key, ERR.NOT_FOUND, 404);
+
+  /*
+   * 删除前先查站内引用（审查 F07）。
+   *
+   * 自定义页面删除一直有 referencesOf 这道检查（被引用时须 force 才删），
+   * 笔记删除却没有 —— 于是删掉一篇首页卡片正指向的笔记后，生成的新包里
+   * 那个入口还在，用户点进去就是「笔记不存在」，而且运营完全不知道是哪一处。
+   *
+   * 口径与 removeCustomPage 一致：有引用 → 默认拒绝 + 列出引用位置；
+   * 确认要删 → 带 force=1。这里**不做**「自动解绑」：悄悄改掉别人的页面
+   * 比报个错更危险（运营不知道自己的首页被改过）。
+   */
+  const refs = referencesOf(key).filter((r) => r.pageKey !== key);
+  if (refs.length && !(opt && opt.force)) {
+    const list = refs.slice(0, 8).map((r) => `· ${r.label}`).join('<br>');
+    const e = new BizError(
+      `这篇笔记还被 ${refs.length} 处引用，直接删除会让这些入口变成「笔记不存在」：` +
+      `先到对应页面改掉跳转，或确认无误后强制删除。`, ERR.BIZ);
+    e.refs = refs;
+    e.refsHtml = list;
+    throw e;
+  }
 
   const pageData = publishedAll();
   delete pageData[key];
@@ -1121,5 +1191,6 @@ module.exports = {
   createNote,
   listNotes,
   noteStats,
+  noteIdOfKey: (key) => shopnotes.idOfKey(key),
   removeNote
 };

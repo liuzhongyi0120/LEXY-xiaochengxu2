@@ -205,6 +205,7 @@ const API = {
       const err = new Error(json.msg || '请求失败');
       err.code = json.code;
       err.httpStatus = res.status;
+      err.data = json.data; // 409 冲突时服务端会把「当前值」放在这里
       // 401：没登录 / 令牌过期 —— 清掉旧令牌并拉起登录框（不弹 toast，避免刷屏）
       if (json.code === 401) {
         if (AdminSession.token()) AdminSession.clear();
@@ -255,7 +256,14 @@ function openModal(opt) {
       (opt.footer === null ? '' : '<div class="modal-f">' + (opt.footer || '<button class="btn" data-close>关闭</button>') + '</div>') +
     '</div>';
   $('#layer').appendChild(mask);
-  const close = () => mask.remove();
+  /*
+   * 关闭守卫（审查 F19）：商品编辑是长表单，点一下遮罩就把几十个字段的输入清掉太贵。
+   * `opt.onClose` 返回 false 表示「还有未保存改动，先别关」；save 成功后调 `close(true)` 强制关。
+   */
+  const close = (force) => {
+    if (!force && typeof opt.onClose === 'function' && opt.onClose() === false) return;
+    mask.remove();
+  };
   mask.addEventListener('click', (e) => {
     if (e.target === mask || e.target.hasAttribute('data-close')) close();
   });
@@ -955,8 +963,16 @@ const App = {
   renderNav() {
     /* 未登录：除「登录」外一律置灰不可点。
      * 只是**提示**，不是权限 —— 真正的拦截在服务端（每个管理接口都要管理员令牌）。 */
-    const locked = !AdminSession.me();
-    $('#nav').innerHTML = NAV.map((n) => {
+    const me = AdminSession.me();
+    const locked = !me;
+    $('#nav').innerHTML = NAV
+      /*
+       * 已登录后**不再显示「登录」这一栏**（审查 F26）：
+       * 退出入口在顶栏（#btnWho），侧栏再留一个「登录」会让人以为当前没登录，
+       * 也会顺手把「系统」这组撑成三项。
+       */
+      .filter((n) => n.group || !(me && n.key === GATE_VIEW))
+      .map((n) => {
       if (n.group) return '<div class="nav-group">' + esc(n.group) + '</div>';
       const b = this.badges[n.key];
       const off = locked && n.key !== GATE_VIEW;
@@ -964,7 +980,7 @@ const App = {
         '" data-view="' + n.key + '"' + (off ? ' title="需要先登录管理员账号"' : '') + '>' +
         '<span class="ico">' + navIcon(n.ico) + '</span><span>' + esc(n.text) + '</span>' +
         (b ? '<span class="badge">' + b + '</span>' : '') + '</button>';
-    }).join('');
+      }).join('');
     $('#nav').querySelectorAll('[data-view]').forEach((el) => {
       el.addEventListener('click', () => this.go(el.getAttribute('data-view')));
     });
@@ -1042,15 +1058,22 @@ App.views.login = {
             '<span class="tip" data-err hidden></span>' +
           '</div></div>' +
 
-          '<div class="login-sep">或者：用长期令牌直接进入</div>' +
-          '<div class="form-row"><div class="lbl">长期令牌</div><div class="ctl">' +
-            '<input type="text" data-tk placeholder="粘贴 ADMIN_TOKENS 里的令牌" style="flex:1">' +
-            '<div class="tip">令牌的角色由服务端配置决定（只读 / 运营 / 超级管理员）。' +
-            '这是给系统对接用的通道，日常请用账号登录。</div>' +
-          '</div></div>' +
-          '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
-            '<button class="btn" data-login-tk>用令牌登录</button>' +
-          '</div></div>' +
+          /*
+           * 长期令牌收进「高级」折叠区（审查 F26）。
+           * 它和 `ADMIN_TOKENS` 这类环境变量说明是**运维 / 对接**视角的东西，
+           * 与运营日常要做的「输账号口令登录」并排摆着，只会让人不知道该填哪一栏。
+           * 账号 + 口令是默认路径，其余一律折叠。
+           */
+          '<details class="adv-box"><summary>高级：用长期令牌直接进入（系统对接用）</summary>' +
+            '<div class="form-row" style="margin-top:10px"><div class="lbl">长期令牌</div><div class="ctl">' +
+              '<input type="text" data-tk placeholder="粘贴 ADMIN_TOKENS 里的令牌" style="flex:1">' +
+              '<div class="tip">令牌的角色由服务端配置决定（只读 / 运营 / 超级管理员）。' +
+              '这是给系统对接用的通道，日常请用上面的账号登录。</div>' +
+            '</div></div>' +
+            '<div class="form-row"><div class="lbl"></div><div class="ctl">' +
+              '<button class="btn" data-login-tk>用令牌登录</button>' +
+            '</div></div>' +
+          '</details>' +
         '</div>' +
       '</div>';
 
@@ -1345,8 +1368,25 @@ App.views.settings = {
     const row = (label, tip, input) =>
       '<div class="form-row"><div class="lbl">' + esc(label) + '</div><div class="ctl">' + input +
       (tip ? '<div class="tip">' + tip + '</div>' : '') + '</div></div>';
-    /* 服务参数三行共用同一说明 —— 逐行写「同上」等于没写（运营要往上翻才知道「上」是什么） */
-    const SERVER_SAVED = '保存在服务端 catalog.json，供客服与后续接口读取；<b>不会</b>自动出现在小程序页面上';
+    /*
+     * 服务参数三行共用同一说明 —— 逐行写「同上」等于没写（运营要往上翻才知道「上」是什么）。
+     *
+     * ⚠️ 这行文案曾经**与代码事实相反**（审查 F20）：旧版写的是「不会自动出现在小程序页面上」，
+     *    但「关于我们」页（packageUser/about）本来就 GET /api/shop/settings 把
+     *    客服电话 / 客服时间 / 店铺公告渲染出来了，拨号按钮也读的是这个号码。
+     *    运营照着说明以为改了不管用，于是跑去装修台另找入口 —— 说明骗人比不写更糟。
+     *    现在逐字段写清「谁读它、什么时候生效」。
+     */
+    const SERVER_SAVED = '保存后<b>立即生效</b>：小程序「关于我们」页与拨号入口每次打开都实时读取（无需生成代码）';
+    /*
+     * 逐字段说清「谁读它 / 在哪生效」（审查 F20）：
+     * 三行共用一句「保存后立即生效」时，运营还是不知道改的那一项会出现在哪里 ——
+     * 尤其是公告：它只进「关于我们」，**不会**自动上首页，共用文案必然让人以为改了首页就会变。
+     */
+    const TIP_PHONE = SERVER_SAVED + '：展示在「关于我们」页，同时是「拨打商家电话」按钮拨出的号码';
+    const TIP_HOURS = SERVER_SAVED + '：展示在「关于我们」页客服电话下方；留空则不显示这一行';
+    const TIP_NOTICE = SERVER_SAVED + '：只显示在<b>「关于我们」页顶部</b>；' +
+      '要放到首页，需在装修台添加「公告」区块（那是布局改动，要「生成代码」+ 上传发布新版本才生效）';
     const ro = (v) => '<span class="ro">' + (v ? esc(v) : '—') + '</span>';
     /** 图片地址是相对路径，这里拼成本机可预览的绝对地址（不是线上地址） */
     const imgUrl = (p) => (p ? (/^https?:/.test(p) ? p : location.origin + p) : '');
@@ -1398,9 +1438,9 @@ App.views.settings = {
       '<div class="grid c2">' +
         '<div class="card"><div class="card-h"><h2>服务参数</h2><div class="grow"></div>' +
           '<span class="hint">存放于 server/data/catalog.json</span></div><div class="card-b">' +
-          row('客服电话', SERVER_SAVED, '<input type="text" style="flex:1" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
-          row('客服时间', SERVER_SAVED, '<input type="text" style="flex:1" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
-          row('店铺公告', SERVER_SAVED + '；要展示在小程序页面上，请在装修台添加「公告」区块', '<input type="text" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
+          row('客服电话', TIP_PHONE, '<input type="text" style="flex:1" data-k="servicePhone" value="' + esc(s.servicePhone) + '">') +
+          row('客服时间', TIP_HOURS, '<input type="text" style="flex:1" data-k="serviceHours" value="' + esc(s.serviceHours) + '">') +
+          row('店铺公告', TIP_NOTICE, '<input type="text" style="flex:1" data-k="notice" value="' + esc(s.notice) + '">') +
         '</div></div>' +
 
         '<div class="card"><div class="card-h"><h2>交易设置</h2><div class="grow"></div>' +
@@ -1423,9 +1463,17 @@ App.views.settings = {
         '<span class="stat">分类<b>' + d.categoryCount + '</b></span>' +
         '<span class="stat">券模板<b>' + d.couponCount + '</b></span>' +
         '<span class="grow"></span>' +
-        '<span class="hint" title="商品 / 分类走接口，保存后商品列表页与商品详情页立即读到新值；' +
-          '但首页与自定义页里的「商品」区块读的是装修快照（replica.js），需要重新生成代码并发布小程序版本才会变。">' +
-          '存于 server/data/catalog.json · 装修区块读的是快照，改商品后需重新生成代码</span>' +
+        /*
+         * ⚠️ 旧文案「装修区块读的是快照，改商品后需重新生成代码」是**错的**（审查 F20）：
+         *    首页 / 自定义页里的「商品」「店铺榜单」「商品分组」区块都是**运行时打接口**取数
+         *    （miniprogram/utils/blocks.js 的 loadGoodsData），改价改库存保存后用户端立刻看到。
+         *    真正需要「生成代码」的只有**装修布局本身**（区块的排列、图片区块里那张广告图、
+         *    以及烘进 replica.js 的静态区块）—— 三者必须分开说，一句话概括必然说错。
+         */
+        '<span class="hint" title="① 商品资料 / 价格 / 库存：走接口，保存后用户端立即生效；' +
+          '② 装修布局（区块增删与排序）：要「生成代码」+ 上传发布新版本；' +
+          '③ 图片区块里的广告图与图中价格：是素材，只能在装修台换图。">' +
+          '存于 server/data/catalog.json · 商品数据实时生效；只有装修布局才需要「生成代码」</span>' +
       '</div></div>' +
 
       '<div class="btn-group"><button class="btn primary" data-save>保存设置</button>' +

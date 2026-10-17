@@ -72,7 +72,7 @@ node server/index.js
 - 购物车、分类、自定义页面（活动落地页 / 投放页）
 - 首页 / 自定义页 / 我的 共用一套「区块流」渲染（`miniprogram/utils/blocks.js`，59 种区块类型，全量对标有赞组件库）
 
-**后端（85 个点位）**
+**后端（110 个业务点位 + 2 个运维点位，实际数量以 `GET /api/health` 的 `routes` 为准）**
 
 | 分组 | 说明 |
 |---|---|
@@ -83,7 +83,7 @@ node server/index.js
 | 支付 | 回调 / 查询 / 模拟支付 |
 | 用户资产 | 地址、优惠券、收藏、足迹 |
 | 店铺装修 | 页面列表 / 组件库 / 详情 / 草稿 / 变更 / 发布 / 回滚 / 统计 / 模板 / 新建·改名·删除自定义页 |
-| 素材库 | 上传 / 列表 / 删除（含魔数校验、引用检查） |
+| 素材库 | 上传 / 列表 / 删除（魔数校验 + 引用检查）/ **回收站**（恢复 · 彻底清除 · 到期清理）/ **重复治理**（重复分组 · 哈希扫描 · 合并引用） |
 | 后台控制台 | 28 个运营管理点位 |
 | 运维 | 健康检查、点位清单 |
 
@@ -108,9 +108,56 @@ node server/index.js
 | `WX_MCH_ID` / `WX_PAY_KEY` | 微信支付商户号 / 密钥 | 未配时支付走沙箱参数 |
 | `ALLOW_MOCK_PAY` | 是否开放模拟支付点位 | 非 production 且未配商户号时开启 |
 | `DEBUG_PAGE` | 管理后台总开关（3 个页面 + 3 类管理接口一起开关） | 非 production 开、production 关 |
+| `ADMIN_PAGE` | 运营后台页面与接口开关（与 `DEBUG_PAGE` 分开，避免「关了页面、接口还开着」） | 跟随 `DEBUG_PAGE` |
+| `ADMIN_PASSWORD` | 共享口令（登录即 owner） | 未设置时开发默认口令会打警告 |
+| `ADMIN_TOKENS` | 长期令牌（`token:角色`，逗号分隔） | 空 |
+| `TRUST_PROXY` | `1` 时才按 `X-Forwarded-For` 取来源 IP（否则只认 socket 地址，防伪造限流绕过） | 空 |
+| `WX_ALLOW_MOCK_LOGIN` | `NODE_ENV=production` 且未配 AppID 时，显式 `1` 才允许模拟登录（否则拒绝启动） | 空 |
+| `MALL_DATA_DIR` | 把运行时数据整体挪到别的目录（**回归测试专用**，见下方「回归自检」） | `server/data` |
 | `NODE_ENV` | 环境标识 | — |
 
 > 密钥类配置**只从环境变量读取**，代码与文档零明文。
+
+---
+
+## 回归自检
+
+三条命令，用途不同，**发布门槛是第一条**：
+
+| 命令 | 覆盖 | 说明 |
+|---|---|---|
+| `node server/tools/regress.mjs` | 语法门 + 鉴权 / 角色矩阵 + 素材生命周期（F17）+ 重复治理（F18） | **确定性非交易回归**：自带临时端口与临时数据目录（`MALL_DATA_DIR`），跑完核对 `server/data` 与 `replica.js` 指纹未变；加 `--full` 追加跑点位连通性 |
+| `node .tooling/test-admin-auth.mjs` | 管理端鉴权与角色 | 单独跑时用，已包含在上面那条里 |
+| `node server/tools/check-all.mjs` | 全量点位连通性 + 静态契约断言 | 需要 `3000` 端口已有服务在跑；跑在真实数据上，因此**不作为「未改动真实数据」的证明** |
+
+> 为什么不能只跑点位连通性：本轮最严重的几个缺陷（令牌原型键绕过、用户名重用提权、
+> 旧表单覆盖新库存）**都不是「接口不通」**，而是跨模块语义错误 —— 点位全绿也照样存在。
+> 所以 `regress.mjs` 把每个已修缺陷的复现转成了断言，并要求「真实数据指纹不变」。
+
+---
+
+## 备份与恢复演练
+
+要备份的只有 `server/data/` 一个目录（外加 `miniprogram/config/replica.js`，它由装修台生成）：
+
+| 内容 | 位置 | 说明 |
+|---|---|---|
+| 商品 / 订单 / 用户 / 运营参数 | `server/data/catalog.json`、`server/data/db.json` | 业务数据主体 |
+| 装修草稿与版本快照 | `server/data/decorate/state.json` | 回滚历史在里面 |
+| 已发布内容的历史版本 | `server/data/decorate/backup/replica.<ts>.js` | 发布自动生成，也是素材引用保护（F17）的依据 |
+| 素材 | `server/data/uploads/`（含 `index.json`） | 删素材先进 `server/data/uploads_trash/`，30 天后才清 |
+| 成员账号 | `server/data/admin/members.json` | 只有 scrypt 哈希，不含明文口令 |
+| 审计日志 | `server/data/audit/audit-<日期>.jsonl` | 按天滚动，保留 30 天 |
+
+**演练步骤（建议每季度一次，别只写「可以恢复」）**：
+
+1. 停服务 → `cp -a server/data /tmp/data-bak-<日期>` 与 `cp miniprogram/config/replica.js /tmp/`；
+2. 另起一份：`MALL_DATA_DIR=/tmp/drill node server/index.js`（**不碰生产目录**），用它验证备份能起来；
+3. 逐项核对：商品数（`GET /api/admin/goods/list`）、装修页面（`GET /api/decorate/pages`）、
+   成员（`GET /api/admin/members`）、素材（`GET /api/media/list` 与 `GET /api/media/trash`）；
+4. 装修回滚走 `POST /api/decorate/rollback`（版本快照在 `state.json` 里），
+   误删素材走 `POST /api/media/restore`（URL 不变，页面不用改）；
+5. 记录「恢复了什么、哪一项对不上」，演练结论写进交付记录 —— 没演练过的备份不算备份。
 
 ---
 
@@ -138,7 +185,7 @@ node server/index.js
 
 6. `JWT_SECRET`（生产未设置会拒绝启动）
 7. **管理员凭证 `ADMIN_PASSWORD`（或 `ADMIN_TOKENS`）**：`/api/admin/*` `/api/decorate/*` `/api/media/*`
-   共 49 个运营管理点位**已全部要求管理员令牌**，并按 `viewer` / `operator` / `owner` 三级角色细分
+   共 69 个运营管理点位**已全部要求管理员令牌**，并按 `viewer` / `operator` / `owner` 三级角色细分
    （删除与「生成代码」等不可逆动作收紧到 `owner`）。生产未配置任何管理员凭证时服务拒绝启动。
    `DEBUG_PAGE=off` 是另一道防线（页面与接口一起 403），**不能替代登录态**；网关层限来源仍建议保留
 8. 配置 `WX_APPID` / `WX_SECRET` / `WX_MCH_ID` / `WX_PAY_KEY`，补微信支付 v3 证书签名

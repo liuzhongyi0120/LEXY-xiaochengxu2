@@ -86,6 +86,20 @@ function detectEnv() {
   return p === 'devtools' ? 'local' : 'server';
 }
 
+/**
+ * 小程序版本：develop（开发版）/ trial（体验版）/ release（正式版）。
+ * 只有在小程序里才拿得到；Node 侧一律空串。
+ */
+function envVersionOf() {
+  if (typeof wx === 'undefined' || !wx.getAccountInfoSync) return '';
+  try {
+    const info = wx.getAccountInfoSync();
+    return ((info && info.miniProgram && info.miniProgram.envVersion) || '');
+  } catch (e) {
+    return '';
+  }
+}
+
 const ENV = ENV_OVERRIDE || detectEnv();
 
 const BASE_URL_MAP = {
@@ -95,6 +109,23 @@ const BASE_URL_MAP = {
   dev: 'https://dev-api.example.com',       // TODO 替换为开发环境域名
   prod: 'https://api.example.com'           // TODO 替换为生产域名（须已备案 + HTTPS）
 };
+
+/**
+ * 真机**开发版 / 体验版**要连的测试服务地址（审查 F16）。
+ *
+ * 旧逻辑只按 platform 分两档，真机（ios / android）**一律**连正式服务 ——
+ * 于是开发版、体验版真机调试会把测试数据、上传的图片、下的测试单
+ * 直接写进正式库，而运营完全不知情。
+ *
+ * 现在多判一层 `envVersion`：非 release 的真机应当连测试环境。
+ * ⚠️ 但**不能**在没有测试地址时把它指到 127.0.0.1（那在手机上是手机自己，必然全空），
+ *    也不能指到占位域名（等于把调试版弄成全挂）。所以留空时的行为是：
+ *    退回正式环境，并在控制台明确告警「开发版正在连正式环境」——
+ *    把隐患显式暴露出来，而不是悄悄保留旧行为。
+ *
+ * TODO 填上真实测试环境地址后，开发版/体验版真机会自动切过去。
+ */
+const DEV_BASE_URL = '';
 
 const BASE_URL = BASE_URL_MAP[ENV];
 const IS_MOCK = ENV === 'mock';
@@ -130,10 +161,36 @@ function envNow() {
 
 let baseUrlNowCache = null;
 
-/** 当下应使用的 BASE_URL（首次调用定下来，之后缓存；避免 resolveAssets 里逐条重算） */
+/**
+ * 当下应使用的 BASE_URL（首次调用定下来，之后缓存；避免 resolveAssets 里逐条重算）。
+ *
+ * 在 envNow() 之上再加一层「真机非 release → 测试环境」的判断（见 DEV_BASE_URL 说明）：
+ * 模拟器走 local，正式版真机走 server，开发版 / 体验版真机优先走测试地址。
+ */
 function baseUrlNow() {
-  if (baseUrlNowCache === null) baseUrlNowCache = BASE_URL_MAP[envNow()];
-  return baseUrlNowCache;
+  if (baseUrlNowCache !== null) return baseUrlNowCache;
+  let url = BASE_URL_MAP[envNow()];
+  let warn = '';
+  if (!ENV_OVERRIDE && typeof wx !== 'undefined' && !isDevtoolsNow()) {
+    const ver = envVersionOf();
+    if (ver && ver !== 'release') {
+      if (DEV_BASE_URL) url = DEV_BASE_URL;
+      else warn = `当前是${ver === 'trial' ? '体验版' : '开发版'}，但未配置测试服务地址（DEV_BASE_URL），` +
+        '正连接正式环境：调试数据会写进正式库';
+    }
+  }
+  if (warn && typeof console !== 'undefined' && console.warn) console.warn('[constants] ' + warn);
+  baseUrlNowCache = url;
+  baseUrlNowWarnCache = warn;
+  return url;
+}
+
+let baseUrlNowWarnCache = '';
+
+/** 环境提示：开发版/体验版连正式环境时非空，页面可据此显示一条「非线上」提示 */
+function envWarning() {
+  if (baseUrlNowCache === null) baseUrlNow();
+  return baseUrlNowWarnCache;
 }
 
 /** 业务响应码，与服务端约定保持一致（见 server/lib/http.js 的 ERR） */
@@ -214,6 +271,7 @@ module.exports = {
      它是加载期的快照，加载期拿不到 platform 时会停在 'server'。见上方「惰性复查」。 */
   baseUrlNow,
   envNow,
+  envWarning,
   IS_MOCK,
   CODE,
   ORDER_STATUS,

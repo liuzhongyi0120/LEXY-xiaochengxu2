@@ -557,6 +557,157 @@ try {
   ok('成员表里**最后一个 owner** 删不掉（设计如此：不留「后台在跑但没人能登录」的状态）',
     code(r) !== 0 && /最后一个/.test(msg(r)), `code ${code(r)} ${msg(r)}`);
 
+  /* ============================ 7.6 审查 F01 / F02 / F04 回归 ============================
+   *
+   * 2026-10-17《商城全维度审查》复现出的三个问题，必须转成断言，
+   * 否则「改过了」只是口头结论，下次重构又会退回去：
+   *   F01（P0）：令牌表用普通对象 → `constructor` 这类**继承属性名**被当成有效令牌；
+   *   F02（P1）：JWT 只绑用户名 → 改名 / 删号重建后旧 viewer 令牌变成新 owner；
+   *   F04（P1）：改口令不能撤销既有会话 → 泄露的令牌在 TTL（12h）内继续可用。
+   *
+   * ⚠️ 必须排在第 8 节（爆破退避）之前：那一节会把共享口令那条桶打成限流，
+   *    本节的成员登录用的是**另一个桶**（IP + 账号），不受影响，
+   *    但 F01 那组用例要新起实例，早一点起更省时间。
+   */
+  section('7.6 F01 令牌继承属性绕过 / F02 用户名重用提权 / F04 改口令不撤会话');
+
+  /* —— F01-A：本机实例（已配置 3 条长期令牌）用继承属性名当令牌 —— */
+  const PROTO_KEYS = ['constructor', 'toString', 'valueOf', 'hasOwnProperty', '__proto__', 'isPrototypeOf'];
+  const protoBad = [];
+  for (const k of PROTO_KEYS) {
+    const x = await req(PORT, 'GET', '/api/admin/members', { token: k });
+    if (code(x) !== 401) protoBad.push(`${k}→HTTP${x.status}/code${code(x)}`);
+  }
+  ok(`F01 · 继承属性名当令牌一律 401（${PROTO_KEYS.length} 个：${PROTO_KEYS.slice(0, 3).join(' / ')} …）`,
+    protoBad.length === 0, protoBad.join('；'));
+
+  /* 真正要命的一半：这些"令牌"不只被认成身份，还被认成了 **owner** ——
+     所以必须单独验证它们过不了 owner 专属的成员保存。 */
+  const protoWrite = [];
+  for (const k of PROTO_KEYS) {
+    const x = await req(PORT, 'POST', '/api/admin/members/save', {
+      token: k, body: { username: 'proto_' + k.slice(0, 6), password: 'proto-pw-1234' }
+    });
+    if (code(x) !== 401) protoWrite.push(`${k}→code${code(x)}`);
+  }
+  ok('F01 · 继承属性名也**不能**执行 owner 专属的成员保存（旧实现里 role=undefined 会绕过等级比较）',
+    protoWrite.length === 0, protoWrite.join('；'));
+
+  /* —— F01-B：另起一个「一条长期令牌都没配」的实例 ——
+     原实现在**空令牌表**上同样中招（继承属性永远存在），这是报告里最狠的一条：
+     没配任何令牌的部署照样能被人拿 `constructor` 走进来。 */
+  const PORT_NOTOK = 3313;
+  const srvNoTok = startServer(PORT_NOTOK, { ADMIN_TOKENS: '' });
+  try {
+    const hNoTok = await waitHealth(PORT_NOTOK);
+    ok('F01 · 另起的「未配置长期令牌」实例已启动', !!hNoTok);
+    if (hNoTok) {
+      ok('F01 · 该实例自述长期令牌 0 条（确认这条路径真的是「空表」）',
+        hNoTok.adminAuth.tokens === 0, '实际 ' + hNoTok.adminAuth.tokens);
+      const bad2 = [];
+      for (const k of PROTO_KEYS) {
+        const x = await req(PORT_NOTOK, 'GET', '/api/admin/members', { token: k });
+        if (code(x) !== 401) bad2.push(`${k}→HTTP${x.status}/code${code(x)}`);
+      }
+      ok('F01 · **空令牌表**下继承属性名同样一律 401（没有长期令牌也不该有万能令牌）',
+        bad2.length === 0, bad2.join('；'));
+      const w2 = await req(PORT_NOTOK, 'POST', '/api/admin/members/save', {
+        token: 'constructor', body: { username: 'proto_ctor2', password: 'proto-pw-1234' }
+      });
+      ok('F01 · 空令牌表下 `constructor` 也建不了成员', code(w2) === 401, `code ${code(w2)}`);
+      const stillEmpty = await req(PORT_NOTOK, 'GET', '/api/admin/members', { token: ownerTok });
+      ok('F01 · 上面几次尝试一个成员都没建出来（锁「被拒」也锁「没落库」）',
+        ((stillEmpty.json && stillEmpty.json.data && stillEmpty.json.data.list) || []).length === 0,
+        JSON.stringify(((stillEmpty.json || {}).data || {}).list || []).slice(0, 120));
+    }
+  } finally {
+    srvNoTok.stop();
+  }
+
+  /* —— F02：改个名就能提权 —— */
+  const v2 = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'F02Viewer', name: '只读甲', role: 'viewer', password: 'f02-viewer-pw' }
+  });
+  ok('F02 · 建一个只读成员 → 成功', code(v2) === 0, `code ${code(v2)} ${msg(v2)}`);
+  const v2Id = ((v2.json || {}).data || {}).id;
+  const v2Login = await req(PORT, 'POST', '/api/admin/login', {
+    body: { username: 'f02viewer', password: 'f02-viewer-pw' }
+  });
+  ok('F02 · 该只读成员登录成功，角色回显 viewer',
+    code(v2Login) === 0 && (v2Login.json.data || {}).role === 'viewer',
+    JSON.stringify(v2Login.json && v2Login.json.data));
+  const v2Tok = (v2Login.json.data || {}).token || '';
+
+  const v2Rename = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { id: v2Id, username: 'F02Renamed' }
+  });
+  ok('F02 · 把它改名（腾出原用户名）→ 成功', code(v2Rename) === 0, `code ${code(v2Rename)} ${msg(v2Rename)}`);
+  const o2 = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'F02Viewer', name: '超管顶替', role: 'owner', password: 'f02-owner-pw' }
+  });
+  ok('F02 · 用**腾出来的同名**建一个 owner → 成功（这正是旧实现的提权入口）',
+    code(o2) === 0, `code ${code(o2)} ${msg(o2)}`);
+  const o2Id = ((o2.json || {}).data || {}).id;
+
+  const v2Session = await req(PORT, 'GET', '/api/admin/session', { token: v2Tok });
+  const v2Role = (v2Session.json && v2Session.json.data ? v2Session.json.data.role : null);
+  ok('F02 · 旧 viewer 令牌**没有**变成 owner（要么仍是 viewer，要么已失效 401）',
+    v2Role === 'viewer' || code(v2Session) === 401,
+    `HTTP ${v2Session.status} code ${code(v2Session)} role=${v2Role}`);
+  const v2Write = await req(PORT, 'POST', '/api/admin/settings/save', {
+    token: v2Tok, body: { notice: 'F02 提权尝试' }
+  });
+  ok('F02 · 旧 viewer 令牌执行 owner 操作（改店铺设置）→ 403（提权没成功）',
+    code(v2Write) === 403, `code ${code(v2Write)} ${msg(v2Write)}`);
+
+  const v2Del = await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: v2Id } });
+  ok('F02 · 删掉原只读成员 → 成功', code(v2Del) === 0, `code ${code(v2Del)} ${msg(v2Del)}`);
+  const v2AfterDel = await req(PORT, 'GET', '/api/admin/session', { token: v2Tok });
+  ok('F02 · 删号后旧令牌立刻 401（身份绑的是不可复用的成员 ID，不是用户名）',
+    code(v2AfterDel) === 401, `code ${code(v2AfterDel)} ${msg(v2AfterDel)}`);
+
+  /* —— F04：改口令必须能撤掉已签发的会话 —— */
+  const p4 = await req(PORT, 'POST', '/api/admin/members/save', {
+    token: ownerTok, body: { username: 'F04Oper', name: '运营乙', role: 'operator', password: 'f04-pw-old-01' }
+  });
+  ok('F04 · 建一个运营成员 → 成功', code(p4) === 0, `code ${code(p4)} ${msg(p4)}`);
+  const p4Id = ((p4.json || {}).data || {}).id;
+  const p4Login = await req(PORT, 'POST', '/api/admin/login', {
+    body: { username: 'f04oper', password: 'f04-pw-old-01' }
+  });
+  const p4Tok = ((p4Login.json || {}).data || {}).token || '';
+  const p4Before = await req(PORT, 'GET', '/api/admin/session', { token: p4Tok });
+  ok('F04 · 改口令前：该令牌可用（先证明它不是本来就无效）',
+    code(p4Before) === 0 && (p4Before.json.data || {}).source === 'member',
+    `code ${code(p4Before)} ${msg(p4Before)}`);
+
+  const p4Self = await req(PORT, 'POST', '/api/admin/me/password', {
+    token: p4Tok, body: { oldPassword: 'f04-pw-old-01', newPassword: 'f04-pw-new-02' }
+  });
+  ok('F04 · 成员自助改口令 → 成功', code(p4Self) === 0, `code ${code(p4Self)} ${msg(p4Self)}`);
+  const p4After = await req(PORT, 'GET', '/api/admin/session', { token: p4Tok });
+  ok('F04 · 改完口令，**改前签发的旧令牌立即 401**（否则改密码挡不住已泄露的会话）',
+    code(p4After) === 401, `code ${code(p4After)} ${msg(p4After)}`);
+  const p4Relogin = await req(PORT, 'POST', '/api/admin/login', {
+    body: { username: 'f04oper', password: 'f04-pw-new-02' }
+  });
+  ok('F04 · 新口令可以重新登录（只撤旧会话，不把人锁在外面）',
+    code(p4Relogin) === 0, `code ${code(p4Relogin)} ${msg(p4Relogin)}`);
+
+  /* owner 代重置口令也要撤会话 */
+  const p4Tok2 = ((p4Relogin.json || {}).data || {}).token || '';
+  const p4Reset = await req(PORT, 'POST', '/api/admin/members/password', {
+    token: ownerTok, body: { id: p4Id, password: 'f04-pw-reset-3' }
+  });
+  ok('F04 · owner 代重置口令 → 成功', code(p4Reset) === 0, `code ${code(p4Reset)} ${msg(p4Reset)}`);
+  const p4AfterReset = await req(PORT, 'GET', '/api/admin/session', { token: p4Tok2 });
+  ok('F04 · 被 owner 重置口令后，该成员的旧会话同样立即 401',
+    code(p4AfterReset) === 401, `code ${code(p4AfterReset)} ${msg(p4AfterReset)}`);
+
+  /* 收尾：清掉本节建的两个成员（owner 成员受「最后一个 owner」保护，删不掉也无妨） */
+  await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: p4Id } });
+  await req(PORT, 'POST', '/api/admin/members/delete', { token: ownerTok, body: { id: o2Id } });
+
   /* ============================ 8. 爆破退避 ============================ */
   section('8. 口令爆破退避（5 次 / 60 秒）');
 

@@ -19,7 +19,34 @@ const WX_SECRET = process.env.WX_SECRET || '';
 const WX_MCH_ID = process.env.WX_MCH_ID || '';
 const WX_PAY_KEY = process.env.WX_PAY_KEY || '';
 
+const IS_PROD = process.env.NODE_ENV === 'production';
+/*
+ * 模拟登录**必须显式开启**（审查 F10，P1）。
+ *
+ * 旧行为：只要 WX_APPID / WX_SECRET 不齐，code2Session 就把**任意非空 code**
+ * 映射成 mock_openid —— 不管是不是生产。于是漏配一次环境变量，线上的用户体系
+ * 就静默变成「谁拿一个字符串都能造一个账号」的模拟体系，而且从界面上完全看不出来。
+ *
+ * 现在：
+ *   · 生产默认**拒绝**模拟登录（直接启动失败），必须显式 WX_ALLOW_MOCK_LOGIN=1 才放行；
+ *   · 放行也只是让它能用，健康检查里始终标注当前是 mock，不会假装是真实登录。
+ */
+const ALLOW_MOCK_LOGIN = String(process.env.WX_ALLOW_MOCK_LOGIN || '') === '1';
 const HAS_WX_LOGIN = !!(WX_APPID && WX_SECRET);
+const MOCK_LOGIN_ON = !IS_PROD || ALLOW_MOCK_LOGIN;
+/** 登录模式：real（真实微信）/ mock（显式开启的模拟）/ disabled（生产缺配置，登录不可用） */
+const LOGIN_MODE = HAS_WX_LOGIN ? 'real' : (MOCK_LOGIN_ON ? 'mock' : 'disabled');
+
+/**
+ * 生产启动前必须通过的检查。
+ * @returns {string} 空串 = 可以启动；非空 = 拒绝启动的原因
+ */
+function loginStartupError() {
+  if (!IS_PROD) return '';
+  if (HAS_WX_LOGIN) return '';
+  if (ALLOW_MOCK_LOGIN) return '';
+  return 'NODE_ENV=production 但未配置 WX_APPID / WX_SECRET，且未显式开启模拟登录';
+}
 
 /**
  * 「真实支付可用」= 所有凭据齐备（见 lib/wxpay.js 的 HAS_V3）。
@@ -41,6 +68,13 @@ async function code2Session(code) {
   if (!code) throw new BizError('缺少登录凭证 code', ERR.PARAM);
 
   if (!HAS_WX_LOGIN) {
+    /*
+     * 生产环境缺配置 → **直接失败**，绝不退回模拟身份（F10）。
+     * 宁可让用户看到「登录服务暂不可用」，也不能让他用任意字符串登进别人的体系。
+     */
+    if (!MOCK_LOGIN_ON) {
+      throw new BizError('登录服务未正确配置，暂时无法登录（请联系商家）', ERR.BIZ, 503);
+    }
     // 本地模拟：同一个 code 稳定映射到同一个 openid，便于重复登录拿到同一账号
     const hash = crypto.createHash('md5').update(String(code)).digest('hex').slice(0, 16);
     return { openid: `mock_openid_${hash}`, sessionKey: `mock_session_${hash}`, mock: true };
@@ -70,6 +104,8 @@ async function code2Session(code) {
 async function getPhoneNumber(code, fallback = '') {
   if (!code) return fallback;
   if (!HAS_WX_LOGIN) {
+    /* 同 code2Session：生产缺配置时不编造手机号，直接失败 */
+    if (!MOCK_LOGIN_ON) throw new BizError('登录服务未正确配置，暂时无法获取手机号', ERR.BIZ, 503);
     // 本地模拟：由 code 派生一个稳定的演示手机号
     const hash = crypto.createHash('md5').update(String(code)).digest('hex');
     const tail = String(parseInt(hash.slice(0, 8), 16) % 100000000).padStart(8, '0');
@@ -171,6 +207,9 @@ module.exports = {
   queryPayment,
   HAS_WX_LOGIN,
   HAS_WX_PAY,
+  LOGIN_MODE,
+  ALLOW_MOCK_LOGIN,
+  loginStartupError,
   WX_APPID,
   WX_MCH_ID
 };

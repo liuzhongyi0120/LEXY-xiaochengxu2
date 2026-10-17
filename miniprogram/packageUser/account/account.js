@@ -22,6 +22,14 @@ Page({
   data: {
     loading: true,
     logged: false,
+    /*
+     * 加载失败 ≠ 未登录（审查 F25）。
+     * 旧实现对任何异常都设 logged:false，模板随即显示「登录后管理账号」——
+     * 断网、服务 500 也被当成「要重新登录」，用户会一遍遍去登录却始终进不去，
+     * 而且完全看不出其实是网络问题。现在单独开一个状态：失败时给「重试」。
+     */
+    loadFailed: false,
+    loadFailedMsg: '',
     avatar: '',
     /** 已保存的昵称（用于判断是否有改动） */
     nickname: '',
@@ -38,7 +46,7 @@ Page({
   },
 
   loadProfile() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadFailed: false, loadFailedMsg: '' });
     return fetchProfile()
       .then((p) => {
         const nickname = (p && p.nickname) || '';
@@ -56,8 +64,24 @@ Page({
       })
       .catch((err) => {
         console.error('[account] 资料加载失败', err);
-        this.setData({ loading: false, logged: false });
+        /*
+         * 只有「确实没授权 / 令牌失效」才把人送去登录。
+         * 公共 request 封装已经在 401 时打了 `needLogin` 标记（见 utils/request.js），
+         * 这里直接用它，不再把网络与服务端错误也归成「未登录」。
+         */
+        const needLogin = !!(err && err.needLogin);
+        this.setData({
+          loading: false,
+          logged: false,
+          loadFailed: !needLogin,
+          loadFailedMsg: needLogin ? '' : ((err && err.message) || '资料加载失败')
+        });
       });
+  },
+
+  onRetryLoad() {
+    if (this.data.loading) return;
+    this.loadProfile();
   },
 
   onGoLogin() {

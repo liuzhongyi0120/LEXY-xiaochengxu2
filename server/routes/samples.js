@@ -150,8 +150,36 @@ module.exports = {
     query: { q: '', folder: '', sort: 'new', page: 1, size: 24 }
   },
   'POST /api/media/delete': {
-    note: '删除素材。默认先做引用检查：被 replica.js 或草稿引用时返回引用处数并拒绝；确认要删再传 force=1',
+    note: '删除素材（**先进回收站**，不是立刻从盘上抹掉）。引用检查覆盖当前商品库 / 已发布 / 草稿 + 保留期 30 天内的历史发布版本（旧客户端与回滚仍在用）；被引用时返回 detail 清单（精确到「已发布·首页」「历史版本」）并拒绝，确认要删再传 force=1',
     body: { name: '{{mediaName}}', force: 0 }
+  },
+  'GET /api/media/trash': {
+    note: '回收站清单：进站时间、已几天、还剩几天可恢复、删除瞬间的引用快照。到期（30 天）后才允许彻底清除',
+    query: {}
+  },
+  'POST /api/media/restore': {
+    note: '从回收站恢复素材：URL 与删除前完全一致，页面 / 商品不用改。素材库里已有同名素材时拒绝（避免覆盖后来新传的那张）',
+    body: { name: '{{mediaName}}' }
+  },
+  'POST /api/media/purge': {
+    note: '彻底清除回收站里的一个素材（**不可恢复**，需 owner）。进回收站不满 30 天会被拒绝，确需立刻清除传 force=1',
+    body: { name: '{{mediaName}}', force: 0 }
+  },
+  'POST /api/media/trash/sweep': {
+    note: '清理回收站：只清「保留期已过且无引用」的条目，返回 purged / kept 两份清单并逐条给出依据（未到期几天 / 仍被哪几处引用 / 文件被占用）。force=1 跳过引用复查（仅限确知旧版本已全部下线时使用）',
+    body: { force: 0 }
+  },
+  'GET /api/media/duplicates': {
+    note: '重复素材分组（按**内容哈希**，不是文件名）：每组给出建议保留的一份（最早上传、引用最少改动）、副本清单与白占空间。unhashed>0 说明还有素材没算过哈希，先调 hash-scan 再查',
+    query: {}
+  },
+  'POST /api/media/hash-scan': {
+    note: '给缺哈希的存量素材补算内容哈希（分批）。limit 默认 120、上限 400；返回 remain 为 0 即全部扫完',
+    body: { limit: 200 }
+  },
+  'POST /api/media/merge': {
+    note: '合并重复副本：把 names 里的素材在商品库 / 已发布 / 草稿三处的引用全部改指到 keep，副本进回收站（可恢复，不是物理删除）。需 owner',
+    body: { keep: '{{mediaName}}', names: ['{{mediaName}}'] }
   },
   'POST /api/media/folder': {
     note: '素材文件夹管理（纯逻辑分类，不产生真实目录）。op=create 建（name）；op=rename 改名（from→to，里面的素材一起跟着改）；op=remove 删（name，只删分类、素材回到未分组，**不会删素材**）',
@@ -196,6 +224,10 @@ module.exports = {
   'POST /api/admin/members/delete': {
     note: '删除成员。⚠️ 最后一个启用中的超级管理员不可删除。需超级管理员',
     body: { id: '{{memberId}}' }
+  },
+  'GET /api/admin/audit': {
+    note: '后台审计日志（最近 N 条）：谁在什么时间对哪个对象做了什么、成功还是失败。只记管理侧**写操作**，口令 / 令牌等敏感值已脱敏；按天滚动保留 30 天（审查 F27）',
+    query: { limit: 50, action: '', actorId: '' }
   },
   'GET /api/admin/dashboard': {
     note: '数据概览。days 控制趋势天数（默认 7）。返回今日/昨日/近7日/近30日/累计 GMV 与订单数、待办（待发货 / 待付款 / 库存预警）、各状态计数、Top 商品、库存预警榜、最近订单',
@@ -396,8 +428,12 @@ module.exports = {
     note: '新建店铺笔记：只建后台条目，**先不写 replica.js**（装修完点「生成代码」才下发到小程序）。标题必填且 ≤40 字；返回体带派生地址 key=note-<id> 与真机 path=packageNews/note/note?id=<id>',
     body: { title: '莱克洗地机实测', summary: '一句话卖点', tags: '洗地机,吸尘器' }
   },
+  'GET /api/decorate/note/refs': {
+    note: '店铺笔记的站内引用清单：哪些页面 / 哪些区块用到的这篇笔记。删除前先看它——确认框里摊开的就是这份清单，避免删完留下空白入口（审查 F07）',
+    query: { key: '{{noteKey}}' }
+  },
   'POST /api/decorate/note/delete': {
-    note: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js。key 传**页面标识**（note-<id>，不是内部数字 id）；不存在报 404',
+    note: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js。key 传**页面标识**（note-<id>，不是内部数字 id）；不存在报 404。被引用时须带 force=1',
     body: { key: '{{noteKey}}' }
   },
 

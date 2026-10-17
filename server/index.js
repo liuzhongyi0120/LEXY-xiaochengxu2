@@ -18,12 +18,13 @@ const nodePath = require('node:path');
 const { URL } = require('node:url');
 
 const { parseBody, parseRawBody, parseQuery, ok, fail, preflight, send, isRawHttp,
-  BizError, ERR } = require('./lib/http');
+  requestId, BizError, ERR } = require('./lib/http');
 const authLib = require('./lib/auth');
 const adminAuth = require('./lib/adminAuth');
 const store = require('./lib/store');
 const router = require('./routes');
 const wechat = require('./lib/wechat');
+const audit = require('./lib/audit');
 const media = require('./lib/media');
 const flags = require('./lib/featureFlags');
 const navicon = require('./lib/navicon');
@@ -457,6 +458,38 @@ function log(...args) {
   console.log(`[${timestamp()}]`, ...args);
 }
 
+/* ------------------------------ 审计日志 ------------------------------ */
+
+/**
+ * 记一条后台审计（审查 F27）。
+ *
+ * 只记**管理侧的写操作**：读操作每天成百上千条，记下来只会把文件撑爆、
+ * 真正要找的那几条反而被埋掉。登录点位也不记（它本身没有「改了什么」）。
+ */
+function auditWrite(method, path, session, params, result, requestId) {
+  if (!session) return;                      // 非管理链路不记
+  if (String(method).toUpperCase() === 'GET') return;
+  if (String(path) === ADMIN_LOGIN_PATH) return;
+  const p = params || {};
+  /* 目标对象：各点位的主键字段名不一样，这里认最常见的几个；
+     取不到就留空 —— 有 actor + action + 结果也已经能回答「谁在什么时候做了什么」。 */
+  const target = String(p.id || p.key || p.name || p.names || p.goodsId || p.orderNo || '');
+  audit.record({
+    actorId: audit.actorIdOf(session),
+    actorName: session.name || session.username || '',
+    role: session.role || '',
+    action: `${method} ${path}`,
+    target: target.slice(0, 80),
+    result: result && result.ok === false ? 'fail' : 'ok',
+    code: result && result.code !== undefined ? result.code : null,
+    msg: (result && result.msg) || '',
+    /* 只留「改了哪些字段」的键名，不存值 —— 值里有价格、库存、富文本，
+       体积大且没必要（要查具体内容看版本快照 / 备份） */
+    detail: Object.keys(p).filter((k) => k !== 'password').slice(0, 12),
+    requestId: requestId || ''
+  });
+}
+
 const server = http.createServer(async (req, res) => {
   const started = Date.now();
   let u;
@@ -509,9 +542,16 @@ const server = http.createServer(async (req, res) => {
   if (isAdminApi && !ADMIN_PAGE) {
     return fail(res, '管理接口已关闭（设置 ADMIN_PAGE=1 可临时开启）', ERR.FORBIDDEN, 403);
   }
+  /*
+   * 管理员身份顺手存一份在请求作用域里（审查 F27）。
+   * 后面写审计日志要用它，而 guard() 只在这一处被调用 ——
+   * 不在这里留一份，就得再验一次令牌（多一次 JWT 校验）或到处传参。
+   */
+  let adminSession = null;
   if (isAdminApi && path !== ADMIN_LOGIN_PATH) {
     const gate = adminAuth.guard(req, method, path);
     if (!gate.ok) return fail(res, gate.msg, gate.code, gate.status);
+    adminSession = gate.session;
   }
 
   /* 健康检查 */
@@ -522,7 +562,9 @@ const server = http.createServer(async (req, res) => {
       time: Date.now(),
       uptime: Math.round(process.uptime()),
       routes: router.describe().length + 2, // 业务点位 + health / routes 两个运维点位
-      wechat: { login: wechat.HAS_WX_LOGIN ? 'real' : 'mock', pay: wechat.HAS_WX_PAY ? 'real' : 'mock' },
+      /* login 三种取值：real（真实微信登录）/ mock（显式开启的模拟）/ disabled（生产缺配置，登录不可用）。
+         旧版只有 real|mock 两种，看不出"生产漏配了环境变量"这种最该报警的状态（审查 F10）。 */
+      wechat: { login: wechat.LOGIN_MODE, pay: wechat.HAS_WX_PAY ? 'real' : 'mock' },
       jwtSecret: authLib.IS_DEFAULT_SECRET ? 'default(dev-only)' : 'custom',
       debugPage: DEBUG_PAGE ? 'on' : 'off',
       adminPage: ADMIN_PAGE ? 'on' : 'off',
@@ -554,6 +596,12 @@ const server = http.createServer(async (req, res) => {
     return fail(res, `接口不存在：${method} ${path}`, ERR.NOT_FOUND, 404);
   }
 
+  /*
+   * params 声明在 try 之外：catch 里的审计也要用它（记「谁请求了什么、失败在哪一步」）。
+   * 若声明在 try 内，catch 会因作用域不可见而抛 ReferenceError —— 一次普通业务失败
+   * 反而把进程打崩，属于「为排查问题引入的新问题」。
+   */
+  let params = {};
   try {
     const query = parseQuery(req.url);
     // raw 点位（文件上传）自己读原始流，不能用 JSON 解析器消耗掉
@@ -569,7 +617,7 @@ const server = http.createServer(async (req, res) => {
       // DELETE 允许把参数放 body（wx.request 的 DELETE 行为），也兼容 query
       deleteBody = method === 'DELETE' ? await parseBody(req) : {};
     }
-    const params = Object.assign({}, query, body, deleteBody);
+    params = Object.assign({}, query, body, deleteBody);
 
     /* 鉴权 */
     let userId = null;
@@ -585,8 +633,14 @@ const server = http.createServer(async (req, res) => {
       req,
       res,
       db: store.get(),
-      userId,
-      params,
+    userId,
+    /*
+     * 管理员会话也挂到 ctx 上（审查 F21 / F27）：
+     * 业务层要记「这份代码是谁生成的」时不必再验一次令牌，
+     * 也不必把 session 层层透传进 lib。非管理链路这里是 null，业务侧自行判空。
+     */
+    admin: adminSession,
+    params,
       query,
       body: Object.assign({}, body, deleteBody),
       rawBody
@@ -595,6 +649,7 @@ const server = http.createServer(async (req, res) => {
     const data = await route.handler(ctx);
     // 请求过程中可能产生数据变更（含惰性过期），统一提交
     store.commit();
+    auditWrite(method, path, adminSession, params, { ok: true }, requestId(res));
 
     /*
      * 自行掌控应答的点位（如微信支付回调）：
@@ -614,13 +669,19 @@ const server = http.createServer(async (req, res) => {
     // 业务异常：正常 HTTP 200 + 业务码，前端按 msg 提示
     if (err instanceof BizError) {
       store.commit();
-      fail(res, err.message, err.code, err.httpStatus);
+      /* 冲突类失败要把「服务端当前值」一并下发（409），前端才能摊开给运营看 */
+      fail(res, err.message, err.code, err.httpStatus, err.conflict || null);
       log(`${method} ${path} → 业务失败 ${err.code} ${err.message}`);
+      /* 失败也要记一笔：排查「谁在反复失败」「被谁挡住了」靠的就是它（F27） */
+      auditWrite(method, path, adminSession, params,
+        { ok: false, code: err.code, msg: err.message }, requestId(res));
       return;
     }
     // 未预期异常：打日志，对外不暴露堆栈
     console.error(`[error] ${method} ${path}`, err);
     fail(res, '服务开小差了，请稍后重试', ERR.SERVER, 500);
+    auditWrite(method, path, adminSession, params,
+      { ok: false, code: ERR.SERVER, msg: '服务端异常' }, requestId(res));
   }
 });
 
@@ -658,6 +719,22 @@ if (process.env.NODE_ENV === 'production' && ADMIN_PAGE && !adminAuth.configured
 if (process.env.NODE_ENV === 'production' && ADMIN_PAGE && adminAuth.usingDevPassword()) {
   console.error('[fatal] NODE_ENV=production 下不允许使用开发默认管理员口令，拒绝启动。');
   console.error('        请设置 ADMIN_PASSWORD。');
+  process.exit(1);
+}
+
+/*
+ * 生产环境：微信登录要么真的配好，要么**显式**声明在跑模拟（审查 F10）。
+ *
+ * 缺 WX_APPID/WX_SECRET 时旧代码会把任意 code 变成 mock_openid ——
+ * 一次环境变量漏配，线上用户体系就悄悄变成"谁都能造号"。
+ * 所以生产缺配置默认拒绝启动；真要在生产演示，必须自己写 WX_ALLOW_MOCK_LOGIN=1，
+ * 并且 health 里会一直标着 login=mock，赖不掉。
+ */
+const wxLoginErr = wechat.loginStartupError();
+if (wxLoginErr) {
+  console.error(`[fatal] ${wxLoginErr}，拒绝启动。`);
+  console.error('        请设置 WX_APPID 与 WX_SECRET（小程序后台 → 开发管理 → 开发设置）。');
+  console.error('        如确为演示环境且知情，可显式设置 WX_ALLOW_MOCK_LOGIN=1 放行模拟登录。');
   process.exit(1);
 }
 

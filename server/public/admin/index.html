@@ -78,6 +78,9 @@
       </label>
       <button class="btn" id="btnFilter">筛选</button>
       <button class="btn ghost" id="btnResetFilter">重置</button>
+      <!-- 开发信息（replica.HOME_BLOCKS 一类的源码字段名）默认收起（审查 F21）：
+           运营看的是「哪个页面、什么状态」，字段名只在他要跟开发对账时才有意义。 -->
+      <button class="btn ghost" id="btnDevInfo" title="显示 / 隐藏「数据来源」列（replica.js 里的字段名）">开发信息</button>
     </div>
     <button class="btn primary" id="btnCreatePage" title="新建一个自定义页面（发布后小程序端可访问）">+ 新建页面</button>
     <!-- 「+ 新建笔记」已搬到后台控制台的「店铺笔记」栏目（2026-10-15）。
@@ -93,7 +96,7 @@
         <tr>
           <th>页面名称 · 路径 · 内容量</th>
           <th style="width:178px">页面状态</th>
-          <th style="width:176px">数据来源</th>
+          <th style="width:176px" class="dev-col">数据来源</th>
           <th style="width:176px">备注</th>
           <!-- 操作列 320px：自定义页 4 个按钮（装修 / 丢弃草稿 / 改名 / 删除）
                内联需求约 236px + 左右内边距 28px = 264px，留 ~56px 余量。

@@ -19,6 +19,7 @@ const members = require('../lib/members');
 const catalog = require('../lib/catalog');
 const catalogStore = require('../lib/catalogStore');
 const decorate = require('../decorate/store');
+const audit = require('../lib/audit');
 const { BizError, ERR } = require('../lib/http');
 
 const T = '后台管理';
@@ -38,7 +39,9 @@ module.exports = [
        * 返回的角色必须**按实际登录方式回显**，不能写死 owner —— 成员账号登录后
        * 前端顶栏会照着它显示身份，写死会让「只读」成员一眼看着像超级管理员。 */
       const uname = String(ctx.params.username || '').trim();
-      const token = adminAuth.login(ctx.params.password, uname);
+      // 第三个参数传原始请求：登录限流按「来源 + 账号」分桶，
+      // 别人的错误尝试不会把正常来源的运营一起锁在外面（见 adminAuth 的 F05 说明）
+      const token = adminAuth.login(ctx.params.password, uname, ctx.req);
       const m = uname ? members.findByName(uname) : null;
       const role = m ? m.role : 'owner';
       return {
@@ -175,6 +178,23 @@ module.exports = [
     note: T,
     async handler(ctx) {
       return admin.dashboard(ctx.db, ctx.params);
+    }
+  },
+
+  /* --------------------------- 操作审计 --------------------------- */
+  {
+    method: 'GET',
+    path: '/api/admin/audit',
+    auth: false,
+    desc: '后台操作审计（审查 F27）：谁在什么时候改了什么，按时间倒序；只记管理侧写操作，口令/令牌已脱敏',
+    note: T,
+    async handler(ctx) {
+      const limit = Math.min(Number(ctx.params.limit) || 50, 200);
+      return audit.recent({
+        limit,
+        actorId: String(ctx.params.actorId || ''),
+        action: String(ctx.params.action || '')
+      });
     }
   },
 

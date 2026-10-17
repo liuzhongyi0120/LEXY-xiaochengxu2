@@ -101,6 +101,8 @@ code { font-family: Consolas, Monaco, "Courier New", monospace; background: var(
 .btn.danger { color: var(--danger); border-color: #f5c2c0; }
 .btn.danger:hover { background: #fdf0ef; }
 .btn.sm { height: 26px; padding: 0 10px; font-size: 12px; }
+/* 「开发信息」开关的选中态：不给反馈的话，点了不知道这一列是开了还是关了 */
+.btn.on { border-color: var(--blue-border); background: #eaf2ff; color: var(--blue); }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn:disabled:hover { border-color: var(--line); color: var(--ink-2); }
 

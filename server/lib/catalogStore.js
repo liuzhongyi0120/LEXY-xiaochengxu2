@@ -139,9 +139,27 @@ function markDirty() {
   }, 50);
 }
 
+/**
+ * **同步落盘**（审查 F11）。
+ *
+ * `commit()` 是「标记一下、50ms 后写」：调用方**先收到成功响应**，写盘在此之后。
+ * 万一写盘失败（磁盘满 / 权限被改 / 文件被占用），只有一行日志 ——
+ * 运营看到「已保存」，实际内存与磁盘已经分叉，下次重启改动就消失了。
+ *
+ * 后台的低频重要写入（商品资料、库存、分类、店铺设置）一律走这里：
+ * 写盘成功才返回成功，失败就让请求失败，绝不给出假的成功。
+ * 高频写（购物车、足迹）仍走 commit()，不受影响。
+ */
+function commitSync() {
+  load();
+  if (timer) { clearTimeout(timer); timer = null; }
+  flush(true);
+}
+
 module.exports = {
   get: () => load(),
   commit: () => { load(); markDirty(); },
+  commitSync,
   flushNow: () => {
     if (timer) { clearTimeout(timer); timer = null; }
     if (cache) flush(true);

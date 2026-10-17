@@ -96,7 +96,11 @@ App.views.goods = {
             '</div></div></td>' +
           '<td class="sub">' + esc(catName(g.categoryId)) + '</td>' +
           '<td class="num money">' + (g.priceMax && g.priceMax !== g.price ? money(g.price) + '~' + fen2yuan(g.priceMax) : money(g.price)) + '</td>' +
-          '<td class="num">' + (g.stock <= 10 ? '<span class="tag warn">' + g.stock + '</span>' : g.stock) + '</td>' +
+          /* 库存红点要**自己说明含义**（审查 F26）：光一个颜色，
+             新来的运营不知道「标红」是「≤10 件预警」还是「缺货」「刚改过」。 */
+          '<td class="num">' + (g.stock <= 10
+            ? '<span class="tag warn" title="库存 ≤ 10 件，属于库存预警（可用上方「仅看库存预警」筛选）">' + g.stock + '</span>'
+            : g.stock) + '</td>' +
           '<td class="num sub">' + g.sales + '</td>' +
           '<td>' + (g.status === 'on_sale' ? '<span class="tag on">在售</span>' : '<span class="tag off">已下架</span>') + '</td>' +
           '<td class="nowrap">' +
@@ -119,9 +123,27 @@ App.views.goods = {
 
     /* --- 勾选 --- */
     const checked = () => Array.from(body.querySelectorAll('[data-ck]:checked')).map((el) => el.getAttribute('data-ck'));
+    /*
+     * 批量按钮随勾选状态启用 / 禁用（审查 F26）。
+     * 「点了没反应、只弹一句『请先勾选商品』」属于事后纠错；
+     * 按钮点不动是**事前**说清楚，而且一眼能看出「这个动作需要先选东西」。
+     */
+    const syncBatch = () => {
+      const n = checked().length;
+      ['up', 'down'].forEach((k) => {
+        const b = body.querySelector('[data-' + k + ']');
+        if (!b) return;
+        b.disabled = n === 0;
+        b.title = n ? ('对已勾选的 ' + n + ' 个商品执行') : '先勾选商品才能批量操作';
+      });
+    };
+    body.addEventListener('change', (e) => {
+      if (e.target.hasAttribute && (e.target.hasAttribute('data-ck') || e.target.hasAttribute('data-all'))) syncBatch();
+    });
     body.querySelector('[data-all]').addEventListener('change', (e) => {
       body.querySelectorAll('[data-ck]').forEach((el) => { el.checked = e.target.checked; });
     });
+    syncBatch();
 
     const batchStatus = async (status) => {
       const ids = checked();
@@ -185,6 +207,14 @@ App.views.goods = {
     });
   },
 
+  /** 商品编辑弹窗的四个分区（审查 F19：长表单分区导航，改库存不用一路滚到底） */
+  SEC_TABS: [
+    { k: 'base', t: '基本信息' },
+    { k: 'media', t: '图片与详情' },
+    { k: 'sku', t: '规格 / 库存' },
+    { k: 'show', t: '展示状态' }
+  ],
+
   /** 新建 / 编辑商品 */
   async openEditor(id) {
     const d = await API.get('/api/admin/goods/detail', id ? { id } : {});
@@ -197,36 +227,87 @@ App.views.goods = {
     let images = (g.images || []).slice();
     let detailImages = (g.detailImages || []).slice();
     let cover = g.cover || '';
+    /* 打开时的版本号：保存时带回服务端做乐观锁，被别人改过就报冲突而不是静默覆盖 */
+    let revAtOpen = g.rev === undefined ? null : Number(g.rev);
+    /* 未保存保护（审查 F19）：表单有任何输入就标记为脏，关窗前拦一次 */
+    let dirty = false;
+    /*
+     * 库存是否被本次编辑动过。
+     *
+     * 长表单里 SKU 表格一直带着库存列，如果每次保存都把它回传，
+     * 那「A 打开（库存 167）→ B 改成 174 → A 只改副标题保存」就会把 174 打回 167。
+     * 所以只有运营真的动过库存输入框，才把库存一起提交（审查 F08）。
+     */
+    let stockDirty = !id; // 新建商品没有并发对象，库存照常写入
+    /*
+     * 新建幂等键（审查 F19）：打开表单时就定好，之后每次点保存都带同一个。
+     * 前端按钮禁用挡不住「请求还在路上时又点了一次 / 重开表单再保存」，
+     * 服务端凭这个 key 认出是同一件商品，重复提交直接返回已建好的那件，
+     * 而不是再建一件一模一样的。
+     */
+    const clientKey = id ? '' : 'ck_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 
     const m = openModal({
       title: id ? '编辑商品 · ' + g.name : '新建商品',
       width: 'wide',
+      onClose: () => {
+        if (!dirty) return true;
+        /* 有未保存改动：问一句再关，别让几十个字段白填 */
+        confirmBox('当前修改还没保存，确定要关闭吗？关闭后这些内容会丢失。', '放弃修改')
+          .then((yes) => { if (yes) { dirty = false; m.close(true); } });
+        return false;
+      },
+      /*
+       * 分区导航（审查 F19）。
+       * 这个表单有 十几 个字段 + 图片区 + SKU 表格，一屏放不下：
+       * 以前改库存要一路滚到底，改完再滚回去核对名称，来回几次很容易漏保存某一处。
+       * 分成四段并在顶部给出跳转：基本信息 / 图片与详情 / 规格与库存 / 展示状态。
+       * 底部保存区保持固定（这是原实现合理的部分，不动）。
+       */
       html:
-        '<div class="form-row"><div class="lbl">商品名称</div><div class="ctl"><input type="text" style="flex:1" data-f="name" value="' + esc(g.name) + '" placeholder="必填，例如：莱克立式吸尘器 · 轻量长续航系列"></div></div>' +
-        '<div class="form-row"><div class="lbl">副标题</div><div class="ctl"><input type="text" style="flex:1" data-f="subtitle" value="' + esc(g.subtitle || '') + '" placeholder="卖点一句话，列表页展示"></div></div>' +
-        '<div class="form-row"><div class="lbl">分类</div><div class="ctl">' +
-          '<select data-f="categoryId">' + optionsHtml(categoryOptions(cats, false), g.categoryId) + '</select>' +
-          '<select data-f="status"><option value="on_sale"' + (g.status !== 'off_sale' ? ' selected' : '') + '>上架销售</option><option value="off_sale"' + (g.status === 'off_sale' ? ' selected' : '') + '>暂不上架</option></select>' +
-          '<span class="tip">分类在「分类管理」里维护</span></div></div>' +
-        '<div class="form-row"><div class="lbl">卖点标签</div><div class="ctl"><input type="text" style="flex:1" data-f="tags" value="' + esc((g.tags || []).join(',')) + '" placeholder="逗号分隔，如：新品,热销（最多 6 个）"></div></div>' +
+        '<div class="sec-nav">' +
+          this.SEC_TABS.map((s) => '<button class="sec-t' + (s.k === 'base' ? ' on' : '') + '" data-sec="' + s.k + '">' + s.t + '</button>').join('') +
+        '</div>' +
 
-        '<div class="form-row"><div class="lbl">商品主图</div><div class="ctl"><div class="img-list" data-cover></div>' +
-          '<span class="tip">列表与详情页的第一张图，建议 1:1 或 4:3</span></div></div>' +
-        '<div class="form-row"><div class="lbl">商品图集</div><div class="ctl"><div class="img-list" data-images></div>' +
-          '<span class="tip">最多 12 张，第一张默认作为主图；支持拖拽/粘贴上传</span></div></div>' +
+        '<div class="sec" id="sec-base">' +
+          '<div class="sec-h">基本信息</div>' +
+          '<div class="form-row"><div class="lbl">商品名称</div><div class="ctl"><input type="text" style="flex:1" data-f="name" value="' + esc(g.name) + '" placeholder="必填，例如：莱克立式吸尘器 · 轻量长续航系列"></div></div>' +
+          '<div class="form-row"><div class="lbl">副标题</div><div class="ctl"><input type="text" style="flex:1" data-f="subtitle" value="' + esc(g.subtitle || '') + '" placeholder="卖点一句话，列表页展示"></div></div>' +
+          '<div class="form-row"><div class="lbl">分类</div><div class="ctl">' +
+            '<select data-f="categoryId">' + optionsHtml(categoryOptions(cats, false), g.categoryId) + '</select>' +
+            '<span class="tip">分类在「分类管理」里维护</span></div></div>' +
+        '</div>' +
 
-        '<div class="form-row"><div class="lbl">详情长图</div><div class="ctl"><div class="img-list" data-detailimgs></div>' +
-          '<span class="tip">最多 20 张，按顺序拼在详情页「商品详情」区（建议 750 宽长图）；留空则显示默认占位内容</span></div></div>' +
+        '<div class="sec" id="sec-media">' +
+          '<div class="sec-h">图片与详情</div>' +
+          '<div class="form-row"><div class="lbl">商品主图</div><div class="ctl"><div class="img-list" data-cover></div>' +
+            '<span class="tip">列表与详情页的第一张图，建议 1:1 或 4:3</span></div></div>' +
+          '<div class="form-row"><div class="lbl">商品图集</div><div class="ctl"><div class="img-list" data-images></div>' +
+            '<span class="tip">最多 12 张，第一张默认作为主图；支持拖拽/粘贴上传</span></div></div>' +
+          '<div class="form-row"><div class="lbl">详情长图</div><div class="ctl"><div class="img-list" data-detailimgs></div>' +
+            '<span class="tip">最多 20 张，按顺序拼在详情页「商品详情」区（建议 750 宽长图）；留空则显示默认占位内容</span></div></div>' +
+          '<div class="form-row"><div class="lbl">图文描述</div><div class="ctl"><textarea rows="3" style="flex:1" data-f="description" placeholder="商品卖点描述">' + esc(g.description || '') + '</textarea></div></div>' +
+        '</div>' +
 
-        '<div class="form-row"><div class="lbl">图文描述</div><div class="ctl"><textarea rows="3" style="flex:1" data-f="description" placeholder="商品卖点描述">' + esc(g.description || '') + '</textarea></div></div>' +
+        '<div class="sec" id="sec-sku">' +
+          '<div class="sec-h">规格 / 库存</div>' +
+          '<div class="form-row"><div class="lbl">规格 / 库存</div><div class="ctl" style="display:block">' +
+            '<table class="sku-tb"><thead><tr>' +
+              '<th style="width:34%">规格（逗号分隔）</th><th style="width:19%">售价(元)</th><th style="width:19%">划线价(元)</th><th style="width:15%">库存</th><th style="width:13%"></th>' +
+            '</tr></thead><tbody data-skus></tbody></table>' +
+            '<div class="btn-group" style="margin-top:8px"><button class="btn sm" data-addsku>+ 添加规格</button>' +
+            '<span class="sub" style="align-self:center">单规格商品只保留一行，规格留空即可</span></div>' +
+            '<div class="sub" style="margin-top:6px">库存只在<b>你改过这一列</b>时才提交：别人同时改的库存不会被你这次保存打回去。</div>' +
+          '</div></div>' +
+        '</div>' +
 
-        '<div class="form-row"><div class="lbl">规格 / 库存</div><div class="ctl" style="display:block">' +
-          '<table class="sku-tb"><thead><tr>' +
-            '<th style="width:34%">规格（逗号分隔）</th><th style="width:19%">售价(元)</th><th style="width:19%">划线价(元)</th><th style="width:15%">库存</th><th style="width:13%"></th>' +
-          '</tr></thead><tbody data-skus></tbody></table>' +
-          '<div class="btn-group" style="margin-top:8px"><button class="btn sm" data-addsku>+ 添加规格</button>' +
-          '<span class="sub" style="align-self:center">单规格商品只保留一行，规格留空即可</span></div>' +
-        '</div></div>',
+        '<div class="sec" id="sec-show">' +
+          '<div class="sec-h">展示状态</div>' +
+          '<div class="form-row"><div class="lbl">上架状态</div><div class="ctl">' +
+            '<select data-f="status"><option value="on_sale"' + (g.status !== 'off_sale' ? ' selected' : '') + '>上架销售</option><option value="off_sale"' + (g.status === 'off_sale' ? ' selected' : '') + '>暂不上架</option></select>' +
+            '<span class="tip">下架后小程序端不再展示，历史订单不受影响</span></div></div>' +
+          '<div class="form-row"><div class="lbl">卖点标签</div><div class="ctl"><input type="text" style="flex:1" data-f="tags" value="' + esc((g.tags || []).join(',')) + '" placeholder="逗号分隔，如：新品,热销（最多 6 个）"></div></div>' +
+        '</div>',
 
       footer: '<span class="grow sub">保存后小程序端立即生效（商品接口直接读这份数据）</span>' +
         '<button class="btn" data-close>取消</button><button class="btn primary" data-save>保存商品</button>'
@@ -284,10 +365,11 @@ App.views.goods = {
           '<td><button class="btn text sm red" data-delsku="' + i + '">删</button></td>' +
         '</tr>').join('');
       root.querySelectorAll('[data-sk]').forEach((el) => el.addEventListener('input', () => {
+        dirty = true;
         const i = Number(el.getAttribute('data-i'));
         const k = el.getAttribute('data-sk');
         if (k === 'specs') skus[i].specs = el.value.split(/[/,，、]/).map((x) => x.trim()).filter(Boolean);
-        else if (k === 'stock') skus[i].stock = Number(el.value || 0);
+        else if (k === 'stock') { skus[i].stock = Number(el.value || 0); stockDirty = true; }
         else skus[i][k] = Math.round(Number(el.value || 0) * 100);
       }));
       root.querySelectorAll('[data-delsku]').forEach((b) => b.addEventListener('click', () => {
@@ -304,10 +386,32 @@ App.views.goods = {
 
     renderCover(); renderImages(); renderDetailImages(); renderSkus();
 
+    /* 主表单任一处输入都算「有改动」—— 长表单误关一次代价太大。
+       顺手把这一处的「校验失败标红」清掉：改了就别再红着。 */
+    root.addEventListener('input', (e) => {
+      if (e.target && e.target.hasAttribute && e.target.hasAttribute('data-f')) {
+        dirty = true;
+        e.target.classList.remove('invalid');
+      }
+    });
+
+    /* ---- 分区导航（审查 F19）：点标签跳到对应段落并高亮 ---- */
+    const setSec = (k) => {
+      root.querySelectorAll('[data-sec]').forEach((b) => b.classList.toggle('on', b.getAttribute('data-sec') === k));
+      const el = root.querySelector('#sec-' + k);
+      if (el) el.scrollIntoView({ block: 'start' });
+    };
+    root.querySelectorAll('[data-sec]').forEach((b) => {
+      b.addEventListener('click', () => setSec(b.getAttribute('data-sec')));
+    });
+
     root.querySelector('[data-save]').addEventListener('click', async () => {
       const f = (k) => { const el = root.querySelector('[data-f="' + k + '"]'); return el ? el.value : ''; };
       const payload = {
         id: g.id || undefined,
+        clientKey: clientKey || undefined,
+        rev: revAtOpen === null ? undefined : revAtOpen,
+        withStock: stockDirty ? true : false,
         name: f('name').trim(),
         subtitle: f('subtitle').trim(),
         categoryId: f('categoryId'),
@@ -321,15 +425,58 @@ App.views.goods = {
            这里不再原样回传，避免出现「只有抓取来的存量商品有、新商品没有」的字段 */
         skus: skus.map((s) => ({ skuId: s.skuId, specs: s.specs, price: s.price, originalPrice: s.originalPrice, stock: s.stock }))
       };
-      if (!payload.name) return toast('请填写商品名称', true);
-      if (!payload.categoryId) return toast('请选择商品分类', true);
+      /*
+       * 校验失败要「定位」而不只是弹一句提示（审查 F19）：
+       * 表单已经分区、可以很长，一句「请填写商品名称」落在屏幕底部，
+       * 而出错的字段在顶部 —— 运营得自己找。这里滚到该字段、聚焦并标红。
+       * 输入内容全部保留（不重绘表单），改完直接再点保存。
+       */
+      const markError = (key, msg) => {
+        const el = root.querySelector('[data-f="' + key + '"]');
+        const sec = el ? el.closest('.sec') : null;
+        if (sec) setSec(sec.id.replace('sec-', ''));
+        if (el) {
+          el.classList.add('invalid');
+          el.scrollIntoView({ block: 'center' });
+          el.focus();
+        }
+        toast(msg, true);
+      };
+      if (!payload.name) return markError('name', '请填写商品名称');
+      if (!payload.categoryId) return markError('categoryId', '请选择商品分类');
+      const btn = root.querySelector('[data-save]');
       try {
+        /* 提交防重（审查 F19）：长表单里连点两下就会发两个创建请求，建成两件商品 */
+        if (btn.disabled) return;
+        btn.disabled = true;
+        btn.textContent = '保存中…';
         const r = await API.post('/api/admin/goods/save', payload);
-        m.close();
+        dirty = false; // 已保存，离开保护解除
+        m.close(true);
         toast(r.isNew ? '商品已创建' : '商品已保存');
         App.refreshBadges();
         App.render();
-      } catch (e) { toast(e.message, true); }
+      } catch (e) {
+        if (e.code === 409 && e.data && e.data.latest) {
+          /*
+           * 版本冲突：不静默覆盖，也不让运营干瞪眼。
+           * 把服务端的当前值写回表单（含新的 rev），他改完再点保存即可 ——
+           * 输入内容不丢，也不用手动刷新整页。
+           */
+          const latest = e.data.latest;
+          skus = JSON.parse(JSON.stringify(latest.skus || []));
+          revAtOpen = Number(latest.rev || 0);
+          renderSkus();
+          stockDirty = false;
+          btn.disabled = false;
+          btn.textContent = '保存商品';
+          toast('这件商品已被别人改过，库存/资料已刷新为最新值，请确认后再保存', true);
+          return;
+        }
+        toast(e.message, true);
+      } finally {
+        if (btn && btn.textContent === '保存中…') { btn.disabled = false; btn.textContent = '保存商品'; }
+      }
     });
   }
 };
@@ -907,6 +1054,10 @@ const MEDIA_TRASH_ICO = '<svg viewBox="0 0 16 16" width="14" height="14" fill="n
   '<path d="M6.7 7.2v3.6M9.3 7.2v3.6"/></svg>';
 const MEDIA_PLAY_ICO = '<svg viewBox="0 0 16 16" width="9" height="9" fill="currentColor" aria-hidden="true">' +
   '<path d="M4.6 3.3 12.2 8l-7.6 4.7z"/></svg>';
+/** 恢复（回收站 → 素材库）：一个回转箭头，与「删除」的垃圾桶形状区分开，避免手滑点错 */
+const MEDIA_RESTORE_ICO = '<svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" ' +
+  'stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M3.2 8a4.8 4.8 0 1 0 1.5-3.5"/><path d="M3 2.9v2.6h2.6"/></svg>';
 
 /**
  * 素材库：左侧文件夹（**逻辑分类**）+ 右侧网格（点图放大预览、勾选圈多选、批量移动）
@@ -921,8 +1072,114 @@ const MEDIA_PLAY_ICO = '<svg viewBox="0 0 16 16" width="9" height="9" fill="curr
  *   ④ 文件夹只存在于索引里（不产生真实目录）—— 图片 URL 已写进 replica.js / catalog.json，
  *      挪动磁盘文件会让线上图直接裂掉。所以「删文件夹」也不删素材，只把素材退回未分组。
  */
+/**
+ * 回收站（审查 F17）
+ *
+ * 以前的「删除」= 从盘上抹掉，删错一张正在用的图就只能重传、重配页面。
+ * 现在删除只是把文件移出 uploads（URL 立刻 404，下架当场生效），
+ * 在回收站里留 30 天：可原样恢复（恢复后地址与原来完全一致，页面不用改），
+ * 到期且无人引用才允许清理 —— 清理时逐条说明「为什么清 / 为什么留」。
+ */
+async function renderMediaTrash(body, state) {
+  const t = await API.get('/api/media/trash');
+
+  const card = (it) => {
+    /* 信息行先拼好再进模板：卡片结构（.mt → .inf → .ft）要靠字符串位置对齐，
+       把长表达式塞进模板里会把 .meta 到 .ft 撑开，读起来也不成一个块 */
+    const bits = [it.sizeText, '删除于 ' + it.deletedAtText].filter(Boolean);
+    bits.push(it.expired ? '保留期已过，可彻底清除' : '<span class="warn">还剩 ' + it.daysLeft + ' 天可恢复</span>');
+    if (it.refsAtDelete) bits.push('删除时被 ' + it.refsAtDelete + ' 处引用');
+    const nm = it.orig || it.name;
+    return '<div class="media-it trash-it">' +
+      '<div class="mt"><span class="trash-ph">' + (it.kind === 'video' ? '视频' : '图片') + '</span></div>' +
+        '<div class="inf">' +
+          '<div class="nm" title="' + esc(nm) + '">' + esc(nm) + '</div>' +
+          '<div class="meta">' + bits.join(' · ') + '</div>' +
+        '</div>' +
+      '<div class="ft">' +
+        '<button data-restore="' + esc(it.name) + '" title="恢复到素材库（地址不变）" aria-label="恢复到素材库">' + MEDIA_RESTORE_ICO + '</button>' +
+        '<button data-purge="' + esc(it.name) + '" title="彻底清除（不可恢复）" aria-label="彻底清除（不可恢复）">' + MEDIA_TRASH_ICO + '</button>' +
+      '</div>' +
+    '</div>';
+  };
+
+  body.innerHTML =
+    '<div class="card-b media-wrap">' +
+      '<div class="media-side">' +
+        '<div class="media-side-h">文件夹</div>' +
+        '<div class="media-side-it" data-backlib><span class="nf">← 返回素材库</span></div>' +
+        '<div class="media-side-sep"></div>' +
+        '<div class="media-side-it on"><span class="nf">回收站</span><b>' + t.total + '</b></div>' +
+      '</div>' +
+      '<div class="media-main">' +
+        '<div class="filter media-bar">' +
+          '<span class="hint">删除的素材先到这里，保留 <b>' + t.keepDays + '</b> 天：期间可原样恢复（地址不变，页面与商品不用改）；到期后才会被清理，且仍被引用的一律保留。</span>' +
+          '<div class="grow"></div>' +
+          '<button class="btn sm" data-sweep>清理到期且无引用的</button>' +
+        '</div>' +
+        '<div class="media-grid">' +
+          (t.items.length
+            ? t.items.map(card).join('')
+            : '<div class="empty-state">回收站是空的 —— 删掉的素材会在这里保留 ' + t.keepDays + ' 天</div>') +
+        '</div>' +
+      '</div>' +
+    '</div>';
+
+  body.querySelector('[data-backlib]').addEventListener('click', () => { state.trash = false; App.render(); });
+
+  body.querySelectorAll('[data-restore]').forEach((b) => b.addEventListener('click', async () => {
+    const name = b.getAttribute('data-restore');
+    try {
+      await API.post('/api/media/restore', { name });
+      toast('已恢复到素材库（地址不变）');
+      App.render();
+    } catch (e) { toast(e.message, true); }
+  }));
+
+  body.querySelectorAll('[data-purge]').forEach((b) => b.addEventListener('click', async () => {
+    if (!needRole('owner', '彻底清除素材')) return;
+    const name = b.getAttribute('data-purge');
+    const sure = await confirmBox(
+      '彻底清除这张素材？<br><span class="sub">' + esc(name) + '<br>清除后<b>不可恢复</b>，素材库里同名的图也需要重新上传。</span>',
+      '彻底清除'
+    );
+    if (!sure) return;
+    try {
+      await API.post('/api/media/purge', { name, force: 1 });
+      toast('已彻底清除');
+      App.render();
+    } catch (e) { toast(e.message, true); }
+  }));
+
+  body.querySelector('[data-sweep]').addEventListener('click', async () => {
+    if (!needRole('owner', '清理回收站')) return;
+    try {
+      const r = await API.post('/api/media/trash/sweep', {});
+      const lines = [];
+      if (r.purgedCount) {
+        lines.push('<div>已清除 <b>' + r.purgedCount + '</b> 条（' + esc(r.freedText) + '）：</div>' +
+          r.purged.slice(0, 8).map((x) => '<div class="sub">· ' + esc(x.name) + ' —— ' + esc(x.reason) + '</div>').join(''));
+      }
+      if (r.keptCount) {
+        lines.push('<div style="margin-top:8px">保留 <b>' + r.keptCount + '</b> 条：</div>' +
+          r.kept.slice(0, 8).map((x) => '<div class="sub">· ' + esc(x.name) + ' —— ' + esc(x.reason) + '</div>').join('') +
+          (r.keptCount > 8 ? '<div class="sub">… 其余 ' + (r.keptCount - 8) + ' 条同上</div>' : ''));
+      }
+      await confirmBox(
+        '清理完成<br><span class="sub">' + (lines.join('') || '没有到期可清的素材') + '</span>',
+        '知道了'
+      );
+      App.render();
+    } catch (e) { toast(e.message, true); }
+  });
+}
+
 App.views.media = {
   async render(body, state) {
+    /* 回收站是同一套侧栏下的另一块内容，不单独开一个菜单：
+       素材库与回收站是一对（删了才进来），放在一起才找得到。 */
+    if (state.trash) return renderMediaTrash(body, state);
+
     const d = await API.get('/api/media/list', {
       q: state.q,
       sort: state.sort,
@@ -946,14 +1203,34 @@ App.views.media = {
           : '') +
       '</div>';
 
+    /*
+     * 文件夹搜索 + 折叠（审查 F18）：分组一多（几十个），靠肉眼找某一类很慢，
+     * 全部平铺也会把上传区顶到屏幕外。默认只显示前 8 个，其余按需展开。
+     */
+    const fq = String(state.fq || '').trim().toLowerCase();
+    const matched = d.folders.filter((f) => !fq || f.name.toLowerCase().indexOf(fq) > -1);
+    const FOLDER_SHOW = 8;
+    const shown = state.folderAll ? matched : matched.slice(0, FOLDER_SHOW);
+    const more = matched.length - shown.length;
+
     const side =
       '<div class="media-side">' +
         '<div class="media-side-h">文件夹</div>' +
+        (d.folders.length > FOLDER_SHOW
+          ? '<input type="text" class="w160" data-fq placeholder="搜索文件夹…" value="' + esc(state.fq || '') + '" style="margin-bottom:6px">'
+          : '') +
         sideIt('', '全部素材', d.all, cur === '') +
         sideIt(FOLDER_NONE, '未分组', d.ungrouped, cur === FOLDER_NONE) +
-        (d.folders.length ? '<div class="media-side-sep"></div>' : '') +
-        d.folders.map((f) => sideIt(f.name, f.name, f.count, cur === f.name, true)).join('') +
+        (matched.length ? '<div class="media-side-sep"></div>' : '') +
+        shown.map((f) => sideIt(f.name, f.name, f.count, cur === f.name, true)).join('') +
+        (more > 0
+          ? '<div class="media-side-more" data-folderall>展开其余 ' + more + ' 个</div>'
+          : (state.folderAll && matched.length > FOLDER_SHOW ? '<div class="media-side-more" data-folderall>收起</div>' : '')) +
         '<button class="btn sm block" data-newfolder style="margin-top:10px">+ 新建文件夹</button>' +
+        /* 回收站要在侧栏常驻（审查 F17）：删完图的人第一个念头是「能不能找回」，
+           入口藏在别的菜单里等于没有。带条数是为了让「删了能救」这件事被看见。 */
+        '<div class="media-side-sep"></div>' +
+        '<div class="media-side-it" data-trash><span class="nf">回收站</span><b>' + (d.trash || 0) + '</b></div>' +
       '</div>';
 
     const whereText = cur === '' ? '未分组' : (cur === FOLDER_NONE ? '未分组' : '文件夹「' + cur + '」');
@@ -981,6 +1258,16 @@ App.views.media = {
      * ⚠️ 缩略图区的类名必须叫 .mt，不能叫 .thumb —— `.thumb{width:42px;height:42px}`
      * 是表格小方图的样式，套到卡片上会把缩略图缩成 42px 的小图并溢出压住文件名。
      */
+    /*
+     * 大 GIF 延迟加载（审查 F18）。
+     * 素材库里有多张 3~4MiB 的 GIF：`<img loading=lazy>` 只挡住视口外的，
+     * 屏幕里那几张照样全量下载并逐帧解码 —— 卡片画成 150px 一点没省。
+     * 服务端是零依赖实现，生不出缩略图，所以这里的做法是：
+     * 超过阈值的 GIF 先不挂 src，卡片上标出体积，点开（或点预览）时才真正加载。
+     */
+    const GIF_DEFER_BYTES = 800 * 1024;
+    const heavyGif = (it) => it.kind !== 'video' && String(it.mime || '') === 'image/gif' && (it.size || 0) > GIF_DEFER_BYTES;
+
     const cell = (it, i) => {
       const isVideo = it.kind === 'video';
       const meta = [];
@@ -990,23 +1277,31 @@ App.views.media = {
       const nm = it.orig || it.name;
       return '<div class="media-it zoom' + (state.sel.indexOf(it.name) > -1 ? ' sel' : '') +
           '" data-pick="' + esc(it.name) + '" data-i="' + i + '" data-kind="' + (isVideo ? 'video' : 'image') + '">' +
+        /* 视频不挂 src 也不预载（preload=none）：以前一进页就建 40 个 <video>，
+           浏览器会把 40 份元数据各下一遍，卡片画得小并不减少下载量（审查 F18）；
+           图片走 loading=lazy，只下视口内那几张。
+           大 GIF 同样先不挂 src（动辄 3~4MiB，且一进页就开始解码），
+           点开才真正加载 —— 缩略显示省不掉的字节，只能靠「不下载」省。 */
         '<div class="mt">' +
           (isVideo
-            // muted + preload=metadata：只要首帧，不要出声、不要整段下载
-            ? '<video src="' + esc(it.url) + '" muted preload="metadata" playsinline></video>'
-            : '<img src="' + esc(it.url) + '" alt="" loading="eager">') +
+            ? '<video data-src="' + esc(it.url) + '" muted preload="none" playsinline></video>'
+            : '<img ' + (heavyGif(it) ? 'data-src' : 'src') + '="' + esc(it.url) +
+              '" alt="" loading="lazy" decoding="async">') +
           '<span class="zoomtip">' + MEDIA_ZOOM_ICO + (isVideo ? '播放' : '查看大图') + '</span>' +
+          (heavyGif(it) ? '<span class="vbadge">' + esc(it.sizeText || 'GIF') + '</span>' : '') +
           (isVideo ? '<span class="vbadge">' + MEDIA_PLAY_ICO + esc(it.durationText || '视频') + '</span>' : '') +
           '<span class="pickbox" data-check="' + esc(it.name) + '" title="选择这个（也可 Ctrl / ⌘ + 点击卡片）">' + MEDIA_CHECK_ICO + '</span>' +
         '</div>' +
         '<div class="inf">' +
           '<div class="nm" title="' + esc(nm) + '">' + esc(nm) + '</div>' +
+          /* 图标按钮必须有可访问名（审查 F26）：title 只管悬停提示，
+             aria-label 才是读屏与自动化测试读的那个名字 */
           '<div class="meta">' + esc(meta.join(' · ')) + '</div>' +
         '</div>' +
         '<div class="ft">' +
-          '<button data-copy="' + esc(it.url) + '" title="复制素材地址">' + MEDIA_COPY_ICO + '</button>' +
-          '<button data-down="' + esc(it.name) + '" title="下载到本地">' + MEDIA_DOWN_ICO + '</button>' +
-          '<button data-del="' + esc(it.name) + '" title="删除素材">' + MEDIA_TRASH_ICO + '</button>' +
+          '<button data-copy="' + esc(it.url) + '" title="复制素材地址" aria-label="复制素材地址">' + MEDIA_COPY_ICO + '</button>' +
+          '<button data-down="' + esc(it.name) + '" title="下载到本地" aria-label="下载素材到本地">' + MEDIA_DOWN_ICO + '</button>' +
+          '<button data-del="' + esc(it.name) + '" title="删除素材" aria-label="删除素材">' + MEDIA_TRASH_ICO + '</button>' +
         '</div>' +
       '</div>';
     };
@@ -1046,6 +1341,9 @@ App.views.media = {
               [['new', '最新上传'], ['old', '最早上传'], ['big', '文件最大'], ['small', '文件最小']]
                 .map(([v, t]) => '<option value="' + v + '"' + (state.sort === v ? ' selected' : '') + '>' + t + '</option>').join('') +
             '</select>' +
+            /* 重复素材治理入口（审查 F18）：1312MiB 里有两百多份完全重复的副本，
+               不进这里就永远没人发现。 */
+            '<button class="btn sm" data-dup>重复素材</button>' +
             '<div class="grow"></div>' +
             '<span class="selbar" data-actbar' + (state.sel.length ? '' : ' hidden') + '>' +
               '已选 <b data-selcnt>' + state.sel.length + '</b> 张' +
@@ -1070,21 +1368,29 @@ App.views.media = {
     };
 
     /* ---- 删除一张素材（网格的 ✕ 与预览层里的删除共用同一套确认逻辑） ----
-     * 抽成函数是因为它在两处被调用：只有一份「引用检查 → 强制确认」才不会两边走偏。 */
+     * 抽成函数是因为它在两处被调用：只有一份「引用检查 → 强制确认」才不会两边走偏。
+     *
+     * 两处措辞是刻意改过的（审查 F17）：
+     *   - 删除已不再是「从盘上抹掉」，而是移进回收站，30 天内可原样恢复；
+     *   - 被引用时把**受影响的页面与版本**逐条摊开，而不是只报一个引用总数 ——
+     *     「共 12 处引用」没法让人判断删了会裂在哪，
+     *     「已发布·首页 2 处、历史版本（保留 30 天） 10 处」才能。 */
     const deleteMedia = async (p) => {
       if (!needRole('owner', '删除素材')) return false;
-      if (!(await confirmBox('删除该素材？<br><span class="sub">若图片正被页面或商品引用，需要再次确认强制删除。</span>', '删除'))) return false;
+      if (!(await confirmBox('删除该素材？<br><span class="sub">先进回收站，30 天内可原样恢复（地址不变，页面不用改）。<br>若正被页面、商品或保留期内的历史版本引用，需要再次确认。</span>', '删除'))) return false;
       try {
         await API.post('/api/media/delete', { name: p });
-        toast('已删除');
+        toast('已删除（可在回收站恢复）');
         return true;
       } catch (err) {
         if (String(err.message).indexOf('引用') > -1) {
-          const force = await confirmBox('该素材正被引用：<br><span class="sub">' + esc(err.message) + '</span>', '仍然删除');
+          const hint = '<br><span class="sub">' + esc(err.message) + '</span>' +
+            '<div class="sub" style="margin-top:6px">历史版本对应<b>用户手机上已安装的小程序包</b>与回滚用的旧版本，删了那里会显示空白。</div>';
+          const force = await confirmBox('该素材正被引用：' + hint, '仍然删除');
           if (!force) return false;
           try {
             await API.post('/api/media/delete', { name: p, force: 1 });
-            toast('已强制删除');
+            toast('已强制删除（30 天内仍可在回收站恢复）');
             return true;
           } catch (e2) { toast(e2.message, true); return false; }
         }
@@ -1130,6 +1436,100 @@ App.views.media = {
         toast('已新建文件夹：' + name);
         reload();
       } catch (e) { toast(e.message, true); }
+    });
+
+    const trashEntry = body.querySelector('[data-trash]');
+    if (trashEntry) trashEntry.addEventListener('click', () => { state.trash = true; App.render(); });
+
+    const fqInput = body.querySelector('[data-fq]');
+    if (fqInput) fqInput.addEventListener('input', debounce((e) => { state.fq = e.target.value; App.render(); }, 300));
+    const folderAll = body.querySelector('[data-folderall]');
+    if (folderAll) folderAll.addEventListener('click', () => { state.folderAll = !state.folderAll; App.render(); });
+
+    /* ---- 重复素材（审查 F18）----
+     * 存量素材没有内容哈希时先补算（体积大，分批扫），再把重复组摊开：
+     * 每组明确「保留哪份、合并哪些、白占多少空间」，合并后引用自动改指。 */
+    body.querySelector('[data-dup]').addEventListener('click', async () => {
+      const stop = loading('检查重复素材…');
+      let dup;
+      try { dup = await API.get('/api/media/duplicates'); } catch (e) { stop(); toast(e.message, true); return; }
+      stop();
+
+      const groupsHtml = (d) => {
+        if (!d.groupCount) {
+          return '<div class="empty-state">没有发现内容完全重复的素材' +
+            (d.unhashed ? '<br><span class="sub">还有 ' + d.unhashed + ' 张没算过内容哈希，建议先点下面的「扫描哈希」再查一次</span>' : '') +
+            '</div>';
+        }
+        return '<div class="sub" style="margin-bottom:10px">共 <b>' + d.groupCount + '</b> 组、<b>' + d.dupeCount +
+          '</b> 份副本，白占 <b>' + d.wasteText + '</b>。合并会把引用改指到保留的那份，副本进回收站（可恢复）。</div>' +
+          d.groups.slice(0, 50).map((g, i) =>
+            '<div class="dup-grp" data-g="' + i + '">' +
+              '<div class="dup-h">' + esc(g.keep.orig || g.keep.name) + ' · ' + esc(g.keep.sizeText) +
+                '<span class="grow"></span><span class="sub">共 ' + g.count + ' 份，白占 ' + esc(g.wasteText) + '</span></div>' +
+              '<div class="dup-row"><label><input type="radio" name="k' + i + '" value="' + esc(g.keep.name) + '" checked> ' +
+                '保留（最早上传）：' + esc(g.keep.name) + '</label></div>' +
+              g.dupes.map((x) =>
+                '<div class="dup-row"><label><input type="radio" name="k' + i + '" value="' + esc(x.name) + '"> ' +
+                  '改为保留这份：' + esc(x.orig || x.name) + ' · ' + esc(x.sizeText) + '</label></div>'
+              ).join('') +
+              '<div class="dup-f"><button class="btn sm" data-merge="' + i + '">合并这一组</button></div>' +
+            '</div>'
+          ).join('');
+      };
+
+      let cur = dup;
+      const m = openModal({
+        title: '重复素材',
+        width: 'wide',
+        html: '<div data-dupbody>' + groupsHtml(cur) + '</div>',
+        footer: '<button class="btn sm" data-scan>扫描哈希（尚有 <b data-unhashed>' + (cur.unhashed || 0) + '</b> 张待算）</button>' +
+          '<span class="grow"></span><button class="btn" data-close>关闭</button>'
+      });
+
+      const repaint = (d2) => {
+        cur = d2;
+        m.root.querySelector('[data-dupbody]').innerHTML = groupsHtml(d2);
+        const u = m.root.querySelector('[data-unhashed]');
+        if (u) u.textContent = d2.unhashed || 0;
+        bind();
+      };
+      const bind = () => {
+        m.root.querySelectorAll('[data-merge]').forEach((b) => b.addEventListener('click', async () => {
+          if (!needRole('owner', '合并重复素材')) return;
+          const i = Number(b.getAttribute('data-merge'));
+          const g = cur.groups[i];
+          if (!g) return;
+          const picked = m.root.querySelector('input[name="k' + i + '"]:checked');
+          const keep = picked ? picked.value : g.keep.name;
+          const names = [g.keep.name].concat(g.dupes.map((x) => x.name)).filter((n) => n !== keep);
+          const sure = await confirmBox(
+            '合并这一组（共 ' + g.count + ' 份）？<br><span class="sub">' +
+            '保留 <b>' + esc(keep) + '</b>，另外 ' + names.length + ' 份的引用会被改指到它；<br>' +
+            '副本进回收站，<b>30 天内可恢复</b>。</span>', '合并');
+          if (!sure) return;
+          const s2 = loading('合并中…');
+          try {
+            const r = await API.post('/api/media/merge', { keep, names });
+            toast(r.hint || '已合并');
+            repaint(await API.get('/api/media/duplicates'));
+            App.render();
+          } catch (e) { toast(e.message, true); } finally { s2(); }
+        }));
+      };
+      bind();
+
+      m.root.querySelector('[data-scan]').addEventListener('click', async () => {
+        const s2 = loading('补算内容哈希…');
+        try {
+          /* 分批扫：1.3GiB 一次读不完，来回几次直到 remain=0 */
+          let r = await API.post('/api/media/hash-scan', { limit: 200 });
+          let guard = 0;
+          while (r && r.remain > 0 && guard < 30) { r = await API.post('/api/media/hash-scan', { limit: 200 }); guard += 1; }
+          repaint(await API.get('/api/media/duplicates'));
+          toast('扫描完成，本次补算 ' + (r ? r.scanned : 0) + ' 张');
+        } catch (e) { toast(e.message, true); } finally { s2(); }
+      });
     });
 
     body.querySelectorAll('[data-rnf]').forEach((b) => b.addEventListener('click', async (e) => {
@@ -1178,6 +1578,11 @@ App.views.media = {
           markSel();
           return;
         }
+        /* 大 GIF 在这里才真正挂上 src（见 heavyGif 注释）：
+           不点开的卡片一字节都不下载。 */
+        el.querySelectorAll('img[data-src]').forEach((im) => {
+          if (!im.getAttribute('src')) im.setAttribute('src', im.getAttribute('data-src'));
+        });
         openLightbox(Number(el.getAttribute('data-i')) || 0);
       });
     });
@@ -1239,6 +1644,7 @@ App.views.media = {
       if (!list.length) return;
       const stop = loading('上传中…');
       let ok = 0;
+      let reused = 0;
       let warn = '';
       try {
         for (const f of list) {
@@ -1250,9 +1656,13 @@ App.views.media = {
           if (json.code === 0) {
             ok += 1;
             if (json.data && json.data.warn) warn = json.data.warn;
+            /* 同内容复用（审查 F18）：服务端没落新盘，直接沿用了素材库里已有的那份。
+               这里必须说清楚 —— 否则运营看到列表没多出一张，会以为上传失败了。 */
+            if (json.data && json.data.deduped) reused += json.data.deduped;
           } else toast(f.name + '：' + json.msg, true);
         }
-        toast('上传成功 ' + ok + ' 个素材' + (uploadFolder ? '（已归入「' + uploadFolder + '」）' : ''));
+        toast('上传成功 ' + ok + ' 个素材' + (uploadFolder ? '（已归入「' + uploadFolder + '」）' : '') +
+          (reused ? '，其中 ' + reused + ' 个内容与素材库已有的一致，已直接复用（没有再占一份空间）' : ''));
         if (warn) toast(warn, true);   // 体积偏大的视频：照收，但把话说清楚
         reload();
       } finally { stop(); }
@@ -1398,10 +1808,29 @@ App.views.shopnotes = {
       const key = b.getAttribute('data-note-del');
       const p = notes.filter((x) => x.key === key)[0] || {};
       if (!needRole('owner', '删除笔记')) return;
-      if (!await confirmBox('删除笔记「' + esc(p.name || key) + '」？<br><span class="sub">会连带清掉它的草稿与版本记录，' +
-        '并从 replica.js 里移除（下次生成代码后生效）。<b>不可撤销。</b></span>', '删除')) return;
+      /*
+       * 删除前先查引用（审查 F07）：这篇笔记可能正被首页卡片 / 导航指向，
+       * 删掉之后那些入口会变成「笔记不存在」。先把位置列出来，让运营能去改，
+       * 确认无误再强制删 —— 比悄悄解绑别人的页面安全。
+       */
+      let refs = [];
       try {
-        await API.post('/api/decorate/note/delete', { key });
+        const r = await API.get('/api/decorate/note/refs', { key });
+        refs = (r && r.refs) || [];
+      } catch (e) { /* 查引用失败不阻断删除，按无引用处理 */ }
+      const refHtml = refs.length
+        ? '<div style="margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:6px">' +
+            '<div class="sub">这篇笔记还被 <b>' + refs.length + '</b> 处引用，删除后这些入口会失效：</div>' +
+            '<div style="margin-top:6px;max-height:150px;overflow:auto">' +
+            refs.slice(0, 10).map((x) => '<div>' + esc(x.label || x.pageName || x.pageKey) +
+              (x.state ? ' <span class="sub">（' + esc(x.state) + '）</span>' : '') + '</div>').join('') +
+            (refs.length > 10 ? '<div class="sub">… 其余 ' + (refs.length - 10) + ' 处</div>' : '') +
+            '</div></div>'
+        : '';
+      if (!await confirmBox('删除笔记「' + esc(p.name || key) + '」？<br><span class="sub">会连带清掉它的草稿与版本记录，' +
+        '并从 replica.js 里移除（下次生成代码后生效）。<b>不可撤销。</b></span>' + refHtml, '删除')) return;
+      try {
+        await API.post('/api/decorate/note/delete', { key, force: refs.length ? 1 : 0 });
         toast('已删除');
         App.render();
       } catch (e) { toast(e.message, true); }

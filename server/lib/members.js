@@ -112,6 +112,18 @@ function load() {
       }
       if (!ROLES.includes(m.role)) { m.role = 'viewer'; needFlush = true; }
       if (typeof m.enabled !== 'boolean') { m.enabled = true; needFlush = true; }
+      /*
+       * sessionVersion：会话版本号（审查 F04）。
+       * 改口令 / 重置口令时自增，管理员令牌里的 sv 与之对不上即作废 ——
+       * 否则「改密码」挡不住已经被人拿走的旧令牌：那 12 小时里它照样能用。
+       * 存量记录没有这个字段时补 0；老令牌（payload 里没有 sv）因此全部失效，
+       * 需要重新登录一次 —— 有意为之，因为本次升级同时关掉了 F02 的「用户名重用提权」，
+       * 老令牌本来就绑在可回收的用户名上，不能再信。
+       */
+      if (!Number.isFinite(m.sessionVersion) || m.sessionVersion < 0) {
+        m.sessionVersion = 0;
+        needFlush = true;
+      }
     });
   } else {
     cache = empty();
@@ -137,6 +149,18 @@ function commit() {
 function flush() {
   if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
   flushNow();
+}
+
+/**
+ * 校验完成后**同步落盘**（审查 F03 + F11）。
+ *
+ * 成员表是「谁能进后台」的真源：写完却没落盘，重启后改动消失（甚至可能
+ * 退回一个已经被降级的 owner），比商品数据分叉更危险。
+ * 所以成员写路径一律等落盘结果，失败就让请求失败。
+ */
+function commitSync() {
+  needFlush = true; // flushNow() 只写「标记过脏」的数据，这里必须先标
+  flush();
 }
 
 /** 重置内存缓存（自检夹具用：改完文件后强制重新读） */
@@ -221,6 +245,31 @@ function findByName(username) {
   return load().members.find((m) => normName(m.username) === key) || null;
 }
 
+/**
+ * 按成员 ID 查（**身份认定的唯一依据**，审查 F02）。
+ *
+ * 用户名可被改名、可被删除后重建，拿它当主键等于给「改名 / 同名重建」留一条提权通道：
+ * 建 viewer 号 → 登录 → 改名 → 用腾出来的名字建 owner 号 → 旧 viewer 令牌下一次请求
+ * 就被识别成 owner。成员 ID 单调递增、永不复用，才能作为令牌里的身份锚点。
+ */
+function findById(id) {
+  const n = Number(id);
+  if (!Number.isInteger(n) || n <= 0) return null;
+  return load().members.find((m) => m.id === n) || null;
+}
+
+/**
+ * 自增会话版本号 → 该成员**已签发的全部令牌立即失效**（F04）。
+ * 改口令、被 owner 重置口令、或被强制下线时调用。
+ */
+function bumpSessionVersion(m) {
+  if (!m) return 0;
+  m.sessionVersion = Number(m.sessionVersion || 0) + 1;
+  m.updatedAt = Date.now();
+  commitSync();
+  return m.sessionVersion;
+}
+
 function count() {
   return load().members.length;
 }
@@ -278,10 +327,16 @@ function create(p) {
   if (data.members.length >= MAX_MEMBERS) {
     throw new BizError(`成员数量已达上限（${MAX_MEMBERS} 个）`, ERR.BIZ);
   }
+  /*
+   * 全部校验与哈希计算都在**局部变量**里完成，最后才 push（审查 F03）。
+   * 顺序很重要：任何一项校验抛错，data.members / data.seq 都保持原状 ——
+   * 不会出现「提示保存失败，但记录其实已经建好了」这种最骗人的失败。
+   */
   const username = checkUsername(p.username);
   const password = checkPassword(p.password, true);
   const role = checkRole(p.role || 'operator');
   const name = String(p.name == null ? '' : p.name).trim().slice(0, NAME_MAX);
+  const pwd = hashPassword(password);
   const now = Date.now();
 
   const m = {
@@ -290,13 +345,14 @@ function create(p) {
     name: name || username,
     role,
     enabled: p.enabled === undefined ? true : !!p.enabled,
-    pwd: hashPassword(password),
+    pwd,
+    sessionVersion: 0,
     createdAt: now,
     updatedAt: now,
     lastLoginAt: null
   };
   data.members.push(m);
-  commit();
+  commitSync();
   return pub(m);
 }
 
@@ -305,27 +361,52 @@ function create(p) {
  *
  * ⚠️ 三条自锁防护都收在这里，而不是散在路由里：
  *    删掉这个号会让「启用中的 owner」归零时，拒绝 —— 无论从哪条路走过来。
+ *
+ * ⚠️ **先在临时对象上完成全部校验，再一次性替换**（审查 F03）。
+ *    旧实现是「边校验边写 m」：同时提交新名称 + operator 角色 + 不足 8 位的新口令时，
+ *    前面两项已经写进缓存，最后一项才抛错 —— 运营看到「口令至少 8 位」的红色提示，
+ *    以为什么都没改，实际这个号**已经被提成运营了**。而且这次"失败"的变更还会在
+ *    下一次无关保存时被一起落盘，变成永久提权。
+ *    现在的写法：任何一项校验失败 → 内存、文件、更新时间、实际权限全部保持原状。
  */
 function update(id, p) {
   const m = raw(id);
   if (!m) throw new BizError('成员不存在（可能已被其他人删除，刷新后重试）', ERR.NOT_FOUND, 404);
 
-  const nextRole = p.role === undefined ? m.role : checkRole(p.role);
-  const nextEnabled = p.enabled === undefined ? m.enabled !== false : !!p.enabled;
+  /* ---- 第一步：只读地算出「下一份应该是什么样」，任何一步抛错都不碰 m ---- */
+  const next = {
+    username: m.username,
+    name: m.name,
+    role: m.role,
+    enabled: m.enabled !== false
+  };
+  if (p.username !== undefined) next.username = checkUsername(p.username, m.id);
+  if (p.name !== undefined) {
+    next.name = String(p.name == null ? '' : p.name).trim().slice(0, NAME_MAX) || m.username;
+  }
+  if (p.role !== undefined) next.role = checkRole(p.role);
+  if (p.enabled !== undefined) next.enabled = !!p.enabled;
+
   const wasActiveOwner = m.role === 'owner' && m.enabled !== false;
-  const stillActiveOwner = nextRole === 'owner' && nextEnabled;
+  const stillActiveOwner = next.role === 'owner' && next.enabled;
   if (wasActiveOwner && !stillActiveOwner && activeOwnerCount(m.id) === 0) {
     throw new BizError('这是最后一个启用中的超级管理员，不能降级或禁用（否则没人能再登录后台）', ERR.BIZ);
   }
 
-  if (p.username !== undefined) m.username = checkUsername(p.username, m.id);
-  if (p.name !== undefined) m.name = String(p.name == null ? '' : p.name).trim().slice(0, NAME_MAX) || m.username;
-  m.role = nextRole;
-  m.enabled = nextEnabled;
+  /* 口令校验放在**最后**：它是失败率最高的一项，绝不能让它前面已经改了角色 */
   const pw = p.password === undefined ? '' : checkPassword(p.password, false);
-  if (pw) m.pwd = hashPassword(pw);
+  const nextPwd = pw ? hashPassword(pw) : m.pwd;
+
+  /* ---- 第二步：校验全过，一次性落定 ---- */
+  m.username = next.username;
+  m.name = next.name;
+  m.role = next.role;
+  m.enabled = next.enabled;
+  m.pwd = nextPwd;
+  /* 改口令 = 撤销该成员手上所有旧会话（F04） */
+  if (pw) m.sessionVersion = Number(m.sessionVersion || 0) + 1;
   m.updatedAt = Date.now();
-  commit();
+  commitSync();
   return pub(m);
 }
 
@@ -338,7 +419,7 @@ function remove(id) {
     throw new BizError('这是最后一个启用中的超级管理员，不能删除（否则没人能再登录后台）', ERR.BIZ);
   }
   data.members = data.members.filter((x) => x.id !== m.id);
-  commit();
+  commitSync();
   return { id: m.id, username: m.username };
 }
 
@@ -355,7 +436,7 @@ function authenticate(username, password) {
   if (!verifyPassword(password, m.pwd)) return null;
   if (m.enabled === false) return null;
   m.lastLoginAt = Date.now();
-  commit();
+  commitSync();
   return m;
 }
 
@@ -365,10 +446,25 @@ function changeOwnPassword(username, oldPw, newPw) {
   if (!m) throw new BizError('当前身份不是成员账号（长期令牌 / 共享口令登录无法在此改口令）', ERR.FORBIDDEN, 403);
   if (!verifyPassword(oldPw, m.pwd)) throw new BizError('原口令不正确', ERR.FORBIDDEN, 403);
   const pw = checkPassword(newPw, true);
-  m.pwd = hashPassword(pw);
+  const pwd = hashPassword(pw);
+  m.pwd = pwd;
+  /* 会话版本号自增 → 修改前签发的令牌立即作废（F04：改密码必须能撤掉已泄露的会话） */
+  m.sessionVersion = Number(m.sessionVersion || 0) + 1;
   m.updatedAt = Date.now();
-  commit();
+  commitSync();
   return pub(m);
+}
+
+/**
+ * 强制下线某人：把他手上所有已签发的令牌作废。
+ *
+ * 用于 owner 重置口令（update 已自动 bump）之外的场景：
+ * 账号疑似泄露、成员离职但记录要留着当审计线索。
+ */
+function revokeSessions(id) {
+  const m = raw(id);
+  if (!m) throw new BizError('成员不存在（可能已被其他人删除，刷新后重试）', ERR.NOT_FOUND, 404);
+  return bumpSessionVersion(m);
 }
 
 module.exports = {
@@ -383,6 +479,9 @@ module.exports = {
   list,
   raw,
   findByName,
+  findById,
+  bumpSessionVersion,
+  revokeSessions,
   count,
   hasWritable,
   activeOwnerCount,
@@ -394,5 +493,6 @@ module.exports = {
   hashPassword,
   verifyPassword,
   flush,
+  commitSync,
   reload
 };

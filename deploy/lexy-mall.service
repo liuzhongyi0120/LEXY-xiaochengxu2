@@ -26,12 +26,23 @@ RestartSec=3
 StandardOutput=append:/var/log/lexy-mall.log
 StandardError=append:/var/log/lexy-mall.log
 
-# 最小权限：进程只应写 /opt/lexy-mall（数据与上传）与 /var/log
+# ── 专用低权限用户（审查 F12）──────────────────────────────────────────
+# 不写 User/Group 时，systemd 会**以 root 运行** —— 虽然下面还有 NoNewPrivileges
+# 等限制，但 ReadWritePaths 覆盖的整个 /opt/lexy-mall 与 /var/log 都是 root 权限，
+# 一旦代码里出现任意写文件，能写的就是整份源码（不只是数据目录）。
+# 这个用户由 deploy/setup-server.sh 创建；不存在时服务会起不来（有意为之：
+# 「起不来」比「悄悄以 root 跑着」好排查得多）。
+User=lexy
+Group=lexy
+
+# 最小权限：进程只应写数据、上传与日志三处
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=full
 ProtectHome=true
-ReadWritePaths=/opt/lexy-mall /var/log
+# ⚠️ 收紧到**具体路径**：装修「生成代码」要写 miniprogram/config/replica.js，
+#    所以只放行这一个文件所在的目录 + 数据 + 上传 + 备份，源码其它部分一律只读。
+ReadWritePaths=/opt/lexy-mall/server/data /opt/lexy-mall/server/public/uploads /opt/lexy-mall/miniprogram/config /var/log
 LimitNOFILE=65535
 
 [Install]

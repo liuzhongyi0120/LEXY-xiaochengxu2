@@ -7,11 +7,12 @@
 #   tar -xzf lexy-backend.tar.gz -C /opt/lexy-mall     # 解开部署包（含本脚本）
 #   bash /opt/lexy-mall/deploy/setup-server.sh
 #
-# 它做四件事：
+# 它做五件事：
 #   1. 装 Node（官方二进制解压到 /usr/local，零依赖项目不需要 npm install）
 #   2. 生成 /opt/lexy-mall/.env（含随机 JWT_SECRET；已存在则不覆盖）
-#   3. 安装并启动 systemd 服务 lexy-mall（开机自启 + 崩溃自动重拉）
-#   4. 本机健康检查
+#   3. 建专用低权限运行用户 lexy（审查 F12：服务不以 root 跑）
+#   4. 安装并启动 systemd 服务 lexy-mall（开机自启 + 崩溃自动重拉）
+#   5. 本机健康检查
 #
 # 安全默认值（为什么这么设，见 server/README.md「上线前必做」）：
 #   NODE_ENV=production  → 强制要求 JWT_SECRET，否则进程直接拒绝启动；
@@ -124,7 +125,33 @@ if ! grep -qE '^(ADMIN_PASSWORD|ADMIN_TOKENS)=' "$ENV_FILE"; then
   log "      需要远程运营后台时，见 .env 里的「管理端鉴权」注释块。"
 fi
 
-# -------------------------------------------------------------- 3. systemd
+# ------------------------------------------------- 3. 专用低权限运行用户
+#
+# 为什么要建这个用户（审查 F12）：systemd 单元里不写 User= 时服务默认以 root 跑。
+# 后端只需要写四处：数据目录、上传目录、装修生成的 config 目录、日志。
+# 让它以 lexy 跑 + ReadWritePaths 收紧到这四个路径，源码其它部分就是只读的 ——
+# 万一将来有「写文件」的代码路径被利用，能改的范围也就是数据，而不是整份程序。
+log "准备运行用户 lexy"
+RUN_USER="lexy"
+if ! id -u "$RUN_USER" >/dev/null 2>&1; then
+  useradd --system --no-create-home --shell /usr/sbin/nologin "$RUN_USER"
+  log "已创建系统用户 $RUN_USER（无家目录、不可登录）"
+else
+  log "用户 $RUN_USER 已存在（不改动，重复执行安全）"
+fi
+# 只把「必须可写」的四处交给它；源码其它部分保持 root 只读
+mkdir -p "$APP_DIR/server/data" "$APP_DIR/server/public/uploads" "$APP_DIR/miniprogram/config"
+chown -R "$RUN_USER":"$RUN_USER" "$APP_DIR/server/data" "$APP_DIR/server/public/uploads" "$APP_DIR/miniprogram/config"
+# .env 里有 JWT_SECRET：只给读（640 已由前面 chmod 600 + 属主 root，
+# 但服务以 lexy 跑就读不到 —— 所以要让 lexy 可读，同时绝不给其它用户任何权限）
+chown root:"$RUN_USER" "$ENV_FILE"
+chmod 640 "$ENV_FILE"
+# 日志文件：先建出来并交给 lexy（systemd 的 append: 需要进程有写权限）
+touch "$LOG"
+chown "$RUN_USER":"$RUN_USER" "$LOG"
+chmod 640 "$LOG"
+
+# -------------------------------------------------------------- 4. systemd
 log "安装 systemd 服务"
 [ -f "$APP_DIR/deploy/lexy-mall.service" ] || die "缺少 $APP_DIR/deploy/lexy-mall.service（部署包不完整）"
 install -m 644 "$APP_DIR/deploy/lexy-mall.service" /etc/systemd/system/lexy-mall.service
@@ -133,10 +160,17 @@ systemctl enable lexy-mall >/dev/null 2>&1 || true
 systemctl restart lexy-mall
 sleep 2
 
-# --------------------------------------------------------- 4. 健康检查
+# --------------------------------------------------------- 5. 健康检查
 log "健康检查"
 if systemctl is-active --quiet lexy-mall; then
   echo "服务状态：active（已开机自启）"
+  # 顺带确认真的不是 root 在跑（F12 的验收点：UID 必须是专用用户，写源码要被拒）
+  SRV_UID="$(systemctl show -p User --value lexy-mall || true)"
+  RUN_UID="$(ps -o user= -C node 2>/dev/null | grep -w "$RUN_USER" | head -1 || true)"
+  echo "运行身份：systemd 配置 User=${SRV_UID:-（空=root！）}　进程实际 ${RUN_UID:-未取到}"
+  if [ -z "$SRV_UID" ]; then
+    echo "⚠️  systemd 单元里没有 User= —— 服务正在以 root 运行，请检查部署包版本"
+  fi
 else
   echo "服务状态：INACTIVE —— 最近日志："
   journalctl -u lexy-mall -n 30 --no-pager || tail -30 "$LOG"

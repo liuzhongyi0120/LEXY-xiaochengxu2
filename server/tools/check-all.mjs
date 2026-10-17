@@ -1236,7 +1236,8 @@ const mediaCount0 = await call('GET', '/api/media/list', { auth: false, silent: 
 
 const fdOk = new FormData();
 fdOk.append('file', new Blob([PNG_2X2], { type: 'image/png' }), 'selfcheck-2x2.png');
-const mediaUp = await call('POST', '/api/media/upload', { form: fdOk, auth: false });
+/* forceNew=1：自检每次都要一份**新的**素材，走同内容复用会让它删掉素材库里已有的那张 */
+const mediaUp = await call('POST', '/api/media/upload', { form: fdOk, auth: false, query: { forceNew: 1 } });
 const upOne = mediaUp.ok && mediaUp.data.list[0] ? mediaUp.data.list[0] : null;
 assert('素材上传返回相对路径与真实尺寸（2×2）',
   !!upOne && /^\/uploads\/\d{6}\/.+\.png$/.test(upOne.url) && upOne.width === 2 && upOne.height === 2,
@@ -1299,7 +1300,7 @@ const FOLDER_C = '自检文件夹C';
 
 const fdFolder = new FormData();
 fdFolder.append('file', new Blob([PNG_2X2], { type: 'image/png' }), 'selfcheck-folder.png');
-const mfUp = await call('POST', '/api/media/upload', { form: fdFolder, auth: false, query: { folder: FOLDER_A } });
+const mfUp = await call('POST', '/api/media/upload', { form: fdFolder, auth: false, query: { folder: FOLDER_A, forceNew: 1 } });
 const mfItem = mfUp.ok && mfUp.data.list[0] ? mfUp.data.list[0] : null;
 assert('上传时可直接指定归属文件夹（?folder=，文件夹不存在会自动创建）',
   !!mfItem && mfItem.folder === FOLDER_A,
@@ -1413,7 +1414,7 @@ const videosBefore = (mvBase.data && mvBase.data.kinds && mvBase.data.kinds.vide
 
 const fdVideo = new FormData();
 fdVideo.append('file', new Blob([MP4_FIXTURE], { type: 'video/mp4' }), 'selfcheck-clip.mp4');
-const mvUp = await call('POST', '/api/media/upload', { form: fdVideo, auth: false });
+const mvUp = await call('POST', '/api/media/upload', { form: fdVideo, auth: false, query: { forceNew: 1 } });
 const mvItem = mvUp.ok && mvUp.data.list[0] ? mvUp.data.list[0] : null;
 assert('视频按 ftyp 魔数被识别为 video/mp4（认文件头，不认扩展名）',
   !!mvItem && mvItem.kind === 'video' && mvItem.mime === 'video/mp4' && /^\/uploads\/\d{6}\/.+\.mp4$/.test(mvItem.url),
@@ -4985,6 +4986,273 @@ assert('每个点位都带联调示例（调试台可一键填参）',
   noSample.length
     ? `缺示例 ${noSample.length} 个：${noSample.slice(0, 8).map((r) => `${r.method} ${r.path}`).join(' | ')}${noSample.length > 8 ? ' …' : ''}`
     : `${registered.length} 个点位全部带示例`);
+
+/* ---------------------------------------------------------------------------
+ * 15.11 审查 F01~F15 / F25 回归（2026-10-17《商城全维度审查与整改建议》）
+ *
+ * 这些是**已经复现过的缺陷**，不是"建议"。转成断言的理由和 18 节那条开关矩阵一样：
+ * 「改过了」只是口头结论，下次重构就会退回去；只有断言会在退回去的那一刻变红。
+ *
+ * HTTP 侧的分级权限与「旧令牌不能提权」放在 `.tooling/test-admin-auth.mjs` 的 7.6 节
+ * （那里起隔离实例 + 临时数据目录，能真建成员、真改口令）；
+ * 本节锁**实现与配置**：令牌表形态、身份锚点、角色门、启动硬校验、落盘口径。
+ * ------------------------------------------------------------------------- */
+const adminAuthSrcF = readFileSync(join(__dirname, '..', 'lib', 'adminAuth.js'), 'utf8');
+const membersSrcF = readFileSync(join(__dirname, '..', 'lib', 'members.js'), 'utf8');
+const wechatSrcF = readFileSync(join(__dirname, '..', 'lib', 'wechat.js'), 'utf8');
+const decorateSrcF = readFileSync(join(__dirname, '..', 'decorate', 'store.js'), 'utf8');
+const indexSrcF = readFileSync(join(__dirname, '..', 'index.js'), 'utf8');
+/*
+ * ⚠️ 这里**必须自己 require 一份**，不能复用 16 节之后的 `adminAuthLib`：
+ *   const 有暂时性死区，用到后面才声明的变量会让整段从这里**静默中断** ——
+ *   表现是「报告照常打印，但本节之后的所有断言一条都没跑」，
+ *   而汇总里看不出少了（失败数不增、通过数也不增）。踩过一次，故单独取一份并改名。
+ */
+const adminAuthLibF = localRequire(join(__dirname, '..', 'lib', 'adminAuth.js'));
+
+/* —— F01（P0）令牌表不能被继承属性绕过 —— */
+assert('F01 · 令牌表是无原型对象 / Map，且读取走 hasOwnProperty（继承属性名不能当令牌）',
+  /Object\.create\(null\)|new Map\(/.test(adminAuthSrcF) && /function hasOwn\(/.test(adminAuthSrcF) &&
+  /hasOwn\(ADMIN_TOKENS, raw\)/.test(adminAuthSrcF),
+  `Object.create(null)=${/Object\.create\(null\)/.test(adminAuthSrcF)}　hasOwn 已用上=${/hasOwn\(ADMIN_TOKENS, raw\)/.test(adminAuthSrcF)}`);
+
+assert('F01 · 等级比较前先校验角色本身合法（否则 role=undefined 时 `undefined < 3` 为 false → 静默放行）',
+  /if \(!isRole\(session\.role\)\)/.test(adminAuthSrcF) &&
+  /if \(!rec \|\| !isRole\(rec\.role\)\) return null/.test(adminAuthSrcF),
+  'guard() 与 env 令牌两条路都先验角色');
+
+/* —— F02 身份锚点必须是不可复用的成员 ID —— */
+assert('F02 · 成员会话按 memberId 回查（用户名可改名 / 可重建，不能当身份锚点）',
+  /payload\.mid/.test(adminAuthSrcF) && /members\.findById\(/.test(adminAuthSrcF) &&
+  /function findById\(/.test(membersSrcF),
+  `JWT 带 mid=${/payload\.mid/.test(adminAuthSrcF)}　findById 已实现=${/function findById\(/.test(membersSrcF)}`);
+assert('F02 · 只有 username、没有 mid 的老令牌一律拒绝（它们绑在可回收的字符串上）',
+  /if \(payload\.username\) return null;/.test(adminAuthSrcF),
+  '老令牌拒绝分支存在');
+
+/* —— F03 校验失败不能留下半成品 —— */
+assert('F03 · 成员 update() 先在临时对象上完成全部校验，再一次性替换（失败时内存与文件都不变）',
+  /const next = \{/.test(membersSrcF) && /const pw = p\.password === undefined/.test(membersSrcF) &&
+  /m\.username = next\.username/.test(membersSrcF),
+  '先算 next → 校验全过 → 落定');
+
+/* —— F04 改口令必须撤掉既有会话 —— */
+assert('F04 · 改口令 / 重置口令时自增 sessionVersion，令牌里的 sv 对不上即作废',
+  /sessionVersion/.test(membersSrcF) && /Number\(m\.sessionVersion \|\| 0\) !== Number\(payload\.sv/.test(adminAuthSrcF),
+  'members 自增 + adminAuth 校验 sv');
+
+/* —— F05 登录限流不能一把全局锁 —— */
+assert('F05 · 登录失败按「来源 + 账号」分桶（不再一个全局计数锁死所有管理员）',
+  /function bucketKey\(/.test(adminAuthSrcF) && /clientIp\(req\)/.test(adminAuthSrcF) &&
+  /GLOBAL_MAX_FAILS/.test(adminAuthSrcF) && /TRUST_PROXY/.test(adminAuthSrcF),
+  '分桶 + 总量保护 + 代理头需显式开启');
+
+/* —— F06 笔记删除必须与页面删除同级 ——
+ * 先 require 一次路由文件：声明是**在路由模块加载时**注册的，
+ * 只 require lib/adminAuth 的话那张声明表里还是空的。 */
+localRequire(join(__dirname, '..', 'routes', 'decorate.js'));
+const noteDelRole = adminAuthLibF.minRoleFor('POST', '/api/decorate/note/delete');
+assert('F06 · 删除笔记要求 owner（与删除自定义页同级：同样会重写 replica.js）',
+  noteDelRole === 'owner', `minRoleFor=${noteDelRole}`);
+assert('F06 · 权限可在路由文件里就近声明（新增高危点位不用跑到另一张正则表去补）',
+  adminAuthLibF.declaredMinRole('POST', '/api/decorate/note/delete') === 'owner' &&
+  /declareRouteMinRole\('POST', '\/api\/decorate\/note\/delete'/.test(
+    readFileSync(join(__dirname, '..', 'routes', 'decorate.js'), 'utf8')),
+  '声明已生效，且写在点位所在文件里');
+
+/* —— F07 删笔记前查引用 —— */
+assert('F07 · 删除笔记前先查站内引用（被引用时默认拒绝，须 force）',
+  /const refs = referencesOf\(key\)\.filter/.test(decorateSrcF) &&
+  /refs\.length && !\(opt && opt\.force\)/.test(decorateSrcF),
+  'removeNote 有引用检查与 force 出口');
+
+/* —— F08 资料保存不再覆盖库存 —— */
+const catalogSrcF = readFileSync(join(__dirname, '..', 'lib', 'catalog.js'), 'utf8');
+assert('F08 · 编辑商品时只有显式带 withStock 才写库存（长表单里的库存列不再回写）',
+  /isNew \|\| p\.withStock === true/.test(catalogSrcF) && /ERR\.CONFLICT/.test(catalogSrcF),
+  '库存与资料分开写 + 版本冲突返回 409');
+
+/* —— F09 草稿并发 —— */
+assert('F09 · 草稿带版本号，保存时校验 expectedRevision，不一致返回 409',
+  /curRev/.test(decorateSrcF) && /ERR\.CONFLICT, 409/.test(decorateSrcF) &&
+  /revision: draft && draft\.data/.test(decorateSrcF),
+  'saveDraft 有乐观锁，getPage 下发 revision');
+
+/* —— F10 生产不能退回模拟登录 —— */
+assert('F10 · 生产缺微信登录配置时拒绝启动（模拟登录必须显式 WX_ALLOW_MOCK_LOGIN=1）',
+  /function loginStartupError/.test(wechatSrcF) && /WX_ALLOW_MOCK_LOGIN/.test(wechatSrcF) &&
+  /wxLoginErr/.test(indexSrcF),
+  'wechat 暴露检查 + index.js 启动硬校验');
+assert('F10 · 生产缺配置时 code2Session 直接失败，不把任意 code 映射成 mock_openid',
+  /if \(!MOCK_LOGIN_ON\)/.test(wechatSrcF),
+  '缺配置 → BizError，不退回模拟身份');
+
+/* —— F11 落盘口径 —— */
+const catalogStoreSrcF = readFileSync(join(__dirname, '..', 'lib', 'catalogStore.js'), 'utf8');
+const storeSrcF = readFileSync(join(__dirname, '..', 'lib', 'store.js'), 'utf8');
+assert('F11 · 重要写入同步落盘（写盘成功才返回成功，不再「先成功、50ms 后写」）',
+  /function commitSync/.test(catalogStoreSrcF) && /function commitSync/.test(storeSrcF) &&
+  /catalogStore\.commitSync\(\)/.test(catalogSrcF),
+  'store / catalogStore 都有 commitSync，商品写路径已切过去');
+
+/* —— F12 部署运行用户 —— */
+const svcSrc = readFileSync(join(__dirname, '..', '..', 'deploy', 'lexy-mall.service'), 'utf8');
+assert('F12 · systemd 单元指定专用低权限用户，且可写路径收紧到数据 / 上传 / config / 日志',
+  /^User=lexy$/m.test(svcSrc) && /^Group=lexy$/m.test(svcSrc) &&
+  /ReadWritePaths=.*server\/data/.test(svcSrc) && !/ReadWritePaths=\/opt\/lexy-mall \/var\/log/.test(svcSrc),
+  'User=lexy + 可写路径不再覆盖整份源码');
+
+/* —— F13 分类取数 —— */
+assert('F13 · 分类参数先解析成分类 ID（ID 命中走 ID，唯一同名走名称，都不中则不猜）',
+  /function resolveCategoryId/.test(catalogSrcF) && /resolveCategoryId\(categoryId\)/.test(catalogSrcF),
+  'filterGoods / adminListGoods 都过 resolveCategoryId');
+
+/* —— F14 / F15 商品区块取数与错误归因 —— */
+const blocksSrcF = readFileSync(join(__dirname, '..', '..', 'miniprogram', 'utils', 'blocks.js'), 'utf8');
+assert('F14 · 榜单显式带 sort=sales 单独请求（不再与普通推荐共用一次不带 sort 的取数）',
+  /rankIdxs\.forEach\(\(i\) => pushList\(i, 'sales'\)\)/.test(blocksSrcF) &&
+  /\(sort \|\| 'default'\) \+ '\|'/.test(blocksSrcF),
+  '榜单单独桶 + 服务端先排序再分页');
+assert('F15 · 商品结果按 ID / 按区块各自记状态（别的区块成功不再掩盖本区块失败）',
+  /state\[r\.id\] = r\.state/.test(blocksSrcF) && /errored > 0/.test(blocksSrcF) &&
+  /g\.state === 'error'/.test(blocksSrcF),
+  '逐 ID 记 ok/error，逐区块聚合');
+
+/* —— F22 正式版不展示未接入入口 —— */
+assert('F22 · 正式版隐藏没有业务底座的入口（开发版 / 预览照常显示给运营看）',
+  /function notReadyVisible\(\)/.test(blocksSrcF) && /notReadyVisible\(\) \|\| x\.real/.test(blocksSrcF) &&
+  /depLine/.test(blocksSrcF),
+  'uc_tools 过滤 + 依赖文案换成「暂未开放」');
+
+/* —— F25 加载失败 ≠ 未登录 —— */
+const accountSrcF = readFileSync(join(__dirname, '..', '..', 'miniprogram', 'packageUser', 'account', 'account.js'), 'utf8');
+assert('F25 · 账号页区分「加载失败」与「未登录」（断网不再显示成要重新登录）',
+  /loadFailed/.test(accountSrcF) && /err\.needLogin/.test(accountSrcF) && /onRetryLoad/.test(accountSrcF),
+  'loadFailed 独立状态 + 重试入口');
+
+/* —— F27 可追溯审计 —— */
+assert('F27 · 后台写操作有审计记录（稳定 actorId + 目标 + 结果 + requestId，敏感值脱敏）',
+  existsSync(join(__dirname, '..', 'lib', 'audit.js')) &&
+  /audit\.record\(/.test(indexSrcF) && /function actorIdOf/.test(
+    readFileSync(join(__dirname, '..', 'lib', 'audit.js'), 'utf8')) &&
+  /SENSITIVE/.test(readFileSync(join(__dirname, '..', 'lib', 'audit.js'), 'utf8')),
+  'lib/audit.js 存在 + index.js 已接入 + 口令/令牌脱敏');
+
+/* —— F17 素材生命周期：历史版本保护 + 回收站 ——
+ * 以前 refs() 只看当前商品库 / 已发布 / 草稿，换图后旧图会被判成「未引用」，
+ * 而用户手机上已上传的小程序包用的还是旧版本 —— 删了就是成片白块。
+ * 同时「删除」以前等于从盘上抹掉，现在必须先过回收站。 */
+const mediaSrcF = readFileSync(join(__dirname, '..', 'lib', 'media.js'), 'utf8');
+assert('F17 · 引用检查把保留期内的历史发布版本算进来（旧客户端与回滚仍在用）',
+  /decorate',\s*'backup'/.test(mediaSrcF) && /VERSION_KEEP_DAYS/.test(mediaSrcF) &&
+  /function historyUrls/.test(mediaSrcF) && /protected:\s*history > 0/.test(mediaSrcF),
+  '扫 decorate/backup 的 replica.<ts>.js + 保护期常量');
+assert('F17 · 引用能定位到具体页面 / 段落（强制删除时点名「哪一页会裂」，不只是总数）',
+  / SECTION_LABEL /.test(mediaSrcF) && /function scanJsHits/.test(mediaSrcF) && /function scanJsonHits/.test(mediaSrcF),
+  'replica.js 按 const 段落定位，JSON 按路径定位');
+assert('F17 · 删除先进回收站、延迟物理删除，且可原样恢复',
+  /uploads_trash/.test(mediaSrcF) && /TRASH_KEEP_DAYS/.test(mediaSrcF) &&
+  /function restore\(/.test(mediaSrcF) && /function purge\(/.test(mediaSrcF) && /function sweepTrash\(/.test(mediaSrcF),
+  '回收站 + 恢复 + 到期才 purge');
+assert('F17 · 清理任务逐条说明依据（不是只返回一个已删数量）',
+  /reason: '进回收站/.test(mediaSrcF) && /reason: '仍被/.test(mediaSrcF) && /reason: '保留期已过/.test(mediaSrcF),
+  'purge / kept 都带 reason');
+assert('F17 · 彻底清除与合并是 owner 专属（与删除同级）',
+  adminAuthLibF.minRoleFor('POST', '/api/media/delete') === 'owner' &&
+  adminAuthLibF.minRoleFor('POST', '/api/media/purge') === 'owner' &&
+  adminAuthLibF.minRoleFor('POST', '/api/media/trash/sweep') === 'owner' &&
+  adminAuthLibF.minRoleFor('POST', '/api/media/merge') === 'owner',
+  `delete=${adminAuthLibF.minRoleFor('POST', '/api/media/delete')} ` +
+  `purge=${adminAuthLibF.minRoleFor('POST', '/api/media/purge')} ` +
+  `sweep=${adminAuthLibF.minRoleFor('POST', '/api/media/trash/sweep')} ` +
+  `merge=${adminAuthLibF.minRoleFor('POST', '/api/media/merge')}`);
+
+/* —— F18 重复素材与缩略加载 —— */
+assert('F18 · 同内容再次上传不再产生第二份物理副本（按内容哈希复用）',
+  /function hashOf/.test(mediaSrcF) && /function findByHash/.test(mediaSrcF) &&
+  /deduped: true/.test(mediaSrcF) && /forceNew/.test(mediaSrcF),
+  'sha256 + 复用已有记录');
+assert('F18 · 存量重复可扫描、可合并引用（三处数据源一起改，副本进回收站）',
+  /function scanHashes/.test(mediaSrcF) && /function duplicates/.test(mediaSrcF) &&
+  /function merge\(/.test(mediaSrcF) && /function replaceInFile/.test(mediaSrcF),
+  '补算哈希 → 分组 → 改指引用');
+assert('F18 · 大 GIF 不预载（点开才加载），图片一律懒加载',
+  /GIF_DEFER_BYTES/.test(consoleModSrc) && /heavyGif\(it\) \? 'data-src'/.test(consoleModSrc) &&
+  /loading="lazy"/.test(consoleModSrc) && !/loading="eager"/.test(consoleModSrc),
+  '超过阈值的 GIF 先不挂 src');
+assert('F18 · 文件夹可搜索、超 8 个可折叠（分组一多不至于找不到）',
+  /data-fq/.test(consoleModSrc) && /data-folderall/.test(consoleModSrc) && /FOLDER_SHOW/.test(consoleModSrc),
+  '侧栏搜索框 + 展开其余 N 个');
+
+/* —— F19 商品编辑：未保存保护 / 提交防重 / 分区导航 / 新建幂等 —— */
+assert('F19 · 长表单有分区导航（改库存不用一路滚到底）',
+  /SEC_TABS/.test(consoleModSrc) && /data-sec="' \+ s\.k/.test(consoleModSrc) &&
+  /id="sec-base"/.test(consoleModSrc) && /id="sec-sku"/.test(consoleModSrc) && /id="sec-show"/.test(consoleModSrc),
+  '基本信息 / 图片与详情 / 规格库存 / 展示状态 四段');
+assert('F19 · 有未保存改动时关窗要二次确认（不是直接 remove）',
+  /onClose: \(\) => \{[\s\S]{0,200}dirty/.test(consoleModSrc) && /confirmBox\('当前修改还没保存/.test(consoleModSrc),
+  'openModal 的 close 守卫');
+assert('F19 · 保存按钮提交中禁用（连点不会建成两件商品）',
+  /if \(btn\.disabled\) return;/.test(consoleModSrc) && /btn\.textContent = '保存中…'/.test(consoleModSrc),
+  '禁用 + 进度文案');
+assert('F19 · 新建商品带幂等键（服务端认 key，重复提交不新建第二件）',
+  /clientKey/.test(consoleModSrc) && /const clientKey = id \? ''/.test(consoleModSrc) &&
+  /if \(isNew && clientKey\)/.test(catalogSrcF) && /idempotent: true/.test(catalogSrcF),
+  '前端生成 + 服务端命中即返回');
+assert('F19 · 校验失败定位到出错字段并标红（输入保留，不重绘表单）',
+  /const markError = /.test(consoleModSrc) && /classList\.add\('invalid'\)/.test(consoleModSrc) &&
+  /scrollIntoView/.test(consoleModSrc),
+  '滚动 + 聚焦 + 标红');
+
+/* —— F20 设置页逐字段说明（说明必须与代码口径一致） —— */
+assert('F20 · 运营参数逐字段写明「谁读它、在哪生效」（不再是三行共用一句）',
+  /TIP_PHONE/.test(consoleCoreSrc) && /TIP_HOURS/.test(consoleCoreSrc) && /TIP_NOTICE/.test(consoleCoreSrc) &&
+  /关于我们/.test(consoleCoreSrc) && /装修台添加「公告」区块/.test(consoleCoreSrc),
+  '电话 / 时间 / 公告三条各不相同，公告点明不会自动上首页');
+
+/* —— F21 装修状态：生成时间 / 操作者 / 版本 + 开发信息折叠 —— */
+assert('F21 · 页面列表带「谁在什么时候生成的这份代码」（时间与操作者）',
+  /generatedAtText/.test(decorateSrcF) && /generatedBy/.test(decorateSrcF) && /versionId/.test(decorateSrcF) &&
+  /生成于/.test(adminJsSrc),
+  'store 下发 + 列表展示');
+assert('F21 · 版本记录的是真实操作者（不再硬编码 admin）',
+  /by: String\(by \|\| ''\)/.test(decorateSrcF) && /decorate\.publish\(key, ctx\.params\.note, ctx\.admin/.test(
+    readFileSync(join(__dirname, '..', 'routes', 'decorate.js'), 'utf8')) &&
+  /admin: adminSession/.test(indexSrcF),
+  'publish 传操作者 + index.js 把会话挂到 ctx');
+assert('F21 · 源码字段名（replica.HOME_BLOCKS 一类）收进「开发信息」折叠区，默认收起',
+  /btnDevInfo/.test(adminJsSrc) && /dev-col/.test(adminJsSrc) && /devInfo: false/.test(adminJsSrc) &&
+  /class="dev-col"/.test(readFileSync(join(__dirname, '..', 'public', 'admin', 'index.html'), 'utf8')),
+  '列表新增开关 + 数据来源列默认隐藏');
+
+/* —— F26 后台表单语义与操作层级（P3，取可静态验证的部分） —— */
+assert('F26 · 图标按钮有可访问名（读屏能念出用途，不只是 title）',
+  /aria-label="复制素材地址"/.test(consoleModSrc) && /aria-label="删除素材"/.test(consoleModSrc) &&
+  /aria-label="恢复到素材库"/.test(consoleModSrc),
+  '素材卡与回收站卡的图标按钮');
+assert('F26 · 已登录后侧栏不再显示「登录」（退出入口在顶栏）',
+  /filter\(\(n\) => n\.group \|\| !\(me && n\.key === GATE_VIEW\)\)/.test(consoleCoreSrc),
+  'renderNav 按登录态过滤');
+assert('F26 · 登录页把「长期令牌」收进高级折叠区（日常只看到账号 + 口令）',
+  /class="adv-box"/.test(consoleCoreSrc) && /高级：用长期令牌直接进入/.test(consoleCoreSrc),
+  'details/summary 折叠');
+assert('F26 · 无勾选时批量按钮禁用（事前说清楚，而不是点了才报错）',
+  /b\.disabled = n === 0/.test(consoleModSrc) && /先勾选商品才能批量操作/.test(consoleModSrc),
+  '批量上架 / 下架随勾选启用');
+assert('F26 · 库存红点自带含义说明（不靠颜色表意）',
+  /库存 ≤ 10 件，属于库存预警/.test(consoleModSrc),
+  'title 写明阈值与用途');
+
+/* —— F28 确定性非交易回归 —— */
+const regressSrc = existsSync(join(__dirname, 'regress.mjs'))
+  ? readFileSync(join(__dirname, 'regress.mjs'), 'utf8') : '';
+assert('F28 · 存在一条确定性非交易回归命令（不依赖人工登录，跑完核对真实数据未变）',
+  !!regressSrc && /test-admin-auth\.mjs/.test(regressSrc) && /test-media-f17\.mjs/.test(regressSrc) &&
+  /MALL_DATA_DIR/.test(regressSrc) && /指纹/.test(regressSrc) && /真实数据未被改动/.test(regressSrc),
+  'server/tools/regress.mjs 汇总 4 个套件 + 数据指纹校验');
+assert('F28 · README 写清回归命令与备份 / 恢复演练步骤（不只是「可以恢复」）',
+  /regress\.mjs/.test(readFileSync(join(__dirname, '..', '..', 'README.md'), 'utf8')),
+  'README 已登记回归入口');
 
 /* 16. 覆盖度与失败数的口径
  *

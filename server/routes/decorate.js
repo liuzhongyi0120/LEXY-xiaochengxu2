@@ -36,8 +36,17 @@
 const decorate = require('../decorate/store');
 const schema = require('../decorate/schema');
 const catalogStore = require('../lib/catalogStore');
+const adminAuth = require('../lib/adminAuth');
 const { diff } = require('../decorate/diff');
 const { BizError, ERR } = require('../lib/http');
+
+/*
+ * 路由自报权限（审查 F06 建议）。
+ *
+ * 权限声明写在**点位所在的文件里**，而不是让 lib/adminAuth 那张正则清单去猜。
+ * 新增高危点位的人就在同一屏看到它，不会漏；漏了也有 OWNER_RULES 兜底。
+ */
+adminAuth.declareRouteMinRole('POST', '/api/decorate/note/delete', 'owner');
 
 function needKey(p) {
   if (!p.key) throw new BizError('缺少页面标识 key', ERR.PARAM);
@@ -206,14 +215,29 @@ module.exports = [
   },
 
   {
+    method: 'GET',
+    path: '/api/decorate/note/refs',
+    auth: false,
+    desc: '笔记的站内引用清单：哪些页面 / 导航的哪个字段跳到了这篇笔记（删除前先看它）',
+    async handler(ctx) {
+      const key = needKey(ctx.params);
+      const id = decorate.noteIdOfKey(key);
+      if (!id) throw new BizError('不是合法的笔记标识：' + key, ERR.PARAM);
+      /* 与 /page/refs 同口径：只列「别人引用我」，不把笔记自己的页面算进来 */
+      const refs = decorate.referencesOf(key).filter((r) => r.pageKey !== key);
+      return { key: key, refs: refs, count: refs.length };
+    }
+  },
+
+  {
     method: 'POST',
     path: '/api/decorate/note/delete',
     auth: false,
-    desc: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js（页面标识不存在报 404）',
+    desc: '删除店铺笔记：连带清理草稿与版本记录并重新生成 replica.js（页面标识不存在报 404；仍被站内引用时须 force=1）',
     async handler(ctx) {
       // 与 /page/delete 同口径：按**页面标识**（note-<id>）删，而不是暴露注册表内部的数字 id。
       // 不是笔记标识时由 store.removeNote 抛 404（'笔记不存在：xxx'），提示比 1001 更准确。
-      return decorate.removeNote(needKey(ctx.params));
+      return decorate.removeNote(needKey(ctx.params), { force: ctx.params.force });
     }
   },
 
@@ -221,14 +245,15 @@ module.exports = [
     method: 'POST',
     path: '/api/decorate/draft',
     auth: false,
-    desc: '保存草稿（不影响线上，发布后才生效）',
+    desc: '保存草稿（不影响线上，发布后才生效）。带 rev 时做版本冲突检测：草稿已被别人保存过则返回 409',
     async handler(ctx) {
       const key = needKey(ctx.params);
       if (!ctx.params.data || typeof ctx.params.data !== 'object') {
         throw new BizError('缺少页面数据 data', ERR.PARAM);
       }
       // 同 page/create：不兜 catch（「数据校验未通过」已是 1001，其余异常必须如实上报）
-      return decorate.saveDraft(key, ctx.params.data);
+      // rev = 编辑器打开时拿到的草稿版本号，用于「这份草稿已被别人保存过」的冲突检测
+      return decorate.saveDraft(key, ctx.params.data, { rev: ctx.params.rev });
     }
   },
 
@@ -268,7 +293,8 @@ module.exports = [
       // 「没有草稿」是 2000，「数据校验未通过」是 1001；
       // 生成/回读 replica.js 失败是真正的服务端异常（5000），不能被压成业务失败 ——
       // 运营看到「服务开小差」才知道该找技术，而不是反复重试。
-      return decorate.publish(key, ctx.params.note);
+      /* 把操作者一起记进版本（审查 F21）：列表要能回答「这份代码是谁生成的」 */
+      return decorate.publish(key, ctx.params.note, ctx.admin && (ctx.admin.name || ctx.admin.username));
     }
   },
 

@@ -20,6 +20,7 @@
  */
 
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const nodePath = require('node:path');
 const atomic = require('./atomicFile');
 const { BizError, ERR } = require('./http');
@@ -28,6 +29,28 @@ const dataDir = require('./dataDir');
 /** 素材根目录（与数据同处 server/data，运维时一个目录备份即可） */
 const ROOT = nodePath.join(dataDir.ROOT, 'uploads');
 const INDEX_FILE = nodePath.join(ROOT, 'index.json');
+
+/*
+ * 历史版本与回收站（审查 F17）
+ *
+ * 背景：refs() 以前只看「当前商品库 + 当前 replica.js + 当前草稿」，
+ * 而小程序**已经上传的包**用的是更早那一版 replica.js —— 包还在用户手机上，
+ * 图删了就是白块，且回滚到旧版本同样会失图。所以引用检查必须把保留期内的历史版本算进去。
+ */
+/** 装修「生成代码」的备份目录，每次发布留一份 replica.<ts>.js */
+const BACKUP_DIR = nodePath.join(dataDir.ROOT, 'decorate', 'backup');
+/** 历史版本保护期（天）：这段时间内的版本按「仍有客户端在用」处理，其素材不许被普通清理删除 */
+const VERSION_KEEP_DAYS = 30;
+/**
+ * 回收站：删素材先进这里，到期才物理删除。
+ * 放在 uploads **之外**是刻意的 —— 挪进来后 /uploads/... 立刻 404，「下架」当场生效，
+ * 同时文件还在盘上，误删 / 回滚都能原样恢复（恢复后 URL 不变，页面不用改）。
+ */
+const TRASH_DIR = nodePath.join(dataDir.ROOT, 'uploads_trash');
+const TRASH_INDEX = nodePath.join(TRASH_DIR, 'trash.json');
+/** 回收站保留期（天）：到期才允许 purge；未到期需显式 force */
+const TRASH_KEEP_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** 对外访问前缀（与 index.js 的静态服务一致） */
 const URL_PREFIX = '/uploads';
@@ -409,8 +432,27 @@ function makeName(ext) {
 }
 
 /**
- * 保存单个素材（含魔数校验 + 按 kind 判体积上限）
- * @param item   {data, orig, rel?, source?}  rel = 指定相对路径（导入工具用，保留可辨识的原文件名）
+ * 内容哈希（审查 F18）
+ *
+ * 素材库里躺着 1312MiB，其中 274 份是完全重复的副本（约占 174.8MiB）：
+ * 同一张图被不同人、不同批次反复上传，文件名与存放目录都不同，**只有内容是一样的**。
+ * 所以去重必须按内容哈希，不能按文件名。
+ */
+function hashOf(buf) {
+  return crypto.createHash('sha256').update(buf).digest('hex');
+}
+
+/** 按内容哈希找已存在的素材（老索引没有 hash 字段，自然匹配不上，走正常入库） */
+function findByHash(hash) {
+  if (!hash) return null;
+  return readIndex().items.find((x) => x.hash === hash) || null;
+}
+
+/**
+ * 保存单个素材（含魔数校验 + 按 kind 判体积上限 + **同内容复用**）
+ * @param item   {data, orig, rel?, source?, forceNew?}
+ *               rel = 指定相对路径（导入工具用，保留可辨识的原文件名）
+ *               forceNew = 1 时跳过去重（明确要留第二份物理副本时用）
  * @param folder 归属文件夹（'' = 未分组）
  */
 function saveOne(item, folder) {
@@ -429,6 +471,29 @@ function saveOne(item, folder) {
       humanSize(item.data.length) + '，' + (probed.kind === 'video' ? '视频' : '图片') + '上限 ' + humanSize(limit),
       ERR.PARAM
     );
+  }
+
+  /*
+   * 同内容不再产生第二份物理副本（审查 F18）。
+   * 直接复用已存在的那条记录：URL 也用原来那个，页面 / 商品里指向的是同一份文件，
+   * 不需要额外改任何引用。返回值里带 deduped / reused，前端要如实告诉运营
+   * 「这张已经传过了，用的是原来那份」，否则他会以为上传失败了。
+   */
+  const hash = hashOf(item.data);
+  if (!item.forceNew) {
+    const dup = findByHash(hash);
+    if (dup) {
+      return Object.assign({}, dup, {
+        deduped: true,
+        reused: dup.name,
+        /* 归属按本次上传的选择返回：调用方（后台 / 自检）要看的是「这张图现在在哪个分组」，
+           回一个旧的 folder 会让它以为「指定文件夹上传」没生效 */
+        folder: folder || dup.folder || '',
+        orig: String(item.orig || dup.orig || '').slice(0, 120),
+        sizeText: humanSize(dup.size || 0),
+        durationText: durationText(dup.duration)
+      });
+    }
   }
 
   const { dir, base } = makeName(probed.ext);
@@ -454,6 +519,7 @@ function saveOne(item, folder) {
   return {
     name: rel,
     url: URL_PREFIX + '/' + rel,
+    hash: hash,
     orig: String(item.orig || base).slice(0, 120),
     // source 只在「从外部导入」时写入（原始外链地址），便于日后重新抓取或核对
     source: item.source ? String(item.source).slice(0, 500) : undefined,
@@ -487,14 +553,32 @@ function upload(items, folder) {
     }
   });
 
-  if (done.length) {
+  const fresh = done.filter((x) => !x.deduped);
+  const reused = done.filter((x) => x.deduped);
+  if (fresh.length) {
     const idx = readIndex();
-    idx.items = done.concat(idx.items);
+    idx.items = fresh.concat(idx.items);
     if (target && idx.folders.indexOf(target) === -1) idx.folders.push(target);
     writeIndex(idx);
   }
   if (!done.length) {
     throw new BizError(failed.length ? failed[0].reason : '上传失败', ERR.PARAM);
+  }
+  /* 复用的那份沿用原 URL —— 它已经在索引里、也已经在页面上，不能再往索引里塞一遍，
+     否则同一张图会出现两条记录，「已选 N 张」、容量统计全都会翻倍。 */
+  if (reused.length) {
+    const idx = readIndex();
+    let touched = false;
+    reused.forEach((r) => {
+      const it = idx.items.find((x) => x.name === r.name);
+      /* 归属文件夹按本次上传的选择更新：运营把同一张图拖到「首页」分组，
+         期望它在「首页」里出现 —— 复用的是文件，不是它的归类。 */
+      if (it && target && it.folder !== target) { it.folder = target; touched = true; }
+    });
+    if (touched) {
+      if (idx.folders.indexOf(target) === -1) idx.folders.push(target);
+      writeIndex(idx);
+    }
   }
   done.forEach((d) => {
     d.sizeText = humanSize(d.size);
@@ -507,10 +591,14 @@ function upload(items, folder) {
     failed: failed.length,
     failedList: failed,
     folder: target,
-    // 体积提示：不阻断上传，只在返回里说清「小程序端加载会慢」
+    // 体积提示：不阻断上传，只在返回里说清「小程序端加载会明显变慢」
     warn: bigVideos.length
       ? bigVideos.map((d) => d.orig + ' 有 ' + humanSize(d.size) + '，建议压到 ' + humanSize(VIDEO_WARN_BYTES) + ' 以内（小程序端首帧加载会明显变慢）').join('；')
       : '',
+    /* 复用提示（审查 F18）：同内容再次上传不再落第二份盘，
+       但要如实说「用的是哪一份」，不能让运营以为没传上 */
+    deduped: reused.length,
+    dedupedList: reused.map((d) => ({ orig: d.orig, reused: d.reused, url: d.url })),
     total: readIndex().items.length
   };
 }
@@ -518,6 +606,164 @@ function upload(items, folder) {
 /** 读一条索引（找不到返回 null） */
 function find(name) {
   return readIndex().items.find((x) => x.name === name) || null;
+}
+
+/* ------------------------- 重复治理（审查 F18） ------------------------- */
+
+/**
+ * 给索引里还没有 hash 的素材补算内容哈希。
+ *
+ * 分批做（limit）是因为存量素材有 1.3GiB：一次全读会把请求卡死几分钟。
+ * 后台点「扫描重复」反复调用即可，每次消化一批，扫完 duplicates() 才完整。
+ */
+function scanHashes(limit) {
+  const n = Math.max(1, Math.min(400, Number(limit) || 120));
+  const idx = readIndex();
+  let scanned = 0;
+  let missing = 0;
+  for (const it of idx.items) {
+    if (scanned >= n) break;
+    if (it.hash) continue;
+    let buf = null;
+    try { buf = fs.readFileSync(nodePath.join(ROOT, it.name)); } catch (e) { buf = null; }
+    if (!buf) { missing += 1; continue; }
+    it.hash = hashOf(buf);
+    scanned += 1;
+  }
+  writeIndex(idx);
+  const remain = idx.items.filter((x) => !x.hash).length;
+  return { scanned: scanned, missing: missing, remain: remain, total: idx.items.length, done: remain === 0 };
+}
+
+/** 当前数据源里「某个 URL 出现的所有位置」（供合并引用复用，与 refs() 同源） */
+function refSources() {
+  return [
+    { label: '商品库', file: nodePath.join(dataDir.ROOT, 'catalog.json') },
+    { label: '已发布', file: nodePath.join(__dirname, '..', '..', 'miniprogram', 'config', 'replica.js') },
+    { label: '草稿', file: nodePath.join(dataDir.ROOT, 'decorate', 'state.json') }
+  ];
+}
+
+/** 把一个 URL 全部替换成另一个（文本级替换：URL 里没有需要转义的字符） */
+function replaceInFile(file, from, to) {
+  let text = '';
+  try { text = fs.readFileSync(file, 'utf8'); } catch (e) { return 0; }
+  const n = text.split(from).length - 1;
+  if (!n) return 0;
+  atomic.writeFileAtomic(file, text.split(from).join(to));
+  return n;
+}
+
+/**
+ * 重复分组：按内容哈希聚成一组，给出「建议保留哪份 / 哪些是副本 / 白占了多少空间」。
+ * 保留最早那份 —— 它的 URL 最可能已经散落在页面与商品里，换掉它需要改的引用最少。
+ */
+function duplicates() {
+  const idx = readIndex();
+  const byHash = new Map();
+  idx.items.forEach((it) => {
+    if (!it.hash) return;
+    if (!byHash.has(it.hash)) byHash.set(it.hash, []);
+    byHash.get(it.hash).push(it);
+  });
+  const groups = [];
+  byHash.forEach((arr, hash) => {
+    if (arr.length < 2) return;
+    const sorted = arr.slice().sort((a, b) => (a.at || 0) - (b.at || 0));
+    const keep = sorted[0];
+    const dupes = sorted.slice(1);
+    const waste = dupes.reduce((s, d) => s + (d.size || 0), 0);
+    const brief = (x) => ({
+      name: x.name, url: URL_PREFIX + '/' + x.name, orig: x.orig || x.name,
+      size: x.size || 0, sizeText: humanSize(x.size || 0), folder: x.folder || '', at: x.at || 0
+    });
+    groups.push({
+      hash: hash,
+      keep: brief(keep),
+      dupes: dupes.map(brief),
+      count: arr.length,
+      wasteBytes: waste,
+      wasteText: humanSize(waste)
+    });
+  });
+  groups.sort((a, b) => b.wasteBytes - a.wasteBytes);
+  const wasteBytes = groups.reduce((s, g) => s + g.wasteBytes, 0);
+  return {
+    groups: groups,
+    groupCount: groups.length,
+    dupeCount: groups.reduce((s, g) => s + g.dupes.length, 0),
+    wasteBytes: wasteBytes,
+    wasteText: humanSize(wasteBytes),
+    /* 还没算过哈希的条数：>0 说明上面的统计不完整，要先点「扫描」 */
+    unhashed: idx.items.filter((x) => !x.hash).length
+  };
+}
+
+/**
+ * 合并重复副本：把 names 指向的引用全部改到 keep，副本进回收站（可恢复）。
+ *
+ * 三个数据源一起改（商品库 / 已发布 / 草稿）是必须的：
+ * 只改其中一份，就会出现「商品页指向 A、装修页指向 B，A 被回收后商品页裂图」。
+ * 副本只进回收站、不物理删除 —— 万一引用没改全，还能救回来（审查 F17）。
+ */
+function merge(opt) {
+  const o = opt || {};
+  const keep = String(o.keep || '').replace(/^\/?uploads\//, '');
+  let names = o.names || [];
+  if (typeof names === 'string') names = names.split(',');
+  if (!keep) throw new BizError('缺少要保留的素材 keep', ERR.PARAM);
+
+  const idx = readIndex();
+  if (!idx.items.some((x) => x.name === keep)) throw new BizError('要保留的素材不存在：' + keep, ERR.NOT_FOUND, 404);
+  names = names.map((n) => String(n || '').replace(/^\/?uploads\//, '')).filter((n) => n && n !== keep);
+  if (!names.length) throw new BizError('缺少要合并的副本 names（至少一个，且不能是 keep 自己）', ERR.PARAM);
+
+  const toUrl = URL_PREFIX + '/' + keep;
+  const sources = refSources();
+  const detail = [];
+  let movedRefs = 0;
+
+  names.forEach((n) => {
+    const fromUrl = URL_PREFIX + '/' + n;
+    const perSource = [];
+    sources.forEach((s) => {
+      const c = replaceInFile(s.file, fromUrl, toUrl);
+      if (c) perSource.push({ where: s.label, count: c });
+      movedRefs += c;
+    });
+    detail.push({ name: n, moved: perSource.reduce((s, x) => s + x.count, 0), sources: perSource });
+  });
+
+  const trashed = [];
+  const skipped = [];
+  names.forEach((n) => {
+    try {
+      const r = remove(n, true);
+      trashed.push({ name: n, trashed: !!r.trashed });
+    } catch (e) {
+      skipped.push({ name: n, reason: e.message });
+    }
+  });
+
+  /* 回收站里标一句来源：日后翻回收站要能看懂「这张为什么在这」 */
+  const trash = readTrash();
+  trash.items.forEach((t) => {
+    if (names.indexOf(t.name) > -1) t.mergeTo = keep;
+  });
+  writeTrash(trash);
+
+  return {
+    keep: keep,
+    keepUrl: toUrl,
+    merged: trashed.length,
+    trashed: trashed,
+    skipped: skipped,
+    movedRefs: movedRefs,
+    detail: detail,
+    hint: movedRefs
+      ? '已把 ' + movedRefs + ' 处引用指向保留的那份；副本进了回收站，30 天内可恢复'
+      : '这些副本当前没有被引用，已直接进回收站'
+  };
 }
 
 /**
@@ -577,6 +823,9 @@ function list(opt) {
     list: slice,
     total: rows.length,
     all: alive.length,
+    /* 回收站条数（审查 F17）：侧栏要常驻显示「回收站 N」，
+       否则运营删完图根本不知道还有个能救回来的地方 */
+    trash: readTrash().items.length,
     page: page,
     size: size,
     pages: Math.max(1, Math.ceil(rows.length / size)),
@@ -609,34 +858,203 @@ function list(opt) {
   };
 }
 
+/* --------------------- 引用定位与历史版本（审查 F17） --------------------- */
+
+/** replica.js 顶层段落 → 运营看得懂的说法（确认框里要点名「删了哪一页会裂」） */
+const SECTION_LABEL = {
+  SHOP: '店铺设置',
+  HOME_BLOCKS: '首页',
+  MINE_BLOCKS: '个人中心',
+  LEXY_SERIES: '莱克系列',
+  NEWS: '资讯',
+  PRODUCT_NAV_LOGO: '产品导航',
+  PRODUCT_BRANDS: '产品页',
+  CUSTOM_PAGES: '自定义页',
+  CUSTOM_PAGE_ALIASES: '页面别名',
+  SHOPNOTES: '店铺笔记',
+  PAGE_META: '页面元信息',
+  TABBAR: '底部导航'
+};
+
+/**
+ * 在生成出来的 replica.js 里定位某张图落在「哪个段落 / 哪个页面」。
+ *
+ * 逐行扫而不是整文件正则一次出总数：总数回答不了「删了会裂在哪」，
+ * 而强制删除的确认框必须把受影响的页面摊开给运营看（审查 F17）。
+ * 同一行出现多次要按次数计，否则少报会让本该拦住的删除放过去。
+ */
+function scanJsHits(text, url) {
+  const lines = String(text).split(/\r?\n/);
+  let section = '';
+  let page = '';
+  const out = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const sec = /^const\s+([A-Za-z_$][\w$]*)\s*=/.exec(line);
+    if (sec) { section = sec[1]; page = ''; continue; }
+    if (section === 'CUSTOM_PAGES') {
+      const pg = /^ {2}([A-Za-z0-9_-]+)\s*:\s*\{/.exec(line);
+      if (pg) page = pg[1];
+    }
+    const n = line.split(url).length - 1;
+    for (let k = 0; k < n; k++) out.push({ section: section, page: page });
+  }
+  return out;
+}
+
+/** 在 JSON 数据源（商品库 / 草稿）里定位引用：路径前两段足够说清「哪块数据」 */
+function scanJsonHits(text, url) {
+  let root = null;
+  try { root = JSON.parse(text); } catch (e) { return []; }
+  const out = [];
+  const walk = (node, path) => {
+    if (typeof node === 'string') {
+      if (node === url) {
+        out.push({ section: path.slice(0, 2).join('.'), page: path[0] === 'drafts' ? (path[1] || '') : '' });
+      }
+      return;
+    }
+    if (Array.isArray(node)) { node.forEach((v) => walk(v, path)); return; }
+    if (node && typeof node === 'object') Object.keys(node).forEach((k) => walk(node[k], path.concat(k)));
+  };
+  walk(root, []);
+  return out;
+}
+
+/**
+ * 保留期内历史版本用到的素材清单（url → 版本号数组）。
+ *
+ * 按「备份目录里有哪些文件 + 各自 mtime/size」做缓存键：
+ * 一次引用检查要把上百个版本全读一遍太慢，而备份文件**只增不改**，
+ * 目录清单没变就说明内容没变，缓存是可靠的。
+ */
+let versionCache = { key: '', urls: new Map(), scanned: 0, kept: 0, keepDays: VERSION_KEEP_DAYS };
+/** 单次最多扫多少个历史版本（兜底：备份目录异常膨胀时不至于把请求卡死） */
+const MAX_VERSION_SCAN = 200;
+
+function historyUrls() {
+  let names = [];
+  try { names = fs.readdirSync(BACKUP_DIR); } catch (e) { names = []; }
+  const files = names.map((f) => {
+    const m = /^replica\.(\d+)\.js$/.exec(f);
+    if (!m) return null;
+    try {
+      const s = fs.statSync(nodePath.join(BACKUP_DIR, f));
+      return { f: f, ts: Number(m[1]), mtimeMs: s.mtimeMs, size: s.size };
+    } catch (e) { return null; }
+  }).filter(Boolean).sort((a, b) => b.ts - a.ts);
+
+  const key = files.map((x) => `${x.f}:${x.mtimeMs}:${x.size}`).join('|');
+  if (versionCache.key === key) return versionCache;
+
+  const cutoff = Date.now() - VERSION_KEEP_DAYS * DAY_MS;
+  const urls = new Map();
+  let kept = 0;
+  files.slice(0, MAX_VERSION_SCAN).forEach((x) => {
+    if (x.ts && x.ts < cutoff) return; // 超出保护期的旧版本不再拦删除
+    kept++;
+    let text = '';
+    try { text = fs.readFileSync(nodePath.join(BACKUP_DIR, x.f), 'utf8'); } catch (e) { return; }
+    const set = new Set(text.match(/\/uploads\/[A-Za-z0-9._\-/]+/g) || []);
+    set.forEach((u) => {
+      if (!urls.has(u)) urls.set(u, []);
+      urls.get(u).push(x.ts);
+    });
+  });
+  versionCache = { key: key, urls: urls, scanned: files.length, kept: kept, keepDays: VERSION_KEEP_DAYS };
+  return versionCache;
+}
+
+/* --------------------------- 回收站读写 --------------------------- */
+
+/** 回收站里的相对路径（去掉盘符 / 前导斜杠与 ..，保证一定落在 TRASH_DIR 内） */
+function trashRelOf(n) {
+  return String(n).replace(/\\/g, '/').replace(/^\/+/, '').replace(/\.\./g, '');
+}
+
+function readTrash() {
+  try {
+    const j = JSON.parse(fs.readFileSync(TRASH_INDEX, 'utf8'));
+    if (Array.isArray(j)) return { items: j.filter((x) => x && x.name) };
+    if (j && Array.isArray(j.items)) return { items: j.items.filter((x) => x && x.name) };
+  } catch (e) {
+    // 首次运行 / 索引损坏都从空开始（回收站空 = 不允许清除，不会误删盘上文件）
+  }
+  return { items: [] };
+}
+
+function writeTrash(t) {
+  ensureDir(TRASH_DIR);
+  atomic.writeFileAtomic(TRASH_INDEX, JSON.stringify({ items: (t && t.items) || [] }, null, 2));
+}
+
 /**
  * 素材被哪些数据引用
  *
- * 三个引用源缺一不可：
+ * 四个引用源缺一不可：
  *   - 已发布 replica.js / 草稿 state.json → 装修页面的图片
  *   - **商品库 catalog.json** → 商品主图、图集、详情长图
+ *   - **保留期内的历史发布版本**（decorate/backup/replica.<ts>.js，审查 F17）
  * 曾漏掉商品库：商品图在素材管理里显示「未引用」，运营一点删除就把商品图删没了。
+ * 又漏掉历史版本：运营换掉首页大图并重新生成代码后，新 replica.js 里已经没有旧图，
+ * 于是旧图被判成「未引用」—— 但**用户手机上已上传的小程序包用的还是旧版本**，
+ * 一删就是成片白块，回滚到旧版本同样失图。所以保留期内的版本一律视作「仍在用」。
+ *
+ * @returns {{url, total, current, history, protected, detail, keepDays}}
+ *   detail 里的 where 已经写到「哪一页」的粒度（如 `已发布·首页`、`自定义页·spring2026`），
+ *   强制删除的确认框要原样摊开给运营看 —— 只给一个总数的话，他不知道删了会裂在哪。
  */
 function refs(name) {
   const url = URL_PREFIX + '/' + name;
   const files = [
-    { label: '商品库', file: nodePath.join(dataDir.ROOT, 'catalog.json') },
-    { label: '已发布', file: nodePath.join(__dirname, '..', '..', 'miniprogram', 'config', 'replica.js') },
-    { label: '草稿', file: nodePath.join(dataDir.ROOT, 'decorate', 'state.json') }
+    { label: '商品库', file: nodePath.join(dataDir.ROOT, 'catalog.json'), scan: scanJsonHits },
+    { label: '已发布', file: nodePath.join(__dirname, '..', '..', 'miniprogram', 'config', 'replica.js'), scan: scanJsHits },
+    { label: '草稿', file: nodePath.join(dataDir.ROOT, 'decorate', 'state.json'), scan: scanJsonHits }
   ];
-  const out = [];
+  const detail = [];
   files.forEach((f) => {
     let text = '';
     try { text = fs.readFileSync(f.file, 'utf8'); } catch (e) { return; }
-    const n = text.split(url).length - 1;
-    if (n) out.push({ where: f.label, count: n });
+    const byWhere = new Map();
+    f.scan(text, url).forEach((h) => {
+      const where = f.label + (h.page ? '·' + h.page : (SECTION_LABEL[h.section] ? '·' + SECTION_LABEL[h.section] : ''));
+      byWhere.set(where, (byWhere.get(where) || 0) + 1);
+    });
+    byWhere.forEach((count, where) => detail.push({ where: where, count: count, source: f.label }));
   });
-  return { url: url, total: out.reduce((s, x) => s + x.count, 0), detail: out };
+  const current = detail.reduce((s, x) => s + x.count, 0);
+
+  const vc = historyUrls();
+  const versions = vc.urls.get(url) || [];
+  const history = versions.length;
+  if (history) {
+    detail.push({
+      where: '历史版本（保留 ' + vc.keepDays + ' 天）',
+      count: history,
+      source: 'history',
+      /* 保留期内**有 N 个已发布版本**仍在用它 —— 这些版本对应着用户手机上已安装的包 */
+      newest: Math.max.apply(null, versions),
+      note: '回滚或旧客户端仍在用这些版本，删除后会显示空白'
+    });
+  }
+
+  return {
+    url: url,
+    total: current + history,
+    current: current,
+    history: history,
+    protected: history > 0,
+    detail: detail,
+    keepDays: vc.keepDays,
+    versionsKept: vc.kept,
+    versionsScanned: vc.scanned
+  };
 }
 
 /**
- * 删除素材
- *   - 默认先做引用检查：被页面用到时拒绝，除非显式 force
+ * 删除素材（先进回收站，**不立刻物理删除**，审查 F17）
+ *   - 引用检查覆盖当前数据 + 保留期内的历史版本；被用到时拒绝，除非显式 force
+ *   - force 也会把「受影响的版本与页面」原样返回，供前端二次确认时展示
  *   - 只允许删索引内的条目，拦住 '../../server/index.js' 这类路径穿越
  */
 function remove(name, force) {
@@ -650,30 +1068,212 @@ function remove(name, force) {
   const r = refs(n);
   if (r.total && !force) {
     throw new BizError(
-      '该素材正被 ' + r.total + ' 处页面内容引用（' + r.detail.map((d) => d.where + ' ' + d.count + ' 处').join('、') +
+      '该素材正被 ' + r.total + ' 处引用（' + r.detail.map((d) => d.where + ' ' + d.count + ' 处').join('、') +
       '），删除后前台会显示空白。确认要删可传 force:1',
       ERR.BIZ
     );
   }
 
   const abs = nodePath.join(ROOT, n);
-  let missing = false;
-  try {
-    /*
-     * 走带重试的删除：Windows 上文件会被实时扫描 / 残留句柄瞬时占用（EPERM / EBUSY），
-     * 重试几十毫秒即可成功。
-     * 曾经这里把任何异常都静默吞掉、照旧返回 deleted:true 并删掉索引 ——
-     * 结果是「索引里没了、磁盘上还在」，运营以为图已下架，而 /uploads/... 仍返回 200。
-     * 内容下架失效比删除失败严重得多，所以失败必须整体失败、让调用方看到真实原因。
-     */
-    if (!atomic.unlinkSync(abs)) missing = true;
-  } catch (e) {
-    throw new BizError('删除文件失败（' + (e.code || e.message) + '）：' + n + '，文件可能正被占用，请稍后重试', ERR.BIZ);
+  if (!fs.existsSync(abs)) {
+    // 索引里有、磁盘上没有：只清索引，别把「文件丢了」当成删除失败挡住运营
+    idx.items.splice(i, 1);
+    writeIndex(idx);
+    return {
+      name: n, url: URL_PREFIX + '/' + n, deleted: true, trashed: false, fileMissing: true,
+      refs: r.total, refsDetail: r.detail, total: idx.items.length
+    };
   }
+
+  const trashRel = trashRelOf(n);
+  const trashAbs = nodePath.join(TRASH_DIR, trashRel);
+  try {
+    ensureDir(nodePath.dirname(trashAbs));
+    /* 先复制再删：跨盘 / 被瞬时占用时 rename 会失败，复制成功后再删原件，
+       最坏情况是「回收站里有、uploads 里也还在」，也不会出现两边都没有的真空 */
+    fs.copyFileSync(abs, trashAbs);
+    atomic.unlinkSync(abs);
+  } catch (e) {
+    throw new BizError('移入回收站失败（' + (e.code || e.message) + '）：' + n +
+      '，文件可能正被占用，请稍后重试（原件未改动）', ERR.BIZ);
+  }
+
+  const item = idx.items[i];
+  const trash = readTrash();
+  trash.items.unshift({
+    name: n,
+    trashRel: trashRel,
+    url: URL_PREFIX + '/' + n,
+    orig: item.orig || n,
+    folder: item.folder || '',
+    kind: item.kind || 'image',
+    size: item.size || 0,
+    sizeText: humanSize(item.size || 0),
+    mime: item.mime || '',
+    at: item.at || 0,
+    deletedAt: Date.now(),
+    /* 删的时候快照一份引用情况：进回收站后当前数据里的引用已经没了，
+       要判断「还能不能彻底清掉」，靠的就是这份快照 + 保留期历史版本 */
+    refsAtDelete: r.total,
+    refsDetail: r.detail
+  });
+  writeTrash(trash);
+
   idx.items.splice(i, 1);
   writeIndex(idx);
 
-  return { name: n, url: URL_PREFIX + '/' + n, deleted: true, fileMissing: missing, refs: r.total, total: idx.items.length };
+  return {
+    name: n,
+    url: URL_PREFIX + '/' + n,
+    deleted: true,
+    trashed: true,
+    restorable: true,
+    fileMissing: false,
+    refs: r.total,
+    refsDetail: r.detail,
+    trashKeepDays: TRASH_KEEP_DAYS,
+    total: idx.items.length
+  };
+}
+
+/* ------------------------------- 回收站 ------------------------------- */
+
+/** 回收站清单：带「还剩几天可恢复」与「是否仍被保留期历史版本引用」 */
+function trashList() {
+  const now = Date.now();
+  return {
+    keepDays: TRASH_KEEP_DAYS,
+    total: readTrash().items.length,
+    items: readTrash().items.map((t) => {
+      const ageDays = Math.floor((now - (t.deletedAt || now)) / DAY_MS);
+      return Object.assign({}, t, {
+        ageDays: ageDays,
+        daysLeft: Math.max(0, TRASH_KEEP_DAYS - ageDays),
+        expired: ageDays >= TRASH_KEEP_DAYS,
+        deletedAtText: new Date(t.deletedAt || now).toLocaleString('zh-CN', { hour12: false })
+      });
+    })
+  };
+}
+
+/**
+ * 从回收站恢复（URL 与原来完全一致，页面 / 商品不用改）
+ * 名字被新上传的素材占用时拒绝 —— 直接覆盖会让「刚传的图」凭空消失。
+ */
+function restore(name) {
+  const n = String(name || '').replace(/^\/?uploads\//, '');
+  if (!n || n.includes('..') || n.startsWith('/')) throw new BizError('素材名不合法', ERR.PARAM);
+
+  const trash = readTrash();
+  const i = trash.items.findIndex((x) => x.name === n);
+  if (i === -1) throw new BizError('回收站里没有这个素材：' + n, ERR.NOT_FOUND, 404);
+  const t = trash.items[i];
+
+  const idx = readIndex();
+  if (idx.items.some((x) => x.name === n)) {
+    throw new BizError('素材库里已有同名素材 ' + n + '（可能是删除后又传了一张），请先处理它再恢复', ERR.BIZ);
+  }
+
+  const from = nodePath.join(TRASH_DIR, t.trashRel || n);
+  if (!fs.existsSync(from)) throw new BizError('回收站里的文件已不存在，无法恢复：' + n, ERR.NOT_FOUND, 404);
+  const to = nodePath.join(ROOT, n);
+  try {
+    ensureDir(nodePath.dirname(to));
+    fs.copyFileSync(from, to);
+  } catch (e) {
+    throw new BizError('恢复失败（' + (e.code || e.message) + '）：' + n, ERR.BIZ);
+  }
+  atomic.unlinkSync(from);
+
+  idx.items.unshift({
+    name: n, url: t.url, orig: t.orig, folder: t.folder, kind: t.kind,
+    size: t.size, sizeText: humanSize(t.size || 0), mime: t.mime, at: t.at
+  });
+  writeIndex(idx);
+  trash.items.splice(i, 1);
+  writeTrash(trash);
+
+  return { name: n, url: t.url, restored: true, total: idx.items.length };
+}
+
+/**
+ * 彻底清除回收站里的一个素材
+ * 未到期需 force=1 —— 回收站的意义就是「删了还能后悔」，一键清空等于没有回收站。
+ */
+function purge(name, force) {
+  const n = String(name || '').replace(/^\/?uploads\//, '');
+  if (!n || n.includes('..') || n.startsWith('/')) throw new BizError('素材名不合法', ERR.PARAM);
+
+  const trash = readTrash();
+  const i = trash.items.findIndex((x) => x.name === n);
+  if (i === -1) throw new BizError('回收站里没有这个素材：' + n, ERR.NOT_FOUND, 404);
+  const t = trash.items[i];
+  const ageDays = Math.floor((Date.now() - (t.deletedAt || Date.now())) / DAY_MS);
+  if (ageDays < TRASH_KEEP_DAYS && !force) {
+    throw new BizError(
+      '该素材进回收站才 ' + ageDays + ' 天，保留期 ' + TRASH_KEEP_DAYS + ' 天（还剩 ' +
+      (TRASH_KEEP_DAYS - ageDays) + ' 天可恢复）。确需立刻清除请传 force=1',
+      ERR.BIZ
+    );
+  }
+
+  const abs = nodePath.join(TRASH_DIR, t.trashRel || n);
+  if (fs.existsSync(abs) && !atomic.unlinkSync(abs)) {
+    throw new BizError('清除失败：文件仍被占用 —— ' + n, ERR.BIZ);
+  }
+  trash.items.splice(i, 1);
+  writeTrash(trash);
+  return { name: n, purged: true, ageDays: ageDays, total: readTrash().items.length };
+}
+
+/**
+ * 回收站清理（定时任务 / 一键清理都走这里）
+ *
+ * 关键是「每个候选都要能说出依据」：只返回一个已删数量的话，
+ * 运营对不上账（「我删的那张怎么不见了 / 怎么还在？」），
+ * 所以保留下来的每一条都带 reason（未到期 / 仍被保留期历史版本引用）。
+ */
+function sweepTrash(opt) {
+  const o = opt || {};
+  const now = Date.now();
+  const trash = readTrash();
+  const purged = [];
+  const kept = [];
+  trash.items.forEach((t) => {
+    const ageDays = Math.floor((now - (t.deletedAt || now)) / DAY_MS);
+    const name = t.name;
+    if (ageDays < TRASH_KEEP_DAYS) {
+      kept.push({ name: name, reason: '进回收站 ' + ageDays + ' 天，保留期 ' + TRASH_KEEP_DAYS + ' 天未到（还剩 ' + (TRASH_KEEP_DAYS - ageDays) + ' 天可恢复）' });
+      return;
+    }
+    /* 到期了也要再看一眼：保留期内的历史版本还在用它的，清掉会让回滚版本失图 */
+    if (!o.force) {
+      const r = refs(name);
+      if (r.total) {
+        kept.push({ name: name, reason: '仍被 ' + r.total + ' 处引用（' + r.detail.map((d) => d.where).join('、') + '），删了会让这些位置空白' });
+        return;
+      }
+    }
+    const abs = nodePath.join(TRASH_DIR, t.trashRel || name);
+    let okDel = true;
+    if (fs.existsSync(abs)) okDel = atomic.unlinkSync(abs);
+    if (!okDel) {
+      kept.push({ name: name, reason: '文件被占用，本次未清除（下次清理会再试）' });
+      return;
+    }
+    purged.push({ name: name, reason: '保留期已过 ' + ageDays + ' 天且无引用', size: t.size || 0 });
+  });
+  const remain = trash.items.filter((t) => kept.some((k) => k.name === t.name));
+  writeTrash({ items: remain });
+  return {
+    purged: purged,
+    kept: kept,
+    purgedCount: purged.length,
+    keptCount: kept.length,
+    freedBytes: purged.reduce((s, x) => s + (x.size || 0), 0),
+    freedText: humanSize(purged.reduce((s, x) => s + (x.size || 0), 0)),
+    keepDays: TRASH_KEEP_DAYS
+  };
 }
 
 /* ----------------------------- 文件夹操作 ----------------------------- */
@@ -811,6 +1411,16 @@ module.exports = {
   find,
   refs,
   remove,
+  trashList,
+  restore,
+  purge,
+  sweepTrash,
+  hashOf,
+  scanHashes,
+  duplicates,
+  merge,
+  TRASH_KEEP_DAYS,
+  VERSION_KEEP_DAYS,
   folders,
   folderCreate,
   folderRename,

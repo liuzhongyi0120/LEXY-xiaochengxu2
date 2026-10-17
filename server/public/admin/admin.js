@@ -162,6 +162,7 @@
      * 所以这里不再缓存笔记配额 —— 页面列表里也不出现笔记行（见 filtered()）。 */
     templates: [],      // 新建页面可选模板
     filters: { name: '', status: '', belongs: '' },
+    devInfo: false,     // 「数据来源」列（源码字段名）是否展开 —— 默认收起（审查 F21）
     cur: null,        // { key, meta, schema, data, published, titles, hasDraft, versions }
     sel: '__root__',
     dirty: false,
@@ -381,6 +382,7 @@
           }
           var err = new Error(json.msg || ('业务码 ' + json.code));
           err.code = json.code;
+          err.data = json.data; // 409 冲突时服务端会把「当前版本信息」放在这里
           return Promise.reject(err);
         }
         return json.data;
@@ -558,9 +560,10 @@
       '<div class="nv-main">' +
         '<div class="nv-title">店铺导航' +
           '<span class="type-tag nav">全局配置</span>' +
+          /* 与页面列表同一套词（审查 F21）：不说「已发布」，那要等上传发布新版本才成立 */
           (nav.hasDraft
-            ? '<span class="tag warn">有未发布草稿</span>'
-            : '<span class="tag ok">已发布</span>') +
+            ? '<span class="tag warn">有未保存改动</span>'
+            : '<span class="tag ok">代码已生成</span>') +
         '</div>' +
         '<div class="nv-sub">' + esc(nav.desc || '') + '</div>' +
         '<div class="nv-chips">' + (chips || '<span class="dim">—</span>') + '</div>' +
@@ -624,13 +627,19 @@
       // 草稿时间并进状态单元格 —— 否则 1440 宽度下「操作」的 6 个按钮会换行（实测需求 354px / 实际 302px）
       var subParts = [p.path, p.belongs, p.blockCount + ' 项', p.fields + ' 字段'];
       /*
-       * 状态列：自定义页要区分「已写进代码包」与「只在后台」——
-       * 刚新建、还没点「生成代码」的页面，小程序端其实打不开，
-       * 一律标「已发布」会让运营以为线上已经有了。
+       * 状态列（审查 F21）：四个状态用**同一套词**，不再「内置页说已发布、自定义页说代码已生成」。
+       *
+       * 「已发布」这个词在这套架构里是**假的**：点「生成代码」只是把内容写回 miniprogram/config/replica.js，
+       * 线上要等「微信开发者工具上传 + 公众平台发布新版本」才更新。标「已发布」会让运营
+       * 以为用户已经看到了 —— 而他们等不到更新时，第一反应是生成按钮坏了。
+       *
+       * 内置页与自定义页的差别只是「有没有生成过」，所以两者用同一对词。
        */
-      var statusHtml = (p.custom && p.generated === false)
+      var statusHtml = (p.generated === false)
         ? '<span class="tag warn">未生成代码</span>'
-        : '<span class="tag ok">' + (p.custom ? '代码已生成' : '已发布') + '</span>';
+        : '<span class="tag ok">代码已生成</span>';
+      /* 有草稿时再补一枚角标：内容还在后台，没进代码包 */
+      if (p.hasDraft) statusHtml += '<span class="tag warn" title="有改动还没生成代码">有未保存改动</span>';
       var aliasHtml = (p.custom && (p.aliasFrom || []).length)
         ? '<div class="psub" title="改过标识：旧地址仍可访问">旧标识 ' +
           esc(p.aliasFrom.join(' / ')) + ' 仍可访问</div>'
@@ -645,9 +654,16 @@
             esc(subParts.join(' · ')) + '</div>' +
         '</td>' +
         '<td>' + statusHtml + aliasHtml +
+          /* 生成时间 / 操作者 / 版本（审查 F21）：状态只说「生成过没有」，
+             运营还要知道「手机上这份是什么时候的、谁生成的」。 */
+          (p.generated && p.generatedAtText
+            ? '<div class="psub" title="最近一次生成代码">生成于 ' + esc(p.generatedAtText) +
+                (p.generatedBy ? ' · ' + esc(p.generatedBy) : '') +
+                (p.versionId ? ' · ' + esc(p.versionId) : '') + '</div>'
+            : '<div class="psub dim">尚未生成过代码</div>') +
           (p.hasDraft ? '<div class="psub warn" title="草稿时间">草稿 ' + esc(p.draftAtText) + '</div>' : '') +
         '</td>' +
-        '<td class="src-cell"><span class="src" title="' + attr(p.source) + '">' +
+        '<td class="src-cell dev-col"><span class="src" title="' + attr(p.source) + '">' +
           esc(shortSource(p.source)) + '</span></td>' +
         '<td class="note-cell">' +
           (p.note ? '<span title="' + attr(p.note) + '">' + esc(p.note) + '</span>' : '<span class="dim">—</span>') +
@@ -667,7 +683,7 @@
           '<a class="btn sm" href="/admin?edit=' + attr(encodeURIComponent(p.key)) + '"' +
             ' target="_blank" rel="noopener" title="在新窗口打开可视化编辑器">装修</a>' +
           '<button class="btn sm danger" data-discard="' + attr(p.key) + '"' + (p.hasDraft ? '' : ' disabled') +
-            ' title="' + (p.hasDraft ? '恢复到已发布内容' : '当前没有草稿') + '">丢弃草稿</button>' +
+            ' title="' + (p.hasDraft ? '丢弃改动，回到上一次生成代码的内容' : '当前没有未保存改动') + '">丢弃草稿</button>' +
           /* 内置页没有「改名 / 删除」：它们对应小程序里编译期固定的页面，删不掉。
            * （笔记此前在这里有一支专属的「删除」按钮，2026-10-15 随入口一起搬到了
            *   控制台的「店铺笔记」栏目 —— 删除仍走同一个端点 /api/decorate/note/delete。） */
@@ -3183,14 +3199,35 @@
   /* ----------------------------- 保存 / 发布 / 版本 ----------------------------- */
 
   function saveDraft() {
-    return api('POST', '/api/decorate/draft', { body: { key: S.cur.key, data: S.cur.data } })
+    /*
+     * 带上打开时的草稿版本号（审查 F09）。
+     * 两人同时装修同一页时，后保存的那份旧草稿会把先保存的人的改动整个盖掉 ——
+     * 服务端检测到版本不一致会回 409，这里拦下来让他自己决定，而不是默默丢内容。
+     */
+    var rev = S.cur && typeof S.cur.revision === 'number' ? S.cur.revision : undefined;
+    return api('POST', '/api/decorate/draft', { body: { key: S.cur.key, data: S.cur.data, rev: rev } })
       .then(function (d) {
         S.dirty = false;
+        if (typeof d.revision === 'number' && S.cur) S.cur.revision = d.revision;
         renderDirty();
         toast('草稿已保存 ' + d.atText, 'ok');
         return d;
       })
       .catch(function (e) {
+        if (e.code === 409) {
+          /* 冲突：不覆盖别人的改动。给出「重新加载最新草稿」与「关闭」两条路 */
+          var b1 = el('button', 'btn primary', '重新加载最新草稿');
+          b1.onclick = function () {
+            closeModal();
+            S.dirty = false;
+            openPage(S.cur.key).then(function () { toast('已加载最新草稿，请在此基础上继续', 'ok'); });
+          };
+          modal('这份草稿已被别人改过',
+            '<div class="hint">' + esc(e.message) + '</div>' +
+            '<div class="hint" style="margin-top:8px">直接覆盖会丢掉对方的改动；' +
+            '建议先重新加载，确认后再保存。</div>', [b1, btnClose()]);
+          return null;
+        }
         toast('保存失败：' + e.message, 'err');
         locateFromMessage(e.message);
       });
@@ -3257,7 +3294,8 @@
   function discardDraft(key) {
     var k = key || (S.cur && S.cur.key);
     if (!k) return;
-    if (!confirm('确定丢弃该页面的草稿？将恢复到已发布内容。')) return;
+    /* 措辞与列表页一致：回到的是「上一次生成代码的内容」，不是「线上已发布」（审查 F21） */
+    if (!confirm('确定丢弃该页面的改动？将回到上一次生成代码的内容。')) return;
     api('POST', '/api/decorate/discard', { body: { key: k } }).then(function () {
       toast('草稿已丢弃');
       if (S.cur && S.cur.key === k) openPage(k);
@@ -3579,6 +3617,19 @@
     S.filters = { name: '', status: '', belongs: '' };
     renderList();
   };
+  /*
+   * 「开发信息」开关（审查 F21）：replica.HOME_BLOCKS、CUSTOM_PAGES 这类源码字段名
+   * 只对「跟开发对账」的人有用，摆在列表里会挤占状态列的宽度、也干扰阅读。
+   * 默认收起，要用时一键展开。
+   */
+  function applyDevInfo() {
+    $('btnDevInfo').classList.toggle('on', !!S.devInfo);
+    Array.prototype.forEach.call(document.querySelectorAll('.dev-col'), function (el) {
+      el.style.display = S.devInfo ? '' : 'none';
+    });
+  }
+  $('btnDevInfo').onclick = function () { S.devInfo = !S.devInfo; applyDevInfo(); };
+  applyDevInfo();   // 初值：默认收起（刷新页面后也保持收起，不靠渲染时机）
 
   /* 只剩「+ 新建页面」一个按钮了：笔记的创建入口已搬到控制台「店铺笔记」栏目（见上面那段指路注释）。 */
   $('btnCreatePage').onclick = createPageDialog;

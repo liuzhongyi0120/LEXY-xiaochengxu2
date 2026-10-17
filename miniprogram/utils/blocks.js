@@ -20,6 +20,33 @@ const goodsSvc = require('../services/goods');
 const SIZE_CLASS = { sm: 's-sm', md: 's-md', lg: 's-lg' };
 
 /**
+ * 正式版是否展示「未接入」入口（审查 F22）。
+ *
+ * 由来：个人中心里有十几个入口（任务中心 / 赠品 / 分销 / 门店 …）**没有业务底座**，
+ * 以前它们和真功能并排显示，底部还挂着「依赖会员余额账户 · 仅占位展示」这类
+ * 开发说明 —— 用户要点进去才知道不可用，而且看到的是内部术语，
+ * 连带对旁边那些**真能用**的功能也失去信任。
+ *
+ * 口径：
+ *   · 正式版（envVersion === 'release'）→ 未接入的入口**不渲染**，依赖型区块只标「暂未开放」；
+ *   · 开发版 / 体验版 / 开发者工具 / 装修台预览（拿不到 envVersion）→ 照常渲染并标注，
+ *     因为运营要看见自己装修了什么。
+ *
+ * ⚠️ 判据放在**渲染期**而不是模块加载期：加载期 wx 未必就绪，那时一律按「展示」处理
+ *    （安全侧是「运营看得见」，不是「用户被隐藏」）。
+ */
+function notReadyVisible() {
+  if (typeof wx === 'undefined' || !wx.getAccountInfoSync) return true;
+  try {
+    const info = wx.getAccountInfoSync();
+    const v = info && info.miniProgram ? info.miniProgram.envVersion : '';
+    return v !== 'release';
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
  * 「有赞基础/高级组件余下 37 项」的渲染族。
  *
  * 键 = 区块类型（与装修台 `schema.js` 的区块 kind 一一对应），值 = 渲染族：
@@ -910,8 +937,17 @@ function normalizeBlock(b, index) {
       /* 资产图只在「只剩一项」时才显示（有赞 van-cell 的行为），模板据此判断 */
       iconFile: ucIconFile(d.icon)
     }));
+    /*
+     * 正式版把没有数据源的资产项（余额 / 积分 / 权益卡 / 钱包 / 礼品卡 / 提货卡）
+     * 一并摘掉：它们只能显示一个 `0` 或 `—`，用户看不出那是「没有」还是「没接」，
+     * 反而像是账号出了问题（审查 F22）。
+     */
+    if (!notReadyVisible()) o.items = o.items.filter((it) => !!it.route);
     const statMiss = o.items.filter((it) => !it.route).map((it) => it.dep).filter(Boolean);
     o.dep = String(o.dep || statMiss.join(' / '));
+    o.depLine = notReadyVisible()
+      ? (o.dep ? '依赖 ' + o.dep + ' · 点击各项看说明' : '')
+      : '';
   } else if (kind === 'uc_order') {
     o.title = o.title || '我的订单';
     o.showAllOn = o.showAll !== false;
@@ -949,8 +985,18 @@ function normalizeBlock(b, index) {
           scope: p.scope === 'fx' ? 'fx' : 'all'
         };
       })
-      .filter((x) => x.label);
+      .filter((x) => x.label)
+      /*
+       * 正式版**不渲染**没有业务底座的入口（审查 F22）。
+       * 装修台预览 / 开发版 / 体验版照常显示（运营要看见自己配了什么），
+       * 只有真正发给用户的正式版把它们摘掉 —— 用户不需要「点了才知道没有」的入口。
+       */
+      .filter((x) => notReadyVisible() || x.real);
     o.dep = String(o.dep || '部分工具依赖会员、门店、分销等业务数据');
+    /* 给模板的一段成品文案：正式版只说「暂未开放」，不把内部依赖术语念给用户听 */
+    o.depLine = notReadyVisible()
+      ? (o.dep ? '依赖 ' + o.dep + ' · 点击各项看说明' : '')
+      : '';
   } else if (kind === 'text') {
     /* 文本（对标有赞「文本」组件） */
     o.marginRpx = px2rpx(o.pageMargin);
@@ -973,6 +1019,9 @@ function normalizeBlock(b, index) {
   } else if (kind === 'follow_oa') {
     o.marginRpx = px2rpx(o.pageMargin);
     o.dep = String(o.dep || '公众号能力（需在微信小程序后台「设置 · 接口设置」开通）');
+    o.depLine = notReadyVisible()
+      ? (o.dep ? '依赖 ' + o.dep + ' · 仅占位展示' : '')
+      : '';
   } else if (SHELL_FAMILY[kind]) {
     /*
      * 有赞基础/高级组件余下的 37 项（依赖型 + 展示型）。
@@ -993,6 +1042,13 @@ function normalizeBlock(b, index) {
     o.marginRpx = px2rpx(o.pageMargin);
     o.round = o.corner === 'round';
     o.dep = String(o.dep || '');
+    /*
+     * 同上：正式版把「依赖 XX · 仅占位展示」换成用户能懂的「暂未开放」。
+     * 开发说明是给运营看的，不是给顾客看的。
+     */
+    o.depLine = o.dep
+      ? (notReadyVisible() ? '依赖 ' + o.dep + ' · 仅占位展示' : '暂未开放')
+      : '';
   }
 
   o.__index = index;
@@ -1100,81 +1156,129 @@ function loadGoodsData(blocks) {
   if (!idxs.length && !rankIdxs.length && !groupIdxs.length) return Promise.resolve(null);
 
   const idBlocks = [];
-  const listGroups = {}; // limit → [区块下标]
-  idxs.concat(rankIdxs).forEach((i) => {
+  /*
+   * 列表请求的分组键是「排序 + 数量」，不能只用数量（审查 F14）。
+   *
+   * 旧实现把「店铺榜单」与普通推荐按 limit 塞进同一个桶：两者数量相同时
+   * 共用同一次**不带 sort** 的请求，先截出一页、再在客户端按销量排 ——
+   * 真正卖得最好的商品如果不在默认排序的第一页，就永远上不了榜。
+   * 现在榜单显式带 sort:'sales' 单独请求，服务端先排序再分页；
+   * 分组键带上 sort 也保证两个区块不会串用对方的结果。
+   */
+  const listGroups = {}; // "sort|limit" → [区块下标]
+  const pushList = (i, sort) => {
     const b = blocks[i];
     if (b.type === 'goods' && b.mode === 'ids' && b.ids) {
       const ids = String(b.ids).split(/[,，\s]+/).filter(Boolean).slice(0, b.limit);
       idBlocks.push({ i, ids });
-    } else {
-      const key = String(b.limit);
-      (listGroups[key] = listGroups[key] || []).push(i);
+      return;
     }
-  });
+    const key = (sort || 'default') + '|' + String(b.limit);
+    (listGroups[key] = listGroups[key] || []).push(i);
+  };
+  idxs.forEach((i) => pushList(i, ''));
+  rankIdxs.forEach((i) => pushList(i, 'sales'));
 
   // 所有区块要的指定商品 ID 去重
   const allIds = [];
   idBlocks.forEach((b) => b.ids.forEach((id) => { if (allIds.indexOf(id) < 0) allIds.push(id); }));
 
+  /*
+   * 每个 ID 的结果**单独记状态**（审查 F15）。
+   *
+   * 旧实现只数一个全局 okCount：「区块甲成功、区块乙全挂」时，甲的成功能把乙的
+   * okCount 撑到 > 0，于是乙的 goodsFailed 是 false —— 乙明明一个商品都没取到，
+   * 界面却不说失败，运营以为是「这个区块本来就没配商品」。
+   * 现在按区块自己的 ID 列表聚合：自己一个都没取到、且确有请求出错，才算失败；
+   * 自己一个都没取到、但请求都成功了（商品被删 / 已下架）→ 空列表，不是失败。
+   */
   const idJob = allIds.length
-    ? mapLimit(allIds, GOODS_CONCURRENCY, (id) => goodsSvc.fetchDetail(id).catch((err) => {
-      console.warn('[blocks] 指定商品加载失败 id=' + id, err && err.message);
-      return null;
-    })).then((list) => {
-      const byId = {};
-      let okCount = 0;
-      list.forEach((g) => { if (g) { byId[g.goodsId || g.id] = g; okCount++; } });
-      return { byId, okCount };
-    })
-    : Promise.resolve({ byId: {}, okCount: 0 });
-
-  const listJob = mapLimit(Object.keys(listGroups), GOODS_CONCURRENCY, (limit) =>
-    goodsSvc.fetchList({ page: 1, size: Number(limit) || 4 })
-      .then((d) => ({ limit, list: (d && d.list) || [], failed: false }))
+    ? mapLimit(allIds, GOODS_CONCURRENCY, (id) => goodsSvc.fetchDetail(id)
+      .then((g) => ({ id: id, goods: g || null, state: g ? 'ok' : 'empty' }))
       .catch((err) => {
-        console.warn('[blocks] 商品列表加载失败 limit=' + limit, err && err.message);
-        return { limit, list: [], failed: true };
+        console.warn('[blocks] 指定商品加载失败 id=' + id, err && err.message);
+        // 404 = 这件商品确实没了（已删 / 已下架）；其它 = 网络或服务问题，值得重试
+        return { id: id, goods: null, state: err && err.code === 404 ? 'missing' : 'error' };
       })).then((rows) => {
-    const byLimit = {};
-    rows.forEach((r) => { byLimit[r.limit] = r; });
-    return byLimit;
+      const byId = {};
+      const state = {};
+      rows.forEach((r) => {
+        if (r.goods) byId[r.id] = r.goods;
+        state[r.id] = r.state;
+      });
+      return { byId: byId, state: state };
+    })
+    : Promise.resolve({ byId: {}, state: {} });
+
+  const listJob = mapLimit(Object.keys(listGroups), GOODS_CONCURRENCY, (key) => {
+    const parts = key.split('|');
+    const sort = parts[0] === 'default' ? '' : parts[0];
+    const limit = Number(parts[1]) || 4;
+    const params = { page: 1, size: limit };
+    if (sort) params.sort = sort; // 榜单：服务端先按销量排再分页
+    return goodsSvc.fetchList(params)
+      .then((d) => ({ key: key, list: (d && d.list) || [], failed: false }))
+      .catch((err) => {
+        console.warn('[blocks] 商品列表加载失败 ' + key, err && err.message);
+        return { key: key, list: [], failed: true };
+      });
+  }).then((rows) => {
+    const byKey = {};
+    rows.forEach((r) => { byKey[r.key] = r; });
+    return byKey;
   });
 
   /*
-   * 「商品分组」：面板里配了几个分组就取几次，按分类名去问商品库。
+   * 「商品分组」：面板里配了几个分组就取几次。
    * 全部分组**一次取完**（分组数 ≤ 15，实际就几个），这样切换分组是纯前端 setData，
    * 不会每点一次 tab 就打一次接口（列表页横滑分组时最怕这个）。
+   *
+   * ⚠️ 取数用 `categoryId`，`name` 只是菜单上显示的标题（审查 F13）。
+   *    以前直接把 name 当分类 ID 传，后端只认 ID → 按界面提示填「清洁电器」会取回 0 件、
+   *    整组空白。现在优先用 categoryId，留空才回落到「按名称精确匹配」（后端只认唯一命中）。
    */
   const groupJob = mapLimit(groupIdxs, GOODS_CONCURRENCY, (i) => {
-    const names = (blocks[i].groups || []).map((g) => String(g.name || '').trim()).filter(Boolean);
-    if (!names.length) return Promise.resolve({ i, groups: [], failed: false });
-    return mapLimit(names, GOODS_CONCURRENCY, (name, gi) => {
-      const limit = Number((blocks[i].groups[gi] || {}).limit) || 6;
-      return goodsSvc.fetchList({ page: 1, size: limit, categoryId: name, sort: 'sales' })
-        .then((d) => ({ name: name, goods: ((d && d.list) || []).map(toCard).filter(Boolean) }))
+    const groups = blocks[i].groups || [];
+    if (!groups.length) return Promise.resolve({ i: i, groups: [], failed: false });
+    return mapLimit(groups, GOODS_CONCURRENCY, (g, gi) => {
+      const limit = Number(g.limit) || 6;
+      const cat = String(g.categoryId || g.name || '').trim();
+      const name = String(g.name || cat).trim();
+      if (!cat) return Promise.resolve({ name: name, goods: [], state: 'empty' });
+      return goodsSvc.fetchList({ page: 1, size: limit, categoryId: cat, sort: 'sales' })
+        .then((d) => ({ name: name, goods: ((d && d.list) || []).map(toCard).filter(Boolean), state: 'ok' }))
         .catch((err) => {
-          console.warn('[blocks] 商品分组加载失败 category=' + name, err && err.message);
-          return { name: name, goods: [] };
+          console.warn('[blocks] 商品分组加载失败 category=' + cat, err && err.message);
+          return { name: name, goods: [], state: 'error' };
         });
-    }).then((groups) => ({ i, groups, failed: groups.every((g) => !g.goods.length) }));
+    }).then((rows) => ({
+      i: i,
+      groups: rows,
+      /* 只有当**请求真的失败**才算失败。以前是「每个分组都空」就判失败 ——
+         一个还没上架商品的空分类于是被当成「加载失败」，与断网混为一谈。 */
+      failed: rows.length > 0 && rows.every((g) => g.state === 'error')
+    }));
   });
 
-  return Promise.all([idJob, listJob, groupJob]).then(([idRes, byLimit, groupRows]) => {
+  return Promise.all([idJob, listJob, groupJob]).then(([idRes, byKey, groupRows]) => {
     const next = {};
     idBlocks.forEach((b) => {
       next['blocks[' + b.i + '].goods'] = b.ids.map((id) => toCard(idRes.byId[id])).filter(Boolean);
-      // 一个都没取到才判为失败：部分商品被删除/下架属于正常，不该报「加载失败」
-      next['blocks[' + b.i + '].goodsFailed'] = b.ids.length > 0 && idRes.okCount === 0;
+      const got = b.ids.filter((id) => idRes.state[id] === 'ok').length;
+      const errored = b.ids.filter((id) => idRes.state[id] === 'error').length;
+      // 一个都没取到**且**确有请求出错 → 失败（可重试）；都成功却没数据 → 只是空
+      next['blocks[' + b.i + '].goodsFailed'] = got === 0 && errored > 0;
     });
     idxs.forEach((i) => {
       if (idBlocks.some((b) => b.i === i)) return;
-      const r = byLimit[String(blocks[i].limit)];
+      const r = byKey['default|' + String(blocks[i].limit)];
       next['blocks[' + i + '].goods'] = r ? r.list.map(toCard).filter(Boolean) : [];
       next['blocks[' + i + '].goodsFailed'] = !!(r && r.failed);
     });
-    /* 榜单：取回后按销量降序（有赞那边是系统算法，这里用商品库的真实销量字段） */
+    /* 榜单：服务端已按销量排过，这里再排一次只是兜底（不同 sort 结果不会串） */
     rankIdxs.forEach((i) => {
-      const r = byLimit[String(blocks[i].limit)];
+      if (idBlocks.some((b) => b.i === i)) return;
+      const r = byKey['sales|' + String(blocks[i].limit)];
       const list = r ? r.list.map(toCard).filter(Boolean) : [];
       list.sort((a, b) => (b.sales || 0) - (a.sales || 0));
       next['blocks[' + i + '].goods'] = list;
@@ -1183,6 +1287,7 @@ function loadGoodsData(blocks) {
     groupRows.forEach((row) => {
       next['blocks[' + row.i + '].groupTabs'] = row.groups;
       next['blocks[' + row.i + '].goodsFailed'] = row.failed;
+      /* 当前展示哪个分组由 block.active 决定（模板读 groupTabs[active].goods），这里不动它 */
     });
     return next;
   });

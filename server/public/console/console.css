@@ -450,6 +450,61 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 .media-it .mt img, .media-it .mt video {
   position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; display: block;
 }
+/* 视频卡片不再预载（审查 F18：40 个 <video preload=metadata> 会把 40 段视频的元数据
+   各下一遍，缩略显示一点没省）。没有 src 时元素就是一块黑底，这里给它一个中性占位，
+   右上角再由 .vbadge 标出时长 —— 运营一眼知道是视频，点开才真正加载。 */
+.media-it .mt video:not([src]) {
+  background: #eceef1;
+}
+/* 大 GIF 也走「不挂 src，点开才加载」（审查 F18），同样需要一块中性占位，
+   右上角 .vbadge 标出体积 —— 让人知道这里有一张没加载的大图，而不是卡片坏了。 */
+.media-it .mt img:not([src]) {
+  background: #eceef1;
+}
+
+/* 文件夹「展开其余 N 个」：不加下划线的话看不出能点 */
+.media-side-more {
+  font-size: 11.5px; color: var(--primary); padding: 4px 6px; cursor: pointer; user-select: none;
+}
+.media-side-more:hover { text-decoration: underline; }
+
+/* 高级入口折叠（审查 F26）：运维向的「长期令牌」不该与日常登录并排，默认收起 */
+.adv-box { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.adv-box > summary {
+  cursor: pointer; font-size: 12px; color: var(--sub); list-style: none; display: flex; align-items: center; gap: 6px;
+}
+.adv-box > summary::-webkit-details-marker { display: none; }
+.adv-box > summary::before { content: '▸'; font-size: 10px; }
+.adv-box[open] > summary::before { content: '▾'; }
+.adv-box > summary:hover { color: var(--text); }
+
+/* 图标按钮的可访问名（审查 F26）：只有图标没有可读名称，读屏念不出用途 */
+.media-it .ft button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+/* 商品编辑分区导航（审查 F19）：表单十几项 + 图片区 + SKU 表，一屏放不下，
+   顶部给出四个分区直达，改库存不用一路滚到底；当前分区高亮。 */
+.sec-nav { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 0 10px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.sec-nav .sec-t {
+  border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 12px;
+  font-size: 12px; color: var(--sub); cursor: pointer;
+}
+.sec-nav .sec-t:hover { border-color: #c6cfdd; color: var(--text); }
+.sec-nav .sec-t.on { background: var(--primary); border-color: var(--primary); color: #fff; }
+.sec { margin-bottom: 6px; }
+.sec-h { font-size: 12.5px; font-weight: 600; color: var(--text); padding: 8px 0 4px; }
+/* 校验失败标红（审查 F19）：光弹一句提示不够 —— 表单分区后出错的字段可能在别的段里 */
+.invalid { border-color: var(--red) !important; box-shadow: 0 0 0 2px rgba(200, 16, 46, .10); }
+
+/* 重复素材分组（审查 F18）：一组一卡片，保留项与副本并列，末尾给合并按钮 */
+.dup-grp { border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; margin-bottom: 10px; }
+.dup-grp .dup-h {
+  display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; margin-bottom: 6px;
+}
+.dup-grp .dup-h .grow { flex: 1; }
+.dup-grp .dup-row { font-size: 12px; color: var(--sub); line-height: 2; word-break: break-all; }
+.dup-grp .dup-row label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
+.dup-grp .dup-row input { margin-top: 6px; }
+.dup-grp .dup-f { margin-top: 8px; display: flex; justify-content: flex-end; }
 
 /* 信息区：名称最多两行（文件名常是长哈希，一行只够露 12 个字，认不出是哪张）
  * 名称颜色刻意比正文淡一档（#414a58 而非 --text #1f2329）：一屏 40 张卡片、每张两行哈希，
@@ -474,6 +529,16 @@ label.ck { display: inline-flex; align-items: center; gap: 5px; cursor: pointer;
 }
 .media-it .ft button:hover { background: #f1f3f7; color: var(--text); }
 .media-it .ft button[data-del]:hover { background: #fdecea; color: var(--red); }
+.media-it .ft button[data-purge]:hover { background: #fdecea; color: var(--red); }
+.media-it .ft button[data-restore]:hover { background: #eaf6ee; color: var(--green); }
+
+/* 回收站卡片（审查 F17）：图已移出 uploads，没有可加载的缩略图，
+   用一块中性占位 + 类型文字代替 —— 不给图是为了不让人误以为「还能看到原图」。 */
+.media-it .mt .trash-ph {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: #eceef1; color: #9aa3b0; font-size: 12px; letter-spacing: 1px;
+}
+.media-it .meta.warn, .media-it .meta .warn { color: #b06a00; }
 
 /* 视频角标：一眼区分「图」和「片」，否则首帧容易被当成一张图。
  * 放右下角 —— 左上角是勾选圈，两个角各管一件事，互不打架。 */

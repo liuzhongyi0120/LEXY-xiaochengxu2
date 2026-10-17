@@ -15,6 +15,7 @@ const ERR = {
   UNAUTHORIZED: 401,  // 未登录 / token 失效
   FORBIDDEN: 403,     // 无权限
   NOT_FOUND: 404,     // 资源不存在
+  CONFLICT: 409,      // 版本冲突（别人已经改过这条记录，本次保存基于旧版本）
   BIZ: 2000,          // 通用业务失败（如库存不足、状态不允许）
   SERVER: 5000        // 服务端异常
 };
@@ -179,12 +180,27 @@ function corsHeaders() {
 }
 
 /** 发送 JSON 响应 */
+/**
+ * 每次应答都带一个 X-Request-Id。
+ *
+ * 用途只有一个：运营报「保存失败了」时，能凭这一个号在服务端日志里
+ * 定位到那一条请求与它对应的审计记录（审查 F27 的验收项之一）。
+ * 已在 res 上挂过就不重复生成（一次请求里 ok/fail 只会走一次）。
+ */
+function requestId(res) {
+  if (!res) return '';
+  if (res.__reqId) return res.__reqId;
+  res.__reqId = Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+  return res.__reqId;
+}
+
 function send(res, httpStatus, body) {
   const payload = JSON.stringify(body);
   res.writeHead(httpStatus, Object.assign({
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(payload),
-    'Cache-Control': 'no-store'
+    'Cache-Control': 'no-store',
+    'X-Request-Id': requestId(res)
   }, corsHeaders()));
   res.end(payload);
 }
@@ -195,8 +211,12 @@ function ok(res, data = null, msg = 'ok') {
 }
 
 /** 失败响应 */
-function fail(res, msg, code = ERR.BIZ, httpStatus = 200) {
-  send(res, httpStatus, { code, msg, data: null });
+/**
+ * @param {object} [extra] 随错误一起下发的数据（目前只有版本冲突用：
+ *                         冲突时要把「服务端当前值」一并给前端，否则运营只能靠猜）
+ */
+function fail(res, msg, code = ERR.BIZ, httpStatus = 200, extra = null) {
+  send(res, httpStatus, { code, msg, data: extra });
 }
 
 /** 预检 */
@@ -207,6 +227,7 @@ function preflight(res) {
 
 module.exports = {
   ERR,
+  requestId,
   BizError,
   parseBody,
   parseRawBody,

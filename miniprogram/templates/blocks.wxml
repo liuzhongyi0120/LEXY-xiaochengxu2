@@ -944,7 +944,8 @@
         <view class="cu-stat-l">{{item.label}}</view>
       </view>
     </view>
-    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 点击各项看说明</view>
+    <!-- 依赖说明由 blocks.js 的 depLine 产出：正式版不把内部术语念给用户（审查 F22） -->
+    <view wx:if="{{block.depLine}}" class="cu-dep">{{block.depLine}}</view>
   </view>
 
   <!-- ===== 我的订单 ===== -->
@@ -1000,7 +1001,7 @@
       </block>
     </view>
     <view wx:if="{{!block.items.length}}" class="cu-empty-chk">所有工具都被关掉了，请到装修台「必备工具」里打开几项</view>
-    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+    <view wx:if="{{block.depLine}}" class="cu-dep">{{block.depLine}}</view>
   </view>
 
   <!-- ===== 文本 ===== -->
@@ -1033,7 +1034,7 @@
   <!-- ===== 关注公众号（微信原生 official-account；非扫码进入时不展示，属平台行为） ===== -->
   <view wx:elif="{{block.type === 'follow_oa'}}" class="cu-oa" style="padding: 0 {{block.marginRpx}}rpx;">
     <official-account></official-account>
-    <view wx:if="{{block.dep}}" class="cu-dep">依赖 {{block.dep}} · 仅占位展示</view>
+    <view wx:if="{{block.depLine}}" class="cu-dep">{{block.depLine}}</view>
   </view>
 
   <view wx:elif="{{block.fam}}" class="c-yz" style="padding: 12rpx {{block.marginRpx}}rpx;">
@@ -1048,7 +1049,7 @@
     />
     <view wx:if="{{block.cardDesc}}" class="yz-desc">{{block.cardDesc}}</view>
     <view wx:if="{{block.btnText}}" class="yz-btn" hover-class="hover-lite" bindtap="onTapBlock" data-index="{{index}}">{{block.btnText}}</view>
-    <view wx:if="{{block.dep}}" class="yz-dep">依赖 {{block.dep}} · 仅占位展示</view>
+    <view wx:if="{{block.depLine}}" class="yz-dep">{{block.depLine}}</view>
   </view>
 
   </view>

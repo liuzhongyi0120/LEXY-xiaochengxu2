@@ -88,8 +88,8 @@ function writeStock(skuId, stock, ownerId) {
     if (ownerId && g.id !== ownerId) return;
     (g.skus || []).forEach((s) => { if (s.skuId === skuId) s.stock = database.stocks[skuId]; });
   });
-  db$.commit();
-  catalogStore.commit();
+  db$.commitSync();
+  catalogStore.commitSync();
 }
 
 /* ------------------------- SKU 标识唯一性 ------------------------- */
@@ -223,11 +223,48 @@ function findSku(goods, skuId) {
  *    前端没有筛选按钮完全不算保护，参数是调用方直接构造的。
  *    下架商品的浏览需求属于后台，走 adminListGoods（有管理权限校验）。
  */
+/**
+ * 把「分类参数」解析成分类 ID（审查 F13）。
+ *
+ * 由来：装修台的「商品分组」面板让运营填的是**分组名称**（如「清洁电器」），
+ * 而这里一直只按分类 **ID** 匹配 —— 于是按界面含义老老实实填名字，取回来的永远是 0 件，
+ * 整组空白，而且后台看不出任何错误（请求成功、列表为空）。
+ *
+ * 口径：
+ *   · 命中分类 ID → 直接用（正常路径）；
+ *   · 命中**唯一**的分类名称 → 解析成它的 ID（兼容已配好的历史数据，不用运营逐个改）；
+ *   · 命中 0 个或**多个**同名分类 → 返回 null（不猜），调用方得到空列表，
+ *     运营在面板上看到的是「这个分组没商品」，而不是被悄悄指向了另一个同名分类。
+ *
+ * @returns {{id:string, via:'id'|'name'}|null}
+ */
+function resolveCategoryId(v) {
+  const raw = String(v == null ? '' : v).trim();
+  if (!raw) return null;
+  const cats = CATEGORIES();
+  const flat = [];
+  cats.forEach((c) => {
+    flat.push({ id: c.id, name: c.name });
+    (c.children || []).forEach((x) => flat.push({ id: x.id, name: x.name }));
+  });
+  if (flat.some((c) => c.id === raw)) return { id: raw, via: 'id' };
+  const byName = flat.filter((c) => String(c.name || '').trim() === raw);
+  if (byName.length === 1) return { id: byName[0].id, via: 'name' };
+  return null;
+}
+
 function filterGoods({ categoryId, keyword }) {
   let list = GOODS().filter((g) => g.status === 'on_sale');
 
   if (categoryId) {
-    const ids = expandCategoryIds(CATEGORIES(), categoryId);
+    /*
+     * 分类参数先过 resolveCategoryId：ID 命中走 ID，唯一同名走名称，
+     * 都命不中就「查不到」—— 与旧行为（把名字当 ID 传进去、必然 0 件）结果一致，
+     * 但至少把「填了名字」这条最常见的路修好了。
+     */
+    const resolved = resolveCategoryId(categoryId);
+    if (!resolved) return [];
+    const ids = expandCategoryIds(CATEGORIES(), resolved.id);
     list = list.filter((g) => ids.indexOf(g.categoryId) > -1);
   }
 
@@ -376,8 +413,9 @@ function adminListGoods({ keyword, categoryId, status, sort, lowStock, page, siz
 
   if (status) list = list.filter((g) => g.status === status);
   if (categoryId) {
-    const ids = expandCategoryIds(CATEGORIES(), categoryId);
-    list = list.filter((g) => ids.indexOf(g.categoryId) > -1);
+    const resolved = resolveCategoryId(categoryId);
+    const ids = resolved ? expandCategoryIds(CATEGORIES(), resolved.id) : [];
+    list = ids.length ? list.filter((g) => ids.indexOf(g.categoryId) > -1) : [];
   }
   if (keyword) {
     const kw = String(keyword).toLowerCase();
@@ -410,6 +448,20 @@ function saveGoods(payload) {
   const list = GOODS();
 
   /*
+   * 新建幂等键（审查 F19）。
+   *
+   * 商品表单是长滚动弹窗，保存按钮点快了、或网络慢时连点几下，
+   * 前端的「按钮禁用了」并不可靠（请求还在路上时刷新 / 重开表单就失效）。
+   * 所以新建时前端带一个 clientKey，重复提交命中同一件商品就直接返回它，
+   * 而不是再建一件 —— 一次误触变成两件一模一样的商品，运营得手动删。
+   */
+  const clientKey = String(p.clientKey || '').trim();
+  if (isNew && clientKey) {
+    const hit = list.find((g) => g.clientKey && g.clientKey === clientKey);
+    if (hit) return { id: hit.id, isNew: false, idempotent: true, rev: hit.rev, name: hit.name };
+  }
+
+  /*
    * ⚠️ 顺序不能反：**先确定商品 ID，再据此生成 SKU 标识**。
    *    早前是先造 skus（用 `p.id || 'g'` 兜底 → 每件新商品的默认标识都是 g-01），
    *    之后才生成商品 ID —— 于是第二件商品必然复用第一件的 g-01，
@@ -440,12 +492,34 @@ function saveGoods(payload) {
       specs: (p.specs || []).slice(0, 4),
       skus,
       status: p.status === 'off_sale' ? 'off_sale' : 'on_sale',
+      rev: 1,
       createdAt: now(),
       updatedAt: now()
     };
     list.unshift(goods);
   } else {
     goods = findAny(goodsId);
+    /*
+     * 乐观锁（审查 F08）。
+     *
+     * 编辑页打开时会把当时的 `rev` 一起带下来，保存时再带回来。对不上就说明
+     * **有别人在你打开之后改过这件商品** —— 这时静默覆盖等于让先保存的人白干，
+     * 而且他不会收到任何提示。返回 409，前端把「最新值」和「本次修改」都摊开给运营看。
+     * 不传 rev 的调用方（脚本、旧客户端）按「不检查」处理，不阻断既有链路。
+     */
+    const expectRev = p.rev === undefined || p.rev === null || p.rev === '' ? null : toInt(p.rev);
+    if (expectRev !== null && expectRev !== toInt(goods.rev)) {
+      const e = new BizError(
+        '这件商品在你打开之后已被别人修改过（可能是库存或资料），请刷新后重新编辑',
+        ERR.CONFLICT, 409);
+      /* 把服务端当前值一起回给前端，运营不用猜「到底哪里不一样」 */
+      e.conflict = {
+        current: { rev: toInt(goods.rev), updatedAt: goods.updatedAt },
+        latest: withLiveStock(clone(goods))
+      };
+      throw e;
+    }
+
     // 编辑时被删掉的规格，其库存键要一并清掉，避免 db.stocks 里长期堆积幽灵键
     const kept = {};
     skus.forEach((s) => { kept[s.skuId] = true; });
@@ -463,14 +537,33 @@ function saveGoods(payload) {
       specs: (p.specs || []).slice(0, 4),
       skus,
       status: p.status === 'off_sale' ? 'off_sale' : 'on_sale',
+      rev: toInt(goods.rev) + 1,
       updatedAt: now()
     });
   }
 
-  skus.forEach((s) => writeStock(s.skuId, s.stock, goods.id));
+  /*
+   * ⚠️ 库存与资料**分开写**（审查 F08）。
+   *
+   * 旧实现是「表单里有什么就写什么」：商品编辑是一个长表单，SKU 表格里永远带着库存列，
+   * 所以**每次保存资料都会把库存一起回写**。于是 ——
+   *   编辑器 A 打开时库存 167 → 编辑器 B 把库存改成 174 → A 只改了个副标题再保存 → 库存回到 167。
+   * B 的库存维护被静默吞掉，而且没有任何提示。
+   *
+   * 现在的口径：
+   *   · 新建商品：库存随表单写（此时没有并发对象）；
+   *   · 编辑商品：只有前端显式声明 `withStock`（运营确实动过库存列）才写库存；
+   *     否则把提交上来的旧库存值**丢掉**，回填实时库存 —— 资料保存绝不碰库存真源。
+   * 库存的日常维护走独立点位（/api/admin/goods/stock），不与资料保存共享写路径。
+   */
+  if (isNew || p.withStock === true) {
+    skus.forEach((s) => writeStock(s.skuId, s.stock, goods.id));
+  } else {
+    skus.forEach((s) => { s.stock = skuStock(s); });
+  }
   derive(goods);
-  catalogStore.commit();
-  return { id: goods.id, isNew, goods: withLiveStock(clone(goods)) };
+  catalogStore.commitSync();
+  return { id: goods.id, isNew, rev: goods.rev, goods: withLiveStock(clone(goods)) };
 }
 
 /** 批量上下架 */
@@ -487,7 +580,7 @@ function setGoodsStatus(ids, status) {
     changed.push(id);
   });
   if (!changed.length) throw new BizError('商品不存在', ERR.NOT_FOUND, 404);
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { changed, status: want };
 }
 
@@ -506,7 +599,7 @@ function setStock({ items, mode }) {
     result.push({ skuId: it.skuId, stock: Math.max(0, toInt(next)) });
   });
   GOODS().forEach((g) => derive(g));
-  catalogStore.commit();
+  catalogStore.commitSync();
   if (!result.length) throw new BizError('SKU 不存在', ERR.NOT_FOUND, 404);
   return { changed: result };
 }
@@ -532,7 +625,7 @@ function setSales({ items, mode }) {
     g.updatedAt = now();
     result.push({ goodsId: g.id, sales: g.sales });
   });
-  catalogStore.commit();
+  catalogStore.commitSync();
   if (!result.length) throw new BizError('商品不存在', ERR.NOT_FOUND, 404);
   return { changed: result };
 }
@@ -562,8 +655,8 @@ function deleteGoods(id) {
     db().comments = db().comments.filter((c) => c.goodsId !== id);
     gone.forEach((cid) => { delete (db().commentReplies || {})[cid]; });
   }
-  db$.commit();
-  catalogStore.commit();
+  db$.commitSync();
+  catalogStore.commitSync();
   return { deleted: true, id };
 }
 
@@ -580,7 +673,7 @@ function saveCategory(payload) {
     if (!target) throw new BizError('分类不存在', ERR.NOT_FOUND, 404);
     target.name = name;
     if (p.icon !== undefined) target.icon = p.icon;
-    catalogStore.commit();
+    catalogStore.commitSync();
     return { id: target.id, isNew: false };
   }
   const parentId = p.parentId || '';
@@ -594,7 +687,7 @@ function saveCategory(payload) {
   } else {
     list.push(Object.assign({ children: [] }, node));
   }
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { id, isNew: true };
 }
 
@@ -644,7 +737,7 @@ function deleteCategory(id) {
   } else {
     list.splice(list.indexOf(node), 1);
   }
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { deleted: true, id, removedChildren: children.length };
 }
 
@@ -694,12 +787,12 @@ function saveCouponTemplate(payload) {
     const t = list.find((x) => x.templateId === p.templateId);
     if (!t) throw new BizError('优惠券不存在', ERR.NOT_FOUND, 404);
     Object.assign(t, fields);
-    catalogStore.commit();
+    catalogStore.commitSync();
     return { templateId: t.templateId, isNew: false };
   }
   const templateId = genId('ct');
   list.unshift(Object.assign({ templateId }, fields));
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { templateId, isNew: true };
 }
 
@@ -707,7 +800,7 @@ function setCouponTemplateStatus(templateId, status) {
   const t = couponTemplates().find((x) => x.templateId === templateId);
   if (!t) throw new BizError('优惠券不存在', ERR.NOT_FOUND, 404);
   t.status = status === 'paused' ? 'paused' : 'active';
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { templateId, status: t.status };
 }
 
@@ -725,7 +818,7 @@ function deleteCouponTemplate(templateId) {
     throw new BizError(`该券已有 ${used} 张被领取，不能删除；如需停发请改为「暂停」`, ERR.BIZ);
   }
   list.splice(idx, 1);
-  catalogStore.commit();
+  catalogStore.commitSync();
   return { deleted: true, templateId };
 }
 
@@ -768,7 +861,7 @@ function saveSettings(patch) {
     if (p[k] === undefined) return;
     s[k] = typeof catalogStore.DEFAULT_SETTINGS[k] === 'number' ? toInt(p[k]) : String(p[k]);
   });
-  catalogStore.commit();
+  catalogStore.commitSync();
   return clone(s);
 }
 
@@ -780,7 +873,7 @@ function bumpSales(goodsId, qty) {
   const goods = GOODS().find((g) => g.id === goodsId);
   if (goods) {
     goods.sales += toInt(qty);
-    catalogStore.commit();
+    catalogStore.commitSync();
   }
 }
 

@@ -124,6 +124,19 @@ function markDirty() {
   }, 50);
 }
 
+/**
+ * **同步落盘**（审查 F11）：写盘成功才返回，失败直接抛错。
+ *
+ * `commit()` 是「标记一下、50ms 后写」—— 调用方已经把「成功」返回给用户了，
+ * 之后写盘失败只会留一行日志，内存与磁盘就此分叉（重启即丢）。
+ * 库存扣减这类真金白银的写入必须等落盘结果，不能给假成功。
+ */
+function commitSync() {
+  load();
+  if (writeTimer) { clearTimeout(writeTimer); writeTimer = null; }
+  flush(true);
+}
+
 const db$ = {
   /** 取数据库句柄（自动初始化） */
   get() {
@@ -133,6 +146,7 @@ const db$ = {
   commit() {
     markDirty();
   },
+  commitSync,
   /** 立即同步落盘（退出前调用） */
   flushNow() {
     if (writeTimer) {

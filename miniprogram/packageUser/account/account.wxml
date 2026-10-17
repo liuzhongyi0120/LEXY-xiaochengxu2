@@ -6,6 +6,15 @@
     <text>加载中…</text>
   </view>
 
+  <!-- 加载失败（断网 / 服务异常）：单独一种状态，给「重试」，不冒充未登录 -->
+  <empty-state
+    wx:elif="{{loadFailed}}"
+    text="资料加载失败"
+    desc="{{loadFailedMsg || '网络或服务暂时不可用'}}"
+    button-text="重试"
+    bind:action="onRetryLoad"
+  />
+
   <empty-state
     wx:elif="{{!logged}}"
     text="登录后管理账号"
