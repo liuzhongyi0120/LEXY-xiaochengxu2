@@ -42,7 +42,7 @@ ProtectSystem=full
 ProtectHome=true
 # ⚠️ 收紧到**具体路径**：装修「生成代码」要写 miniprogram/config/replica.js，
 #    所以只放行这一个文件所在的目录 + 数据 + 上传 + 备份，源码其它部分一律只读。
-ReadWritePaths=/opt/lexy-mall/server/data /opt/lexy-mall/server/public/uploads /opt/lexy-mall/miniprogram/config /var/log
+ReadWritePaths=/opt/lexy-mall/server/data /opt/lexy-mall/miniprogram/config /var/log
 LimitNOFILE=65535
 
 [Install]

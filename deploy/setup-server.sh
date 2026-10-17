@@ -128,7 +128,9 @@ fi
 # ------------------------------------------------- 3. 专用低权限运行用户
 #
 # 为什么要建这个用户（审查 F12）：systemd 单元里不写 User= 时服务默认以 root 跑。
-# 后端只需要写四处：数据目录、上传目录、装修生成的 config 目录、日志。
+# 后端只需要写三处：数据目录（上传素材 server/data/uploads 与回收站都在其下）、
+# 装修生成的 config 目录、日志。⚠️ 上传目录不是 server/public/uploads —— 那个路径项目里
+# 根本没有，素材实际落在 server/data/uploads（写错过一次，别再写回去）。
 # 让它以 lexy 跑 + ReadWritePaths 收紧到这四个路径，源码其它部分就是只读的 ——
 # 万一将来有「写文件」的代码路径被利用，能改的范围也就是数据，而不是整份程序。
 log "准备运行用户 lexy"
@@ -140,8 +142,8 @@ else
   log "用户 $RUN_USER 已存在（不改动，重复执行安全）"
 fi
 # 只把「必须可写」的四处交给它；源码其它部分保持 root 只读
-mkdir -p "$APP_DIR/server/data" "$APP_DIR/server/public/uploads" "$APP_DIR/miniprogram/config"
-chown -R "$RUN_USER":"$RUN_USER" "$APP_DIR/server/data" "$APP_DIR/server/public/uploads" "$APP_DIR/miniprogram/config"
+mkdir -p "$APP_DIR/server/data" "$APP_DIR/server/data/uploads" "$APP_DIR/miniprogram/config"
+chown -R "$RUN_USER":"$RUN_USER" "$APP_DIR/server/data" "$APP_DIR/miniprogram/config"
 # .env 里有 JWT_SECRET：只给读（640 已由前面 chmod 600 + 属主 root，
 # 但服务以 lexy 跑就读不到 —— 所以要让 lexy 可读，同时绝不给其它用户任何权限）
 chown root:"$RUN_USER" "$ENV_FILE"

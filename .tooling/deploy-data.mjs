@@ -123,6 +123,7 @@ function pack() {
     '-cf', TARBALL,
     '--exclude=server/data/db.json',
     '--exclude=server/data/db.json.broken.*',
+    '--exclude=server/data/uploads_trash',   // 与 sync-incremental.mjs 的 EXCLUDE 对应：回收站不同步
     '--exclude=miniprogram/project.private.config.json',
     'server', 'miniprogram'
   ]);

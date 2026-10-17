@@ -84,6 +84,9 @@ const EXCLUDE = [
   /^server\/data\/db\.json$/,                    // 线上用户/订单，生产自举
   /^server\/data\/db\.json\.broken\./,           // 落盘损坏的现场快照
   /^server\/data\/.*\.bak\./,                    // 各脚本留下的带时间戳备份
+  /^server\/data\/uploads_trash\//,              // 本机素材回收站（2026-10-17 加）：两端各自独立，
+                                                 // 同步会把本机的删除记录带上，线上 trash.json
+                                                 // 会列一堆线上压根没有的条目
   /^miniprogram\/project\.private\.config\.json$/, // 开发机专有
   /(^|\/)node_modules\//,
   /(^|\/)\.DS_Store$/,
