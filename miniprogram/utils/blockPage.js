@@ -115,6 +115,66 @@ const blockPageBehavior = {
     this.setData({ ['blocks[' + index + '].failed']: true });
   },
 
+  /* ------------------------------------------------------------------ 视频
+   * 装修台可以把视频的原生控件关掉（controls=false），但微信 video 那样一来**连中间播放
+   * 按钮都不显示**，点画面也没反应 —— 真机表现就是「视频播放不了」（2026-10-17 反馈）。
+   * 所以这里补一套自己管的播放/暂停：未播点播放、播放中点画面即暂停，且同一时间只播一个。
+   */
+
+  /** 点视频（控件关掉时才有这层）：播放 / 暂停 */
+  onVideoTap(e) {
+    const i = Number(e.currentTarget.dataset.index);
+    const b = (this.data.blocks || [])[i];
+    if (!b || b.type !== 'video') return;
+    const ctx = wx.createVideoContext('bv' + i, this);
+    if (!ctx) return;
+    if (b.playing) {
+      ctx.pause();
+      return;
+    }
+    this.pauseOtherVideos(i);
+    ctx.play();
+  },
+
+  /** 播一个之前先停掉其它正在播的（多个静音视频同时跑，流量和发热都吃不消） */
+  pauseOtherVideos(except) {
+    (this.data.blocks || []).forEach((b, i) => {
+      if (b && b.type === 'video' && b.playing && i !== except) {
+        const c = wx.createVideoContext('bv' + i, this);
+        if (c) c.pause();
+      }
+    });
+  },
+
+  /** 播放状态一律由 video 自己的事件回写，避免「点了但没真的播起来」时按钮状态说谎 */
+  onVideoPlay(e) {
+    this.setVideoPlaying(e, true);
+  },
+  onVideoPause(e) {
+    this.setVideoPlaying(e, false);
+  },
+  onVideoEnded(e) {
+    this.setVideoPlaying(e, false);
+  },
+  setVideoPlaying(e, playing) {
+    const i = Number(e.currentTarget.dataset.index);
+    if (!Number.isFinite(i)) return;
+    const b = (this.data.blocks || [])[i];
+    if (!b || b.playing === playing) return;
+    const next = { ['blocks[' + i + '].playing']: playing };
+    /* 播过一次就把封面层撤掉（否则暂停后封面又盖回来，画面被遮） */
+    if (playing) next['blocks[' + i + '].played'] = true;
+    this.setData(next);
+  },
+
+  /** 播放失败（地址 404 / 编码不支持 / 网络断）时给出可操作的提示，别让画面一直黑着 */
+  onVideoError(e) {
+    const i = Number(e.currentTarget.dataset.index);
+    const b = (this.data.blocks || [])[i];
+    if (b && b.playing) this.setData({ ['blocks[' + i + '].playing']: false });
+    console.warn('[video] 播放失败 index=' + i, e && e.detail);
+  },
+
   /** 商品区块内单张商品图加载失败，降级为色块 */
   onGoodsImgError(e) {
     const { b, g } = e.currentTarget.dataset;

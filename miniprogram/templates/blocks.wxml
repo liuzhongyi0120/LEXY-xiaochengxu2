@@ -152,19 +152,52 @@
   </view>
 
   <!-- ============ 视频 ============ -->
+  <!--
+    ⚠️ 为什么要外面套一层、再叠一个播放层（2026-10-17 真机反馈：视频播放不了）
+    装修台里视频区块默认「不显示控件」= controls=false，而微信 video 在 controls=false 时
+    **连中间那个播放按钮都不显示**，点画面也没有任何反应 —— 真机上看到的就是「视频播不了」。
+    所以：控件开着时交给原生；控件关掉时由我们自己画一个播放按钮，点击走 VideoContext 播放，
+    再点一次暂停。同时开 enable-play-gesture（支持双击播放/暂停手势）。
+    中间播放按钮也跟着 controls 走：controls=false 时原生那个本来就不显示，别再声明它。
+  -->
   <view wx:elif="{{block.type === 'video'}}" class="block-wrap" style="padding: 0 {{block.marginRpx}}rpx;">
-    <video
-      class="bv {{block.round ? 'round' : ''}}"
-      style="height: {{block.hRpx}}rpx;"
-      src="{{block.src}}"
-      poster="{{block.poster}}"
-      object-fit="cover"
-      autoplay="{{block.autoplay}}"
-      muted="{{block.muted}}"
-      controls="{{block.controls}}"
-      loop="{{block.loop}}"
-      show-center-play-btn
-    />
+    <view class="bv-box {{block.round ? 'round' : ''}}" style="height: {{block.hRpx}}rpx;">
+      <video
+        id="bv{{index}}"
+        class="bv"
+        style="height: {{block.hRpx}}rpx;"
+        src="{{block.src}}"
+        poster="{{block.poster}}"
+        object-fit="cover"
+        autoplay="{{block.autoplay}}"
+        muted="{{block.muted}}"
+        controls="{{block.controls}}"
+        loop="{{block.loop}}"
+        show-center-play-btn="{{block.controls}}"
+        enable-play-gesture
+        data-index="{{index}}"
+        bindplay="onVideoPlay"
+        bindpause="onVideoPause"
+        bindended="onVideoEnded"
+        binderror="onVideoError"
+      />
+      <!--
+        封面用 image 画，不用 video 的 poster：素材库里封面多是 .webp（从有赞抓的原图），
+        微信 video 的 poster 对 webp 支持不稳定（真机上就是一块黑），而 image 组件支持。
+        播起来之后封面撤掉，露出画面。
+      -->
+      <image
+        wx:if="{{block.poster && !block.played}}"
+        class="bv-poster"
+        src="{{block.poster}}"
+        mode="aspectFill"
+      />
+      <view wx:if="{{!block.controls}}" class="bv-tap" data-index="{{index}}" bindtap="onVideoTap">
+        <view wx:if="{{!block.playing}}" class="bv-play">
+          <view class="bv-tri"></view>
+        </view>
+      </view>
+    </view>
   </view>
 
   <!-- ============ 标题文本 ============ -->

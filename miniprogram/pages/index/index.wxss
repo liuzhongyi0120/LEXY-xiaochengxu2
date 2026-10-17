@@ -25,6 +25,52 @@
   width: 100%;
   display: block;
 }
+/*
+ * 视频外框与自定义播放按钮（2026-10-17）：控件关掉（controls=false）时微信不提供任何
+ * 可点区域，用户点了没反应 = 「播放不了」。这层负责接管点击：未播时给一个播放三角，
+ * 播放中整层透明、点任意处暂停。
+ */
+.bv-box {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+}
+/* 封面层：播起来之前盖住 video（webp 封面比 video 的 poster 稳） */
+.bv-poster {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.bv-tap {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-play {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.bv-tri {
+  width: 0;
+  height: 0;
+  margin-left: 8rpx;
+  border-left: 30rpx solid #fff;
+  border-top: 18rpx solid transparent;
+  border-bottom: 18rpx solid transparent;
+}
 .round {
   border-radius: 16rpx;
   overflow: hidden;

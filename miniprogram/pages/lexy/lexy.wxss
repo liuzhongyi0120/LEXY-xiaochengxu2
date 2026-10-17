@@ -1,7 +1,13 @@
 .page {
   background: var(--color-bg-card);
   min-height: 100vh;
-  padding-bottom: 32rpx;
+  /*
+   * 底部必须给自定义 tabBar 让位（2026-10-17 真机反馈：莱克页内容显示不完全）。
+   * tabBar 高 50px = 100rpx，再加底部安全区（iPhone 全面屏还有 34px 左右）；
+   * 原来只留 32rpx，最后一组系列卡片被导航盖住一截。
+   * 口径与 custom-tab-bar/index.wxss 的 .tb、custom/index.wxss 的 .tabbar-hold 保持一致。
+   */
+  padding-bottom: calc(120rpx + env(safe-area-inset-bottom));
 }
 
 /* ---------- 系列头图 ---------- */
@@ -52,8 +58,13 @@
   text-shadow: 0 2rpx 10rpx rgba(0, 0, 0, 0.25);
 }
 
+/*
+ * 系列名靠右：原来写死 margin-left: 284rpx —— 那个数是按 375 屏宽拍的，
+ * 屏宽一变（大屏 / 平板）就会跟着漂，窄屏上还会顶出边界。改成靠右对齐自适应。
+ */
 .hero-tag {
-  margin-left: 284rpx;
+  align-self: flex-end;
+  margin-right: 24rpx;
   margin-top: 18rpx;
   font-size: 28rpx;
   color: var(--color-text-inverse);

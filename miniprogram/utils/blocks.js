@@ -402,6 +402,10 @@ function normalizeBlock(b, index) {
     o.hRpx = heightRpx(o.height, 420);
     o.marginRpx = px2rpx(o.pageMargin);
     o.round = o.radius === 'round';
+    /* 播放中标记：控件关掉时由自定义播放按钮驱动（见 blocks.wxml 的 .bv-tap） */
+    o.playing = false;
+    /* 是否已播过一次：播过就不再显示封面层 */
+    o.played = false;
   } else if (kind === 'title') {
     o.marginRpx = px2rpx(o.pageMargin);
     o.padYRpx = px2rpx(o.paddingY);
