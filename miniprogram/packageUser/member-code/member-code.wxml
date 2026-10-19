@@ -19,7 +19,7 @@
   <block wx:else>
     <view class="card c-main">
       <view class="who">
-        <image wx:if="{{avatar}}" class="who-av" src="{{avatar}}" mode="aspectFill" />
+        <image webp="{{true}}" wx:if="{{avatar}}" class="who-av" src="{{avatar}}" mode="aspectFill" />
         <view wx:else class="who-av who-av-ph"><text class="who-av-t">我</text></view>
         <text class="who-name">{{nickname}}</text>
         <text wx:if="{{phoneMasked}}" class="who-phone">{{phoneMasked}}</text>

@@ -1,6 +1,6 @@
 <view class="goods-card" hover-class="card-hover" hover-stay-time="80" bindtap="onTap">
   <view class="cover">
-    <image
+    <image webp="{{true}}"
       wx:if="{{!imgError}}"
       class="cover-img"
       src="{{goods.cover}}"

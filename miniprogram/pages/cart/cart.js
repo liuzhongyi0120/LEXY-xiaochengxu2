@@ -2,6 +2,7 @@ const app = getApp();
 const { fetchCart, updateCartItem, removeCartItems } = require('../../services/cart');
 const { splitPrice, money } = require('../../utils/format');
 const { ROUTES } = require('../../utils/constants');
+const { retryUrl } = require('../../utils/imgRetry');
 
 Page({
   data: {
@@ -143,9 +144,15 @@ Page({
     wx.navigateTo({ url: `${ROUTES.GOODS_DETAIL}?id=${id}` });
   },
 
-  /** 商品图加载失败，降级为色块 + 名称首字 */
+  /** 商品图加载失败，先换地址重试一次，仍失败才降级为色块 + 名称首字 */
   onImgError(e) {
     const { index } = e.currentTarget.dataset;
+    const it = (this.data.items || [])[index] || {};
+    const next = retryUrl(it.image);
+    if (next) {
+      this.setData({ ['items[' + index + '].image']: next });
+      return;
+    }
     this.setData({ ['items[' + index + '].imgError']: true });
   },
 

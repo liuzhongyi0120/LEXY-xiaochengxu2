@@ -8,7 +8,7 @@
         data-index="{{index}}"
         bindtap="onPreviewImage"
       >
-        <image class="gallery-img" src="{{item}}" mode="aspectFill" />
+        <image webp="{{true}}" class="gallery-img" src="{{item}}" mode="aspectFill" />
       </swiper-item>
     </swiper>
     <view class="gallery-counter">{{currentImage + 1}} / {{goods.images.length}}</view>
@@ -70,7 +70,7 @@
     <view class="detail-title">商品详情</view>
     <block wx:for="{{detailBlocks}}" wx:key="key">
       <text wx:if="{{item.type === 'text'}}" class="detail-text">{{item.content}}</text>
-      <image
+      <image webp="{{true}}"
         wx:elif="{{item.type === 'image'}}"
         class="detail-image"
         src="{{item.content}}"

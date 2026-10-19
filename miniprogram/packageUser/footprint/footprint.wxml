@@ -38,7 +38,7 @@
 
     <view class="body">
       <view class="item" wx:for="{{list}}" wx:for-index="i" wx:key="id" data-id="{{item.id}}" bindtap="onTapGoods" hover-class="hover-lite" hover-stay-time="80">
-        <image
+        <image webp="{{true}}"
           wx:if="{{!item.imgErr}}"
           class="g-img"
           src="{{item.cover}}"

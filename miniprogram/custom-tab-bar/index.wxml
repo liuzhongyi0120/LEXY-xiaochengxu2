@@ -31,7 +31,7 @@
         改了「导航图标色」才指向服务端染色图 /navicon/<名>@<色>.png。
         加载失败时 binderror 回落到包内原图（item.rawOff / rawOn）。
       -->
-      <image
+      <image webp="{{true}}"
         class="tb-icon"
         src="{{selected === index ? item.srcOn : item.srcOff}}"
         mode="aspectFit"

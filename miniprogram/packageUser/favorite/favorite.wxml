@@ -44,7 +44,7 @@
         hover-class="hover-lite"
         hover-stay-time="80"
       >
-        <image
+        <image webp="{{true}}"
           wx:if="{{!item.imgErr}}"
           class="g-img"
           src="{{item.cover}}"

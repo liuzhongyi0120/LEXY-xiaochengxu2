@@ -44,7 +44,7 @@
         data-lv="{{b.lv}}"
         bindtap="onTapBlock"
       >
-        <image class="pic" src="{{b.s}}" mode="widthFix" lazy-load />
+        <image webp="{{true}}" class="pic" src="{{b.s}}" mode="widthFix" lazy-load />
         <view class="cap-row" wx:if="{{b.cap || b.lk}}">
           <text class="cap">{{b.cap}}</text>
           <text class="lk" wx:if="{{b.lk === 'note'}}">笔记</text>
@@ -54,7 +54,7 @@
 
       <!-- 一组整宽图（纵向排列） -->
       <view wx:elif="{{b.t === 'imgs'}}" id="blk{{index}}" class="blk">
-        <image
+        <image webp="{{true}}"
           wx:for="{{b.a}}"
           wx:for-item="x"
           wx:key="index"
@@ -76,7 +76,7 @@
           class="cube-i"
           style="left: {{x.x * 100 / b.cols}}%; top: {{x.y * 100 / b.rows}}%; width: {{x.w * 100 / b.cols}}%; height: {{x.h * 100 / b.rows}}%"
         >
-          <image class="cube-pic" src="{{x.s}}" mode="aspectFill" lazy-load data-src="{{x.s}}" bindtap="onTapImage" />
+          <image webp="{{true}}" class="cube-pic" src="{{x.s}}" mode="aspectFill" lazy-load data-src="{{x.s}}" bindtap="onTapImage" />
         </view>
       </view>
 
@@ -95,7 +95,7 @@
           bindtap="onTapCard"
         >
           <view class="card-pic" style="padding-bottom: {{100 / b.ar}}%">
-            <image class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
+            <image webp="{{true}}" class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
             <text class="card-tag" wx:if="{{x.lk === 'note'}}">笔记</text>
           </view>
           <text class="card-t" wx:if="{{x.t}}">{{x.t}}</text>
@@ -116,7 +116,7 @@
           bindtap="onTapCard"
         >
           <view class="card-pic" style="padding-bottom: 75%">
-            <image class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
+            <image webp="{{true}}" class="card-img" src="{{x.s}}" mode="aspectFill" lazy-load />
             <text class="card-tag">笔记</text>
           </view>
           <text class="card-t" wx:if="{{x.t}}">{{x.t}}</text>

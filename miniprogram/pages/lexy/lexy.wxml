@@ -8,7 +8,7 @@
       hover-class="{{group.link ? 'hover-lite' : 'none'}}"
       hover-stay-time="80"
     >
-      <image
+      <image webp="{{true}}"
         wx:if="{{!group.heroFailed}}"
         class="hero-img"
         src="{{group.hero}}"
@@ -39,7 +39,7 @@
           bindtap="onTapProduct"
           hover-class="card-hover"
         >
-          <image
+          <image webp="{{true}}"
             wx:if="{{!prod.failed}}"
             class="card-img"
             src="{{prod.image}}"

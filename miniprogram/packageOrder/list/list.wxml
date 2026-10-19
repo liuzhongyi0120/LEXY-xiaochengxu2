@@ -73,7 +73,7 @@
       <!-- 商品行 -->
       <view class="od-body" data-id="{{od.orderId}}" bindtap="onTapDetail" hover-class="hover-lite" hover-stay-time="80">
         <view class="od-item" wx:for="{{od.items}}" wx:for-item="g" wx:for-index="gi" wx:key="goodsId">
-          <image
+          <image webp="{{true}}"
             wx:if="{{!g.imgErr}}"
             class="od-img"
             src="{{g.image}}"

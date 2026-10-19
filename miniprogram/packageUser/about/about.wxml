@@ -3,7 +3,7 @@
 
   <!-- 店铺信息（真源：装修台 replica.SHOP） -->
   <view class="brand">
-    <image wx:if="{{shop.avatar}}" class="brand-logo" src="{{shop.avatar}}" mode="aspectFit" />
+    <image webp="{{true}}" wx:if="{{shop.avatar}}" class="brand-logo" src="{{shop.avatar}}" mode="aspectFit" />
     <view wx:else class="brand-logo brand-logo-ph"><text class="brand-logo-t">LEXY</text></view>
     <text class="brand-name">{{shop.name}}</text>
     <text wx:if="{{shop.slogan}}" class="brand-slogan">{{shop.slogan}}</text>

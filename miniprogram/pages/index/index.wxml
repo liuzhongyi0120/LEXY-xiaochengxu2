@@ -20,7 +20,7 @@
 
   <!-- 店铺信息（页面级，非区块） -->
   <view class="shop">
-    <image class="shop-avatar" src="{{shop.avatar}}" mode="aspectFill" />
+    <image webp="{{true}}" class="shop-avatar" src="{{shop.avatar}}" mode="aspectFill" />
     <text class="shop-name">{{shop.name}}</text>
     <text class="shop-slogan">{{shop.slogan}}</text>
   </view>

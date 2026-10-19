@@ -27,7 +27,7 @@
     <!-- ==================== 1. 店长区 ==================== -->
     <view class="nt-head">
       <view class="nt-shoprow">
-        <image wx:if="{{note.shopAvatar}}" class="nt-avatar" src="{{note.shopAvatar}}" mode="aspectFill" />
+        <image webp="{{true}}" wx:if="{{note.shopAvatar}}" class="nt-avatar" src="{{note.shopAvatar}}" mode="aspectFill" />
         <view wx:else class="nt-avatar nt-avatar-ph"><text class="nt-avatar-t">店</text></view>
         <text class="nt-shopname">{{note.shopName}}</text>
         <view

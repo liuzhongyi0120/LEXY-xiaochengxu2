@@ -20,7 +20,7 @@
       hover-class="cell-hover"
     >
       <view class="cell-pic pic-big">
-        <image
+        <image webp="{{true}}"
           wx:if="{{!item.failed}}"
           class="cell-img"
           src="{{item.image}}"
@@ -50,7 +50,7 @@
       hover-class="cell-hover"
     >
       <view class="cell-pic pic-small">
-        <image
+        <image webp="{{true}}"
           wx:if="{{!item.failed}}"
           class="cell-img"
           src="{{item.image}}"

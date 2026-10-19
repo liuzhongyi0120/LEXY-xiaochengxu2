@@ -1,6 +1,7 @@
 const { syncTabBar } = require('../../utils/tabbar');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
+const { retryUrl } = require('../../utils/imgRetry');
 
 Page({
   /** 切页时同步底部导航高亮（自定义 tabBar 的实例每页一份，必须由页面主动通知） */
@@ -33,8 +34,16 @@ Page({
 
   onImgError(e) {
     const { group, index } = e.currentTarget.dataset;
-    const key = group === 'big' ? `news.big[${index}].failed` : `news.small[${index}].failed`;
-    this.setData({ [key]: true });
+    const list = (this.data.news && this.data.news[group]) || [];
+    const cur = (list[index] && list[index].image) || '';
+    /* 失败先换地址重试一次；仍失败才落空占位（微信会缓存坏图 URL，同地址不再请求） */
+    const next = retryUrl(cur);
+    const path = group === 'big' ? `news.big[${index}]` : `news.small[${index}]`;
+    if (next) {
+      this.setData({ [path + '.image']: next });
+      return;
+    }
+    this.setData({ [path + '.failed']: true });
   },
 
   onShareAppMessage() {

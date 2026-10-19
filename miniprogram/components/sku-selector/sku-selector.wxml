@@ -4,7 +4,7 @@
   <view class="sku-sheet" catchtouchmove="noop">
     <!-- ---------- 商品信息 ---------- -->
     <view class="sku-head">
-      <image class="sku-thumb" src="{{goods.cover}}" mode="aspectFill" />
+      <image webp="{{true}}" class="sku-thumb" src="{{goods.cover}}" mode="aspectFill" />
 
       <view class="sku-head-info">
         <view class="sku-price">

@@ -12,6 +12,7 @@
  */
 
 const { openLink } = require('./link');
+const { retryUrl } = require('./imgRetry');
 const { loadGoodsData, TOOL_META, statDef } = require('./blocks');
 const { ROUTES } = require('./constants');
 const { login, logout } = require('./auth');
@@ -112,6 +113,14 @@ const blockPageBehavior = {
   onImgError(e) {
     const { index } = e.currentTarget.dataset;
     if (index === undefined) return;
+    /* 先换地址重试一次（微信会把失败的 URL 缓存成坏图，同地址不再重试），
+       仍是失败才落占位 —— 真机上弱网/多图并发导致的偶发空白因此能自愈。 */
+    const b = (this.data.blocks || [])[index] || {};
+    const next = retryUrl(b.src);
+    if (next) {
+      this.setData({ ['blocks[' + index + '].src']: next });
+      return;
+    }
     this.setData({ ['blocks[' + index + '].failed']: true });
   },
 

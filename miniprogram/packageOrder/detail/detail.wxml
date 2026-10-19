@@ -43,7 +43,7 @@
         <text class="sec-x">共 {{order.totalQty}} 件</text>
       </view>
       <view class="item" wx:for="{{order.items}}" wx:for-item="g" wx:for-index="gi" wx:key="goodsId">
-        <image
+        <image webp="{{true}}"
           wx:if="{{!g.imgErr}}"
           class="item-img"
           src="{{g.image}}"

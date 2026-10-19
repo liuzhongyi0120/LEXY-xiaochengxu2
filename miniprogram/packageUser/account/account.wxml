@@ -29,7 +29,7 @@
       <view class="row-between">
         <text class="k">头像</text>
         <view class="av-wrap">
-          <image wx:if="{{avatar}}" class="av" src="{{avatar}}" mode="aspectFill" />
+          <image webp="{{true}}" wx:if="{{avatar}}" class="av" src="{{avatar}}" mode="aspectFill" />
           <view wx:else class="av av-ph"><text class="av-t">我</text></view>
         </view>
       </view>

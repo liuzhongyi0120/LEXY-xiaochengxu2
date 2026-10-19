@@ -25,7 +25,7 @@
         ></view>
 
         <!-- 商品图（加载失败降级为色块 + 名称首字，避免破图） -->
-        <image
+        <image webp="{{true}}"
           wx:if="{{!item.imgError}}"
           class="item-img"
           src="{{item.image}}"

@@ -1,6 +1,7 @@
 const { syncTabBar } = require('../../utils/tabbar');
 const replica = require('../../config/replica');
 const { resolveAssets } = require('../../utils/asset');
+const { retryUrl } = require('../../utils/imgRetry');
 const { openLink } = require('../../utils/link');
 
 Page({
@@ -35,11 +36,25 @@ Page({
 
   onHeroError(e) {
     const { sindex } = e.currentTarget.dataset;
+    const g = (this.data.series || [])[sindex] || {};
+    /* 先换地址重试一次，仍失败才用底色占位（微信会缓存坏图 URL，同地址不会再请求） */
+    const next = retryUrl(g.hero);
+    if (next) {
+      this.setData({ [`series[${sindex}].hero`]: next });
+      return;
+    }
     this.setData({ [`series[${sindex}].heroFailed`]: true });
   },
 
   onProdError(e) {
     const { sindex, pindex } = e.currentTarget.dataset;
+    const g = (this.data.series || [])[sindex] || {};
+    const p = (g.products || [])[pindex] || {};
+    const next = retryUrl(p.image);
+    if (next) {
+      this.setData({ [`series[${sindex}].products[${pindex}].image`]: next });
+      return;
+    }
     this.setData({ [`series[${sindex}].products[${pindex}].failed`]: true });
   },
 

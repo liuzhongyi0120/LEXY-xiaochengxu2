@@ -3,7 +3,7 @@
   <scroll-view class="side" scroll-y wx:if="{{!noBrands}}">
     <!-- 导航顶部固定 logo（源页面左栏顶部，669×414 横幅，按宽度自适应高度） -->
     <view class="side-top">
-      <image class="side-top-logo" src="{{navLogo}}" mode="widthFix" />
+      <image webp="{{true}}" class="side-top-logo" src="{{navLogo}}" mode="widthFix" />
     </view>
 
     <view
@@ -34,7 +34,7 @@
         hover-class="{{group.link ? 'hover-lite' : 'none'}}"
         hover-stay-time="80"
       >
-        <image
+        <image webp="{{true}}"
           class="group-head-img"
           src="{{group.header}}"
           mode="widthFix"
@@ -57,7 +57,7 @@
           hover-class="prod-hover"
         >
           <view class="prod-pic">
-            <image
+            <image webp="{{true}}"
               wx:if="{{!prod.failed}}"
               class="prod-img"
               src="{{prod.image}}"
