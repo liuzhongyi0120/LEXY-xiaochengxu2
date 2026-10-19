@@ -11,7 +11,7 @@
  *   历史坑：height 曾被当成 375 基准 px 再 ×2，导致首屏图被放大一倍后裁切。
  */
 
-const { resolveAssets, assetUrl } = require('./asset');
+const { resolveAssets, assetUrl, safeImgPath } = require('./asset');
 const { baseUrlNow } = require('./constants');
 const { px2rpx, heightRpx } = require('./units');
 const { strikePrice } = require('./format');
@@ -317,7 +317,7 @@ function resolveRichAssets(html) {
   return String(html || '')
     .replace(
       /(<img\b[^>]*?\ssrc\s*=\s*)(["']?)(\/uploads\/[^"'\s>]*)\2/gi,
-      function (whole, pre, q, path) { return pre + q + (base || '') + path + q; }
+      function (whole, pre, q, path) { return pre + q + (base || '') + safeImgPath(path) + q; }
     )
     .replace(/<img\b[^>]*>/gi, imgFit);
 }

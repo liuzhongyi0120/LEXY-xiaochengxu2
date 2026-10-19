@@ -1057,6 +1057,34 @@ function refs(name) {
  *   - force 也会把「受影响的版本与页面」原样返回，供前端二次确认时展示
  *   - 只允许删索引内的条目，拦住 '../../server/index.js' 这类路径穿越
  */
+/**
+ * iOS 兼容副本的对人身调用：一张图本体与它的另一格式版本必须同进退。
+ *
+ * background：webp 会被 server/tools/webp-to-jpg.py 转成同名 jpg，二者是同一张图的两个版本。
+ * 只删一个会留下孤儿 —— 它不在素材索引里，sweep 扫不到，也没人认领，只能靠人肉清理。
+ * 所以删除 / 恢复都以「本体 + 副本」为单位。
+ */
+function peerName(n) {
+  const ext = nodePath.extname(n).toLowerCase();
+  if (ext !== '.webp' && ext !== '.jpg' && ext !== '.jpeg') return '';
+  const stem = n.slice(0, n.length - ext.length);
+  return ext === '.webp' ? stem + '.jpg' : stem + '.webp';
+}
+
+function moveToTrash(rel) {
+  const abs = nodePath.join(ROOT, rel);
+  if (!fs.existsSync(abs)) return false;
+  const dst = nodePath.join(TRASH_DIR, trashRelOf(rel));
+  try {
+    ensureDir(nodePath.dirname(dst));
+    fs.copyFileSync(abs, dst);
+    atomic.unlinkSync(abs);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 function remove(name, force) {
   const n = String(name || '').replace(/^\/?uploads\//, '');
   if (!n || n.includes('..') || n.startsWith('/')) throw new BizError('素材名不合法', ERR.PARAM);
@@ -1093,6 +1121,7 @@ function remove(name, force) {
        最坏情况是「回收站里有、uploads 里也还在」，也不会出现两边都没有的真空 */
     fs.copyFileSync(abs, trashAbs);
     atomic.unlinkSync(abs);
+    moveToTrash(peerName(n));
   } catch (e) {
     throw new BizError('移入回收站失败（' + (e.code || e.message) + '）：' + n +
       '，文件可能正被占用，请稍后重试（原件未改动）', ERR.BIZ);
@@ -1184,6 +1213,16 @@ function restore(name) {
     throw new BizError('恢复失败（' + (e.code || e.message) + '）：' + n, ERR.BIZ);
   }
   atomic.unlinkSync(from);
+
+  const peer = peerName(n);
+  const peerFrom = peer ? nodePath.join(TRASH_DIR, trashRelOf(peer)) : '';
+  if (peer && fs.existsSync(peerFrom)) {
+    try {
+      ensureDir(nodePath.dirname(nodePath.join(ROOT, peer)));
+      fs.copyFileSync(peerFrom, nodePath.join(ROOT, peer));
+      atomic.unlinkSync(peerFrom);
+    } catch (e) { /* 副本恢复失败不影响本体 */ }
+  }
 
   idx.items.unshift({
     name: n, url: t.url, orig: t.orig, folder: t.folder, kind: t.kind,

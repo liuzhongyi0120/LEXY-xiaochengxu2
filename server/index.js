@@ -364,7 +364,7 @@ function tryUploads(path, req, res) {
 
     // 304 只对完整请求有意义：带 Range 的响应必须真的把那段字节发出去
     if (!partial && req.headers['if-none-match'] === etag) {
-      res.writeHead(304, { ETag: etag, 'Cache-Control': 'public, max-age=604800' });
+      res.writeHead(304, { ETag: etag, 'Cache-Control': 'public, max-age=3600' });
       return res.end();
     }
     if (partial) {
@@ -374,7 +374,7 @@ function tryUploads(path, req, res) {
         'Content-Length': end - start + 1,
         'Accept-Ranges': 'bytes',
         ETag: etag,
-        'Cache-Control': 'public, max-age=604800'
+        'Cache-Control': 'public, max-age=3600'
       });
       fs.createReadStream(file, { start: start, end: end }).pipe(res);
       return;
@@ -384,7 +384,7 @@ function tryUploads(path, req, res) {
       'Content-Length': total,
       'Accept-Ranges': 'bytes',
       ETag: etag,
-      'Cache-Control': 'public, max-age=604800'
+      'Cache-Control': 'public, max-age=3600'
     });
     fs.createReadStream(file).pipe(res);
   });

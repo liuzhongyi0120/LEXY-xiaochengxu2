@@ -136,6 +136,28 @@ node server/index.js
 
 ---
 
+## 素材兼容：为什么真机上一律用 jpg 而不是 webp
+
+装修上传与抓站下来的素材大量是 `.webp`（本项目 530 张 / 20.7 MB），而**小程序端统一改指同名 jpg**：
+
+| 现象 | 证据 |
+|---|---|
+| iPhone 上大片图片是占位色块 | 服务端日志显示图片**下载完整**（状态码 200、发送字节 = 磁盘字节），却走 `binderror` ⇒ 文件拿到了、解不开 |
+| 改完代码重新编译，手机上**还是白的** | 素材响应头原本是 `Cache-Control: max-age=604800`（7 天），坏结果被 iOS 缓存住，7 天内根本不再向服务器请求 —— 新代码压根没机会跑到 |
+
+两层分别对付掉了：
+
+1. **不让 iOS 碰 webp**：`python server/tools/webp-to-jpg.py` 给每个 `.webp` 生成一份同名 `.jpg`
+   （幂等，已存在则跳过；依赖 `pip install pillow`）。`miniprogram/utils/asset.js` 的
+   `safeImgPath()` 统一把 `/uploads/….webp` 改指到 `.jpg` —— 外链与站内路径不受影响。
+   附带收益：扩展名变了 ⇒ URL 变了 ⇒ 那 7 天的坏缓存自然失效。实际增量 45 MB（530 张）。
+2. **缓存期从 7 天降到 1 小时**（`server/index.js` 的静态素材响应头），以后再调图不会被长期粘住。
+
+> ⚠️ 新上传的 webp 要再跑一次脚本才会有 jpg 版本，建议以后直接传 jpg / png。
+> 删除素材时 `media.js` 会把 webp 与它的 jpg 副本一并移进回收站（恢复同理），不会留孤儿。
+
+---
+
 ## 备份与恢复演练
 
 要备份的只有 `server/data/` 一个目录（外加 `miniprogram/config/replica.js`，它由装修台生成）：
