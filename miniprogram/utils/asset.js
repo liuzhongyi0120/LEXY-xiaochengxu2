@@ -46,6 +46,32 @@ function safeImgPath(p) {
 }
 
 /**
+ * 把素材路径按段做 URL 编码，只动**含非 ASCII 字符**的路径。
+ *
+ * 起因：历史上有一批素材落在 `/uploads/首页/` 这个**中文目录**下（4 张，首页最后两个区块用）。
+ * 直接把中文拼进 URL 发出去，服务端收到的是乱码路径 ⇒ **HTTP 400** ⇒ 图出不来，
+ * 而且 imgRetry 给地址加 `_r=1` 重试也还是 400，等于永久空白。
+ * 实测：766 条真机请求地址里，其余 762 条全是 200，异常的就这 4 条。
+ *
+ * 服务端 `tryUploads()` 取路径时本来就有 `decodeURIComponent()`，编码后能原样还原
+ * 为其它的中文目录名，两边是配套的，不用改服务端。
+ *
+ * ⚠️ 纯 ASCII 路径原样返回：不带参数（`?v=xx`）的直 Mode 编码 才能出 Комментарии إلى / 之类的转义，反而更稳。
+ */
+function encodeUploadPath(p) {
+  if (!p || typeof p !== 'string' || p.indexOf('/uploads/') !== 0) return p;
+  const q = p.indexOf('?');
+  const head = q === -1 ? p : p.slice(0, q);
+  const tail = q === -1 ? '' : p.slice(q);
+  /* 只含文件名安全字符 → 完全不用动（绝大多数素材走这条路） */
+  if (/^[A-Za-z0-9_\-./]+$/.test(head)) return p;
+  /* 已经是 %xx 形式且每个 % 后面都跟两位十六进制 → 别二次编码（%E9 → %25E9 会彻底错） */
+  if (/^[A-Za-z0-9_\-./%]+$/.test(head) && !/%(?![0-9A-Fa-f]{2})/.test(head)) return p;
+  /* 其余（中文目录、空格、+、&、# …）按段编码 */
+  return head.replace(/[^/]+/g, (seg) => encodeURIComponent(seg)) + tail;
+}
+
+/**
  * 单个地址归一
  *   http(s)://… 或 //…  → 原样（外链）
  *   /uploads/…           → 拼接后端域名（本地上传的素材）
@@ -58,7 +84,7 @@ function safeImgPath(p) {
 function assetUrl(p) {
   if (!p || typeof p !== 'string') return p || '';
   if (/^(https?:)?\/\//.test(p)) return p;
-  if (p.indexOf('/uploads/') === 0) return baseUrlNow() + safeImgPath(p);
+  if (p.indexOf('/uploads/') === 0) return baseUrlNow() + encodeUploadPath(safeImgPath(p));
   return p;
 }
 
@@ -73,4 +99,4 @@ function resolveAssets(v) {
   return typeof v === 'string' ? assetUrl(v) : v;
 }
 
-module.exports = { assetUrl, resolveAssets, safeImgPath };
+module.exports = { assetUrl, resolveAssets, safeImgPath, encodeUploadPath };

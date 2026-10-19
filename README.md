@@ -156,6 +156,21 @@ node server/index.js
 > ⚠️ 新上传的 webp 要再跑一次脚本才会有 jpg 版本，建议以后直接传 jpg / png。
 > 删除素材时 `media.js` 会把 webp 与它的 jpg 副本一并移进回收站（恢复同理），不会留孤儿。
 
+### 素材路径不要带中文
+
+历史上有一批素材落在 `/uploads/首页/` 这个**中文目录**里。这条在开发者工具里看不出来 ——
+WebView 会自动规范化 URL 里的非 ASCII 字符，真机的原生 image 组件不会，原样发出去就是 **HTTP 400**，
+表现是「编辑器里正常、手机预览才白，而且重试也没用」（重试仍打同一个非法路径）。
+
+前端 `encodeUploadPath()` 已做兜底（按段 `encodeURIComponent`；服务端 `tryUploads()`
+本来就有 `decodeURIComponent`，两边配套），但**更干净的做法是把这些图重新上传到 ASCII 目录**。
+
+> 排查同类问题时注意别搞错口径：**不能用素材索引里的名字去验证可用性**。
+> 前端会把 `.webp` 换指 `.jpg`、给路径做编码，两者不是同一组 URL。
+> 另外本机 → `mall.lexy.cn` 的 TLS 会被公司出口按 SNI 拦掉（ECONNRESET），
+> 要验证得**在服务器本机**发起（`ssh … 'curl -H "Host: mall.lexy.cn" https://127.0.0.1/mall-api…'`），
+> 否则满屏红都是假象。
+
 ---
 
 ## 备份与恢复演练
